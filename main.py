@@ -18,6 +18,11 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from dotenv import load_dotenv
+
+# Load env variables from .env
+load_dotenv()
+
 
 # ==========================================================================
 # 1. CONFIGURATION & ENVIRONMENT VARIABLES
