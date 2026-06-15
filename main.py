@@ -201,7 +201,6 @@ async def init_db():
                 print("[Database] MySQL Tables check/creation complete.")
     except Exception as e:
         print(f"[Database] Error initializing database: {e}")
-        raise e
 
 # Database operations
 async def db_save_banner(b: dict):
