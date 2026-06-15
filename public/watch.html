@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watch Online - MovieBox</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Plyr CSS for premium video player -->
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+    
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand" onclick="window.location.href='/'" style="cursor: pointer;">
+                <i class="fa-solid fa-play play-logo"></i>
+                <span class="logo-text">Movie<span>Box</span></span>
+            </div>
+            
+            <nav class="nav-menu">
+                <div class="menu-label">Navigation</div>
+                <ul>
+                    <li><a href="/"><i class="fa-solid fa-house"></i> Home</a></li>
+                    <li><a href="/movies"><i class="fa-solid fa-film"></i> Movies</a></li>
+                    <li><a href="/tv"><i class="fa-solid fa-tv"></i> TV Series</a></li>
+                </ul>
+
+                <div class="menu-label">Categories</div>
+                <ul>
+                    <li><a href="/movies?genre=Action"><i class="fa-solid fa-gun"></i> Action</a></li>
+                    <li><a href="/movies?genre=Comedy"><i class="fa-solid fa-face-laugh-beam"></i> Comedy</a></li>
+                    <li><a href="/tv?genre=Animation"><i class="fa-solid fa-face-smile"></i> Animation</a></li>
+                </ul>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <span class="dot"></span>
+                    <span class="status-txt">Scraper Active</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Panel -->
+        <main class="main-content">
+            <!-- Header section -->
+            <header class="header">
+                <!-- Search bar -->
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" id="searchInput" placeholder="Search movies/shows...">
+                    <button id="searchBtn">Search</button>
+                </div>
+                
+                <!-- Right Controls -->
+                <div class="header-controls">
+                    <div class="language-selector" onclick="window.location.href='/'">
+                        <i class="fa-solid fa-arrow-left"></i>
+                        <span>Back Home</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Loading Shimmer / Spinner -->
+            <div id="watchPageLoading" class="watch-loading-container">
+                <div class="loading-spinner"></div>
+                <p>Loading media resources, please wait...</p>
+            </div>
+
+            <!-- Main Watch Content Wrapper (Hidden until loaded) -->
+            <div class="watch-wrapper" id="watchWrapper" style="display: none;">
+                
+                <!-- Background blur element (optional backdrop background) -->
+                <div class="watch-blur-backdrop" id="watchBackdrop" style="display:none;"></div>
+                
+                <div class="watch-cinema-grid">
+                    
+                    <!-- Left column: Video player and details -->
+                    <div class="cinema-player-column">
+                        <div class="player-wrapper">
+                            <!-- Player Loading Overlay -->
+                            <div class="player-loader-overlay" id="playerLoaderOverlay">
+                                <div class="player-spinner"></div>
+                                <span>Loading stream...</span>
+                            </div>
+                            <!-- Netflix-style top control bar overlay -->
+                            <div class="player-header-overlay" id="playerHeaderOverlay">
+                                <button class="player-back-btn" onclick="window.history.back()"><i class="fa-solid fa-arrow-left"></i></button>
+                                <div class="player-title-info">
+                                    <span id="playerMediaCategory">Streaming</span>
+                                    <h2 id="playerMediaTitle">Title</h2>
+                                </div>
+                                <div class="player-status-badge">
+                                    <span class="status-dot"></span>
+                                    <span id="playerStatusText">1080P Stable</span>
+                                </div>
+                            </div>
+                            <!-- Premium Video Player -->
+                            <video id="player" playsinline controls autoplay></video>
+                        </div>
+                        
+                        <!-- Metadata details sit below player -->
+                        <div class="cinema-meta-section">
+                            <h1 id="watchTitle">Title</h1>
+                            
+                            <div class="meta-row">
+                                <span class="rating" id="watchRating"><i class="fa-solid fa-star"></i> --</span>
+                                <span class="year" id="watchYear">----</span>
+                                <span class="country" id="watchCountry">Country</span>
+                                <span class="duration" id="watchDuration">-- min</span>
+                            </div>
+                            
+                            <div class="tag-container" id="watchGenres">
+                                <!-- Tags loaded dynamically -->
+                            </div>
+                            
+                            <div class="description-box">
+                                <h3>Description</h3>
+                                <p id="watchDescription">Description loading...</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Right column: Sidebar panel for playlists/qualities -->
+                    <div class="cinema-sidebar-column">
+                        <div class="sidebar-widget">
+                            <h2 class="widget-title"><i class="fa-solid fa-server"></i> Resources</h2>
+                            
+                            <!-- Dub / Language selector (visible when multiple dubs exist) -->
+                            <div class="widget-group" id="watchDubSelectorGroup" style="display: none; margin-bottom: 20px;">
+                                <label for="dubLanguageSelect" class="field-label"><i class="fa-solid fa-language"></i> Select Dub / Audio</label>
+                                <select id="dubLanguageSelect" class="custom-select">
+                                    <!-- Options loaded dynamically -->
+                                </select>
+                            </div>
+                            
+                            <!-- TV Show Season & Episode grid (hidden for movies) -->
+                            <div class="widget-group tv-episode-selector" id="watchTvSelector" style="display: none;">
+                                <label class="field-label">Select Season</label>
+                                <div class="season-tabs" id="watchSeasonTabs">
+                                    <!-- Season buttons loaded dynamically -->
+                                </div>
+                                <label class="field-label" style="margin-top: 15px;">Episodes</label>
+                                <div class="episode-grid scroll-y" id="watchEpisodeGrid">
+                                    <!-- Episode buttons loaded dynamically -->
+                                </div>
+                            </div>
+                            
+
+                            
+
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Plyr Library JS -->
+    <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
+    <!-- HLS Library for HLS streaming support -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <!-- Application Script -->
+    <script src="app.js"></script>
+</body>
+</html>

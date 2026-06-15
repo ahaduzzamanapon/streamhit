@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MovieBox - Premium Movie & TV Series Streaming</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand" onclick="window.location.href='/'" style="cursor: pointer;">
+                <i class="fa-solid fa-play play-logo"></i>
+                <span class="logo-text">Movie<span>Box</span></span>
+            </div>
+            
+            <nav class="nav-menu">
+                <div class="menu-label">Navigation</div>
+                <ul>
+                    <li class="active"><a href="/"><i class="fa-solid fa-house"></i> Home</a></li>
+                    <li><a href="/movies"><i class="fa-solid fa-film"></i> Movies</a></li>
+                    <li><a href="/tv"><i class="fa-solid fa-tv"></i> TV Series</a></li>
+                </ul>
+
+                <div class="menu-label">Categories</div>
+                <ul>
+                    <li><a href="/movies?genre=Action"><i class="fa-solid fa-gun"></i> Action</a></li>
+                    <li><a href="/movies?genre=Comedy"><i class="fa-solid fa-face-laugh-beam"></i> Comedy</a></li>
+                    <li><a href="/tv?genre=Animation"><i class="fa-solid fa-face-smile"></i> Animation</a></li>
+                </ul>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <span class="dot"></span>
+                    <span class="status-txt">Scraper Active</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Panel -->
+        <main class="main-content">
+            <!-- Header section -->
+            <header class="header">
+                <!-- Search bar -->
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" id="searchInput" placeholder="Search movies, TV shows, and anime...">
+                    <button id="searchBtn">Search</button>
+                </div>
+                
+                <!-- Right Controls -->
+                <div class="header-controls">
+                    <div class="language-selector">
+                        <i class="fa-solid fa-globe"></i>
+                        <span>ENGLISH</span>
+                    </div>
+                    <button class="download-app-btn"><i class="fa-solid fa-arrow-down-to-bracket"></i> Download App</button>
+                </div>
+            </header>
+
+            <!-- Featured Banner Slider -->
+            <section class="hero-slider" id="heroSlider">
+                <div class="hero-slide-placeholder">
+                    <div class="shimmer-line title"></div>
+                    <div class="shimmer-line desc"></div>
+                </div>
+            </section>
+
+            <!-- Navigation Tabs & Category Filters -->
+            <section class="navigation-filters">
+                <div class="categories-tabs">
+                    <button class="cat-tab active" onclick="window.location.href='/'">All Releases</button>
+                    <button class="cat-tab" onclick="window.location.href='/movies'">Movies</button>
+                    <button class="cat-tab" onclick="window.location.href='/tv'">TV Shows</button>
+                </div>
+            </section>
+
+            <!-- Trending Now Grid -->
+            <section class="content-section" id="trendingSection">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-bolt icon-trending"></i> Trending Now</h2>
+                </div>
+                
+                <div class="content-slider scroll-x" id="trendingGrid">
+                    <!-- Shimmer Loaders -->
+                    <div class="card-shimmer"></div>
+                    <div class="card-shimmer"></div>
+                    <div class="card-shimmer"></div>
+                    <div class="card-shimmer"></div>
+                    <div class="card-shimmer"></div>
+                </div>
+            </section>
+
+            <!-- Main Dynamic Grid (Movies/Series) -->
+            <section class="content-section" id="dynamicSection">
+                <div class="section-header">
+                    <h2 id="dynamicTitle">Latest Releases</h2>
+                </div>
+                
+                <div class="content-grid" id="dynamicGrid">
+                    <!-- Loaded movies/TV shows -->
+                </div>
+
+                <div class="pagination-controls" id="paginationControls">
+                    <button class="page-btn prev" id="prevPageBtn" disabled><i class="fa-solid fa-arrow-left"></i> Previous</button>
+                    <span class="page-indicator" id="pageIndicator">Page 1</span>
+                    <button class="page-btn next" id="nextPageBtn">Next <i class="fa-solid fa-arrow-right"></i></button>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Application Script -->
+    <script src="app.js"></script>
+</body>
+</html>

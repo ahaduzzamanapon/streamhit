@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movies - MovieBox</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand" onclick="window.location.href='/'" style="cursor: pointer;">
+                <i class="fa-solid fa-play play-logo"></i>
+                <span class="logo-text">Movie<span>Box</span></span>
+            </div>
+            
+            <nav class="nav-menu">
+                <div class="menu-label">Navigation</div>
+                <ul>
+                    <li><a href="/"><i class="fa-solid fa-house"></i> Home</a></li>
+                    <li class="active"><a href="/movies"><i class="fa-solid fa-film"></i> Movies</a></li>
+                    <li><a href="/tv"><i class="fa-solid fa-tv"></i> TV Series</a></li>
+                </ul>
+
+                <div class="menu-label">Categories</div>
+                <ul>
+                    <li><a href="/movies?genre=Action"><i class="fa-solid fa-gun"></i> Action</a></li>
+                    <li><a href="/movies?genre=Comedy"><i class="fa-solid fa-face-laugh-beam"></i> Comedy</a></li>
+                    <li><a href="/tv?genre=Animation"><i class="fa-solid fa-face-smile"></i> Animation</a></li>
+                </ul>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <span class="dot"></span>
+                    <span class="status-txt">Scraper Active</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Panel -->
+        <main class="main-content">
+            <!-- Header section -->
+            <header class="header">
+                <!-- Search bar -->
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" id="searchInput" placeholder="Search movies...">
+                    <button id="searchBtn">Search</button>
+                </div>
+                
+                <!-- Right Controls -->
+                <div class="header-controls">
+                    <div class="language-selector">
+                        <i class="fa-solid fa-globe"></i>
+                        <span>ENGLISH</span>
+                    </div>
+                    <button class="download-app-btn"><i class="fa-solid fa-arrow-down-to-bracket"></i> Download App</button>
+                </div>
+            </header>
+
+            <!-- Advanced Filter Panel (Always visible or toggled) -->
+            <section class="navigation-filters">
+                <div class="categories-tabs">
+                    <button class="cat-tab active">Explore Movies</button>
+                </div>
+                <button class="filter-toggle-btn active" id="filterToggleBtn">
+                    <i class="fa-solid fa-filter"></i> Filters
+                </button>
+            </section>
+
+            <!-- Filter Options Panel -->
+            <section class="filter-panel open" id="filterPanel">
+                <div class="filter-group">
+                    <label>Genre</label>
+                    <select id="filterGenre">
+                        <option value="*">All Genres</option>
+                        <option value="Action">Action</option>
+                        <option value="Adventure">Adventure</option>
+                        <option value="Animation">Animation</option>
+                        <option value="Comedy">Comedy</option>
+                        <option value="Crime">Crime</option>
+                        <option value="Documentary">Documentary</option>
+                        <option value="Drama">Drama</option>
+                        <option value="Family">Family</option>
+                        <option value="Fantasy">Fantasy</option>
+                        <option value="History">History</option>
+                        <option value="Horror">Horror</option>
+                        <option value="Mystery">Mystery</option>
+                        <option value="Romance">Romance</option>
+                        <option value="Sci-Fi">Sci-Fi</option>
+                        <option value="Thriller">Thriller</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>Country</label>
+                    <select id="filterCountry">
+                        <option value="*">All Countries</option>
+                        <option value="United States">United States</option>
+                        <option value="United Kingdom">United Kingdom</option>
+                        <option value="India">India</option>
+                        <option value="Bangladesh">Bangladesh</option>
+                        <option value="Japan">Japan</option>
+                        <option value="Korea">Korea</option>
+                        <option value="China">China</option>
+                        <option value="France">France</option>
+                        <option value="Germany">Germany</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>Year</label>
+                    <select id="filterYear">
+                        <option value="*">All Years</option>
+                        <option value="2026">2026</option>
+                        <option value="2025">2025</option>
+                        <option value="2024">2024</option>
+                        <option value="2023">2023</option>
+                        <option value="2022">2022</option>
+                        <option value="2021">2021</option>
+                        <option value="2020">2020</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>Sort By</label>
+                    <select id="filterSort">
+                        <option value="Latest">Latest Additions</option>
+                        <option value="Hottest">Highest Rated</option>
+                        <option value="ForYou">Recommended</option>
+                    </select>
+                </div>
+
+                <button class="apply-filters-btn" id="applyFiltersBtn">Apply Filters</button>
+            </section>
+
+            <!-- Movies Grid Section -->
+            <section class="content-section">
+                <div class="section-header">
+                    <h2 id="dynamicTitle">All Movies</h2>
+                </div>
+                
+                <div class="content-grid" id="dynamicGrid">
+                    <!-- Loaded movies -->
+                </div>
+
+                <div class="pagination-controls" id="paginationControls">
+                    <button class="page-btn prev" id="prevPageBtn" disabled><i class="fa-solid fa-arrow-left"></i> Previous</button>
+                    <span class="page-indicator" id="pageIndicator">Page 1</span>
+                    <button class="page-btn next" id="nextPageBtn">Next <i class="fa-solid fa-arrow-right"></i></button>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Application Script -->
+    <script src="app.js"></script>
+</body>
+</html>
