@@ -1,0 +1,22 @@
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local Environment
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Scratch and log files
+scratch_*.json
+.scraper_progress.json
+*.log
+
+# IDEs
+.vscode/
+.idea/
