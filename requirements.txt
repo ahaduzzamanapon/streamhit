@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+httpx
+aiomysql
+pymysql
+a2wsgi
+cryptography
+python-dotenv
