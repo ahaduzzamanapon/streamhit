@@ -81,6 +81,7 @@ CLIENT_INFO_STR = json.dumps(CLIENT_INFO, separators=(',', ':'))
 
 # Global state
 db_pool = None
+db_init_lock = None
 worker_index = 0
 active_api_base = "https://h5-api.aoneroom.com"
 
@@ -94,6 +95,16 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["Content-Length", "Content-Range"]
 )
+
+async def get_db_pool():
+    global db_pool, db_init_lock
+    if db_pool is None:
+        if db_init_lock is None:
+            db_init_lock = asyncio.Lock()
+        async with db_init_lock:
+            if db_pool is None:
+                await init_db()
+    return db_pool
 
 # ==========================================================================
 # 2. DATABASE HELPER
@@ -211,8 +222,9 @@ async def init_db():
 
 # Database operations
 async def db_save_banner(b: dict):
-    if not db_pool: return
-    async with db_pool.acquire() as conn:
+    pool = await get_db_pool()
+    if not pool: return
+    async with pool.acquire() as conn:
         async with conn.cursor() as cur:
             await cur.execute("""
                 INSERT INTO banners (subject_id, title, image_url, detail_path, subject_type)
@@ -225,16 +237,18 @@ async def db_save_banner(b: dict):
             """, (b["subject_id"], b["title"], b["image_url"], b["detail_path"], b["subject_type"]))
 
 async def db_get_banners():
-    if not db_pool: return []
-    async with db_pool.acquire() as conn:
+    pool = await get_db_pool()
+    if not pool: return []
+    async with pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cur:
             await cur.execute("SELECT * FROM banners ORDER BY created_at DESC LIMIT 20")
             return await cur.fetchall()
 
 async def db_save_subject(s: dict):
-    if not db_pool: return
+    pool = await get_db_pool()
+    if not pool: return
     dubs_json = json.dumps(s.get("dubs")) if s.get("dubs") is not None else None
-    async with db_pool.acquire() as conn:
+    async with pool.acquire() as conn:
         async with conn.cursor() as cur:
             await cur.execute("""
                 INSERT INTO subjects (subject_id, title, subject_type, cover, backdrop, rating, release_date, country, genre, description, is_cam, detail_path, tmdb_id, dubs)
@@ -259,8 +273,9 @@ async def db_save_subject(s: dict):
             ))
 
 async def db_save_season(subject_id: str, season_number: int, episode_count: int, episodes_list: str):
-    if not db_pool: return
-    async with db_pool.acquire() as conn:
+    pool = await get_db_pool()
+    if not pool: return
+    async with pool.acquire() as conn:
         async with conn.cursor() as cur:
             await cur.execute("""
                 INSERT INTO seasons (subject_id, season_number, episode_count, episodes_list)
@@ -271,8 +286,9 @@ async def db_save_season(subject_id: str, season_number: int, episode_count: int
             """, (str(subject_id), int(season_number), int(episode_count), episodes_list))
 
 async def db_save_resource(r: dict):
-    if not db_pool: return
-    async with db_pool.acquire() as conn:
+    pool = await get_db_pool()
+    if not pool: return
+    async with pool.acquire() as conn:
         async with conn.cursor() as cur:
             await cur.execute("""
                 INSERT INTO play_resources (resource_id, subject_id, season, episode, resolution, size, resource_link, expires_at)
@@ -288,8 +304,9 @@ async def db_save_resource(r: dict):
             ))
 
 async def db_save_caption(c: dict):
-    if not db_pool: return
-    async with db_pool.acquire() as conn:
+    pool = await get_db_pool()
+    if not pool: return
+    async with pool.acquire() as conn:
         async with conn.cursor() as cur:
             await cur.execute("""
                 INSERT INTO captions (caption_id, subject_id, resource_id, label, lang, url)
@@ -505,12 +522,14 @@ async def scrape_subject_details(subject_id: str) -> dict:
 async def scrape_episode_resources(subject_id: str, season: int, episode: int):
     try:
         detail_path = ""
-        async with db_pool.acquire() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute("SELECT detail_path FROM subjects WHERE subject_id = %s", (subject_id,))
-                row = await cur.fetchone()
-                if row:
-                    detail_path = row[0]
+        pool = await get_db_pool()
+        if pool:
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute("SELECT detail_path FROM subjects WHERE subject_id = %s", (subject_id,))
+                    row = await cur.fetchone()
+                    if row:
+                        detail_path = row[0]
                     
         if not detail_path:
             detail_path = "details"
@@ -590,10 +609,13 @@ async def run_incremental_scraper():
                 if not sub_id: continue
                 
                 # Check if already cached
-                async with db_pool.acquire() as conn:
-                    async with conn.cursor() as cur:
-                        await cur.execute("SELECT 1 FROM subjects WHERE subject_id = %s", (str(sub_id),))
-                        exists = await cur.fetchone()
+                pool = await get_db_pool()
+                exists = None
+                if pool:
+                    async with pool.acquire() as conn:
+                        async with conn.cursor() as cur:
+                            await cur.execute("SELECT 1 FROM subjects WHERE subject_id = %s", (str(sub_id),))
+                            exists = await cur.fetchone()
                         
                 if not exists:
                     safe_title = item.get('title', '').encode('ascii', 'replace').decode('ascii')
@@ -605,9 +627,7 @@ async def run_incremental_scraper():
 
 async def scraper_loop():
     # Wait for DB connection
-    while db_pool is None:
-        await asyncio.sleep(1)
-        
+    await get_db_pool()
     await run_config_sync()
     
     while True:
@@ -677,10 +697,13 @@ async def run_historical_scraper():
                     sub_id = item.get("subjectId")
                     if not sub_id: continue
                     
-                    async with db_pool.acquire() as conn:
-                        async with conn.cursor() as cur:
-                            await cur.execute("SELECT 1 FROM subjects WHERE subject_id = %s", (str(sub_id),))
-                            exists = await cur.fetchone()
+                    pool = await get_db_pool()
+                    exists = None
+                    if pool:
+                        async with pool.acquire() as conn:
+                            async with conn.cursor() as cur:
+                                await cur.execute("SELECT 1 FROM subjects WHERE subject_id = %s", (str(sub_id),))
+                                exists = await cur.fetchone()
                             
                     if not exists:
                         safe_title = item.get('title', '').encode('ascii', 'replace').decode('ascii')
@@ -701,8 +724,7 @@ async def run_historical_scraper():
                 await asyncio.sleep(15.0)
 
 async def historical_scraper_loop():
-    while db_pool is None:
-        await asyncio.sleep(1)
+    await get_db_pool()
         
     await asyncio.sleep(30)
     
@@ -918,9 +940,10 @@ async def resolve_tmdb_resource(tmdb_id: str, is_tv: bool, season: int, episode:
     now = datetime.now()
     
     # 1. Try local MySQL lookup first
-    if db_pool:
+    pool = await get_db_pool()
+    if pool:
         try:
-            async with db_pool.acquire() as conn:
+            async with pool.acquire() as conn:
                 async with conn.cursor(aiomysql.DictCursor) as cur:
                     await cur.execute("SELECT * FROM subjects WHERE tmdb_id = %s AND subject_type = %s", (tmdb_id, 2 if is_tv else 1))
                     subject = await cur.fetchone()
@@ -1274,9 +1297,10 @@ async def search_content(payload: dict):
     params.extend([per_page, offset])
 
     local_results = []
-    if db_pool:
+    pool = await get_db_pool()
+    if pool:
         try:
-            async with db_pool.acquire() as conn:
+            async with pool.acquire() as conn:
                 async with conn.cursor(aiomysql.DictCursor) as cur:
                     await cur.execute(query, tuple(params))
                     rows = await cur.fetchall()
@@ -1369,9 +1393,10 @@ async def filter_content(payload: dict):
     params.extend([per_page, offset])
 
     local_results = []
-    if db_pool:
+    pool = await get_db_pool()
+    if pool:
         try:
-            async with db_pool.acquire() as conn:
+            async with pool.acquire() as conn:
                 async with conn.cursor(aiomysql.DictCursor) as cur:
                     await cur.execute(query, tuple(params))
                     rows = await cur.fetchall()
@@ -1443,9 +1468,10 @@ async def get_detail(subjectId: str, detailPath: str = ""):
     db_detail_path = ""
     row = None
     # Try MySQL
-    if db_pool:
+    pool = await get_db_pool()
+    if pool:
         try:
-            async with db_pool.acquire() as conn:
+            async with pool.acquire() as conn:
                 async with conn.cursor(aiomysql.DictCursor) as cur:
                     await cur.execute("SELECT * FROM subjects WHERE subject_id = %s", (subjectId,))
                     row = await cur.fetchone()
@@ -1569,28 +1595,37 @@ async def get_detail(subjectId: str, detailPath: str = ""):
 async def get_season_info(subjectId: str, detailPath: str = ""):
     # Try MySQL
     seasons = []
-    async with db_pool.acquire() as conn:
-        async with conn.cursor(aiomysql.DictCursor) as cur:
-            await cur.execute("SELECT * FROM seasons WHERE subject_id = %s ORDER BY season_number", (subjectId,))
-            rows = await cur.fetchall()
-            for r in rows:
-                seasons.append({
-                    "se": r["season_number"],
-                    "episodeCount": r["episode_count"],
-                    "allEp": r["episodes_list"]
-                })
+    pool = await get_db_pool()
+    if pool:
+        try:
+            async with pool.acquire() as conn:
+                async with conn.cursor(aiomysql.DictCursor) as cur:
+                    await cur.execute("SELECT * FROM seasons WHERE subject_id = %s ORDER BY season_number", (subjectId,))
+                    rows = await cur.fetchall()
+                    for r in rows:
+                        seasons.append({
+                            "se": r["season_number"],
+                            "episodeCount": r["episode_count"],
+                            "allEp": r["episodes_list"]
+                        })
+        except Exception as db_err:
+            print(f"[DB Season Info Lookup Error] {db_err}")
                 
     if seasons:
         return {"code": 0, "data": {"seasons": seasons}}
 
     # Try to get detail path from db
     db_detail_path = ""
-    async with db_pool.acquire() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute("SELECT detail_path FROM subjects WHERE subject_id = %s", (subjectId,))
-            row = await cur.fetchone()
-            if row:
-                db_detail_path = row[0] or ""
+    if pool:
+        try:
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute("SELECT detail_path FROM subjects WHERE subject_id = %s", (subjectId,))
+                    row = await cur.fetchone()
+                    if row:
+                        db_detail_path = row[0] or ""
+        except Exception as db_err:
+            print(f"[DB detail_path Lookup Error] {db_err}")
 
     # Fallback to API
     path_to_use = detailPath or db_detail_path
@@ -1631,15 +1666,21 @@ async def get_season_info(subjectId: str, detailPath: str = ""):
 @app.get("/api/resource")
 async def get_resource(subjectId: str, se: int = 0, ep: int = 0):
     now = datetime.now()
+    pool = await get_db_pool()
 
     # Query MySQL for cached play resources
-    async with db_pool.acquire() as conn:
-        async with conn.cursor(aiomysql.DictCursor) as cur:
-            await cur.execute("""
-                SELECT * FROM play_resources 
-                WHERE subject_id = %s AND season = %s AND episode = %s
-            """, (subjectId, se, ep))
-            cached_rows = await cur.fetchall()
+    cached_rows = []
+    if pool:
+        try:
+            async with pool.acquire() as conn:
+                async with conn.cursor(aiomysql.DictCursor) as cur:
+                    await cur.execute("""
+                        SELECT * FROM play_resources 
+                        WHERE subject_id = %s AND season = %s AND episode = %s
+                    """, (subjectId, se, ep))
+                    cached_rows = await cur.fetchall()
+        except Exception as db_err:
+            print(f"[DB Resource Lookup Error] {db_err}")
 
     # Check if any cached resource is valid (expires at least 5 minutes in the future)
     valid_resources = []
@@ -1663,12 +1704,16 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0):
     # Missing or expired: fetch fresh links from OneRoom
     try:
         detail_path = ""
-        async with db_pool.acquire() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute("SELECT detail_path FROM subjects WHERE subject_id = %s", (subjectId,))
-                row = await cur.fetchone()
-                if row:
-                    detail_path = row[0]
+        if pool:
+            try:
+                async with pool.acquire() as conn:
+                    async with conn.cursor() as cur:
+                        await cur.execute("SELECT detail_path FROM subjects WHERE subject_id = %s", (subjectId,))
+                        row = await cur.fetchone()
+                        if row:
+                            detail_path = row[0]
+            except Exception as db_err:
+                print(f"[DB detail_path Lookup Error in get_resource] {db_err}")
                     
         if not detail_path:
             detail_path = "details"
@@ -1732,22 +1777,27 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0):
 # Captions (Subtitles)
 @app.get("/api/captions")
 async def get_captions(subjectId: str, resourceId: str):
+    pool = await get_db_pool()
     # Query MySQL
     captions = []
-    async with db_pool.acquire() as conn:
-        async with conn.cursor(aiomysql.DictCursor) as cur:
-            await cur.execute("""
-                SELECT * FROM captions 
-                WHERE subject_id = %s AND resource_id = %s
-            """, (subjectId, resourceId))
-            rows = await cur.fetchall()
-            for r in rows:
-                captions.append({
-                    "id": r["caption_id"],
-                    "lanName": r["label"],
-                    "lan": r["lang"],
-                    "url": r["url"]
-                })
+    if pool:
+        try:
+            async with pool.acquire() as conn:
+                async with conn.cursor(aiomysql.DictCursor) as cur:
+                    await cur.execute("""
+                        SELECT * FROM captions 
+                        WHERE subject_id = %s AND resource_id = %s
+                    """, (subjectId, resourceId))
+                    rows = await cur.fetchall()
+                    for r in rows:
+                        captions.append({
+                            "id": r["caption_id"],
+                            "lanName": r["label"],
+                            "lan": r["lang"],
+                            "url": r["url"]
+                        })
+        except Exception as db_err:
+            print(f"[DB Captions Lookup Error] {db_err}")
 
     if captions:
         return {"code": 0, "data": {"extCaptions": captions}}
@@ -1756,35 +1806,43 @@ async def get_captions(subjectId: str, resourceId: str):
     try:
         se = 0
         ep = 0
-        async with db_pool.acquire() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute("""
-                    SELECT season, episode FROM play_resources 
-                    WHERE subject_id = %s AND resource_id = %s
-                """, (subjectId, resourceId))
-                row = await cur.fetchone()
-                if row:
-                    se = row[0]
-                    ep = row[1]
+        if pool:
+            try:
+                async with pool.acquire() as conn:
+                    async with conn.cursor() as cur:
+                        await cur.execute("""
+                            SELECT season, episode FROM play_resources 
+                            WHERE subject_id = %s AND resource_id = %s
+                        """, (subjectId, resourceId))
+                        row = await cur.fetchone()
+                        if row:
+                            se = row[0]
+                            ep = row[1]
+            except Exception as db_err:
+                print(f"[DB play_resources Lookup Error in get_captions] {db_err}")
                     
         await get_resource(subjectId, se, ep)
         
         # Query MySQL again
         captions = []
-        async with db_pool.acquire() as conn:
-            async with conn.cursor(aiomysql.DictCursor) as cur:
-                await cur.execute("""
-                    SELECT * FROM captions 
-                    WHERE subject_id = %s AND resource_id = %s
-                """, (subjectId, resourceId))
-                rows = await cur.fetchall()
-                for r in rows:
-                    captions.append({
-                        "id": r["caption_id"],
-                        "lanName": r["label"],
-                        "lan": r["lang"],
-                        "url": r["url"]
-                    })
+        if pool:
+            try:
+                async with pool.acquire() as conn:
+                    async with conn.cursor(aiomysql.DictCursor) as cur:
+                        await cur.execute("""
+                            SELECT * FROM captions 
+                            WHERE subject_id = %s AND resource_id = %s
+                        """, (subjectId, resourceId))
+                        rows = await cur.fetchall()
+                        for r in rows:
+                            captions.append({
+                                "id": r["caption_id"],
+                                "lanName": r["label"],
+                                "lan": r["lang"],
+                                "url": r["url"]
+                            })
+            except Exception as db_err:
+                print(f"[DB Captions Re-lookup Error] {db_err}")
         return {"code": 0, "data": {"extCaptions": captions}}
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
