@@ -100,9 +100,10 @@ async def init_db():
             user=DB_USER,
             password=DB_PASSWORD,
             db=DB_NAME,
-            minsize=5,
-            maxsize=20,
-            autocommit=True
+            minsize=2,
+            maxsize=10,
+            autocommit=True,
+            connect_timeout=5
         )
         
         async with db_pool.acquire() as conn:
@@ -910,52 +911,56 @@ async def resolve_tmdb_resource(tmdb_id: str, is_tv: bool, season: int, episode:
     now = datetime.now()
     
     # 1. Try local MySQL lookup first
-    async with db_pool.acquire() as conn:
-        async with conn.cursor(aiomysql.DictCursor) as cur:
-            await cur.execute("SELECT * FROM subjects WHERE tmdb_id = %s AND subject_type = %s", (tmdb_id, 2 if is_tv else 1))
-            subject = await cur.fetchone()
-            if subject:
-                subject_id = subject["subject_id"]
-                await cur.execute("""
-                    SELECT * FROM play_resources 
-                    WHERE subject_id = %s AND season = %s AND episode = %s
-                """, (subject_id, season, episode))
-                resources = await cur.fetchall()
-                
-                valid_resources = [r for r in resources if r["expires_at"] and r["expires_at"] > now + timedelta(minutes=5)]
-                
-                if valid_resources:
-                    await cur.execute("""
-                        SELECT * FROM captions WHERE subject_id = %s AND resource_id = %s
-                    """, (subject_id, valid_resources[0]["resource_id"]))
-                    caps = await cur.fetchall()
-                    
-                    qualities = []
-                    for r in valid_resources:
-                        qualities.append({
-                            "resolution": r["resolution"],
-                            "size": r["size"],
-                            "url": f"{APP_URL}/fetch?source_url={urllib.parse.quote(r['resource_link'])}"
-                        })
-                    qualities.sort(key=lambda q: q["resolution"])
-                    
-                    captions = []
-                    for c in caps:
-                        captions.append({
-                            "language": c["lang"],
-                            "name": c["label"],
-                            "url": f"{APP_URL}/api/proxy-subtitle?url={urllib.parse.quote(c['url'])}"
-                        })
+    if db_pool:
+        try:
+            async with db_pool.acquire() as conn:
+                async with conn.cursor(aiomysql.DictCursor) as cur:
+                    await cur.execute("SELECT * FROM subjects WHERE tmdb_id = %s AND subject_type = %s", (tmdb_id, 2 if is_tv else 1))
+                    subject = await cur.fetchone()
+                    if subject:
+                        subject_id = subject["subject_id"]
+                        await cur.execute("""
+                            SELECT * FROM play_resources 
+                            WHERE subject_id = %s AND season = %s AND episode = %s
+                        """, (subject_id, season, episode))
+                        resources = await cur.fetchall()
                         
-                    highest = qualities[-1]["url"] if qualities else ""
-                    return {
-                        "subjectId": subject_id,
-                        "title": subject["title"],
-                        "url": highest,
-                        "highest": highest,
-                        "qualities": qualities,
-                        "captions": captions
-                    }
+                        valid_resources = [r for r in resources if r["expires_at"] and r["expires_at"] > now + timedelta(minutes=5)]
+                        
+                        if valid_resources:
+                            await cur.execute("""
+                                SELECT * FROM captions WHERE subject_id = %s AND resource_id = %s
+                            """, (subject_id, valid_resources[0]["resource_id"]))
+                            caps = await cur.fetchall()
+                            
+                            qualities = []
+                            for r in valid_resources:
+                                qualities.append({
+                                    "resolution": r["resolution"],
+                                    "size": r["size"],
+                                    "url": f"{APP_URL}/fetch?source_url={urllib.parse.quote(r['resource_link'])}"
+                                })
+                            qualities.sort(key=lambda q: q["resolution"])
+                            
+                            captions = []
+                            for c in caps:
+                                captions.append({
+                                    "language": c["lang"],
+                                    "name": c["label"],
+                                    "url": f"{APP_URL}/api/proxy-subtitle?url={urllib.parse.quote(c['url'])}"
+                                })
+                                
+                            highest = qualities[-1]["url"] if qualities else ""
+                            return {
+                                "subjectId": subject_id,
+                                "title": subject["title"],
+                                "url": highest,
+                                "highest": highest,
+                                "qualities": qualities,
+                                "captions": captions
+                            }
+        except Exception as db_err:
+            print(f"[DB Resolver Lookup Error] {db_err}")
                     
     # 2. Cache miss: Resolve using TMDB -> MovieBox API
     td = await fetch_tmdb_data(tmdb_id, is_tv)
@@ -1262,22 +1267,26 @@ async def search_content(payload: dict):
     params.extend([per_page, offset])
 
     local_results = []
-    async with db_pool.acquire() as conn:
-        async with conn.cursor(aiomysql.DictCursor) as cur:
-            await cur.execute(query, tuple(params))
-            rows = await cur.fetchall()
-            for row in rows:
-                local_results.append({
-                    "subjectId": row["subject_id"],
-                    "title": row["title"],
-                    "subjectType": row["subject_type"],
-                    "cover": {"url": row["cover"]},
-                    "imdbRatingValue": str(row["rating"]),
-                    "releaseDate": row["release_date"],
-                    "countryName": row["country"],
-                    "genre": row["genre"].split(",") if row["genre"] else [],
-                    "isCam": row["is_cam"]
-                })
+    if db_pool:
+        try:
+            async with db_pool.acquire() as conn:
+                async with conn.cursor(aiomysql.DictCursor) as cur:
+                    await cur.execute(query, tuple(params))
+                    rows = await cur.fetchall()
+                    for row in rows:
+                        local_results.append({
+                            "subjectId": row["subject_id"],
+                            "title": row["title"],
+                            "subjectType": row["subject_type"],
+                            "cover": {"url": row["cover"]},
+                            "imdbRatingValue": str(row["rating"]),
+                            "releaseDate": row["release_date"],
+                            "countryName": row["country"],
+                            "genre": row["genre"].split(",") if row["genre"] else [],
+                            "isCam": row["is_cam"]
+                        })
+        except Exception as db_err:
+            print(f"[DB Search Error] {db_err}")
 
     if len(local_results) >= 5:
         # Return local results
@@ -1353,22 +1362,26 @@ async def filter_content(payload: dict):
     params.extend([per_page, offset])
 
     local_results = []
-    async with db_pool.acquire() as conn:
-        async with conn.cursor(aiomysql.DictCursor) as cur:
-            await cur.execute(query, tuple(params))
-            rows = await cur.fetchall()
-            for row in rows:
-                local_results.append({
-                    "subjectId": row["subject_id"],
-                    "title": row["title"],
-                    "subjectType": row["subject_type"],
-                    "cover": {"url": row["cover"]},
-                    "imdbRatingValue": str(row["rating"]),
-                    "releaseDate": row["release_date"],
-                    "countryName": row["country"],
-                    "genre": row["genre"].split(",") if row["genre"] else [],
-                    "isCam": row["is_cam"]
-                })
+    if db_pool:
+        try:
+            async with db_pool.acquire() as conn:
+                async with conn.cursor(aiomysql.DictCursor) as cur:
+                    await cur.execute(query, tuple(params))
+                    rows = await cur.fetchall()
+                    for row in rows:
+                        local_results.append({
+                            "subjectId": row["subject_id"],
+                            "title": row["title"],
+                            "subjectType": row["subject_type"],
+                            "cover": {"url": row["cover"]},
+                            "imdbRatingValue": str(row["rating"]),
+                            "releaseDate": row["release_date"],
+                            "countryName": row["country"],
+                            "genre": row["genre"].split(",") if row["genre"] else [],
+                            "isCam": row["is_cam"]
+                        })
+        except Exception as db_err:
+            print(f"[DB Filter Error] {db_err}")
 
     if len(local_results) >= 5 or (page > 1 and len(local_results) > 0):
         return {
@@ -1423,35 +1436,43 @@ async def get_detail(subjectId: str, detailPath: str = ""):
     db_detail_path = ""
     row = None
     # Try MySQL
-    async with db_pool.acquire() as conn:
-        async with conn.cursor(aiomysql.DictCursor) as cur:
-            await cur.execute("SELECT * FROM subjects WHERE subject_id = %s", (subjectId,))
-            row = await cur.fetchone()
-            if row:
-                db_detail_path = row.get("detail_path") or ""
-                dubs_data = []
-                if row.get("dubs"):
-                    try:
-                        dubs_data = json.loads(row["dubs"])
-                    except Exception:
-                        pass
-                if row["description"]:
-                    return {
-                        "code": 0,
-                        "data": {
-                            "subjectId": row["subject_id"],
-                            "title": row["title"],
-                            "subjectType": row["subject_type"],
-                            "cover": {"url": row["cover"]},
-                            "imdbRatingValue": str(row["rating"]),
-                            "releaseDate": row["release_date"],
-                            "countryName": row["country"],
-                            "genre": row["genre"].split(",") if row["genre"] else [],
-                            "description": row["description"],
-                            "isCam": row["is_cam"],
-                            "dubs": dubs_data
-                        }
-                    }
+    if db_pool:
+        try:
+            async with db_pool.acquire() as conn:
+                async with conn.cursor(aiomysql.DictCursor) as cur:
+                    await cur.execute("SELECT * FROM subjects WHERE subject_id = %s", (subjectId,))
+                    row = await cur.fetchone()
+                    if row:
+                        db_detail_path = row.get("detail_path") or ""
+        except Exception as db_err:
+            print(f"[DB Details Lookup Error] {db_err}")
+            row = None
+            
+    if row:
+        db_detail_path = row.get("detail_path") or ""
+        dubs_data = []
+        if row.get("dubs"):
+            try:
+                dubs_data = json.loads(row["dubs"])
+            except Exception:
+                pass
+        if row["description"]:
+            return {
+                "code": 0,
+                "data": {
+                    "subjectId": row["subject_id"],
+                    "title": row["title"],
+                    "subjectType": row["subject_type"],
+                    "cover": {"url": row["cover"]},
+                    "imdbRatingValue": str(row["rating"]),
+                    "releaseDate": row["release_date"],
+                    "countryName": row["country"],
+                    "genre": row["genre"].split(",") if row["genre"] else [],
+                    "description": row["description"],
+                    "isCam": row["is_cam"],
+                    "dubs": dubs_data
+                }
+            }
 
     # API Fallback
     path_to_use = detailPath or db_detail_path
