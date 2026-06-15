@@ -1977,26 +1977,30 @@ def build_streaming_response(resp, range_header):
 # ==========================================================================
 @app.get("/", response_class=HTMLResponse)
 async def serve_home():
-    with open("public/index.html", "r", encoding="utf-8") as f:
+    path = os.path.join(base_dir, "public/index.html")
+    with open(path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
 @app.get("/movies", response_class=HTMLResponse)
 async def serve_movies():
-    with open("public/movies.html", "r", encoding="utf-8") as f:
+    path = os.path.join(base_dir, "public/movies.html")
+    with open(path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
 @app.get("/tv", response_class=HTMLResponse)
 async def serve_tv_shows():
-    with open("public/tv.html", "r", encoding="utf-8") as f:
+    path = os.path.join(base_dir, "public/tv.html")
+    with open(path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
 @app.get("/watch", response_class=HTMLResponse)
 async def serve_watch_page():
-    with open("public/watch.html", "r", encoding="utf-8") as f:
+    path = os.path.join(base_dir, "public/watch.html")
+    with open(path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
 # Mount general static assets
-app.mount("/", StaticFiles(directory="public"), name="public")
+app.mount("/", StaticFiles(directory=os.path.join(base_dir, "public")), name="public")
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=3005, reload=False)
