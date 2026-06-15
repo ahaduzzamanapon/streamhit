@@ -709,7 +709,7 @@ async def historical_scraper_loop():
 # Start scraper on application startup
 @app.on_event("startup")
 async def startup_event():
-    await init_db()
+    asyncio.create_task(init_db())
     asyncio.create_task(scraper_loop())
     asyncio.create_task(historical_scraper_loop())
 
