@@ -5,3 +5,4 @@ aiomysql
 pymysql
 a2wsgi
 python-dotenv
+asgiref
