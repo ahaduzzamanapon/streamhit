@@ -620,7 +620,7 @@ async def scraper_loop():
         # Run every 10 minutes
         await asyncio.sleep(600)
 
-PROGRESS_FILE = ".scraper_progress.json"
+PROGRESS_FILE = os.path.join(base_dir, ".scraper_progress.json")
 
 def read_scraper_progress() -> dict:
     if os.path.exists(PROGRESS_FILE):
