@@ -20,8 +20,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
-# Load env variables from .env
-load_dotenv()
+# Load env variables from .env using absolute path
+base_dir = os.path.dirname(os.path.abspath(__file__))
+env_path = os.path.join(base_dir, ".env")
+load_dotenv(env_path)
 
 
 # ==========================================================================
