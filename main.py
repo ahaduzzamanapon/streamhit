@@ -717,8 +717,8 @@ async def historical_scraper_loop():
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(init_db())
-    asyncio.create_task(scraper_loop())
-    asyncio.create_task(historical_scraper_loop())
+    # asyncio.create_task(scraper_loop())
+    # asyncio.create_task(historical_scraper_loop())
 
 @app.on_event("shutdown")
 async def shutdown_event():
