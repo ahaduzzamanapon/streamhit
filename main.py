@@ -248,6 +248,18 @@ async def init_db():
                         current_page INT NOT NULL
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
+
+                # One-time migration to clear play_resources timezone cache
+                migration_flag = os.path.join(base_dir, ".db_timezone_migration_done")
+                if not os.path.exists(migration_flag):
+                    try:
+                        await cur.execute("DELETE FROM play_resources")
+                        print("[Database] Successfully cleared play_resources table for timezone migration.")
+                        with open(migration_flag, "w") as f:
+                            f.write("done")
+                    except Exception as migration_err:
+                        print(f"[Database] Error during timezone migration: {migration_err}")
+
                 print("[Database] MySQL Tables check/creation complete.")
     except Exception as e:
         print(f"[Database] Error initializing database: {e}")
