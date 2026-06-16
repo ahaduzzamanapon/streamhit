@@ -12,6 +12,9 @@ import random
 from datetime import datetime, timedelta
 import httpx
 import pymysql
+import warnings
+warnings.filterwarnings("ignore", category=pymysql.Warning)
+warnings.filterwarnings("ignore", message=".*already exists.*")
 import aiomysql
 import uvicorn
 from fastapi import FastAPI, Request, HTTPException
@@ -217,6 +220,13 @@ async def init_db():
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
+                # 6. Scraper Progress table
+                await cur.execute("""
+                    CREATE TABLE IF NOT EXISTS scraper_progress (
+                        subject_type INT PRIMARY KEY,
+                        current_page INT NOT NULL
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
                 print("[Database] MySQL Tables check/creation complete.")
     except Exception as e:
         print(f"[Database] Error initializing database: {e}")
@@ -307,17 +317,50 @@ async def db_save_resource(r: dict):
 async def db_save_caption(c: dict):
     pool = await get_db_pool()
     if not pool: return
-    async with pool.acquire() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute("""
-                INSERT INTO captions (caption_id, subject_id, resource_id, label, lang, url)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE
-                    url=VALUES(url),
-                    label=VALUES(label)
-            """, (
-                str(c["caption_id"]), str(c["subject_id"]), str(c["resource_id"]), c.get("label"), c["lang"], c["url"]
-            ))
+    try:
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("""
+                    INSERT INTO captions (caption_id, subject_id, resource_id, label, lang, url)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON DUPLICATE KEY UPDATE
+                        caption_id = VALUES(caption_id),
+                        label = VALUES(label),
+                        url = VALUES(url)
+                """, (c["caption_id"], c["subject_id"], c["resource_id"], c["label"], c["lang"], c["url"]))
+    except Exception as e:
+        print(f"[Database] Error saving caption: {e}")
+
+async def db_read_scraper_progress() -> dict:
+    progress = {"1": 2, "2": 2, "7": 2}
+    pool = await get_db_pool()
+    if not pool:
+        return progress
+    try:
+        async with pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+                await cur.execute("SELECT * FROM scraper_progress")
+                rows = await cur.fetchall()
+                for r in rows:
+                    progress[str(r["subject_type"])] = r["current_page"]
+    except Exception as e:
+        print(f"[Database] Error reading scraper progress: {e}")
+    return progress
+
+async def db_save_scraper_progress(subject_type: int, current_page: int):
+    pool = await get_db_pool()
+    if not pool:
+        return
+    try:
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("""
+                    INSERT INTO scraper_progress (subject_type, current_page)
+                    VALUES (%s, %s)
+                    ON DUPLICATE KEY UPDATE current_page = VALUES(current_page)
+                """, (int(subject_type), int(current_page)))
+    except Exception as e:
+        print(f"[Database] Error saving scraper progress: {e}")
 
 # ==========================================================================
 # 3. ONEROOM COOKIE-BASED H5 API CLIENT (SIGNATURE-FREE)
@@ -683,26 +726,8 @@ async def scraper_loop():
         # Run every 10 minutes
         await asyncio.sleep(600)
 
-PROGRESS_FILE = os.path.join(base_dir, ".scraper_progress.json")
-
-def read_scraper_progress() -> dict:
-    if os.path.exists(PROGRESS_FILE):
-        try:
-            with open(PROGRESS_FILE, "r") as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {"1": 2, "2": 2, "7": 2}
-
-def save_scraper_progress(progress: dict):
-    try:
-        with open(PROGRESS_FILE, "w") as f:
-            json.dump(progress, f)
-    except Exception as e:
-        print(f"[Scraper] Failed to save progress: {e}")
-
 async def run_historical_scraper():
-    progress = read_scraper_progress()
+    progress = await db_read_scraper_progress()
     print(f"[Scraper] Starting historical scraping cycle. Current progress: {progress}")
     
     for sub_type_str in ["2", "1", "7"]:
@@ -735,7 +760,7 @@ async def run_historical_scraper():
                 if not items:
                     print(f"[Scraper] No more items found on page {current_page} for type {sub_type}. Stopping historical scraper for this type.")
                     progress[sub_type_str] = 999
-                    save_scraper_progress(progress)
+                    await db_save_scraper_progress(sub_type, 999)
                     break
                 
                 new_items_count = 0
@@ -762,7 +787,7 @@ async def run_historical_scraper():
                 retry_count = 0  # Reset retry count on successful crawl
                 current_page += 1
                 progress[sub_type_str] = current_page
-                save_scraper_progress(progress)
+                await db_save_scraper_progress(sub_type, current_page)
                 
                 await asyncio.sleep(5.0)
                 
@@ -771,7 +796,7 @@ async def run_historical_scraper():
                 if "HTTP status 400" in err_msg or "API error code 400" in err_msg:
                     print(f"[Scraper] Page {current_page} is out of bounds (Limit Exceeded). Marking type {sub_type} as completed.")
                     progress[sub_type_str] = 999
-                    save_scraper_progress(progress)
+                    await db_save_scraper_progress(sub_type, 999)
                     break
                 
                 retry_count += 1
@@ -780,7 +805,7 @@ async def run_historical_scraper():
                     retry_count = 0
                     current_page += 1
                     progress[sub_type_str] = current_page
-                    save_scraper_progress(progress)
+                    await db_save_scraper_progress(sub_type, current_page)
                 else:
                     print(f"[Scraper] Error on page {current_page} for type {sub_type}: {e}. Retrying ({retry_count}/3) in 15s...")
                     await asyncio.sleep(15.0)
