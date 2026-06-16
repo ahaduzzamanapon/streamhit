@@ -19,7 +19,7 @@
     <!-- Custom Style Sheet -->
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="watch-page-body">
 
     <div class="app-container">
         <!-- Sidebar Navigation -->
@@ -87,7 +87,7 @@
                 
                 <div class="watch-cinema-grid">
                     
-                    <!-- Left column: Video player and details -->
+                    <!-- Main column: Video player and details -->
                     <div class="cinema-player-column">
                         <div class="player-wrapper">
                             <!-- Player Loading Overlay -->
@@ -122,6 +122,78 @@
                                 <span class="duration" id="watchDuration">-- min</span>
                             </div>
                             
+                            <!-- Premium Actions Row -->
+                            <div class="watch-actions-row">
+                                <button class="action-btn" id="actionAddList"><i class="fa-solid fa-plus"></i> Add to list</button>
+                                <button class="action-btn" id="actionShare"><i class="fa-solid fa-share-nodes"></i> Share</button>
+                                <button class="action-btn" id="actionDownload"><i class="fa-solid fa-arrow-down-to-bracket"></i> Download</button>
+                                <button class="action-btn" id="actionViewDoc"><i class="fa-solid fa-circle-info"></i> Info</button>
+                            </div>
+
+                            <!-- Resources & Episodes Selector -->
+                            <div class="resources-container">
+                                <div class="resources-header">
+                                    <span>Resources <span class="upload-by">Uploaded by christodrd etc.</span></span>
+                                    <i class="fa-solid fa-circle-question info-icon"></i>
+                                </div>
+                                
+                                <!-- Dub / Language selector (visible when multiple dubs exist) -->
+                                <div class="dub-selector-wrapper" id="watchDubSelectorGroup" style="display: none;">
+                                    <select id="dubLanguageSelect" class="custom-select">
+                                        <!-- Options loaded dynamically -->
+                                    </select>
+                                </div>
+                                
+                                <!-- TV Show Season & Episode grid (hidden for movies) -->
+                                <div class="tv-episode-selector" id="watchTvSelector" style="display: none;">
+                                    <div class="season-tabs" id="watchSeasonTabs">
+                                        <!-- Season buttons loaded dynamically -->
+                                    </div>
+                                    <div class="episode-grid scroll-y" id="watchEpisodeGrid">
+                                        <!-- Episode buttons loaded dynamically -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tabs Section (For you & Comments) -->
+                            <div class="watch-tabs-section">
+                                <div class="watch-tabs-header">
+                                    <button class="tab-header-btn active" id="tabBtnForYou">For you</button>
+                                    <button class="tab-header-btn" id="tabBtnComments">Comments (99+)</button>
+                                </div>
+                                <div class="watch-tabs-content">
+                                    <div class="tab-pane active" id="tabPaneForYou">
+                                        <div class="content-grid" id="watchRecommendationsGrid">
+                                            <!-- Dynamically populated recommendations -->
+                                        </div>
+                                    </div>
+                                    <div class="tab-pane" id="tabPaneComments">
+                                        <div class="comments-list">
+                                            <div class="comment-item">
+                                                <div class="comment-avatar"><i class="fa-solid fa-user"></i></div>
+                                                <div class="comment-details">
+                                                    <div class="comment-meta">
+                                                        <span class="comment-author">apon_streamhit</span>
+                                                        <span class="comment-time">2 hours ago</span>
+                                                    </div>
+                                                    <p class="comment-text">Finally found a site that plays Hindi dub smooth and fast. Kudos!</p>
+                                                </div>
+                                            </div>
+                                            <div class="comment-item">
+                                                <div class="comment-avatar"><i class="fa-solid fa-user"></i></div>
+                                                <div class="comment-details">
+                                                    <div class="comment-meta">
+                                                        <span class="comment-author">john_doe</span>
+                                                        <span class="comment-time">1 day ago</span>
+                                                    </div>
+                                                    <p class="comment-text">Quality is 1080p stream as advertised. Thanks for the fix on TV episodes!</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <div class="tag-container" id="watchGenres">
                                 <!-- Tags loaded dynamically -->
                             </div>
@@ -133,41 +205,26 @@
                         </div>
                     </div>
                     
-                    <!-- Right column: Sidebar panel for playlists/qualities -->
-                    <div class="cinema-sidebar-column">
-                        <div class="sidebar-widget">
-                            <h2 class="widget-title"><i class="fa-solid fa-server"></i> Resources</h2>
-                            
-                            <!-- Dub / Language selector (visible when multiple dubs exist) -->
-                            <div class="widget-group" id="watchDubSelectorGroup" style="display: none; margin-bottom: 20px;">
-                                <label for="dubLanguageSelect" class="field-label"><i class="fa-solid fa-language"></i> Select Dub / Audio</label>
-                                <select id="dubLanguageSelect" class="custom-select">
-                                    <!-- Options loaded dynamically -->
-                                </select>
-                            </div>
-                            
-                            <!-- TV Show Season & Episode grid (hidden for movies) -->
-                            <div class="widget-group tv-episode-selector" id="watchTvSelector" style="display: none;">
-                                <label class="field-label">Select Season</label>
-                                <div class="season-tabs" id="watchSeasonTabs">
-                                    <!-- Season buttons loaded dynamically -->
-                                </div>
-                                <label class="field-label" style="margin-top: 15px;">Episodes</label>
-                                <div class="episode-grid scroll-y" id="watchEpisodeGrid">
-                                    <!-- Episode buttons loaded dynamically -->
-                                </div>
-                            </div>
-                            
-
-                            
-
-                        </div>
-                    </div>
-                    
                 </div>
             </div>
 
         </main>
+    </div>
+
+    <!-- Mobile Sticky Bottom Navigation Bar -->
+    <div class="mobile-navigation-bar">
+        <a href="/" class="nav-item" id="mobileNavHome">
+            <i class="fa-solid fa-house"></i>
+            <span>Home</span>
+        </a>
+        <a href="/movies" class="nav-item" id="mobileNavMovies">
+            <i class="fa-solid fa-film"></i>
+            <span>Movies</span>
+        </a>
+        <a href="/tv" class="nav-item" id="mobileNavTv">
+            <i class="fa-solid fa-tv"></i>
+            <span>TV Series</span>
+        </a>
     </div>
 
     <!-- Plyr Library JS -->

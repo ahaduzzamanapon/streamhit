@@ -43,6 +43,25 @@ function detectRoute() {
         routes.isHome = true;
         state.subjectType = 0;
     }
+    highlightActiveMobileNav();
+}
+
+function highlightActiveMobileNav() {
+    const homeNav = document.getElementById("mobileNavHome");
+    const moviesNav = document.getElementById("mobileNavMovies");
+    const tvNav = document.getElementById("mobileNavTv");
+
+    if (homeNav) homeNav.classList.remove("active");
+    if (moviesNav) moviesNav.classList.remove("active");
+    if (tvNav) tvNav.classList.remove("active");
+
+    if (routes.isMovies && moviesNav) {
+        moviesNav.classList.add("active");
+    } else if (routes.isTv && tvNav) {
+        tvNav.classList.add("active");
+    } else if (routes.isHome && homeNav) {
+        homeNav.classList.add("active");
+    }
 }
 
 // Initial Load
@@ -738,10 +757,119 @@ async function initWatchPage() {
             }
         }
 
+        // Setup Action Buttons
+        const actionAddList = document.getElementById("actionAddList");
+        if (actionAddList) {
+            actionAddList.onclick = () => {
+                alert("Added to list!");
+            };
+        }
+        const actionShare = document.getElementById("actionShare");
+        if (actionShare) {
+            actionShare.onclick = () => {
+                navigator.clipboard.writeText(window.location.href);
+                alert("Watch link copied to clipboard!");
+            };
+        }
+        const actionDownload = document.getElementById("actionDownload");
+        if (actionDownload) {
+            actionDownload.onclick = () => {
+                if (state.directMp4Url) {
+                    window.open(state.directMp4Url, "_blank");
+                } else {
+                    alert("Download link is not ready yet.");
+                }
+            };
+        }
+        const actionViewDoc = document.getElementById("actionViewDoc");
+        if (actionViewDoc) {
+            actionViewDoc.onclick = () => {
+                alert("Title: " + detail.title + "\nYear: " + (detail.releaseDate ? detail.releaseDate.split('-')[0] : '----') + "\nRating: " + (detail.imdbRatingValue || '--') + "\nCountry: " + (detail.countryName || 'USA') + "\nGenre: " + (detail.genre ? detail.genre.join(', ') : ''));
+            };
+        }
+
+        // Tabs Logic
+        const tabBtnForYou = document.getElementById("tabBtnForYou");
+        const tabBtnComments = document.getElementById("tabBtnComments");
+        const tabPaneForYou = document.getElementById("tabPaneForYou");
+        const tabPaneComments = document.getElementById("tabPaneComments");
+
+        if (tabBtnForYou && tabBtnComments && tabPaneForYou && tabPaneComments) {
+            tabBtnForYou.onclick = () => {
+                tabBtnForYou.classList.add("active");
+                tabBtnComments.classList.remove("active");
+                tabPaneForYou.classList.add("active");
+                tabPaneComments.classList.remove("active");
+            };
+            tabBtnComments.onclick = () => {
+                tabBtnComments.classList.add("active");
+                tabBtnForYou.classList.remove("active");
+                tabPaneComments.classList.add("active");
+                tabPaneForYou.classList.remove("active");
+            };
+        }
+
+        // Load recommendations
+        loadRecommendations(detail);
+
         loading.style.display = "none";
         content.style.display = "block";
     } else {
         loading.innerHTML = "<p><i class='fa-solid fa-triangle-exclamation'></i> Failed to load media details. Go back home.</p>";
+    }
+}
+
+async function loadRecommendations(detail) {
+    const grid = document.getElementById("watchRecommendationsGrid");
+    if (!grid) return;
+    grid.innerHTML = '<div class="card-shimmer"></div><div class="card-shimmer"></div><div class="card-shimmer"></div>';
+
+    // Query filter API with the same genre/subject type
+    const firstGenre = detail.genre && detail.genre.length > 0 ? detail.genre[0] : "*";
+    const payload = {
+        genre: firstGenre,
+        country: "*",
+        year: "*",
+        language: "*",
+        sort: "Hottest",
+        subjectType: detail.subjectType || 1,
+        page: 1,
+        perPage: 6
+    };
+
+    const result = await apiPost('/api/filter', payload);
+    grid.innerHTML = "";
+    if (result && result.data && result.data.items) {
+        const raw = result.data.items || [];
+        const subjects = (raw.length > 0 && raw[0].subjects !== undefined)
+            ? raw.flatMap(sec => sec.subjects || [])
+            : raw;
+        
+        // Filter out current subject
+        const filtered = subjects.filter(item => String(item.subjectId) !== String(detail.subjectId)).slice(0, 6);
+        if (filtered.length > 0) {
+            filtered.forEach(item => {
+                grid.appendChild(createContentCard(item));
+            });
+            return;
+        }
+    }
+    
+    // Fallback: load trending items
+    const homeResult = await apiGet("/api/home?page=1&tabId=0");
+    if (homeResult && homeResult.data && homeResult.data.items) {
+        let subjects = [];
+        homeResult.data.items.forEach(sec => {
+            if (sec.subjects) subjects = subjects.concat(sec.subjects);
+        });
+        const filtered = subjects.filter(item => String(item.subjectId) !== String(detail.subjectId)).slice(0, 6);
+        filtered.forEach(item => {
+            grid.appendChild(createContentCard(item));
+        });
+    }
+    
+    if (grid.children.length === 0) {
+        grid.innerHTML = '<div style="color:var(--text-muted);padding:10px 0;">No suggestions available.</div>';
     }
 
 
@@ -804,8 +932,16 @@ function renderEpisodes(season) {
                 // Episode click is a direct user gesture — mark interacted so autoplay works
                 state.userInteracted = true;
 
+                // Synchronously unlock media elements to satisfy strict mobile browser play gesture policies
+                const video = document.getElementById("player");
+                if (video) {
+                    video.play().then(() => video.pause()).catch(e => {});
+                }
+                if (playerInstance) {
+                    playerInstance.play().then(() => playerInstance.pause()).catch(e => {});
+                }
+
                 // Immediately stop current playback so there's no audio bleed
-                if (playerInstance) playerInstance.pause();
                 if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
 
                 document.querySelectorAll(".episode-btn").forEach(b => {

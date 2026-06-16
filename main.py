@@ -84,6 +84,7 @@ db_pool = None
 db_init_lock = None
 worker_index = 0
 active_api_base = "https://h5-api.aoneroom.com"
+http_client = None
 
 app = FastAPI()
 
@@ -368,6 +369,7 @@ async def refresh_cookies_if_needed() -> str:
         "Referer": "https://h5.aoneroom.com"
     }
 
+    # Try direct first
     try:
         async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
             cookie_url = "https://h5.aoneroom.com/wefeed-h5-bff/app/get-latest-app-pkgs?app_name=moviebox"
@@ -383,7 +385,26 @@ async def refresh_cookies_if_needed() -> str:
                 print(f"[API Auth] Refreshed H5 cookies successfully.")
                 return global_cookies
     except Exception as e:
-        print(f"[API Auth] Cookie refresh failed: {e}")
+        print(f"[API Auth] Direct cookie refresh failed: {e}. Trying via Singapore proxy...")
+
+    # Fallback to Singapore proxy
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
+            cookie_url = "https://h5.aoneroom.com/wefeed-h5-bff/app/get-latest-app-pkgs?app_name=moviebox"
+            proxied_url = f"http://194.127.178.223/?url={urllib.parse.quote(cookie_url)}"
+            resp = await client.get(proxied_url, headers=headers)
+            if resp.status_code == 200:
+                cookie_headers = resp.headers.get_list("Set-Cookie")
+                parsed_cookies = []
+                for cookie in cookie_headers:
+                    part = cookie.split(";")[0]
+                    parsed_cookies.append(part)
+                global_cookies = "; ".join(parsed_cookies)
+                cookies_expiry = now + 3600.0
+                print(f"[API Auth] Refreshed H5 cookies via Singapore proxy successfully.")
+                return global_cookies
+    except Exception as e:
+        print(f"[API Auth] Proxied cookie refresh failed: {e}")
     
     if global_cookies:
         return global_cookies
@@ -408,6 +429,8 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
         headers["Origin"] = origin
 
     url = f"{host}{path}"
+    
+    # 1. Try direct first
     try:
         async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
             if method.upper() == "POST":
@@ -424,7 +447,27 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
             else:
                 raise Exception(f"HTTP status {resp.status_code}")
     except Exception as e:
-        print(f"[API Error] H5 API request failed for {path}: {e}")
+        print(f"[API Warning] Direct H5 API request failed for {path}: {e}. Trying via Singapore proxy...")
+
+    # 2. Proxy Fallback
+    try:
+        proxied_url = f"http://194.127.178.223/?url={urllib.parse.quote(url)}"
+        async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
+            if method.upper() == "POST":
+                resp = await client.post(proxied_url, json=body_dict, headers=headers)
+            else:
+                resp = await client.get(proxied_url, headers=headers)
+                
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("code") == 0 or "data" in data:
+                    return data
+                else:
+                    raise Exception(data.get("message", f"API error code {data.get('code')}"))
+            else:
+                raise Exception(f"HTTP status {resp.status_code}")
+    except Exception as e:
+        print(f"[API Error] Proxied H5 API request failed for {path}: {e}")
         raise e
 
 # Extract CDN expiration
@@ -757,6 +800,8 @@ async def historical_scraper_loop():
 # Start scraper on application startup
 @app.on_event("startup")
 async def startup_event():
+    global http_client
+    http_client = httpx.AsyncClient(trust_env=False, timeout=120.0)
     asyncio.create_task(init_db())
     if os.getenv("RUN_SCRAPER", "false").lower() == "true":
         asyncio.create_task(scraper_loop())
@@ -764,6 +809,9 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
+    global http_client
+    if http_client:
+        await http_client.aclose()
     if db_pool:
         db_pool.close()
         await db_pool.wait_closed()
@@ -1077,6 +1125,14 @@ async def resolve_tmdb_resource(tmdb_id: str, is_tv: bool, season: int, episode:
     downloads = inner_data.get("downloads", [])
     captions = inner_data.get("captions", [])
     
+    if not downloads:
+        # Regex fallback: scan raw JSON response string for any mp4 link
+        raw_text = json.dumps(download_data)
+        mp4_matches = re.findall(r'https?://[^\s"\']+\.mp4[^\s"\']*', raw_text)
+        if mp4_matches:
+            unique_links = list(dict.fromkeys(mp4_matches))
+            downloads = [{"id": f"regex_fallback_{idx}", "resolution": 720 + idx, "size": 0, "url": link} for idx, link in enumerate(unique_links)]
+
     qualities = []
     for r in downloads:
         r_id = r.get("id")
@@ -1747,6 +1803,14 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0):
         downloads = inner_data.get("downloads", [])
         captions = inner_data.get("captions", [])
         
+        if not downloads:
+            # Regex fallback: scan raw JSON response string for any mp4 link
+            raw_text = json.dumps(download_data)
+            mp4_matches = re.findall(r'https?://[^\s"\']+\.mp4[^\s"\']*', raw_text)
+            if mp4_matches:
+                unique_links = list(dict.fromkeys(mp4_matches))
+                downloads = [{"id": f"regex_fallback_{idx}", "resolution": 720 + idx, "size": 0, "url": link} for idx, link in enumerate(unique_links)]
+
         items = []
         for r in downloads:
             r_id = r.get("id")
@@ -1947,6 +2011,7 @@ async def stream_chunks(resp, start=None, end=None):
 
 @app.get("/fetch")
 async def handle_fetch(request: Request, source_url: str):
+    global http_client
     if not source_url:
         raise HTTPException(status_code=400, detail="Missing source_url parameter")
 
@@ -1972,29 +2037,39 @@ async def handle_fetch(request: Request, source_url: str):
     if if_range:
         headers_to_send["If-Range"] = if_range
 
-    client = httpx.AsyncClient(trust_env=False, timeout=120.0)
+    if http_client is None:
+        http_client = httpx.AsyncClient(trust_env=False, timeout=120.0)
     
     # 1. Try direct proxying first for high-speed, direct range-request streaming
+    resp = None
     try:
-        req = client.build_request("GET", source_url, headers=headers_to_send)
-        resp = await client.send(req, stream=True)
+        req = http_client.build_request("GET", source_url, headers=headers_to_send)
+        resp = await http_client.send(req, stream=True)
         if resp.status_code in [200, 206]:
             return build_streaming_response(resp, range_header)
         else:
+            await resp.aclose()
             print(f"[Proxy] Direct proxy returned status {resp.status_code}. Falling back to worker proxy...")
     except Exception as e:
+        if resp is not None:
+            await resp.aclose()
         print(f"[Proxy] Direct proxy failed: {e}. Falling back to worker proxy...")
 
     # 2. Worker proxy fallback if direct fetch fails (e.g., due to region blocks)
+    resp = None
     try:
         worker = get_next_worker()
         proxy_url = f"{worker}/mp4-proxy?url={urllib.parse.quote(source_url)}&headers={urllib.parse.quote(json.dumps(headers_to_send))}"
         
-        req = client.build_request(request.method, proxy_url)
-        resp = await client.send(req, stream=True)
+        req = http_client.build_request(request.method, proxy_url)
+        resp = await http_client.send(req, stream=True)
         if resp.status_code in [200, 206]:
             return build_streaming_response(resp, range_header)
+        else:
+            await resp.aclose()
     except Exception as e:
+        if resp is not None:
+            await resp.aclose()
         print(f"[Proxy] Worker proxy failed: {e}")
 
     raise HTTPException(status_code=502, detail="Streaming proxy failed on all routes")
