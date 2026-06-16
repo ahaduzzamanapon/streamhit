@@ -1035,7 +1035,7 @@ async def resolve_tmdb_resource(tmdb_id: str, is_tv: bool, season: int, episode:
                                 qualities.append({
                                     "resolution": r["resolution"],
                                     "size": r["size"],
-                                    "url": f"{APP_URL}/fetch?source_url={urllib.parse.quote(r['resource_link'])}"
+                                    "url": f"/fetch?source_url={urllib.parse.quote(r['resource_link'])}"
                                 })
                             qualities.sort(key=lambda q: q["resolution"])
                             
@@ -1044,7 +1044,7 @@ async def resolve_tmdb_resource(tmdb_id: str, is_tv: bool, season: int, episode:
                                 captions.append({
                                     "language": c["lang"],
                                     "name": c["label"],
-                                    "url": f"{APP_URL}/api/proxy-subtitle?url={urllib.parse.quote(c['url'])}"
+                                    "url": f"/api/proxy-subtitle?url={urllib.parse.quote(c['url'])}"
                                 })
                                 
                             highest = qualities[-1]["url"] if qualities else ""
@@ -1159,7 +1159,7 @@ async def resolve_tmdb_resource(tmdb_id: str, is_tv: bool, season: int, episode:
         qualities.append({
             "resolution": resolution,
             "size": size,
-            "url": f"{APP_URL}/fetch?source_url={urllib.parse.quote(r_link)}"
+            "url": f"/fetch?source_url={urllib.parse.quote(r_link)}"
         })
         
     qualities.sort(key=lambda q: q["resolution"])
@@ -1188,7 +1188,7 @@ async def resolve_tmdb_resource(tmdb_id: str, is_tv: bool, season: int, episode:
         formatted_captions.append({
             "language": cap.get("lan"),
             "name": cap.get("lanName"),
-            "url": f"{APP_URL}/api/proxy-subtitle?url={urllib.parse.quote(cap_url)}"
+            "url": f"/api/proxy-subtitle?url={urllib.parse.quote(cap_url)}"
         })
         
     highest = qualities[-1]["url"] if qualities else ""
@@ -1772,7 +1772,7 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0):
                 "resolution": r["resolution"],
                 "size": r["size"],
                 # Wrap streaming link through local streaming fetch proxy to resolve CORS and 403 Forbidden
-                "resourceLink": f"{APP_URL}/fetch?source_url={urllib.parse.quote(r['resource_link'])}"
+                "resourceLink": f"/fetch?source_url={urllib.parse.quote(r['resource_link'])}"
             })
         return {"code": 0, "data": {"list": items}}
 
@@ -1835,7 +1835,7 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0):
                 "resourceId": str(r_id),
                 "resolution": int(r.get("resolution", 0)),
                 "size": int(r.get("size", 0)),
-                "resourceLink": f"{APP_URL}/fetch?source_url={urllib.parse.quote(r_link)}"
+                "resourceLink": f"/fetch?source_url={urllib.parse.quote(r_link)}"
             })
             
         # Cache captions associated with each resource retrieved

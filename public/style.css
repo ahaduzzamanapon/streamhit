@@ -364,7 +364,8 @@ button, input, select {
     width: 100%;
     height: 100%;
     background-size: cover;
-    background-position: center 20%;
+    background-position: center;
+    background-repeat: no-repeat;
     display: flex;
     align-items: flex-end;
     position: absolute;
@@ -779,6 +780,7 @@ button, input, select {
     padding-bottom: 10px;
     scroll-snap-type: x mandatory;
     scrollbar-width: none; /* Firefox */
+    overflow-x: auto; /* Ensure horizontal scroll bar is enabled */
 }
 
 .content-slider::-webkit-scrollbar {
@@ -2311,6 +2313,14 @@ button, input, select {
     line-height: 1.4;
 }
 
+/* Mobile Navigation Bar Styles (Hidden on Desktop) */
+.mobile-navigation-bar {
+    display: none;
+}
+.mobile-brand {
+    display: none;
+}
+
 /* Mobile Media Queries (screens up to 768px) */
 @media (max-width: 768px) {
     /* Main container and Sidebar rules */
@@ -2365,19 +2375,69 @@ button, input, select {
         font-weight: 600;
     }
     
-    /* Header layout for mobile */
+    /* Header layout for mobile - Grid template areas */
     .header {
-        flex-direction: column;
-        gap: 12px;
-        height: auto;
-        padding: 10px 0;
-        border-bottom: none;
+        display: grid !important;
+        grid-template-areas: 
+            "brand controls"
+            "search search" !important;
+        grid-template-columns: 1fr auto !important;
+        gap: 12px !important;
+        height: auto !important;
+        padding: 15px 0 !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
     }
-    .header .search-box {
-        width: 100%;
+    .mobile-brand {
+        grid-area: brand !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        font-size: 20px !important;
+        font-weight: 800 !important;
+        cursor: pointer !important;
+    }
+    .mobile-brand .play-logo {
+        color: var(--color-accent);
+        font-size: 16px;
+    }
+    .mobile-brand .logo-text {
+        font-family: 'Outfit', sans-serif;
+    }
+    .mobile-brand .logo-text span {
+        color: var(--color-accent);
     }
     .header-controls {
-        display: none !important; /* Hide settings on mobile header */
+        grid-area: controls !important;
+        display: flex !important;
+        gap: 10px !important;
+    }
+    .header-controls .language-selector {
+        display: none !important; /* Hide language selector on mobile by default */
+    }
+    .watch-page-body .header-controls .language-selector {
+        display: flex !important; /* Show Back Home button on watch page */
+        padding: 8px 12px !important;
+        font-size: 12px !important;
+    }
+    .header-controls .download-app-btn {
+        padding: 8px 12px !important;
+        font-size: 12px !important;
+    }
+    .search-box {
+        grid-area: search !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: 40px !important;
+        padding: 4px 4px 4px 12px !important;
+    }
+    .search-box button {
+        padding: 6px 12px !important;
+        font-size: 12px !important;
+    }
+    
+    /* Hide slider navigation arrows on mobile to prevent overflow & scroll issues */
+    .slider-nav-btn {
+        display: none !important;
     }
     
     /* Featured Slider / Hero Slider on Mobile */
@@ -2404,16 +2464,28 @@ button, input, select {
     }
     
     /* Watch Page Specific Mobile Responsive rules */
+    .watch-page-body .header {
+        display: none !important;
+    }
+    .watch-page-body .mobile-navigation-bar {
+        display: none !important;
+    }
+    .watch-page-body .app-container {
+        padding-bottom: 0 !important;
+    }
     .watch-page-body .main-content {
         padding: 0 !important; /* Remove page padding to allow player to be 100% full bleed width */
     }
     .watch-page-body .player-wrapper {
         border-radius: 0px !important; /* Strip player border radius */
     }
-    .watch-page-body .cinema-meta-section,
-    .watch-page-body .resources-container,
-    .watch-page-body .watch-tabs-section {
-        padding: 0 15px !important; /* Re-apply padding on details below player */
+    .watch-page-body .watch-cinema-grid {
+        margin-top: 0 !important;
+    }
+    .watch-page-body .cinema-meta-section {
+        margin: 15px !important;
+        padding: 20px 15px !important;
+        border-radius: var(--border-radius-md) !important;
     }
     .watch-page-body .cinema-meta-section h1 {
         font-size: 22px !important;
