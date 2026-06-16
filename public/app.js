@@ -408,7 +408,12 @@ async function initFilterPage() {
     const urlParams = new URLSearchParams(window.location.search);
     const genre = urlParams.get("genre");
     const keyword = urlParams.get("keyword");
+    const typeParam = urlParams.get("type");
     
+    if (typeParam !== null) {
+        state.subjectType = parseInt(typeParam);
+    }
+
     if (genre) {
         state.activeGenre = genre;
         const select = document.getElementById("filterGenre");
@@ -1247,8 +1252,9 @@ function bindCommonEvents() {
         const handleSearch = () => {
             const query = searchInput.value.trim();
             if (!query) return;
-            // Always redirect to the movies search page
-            window.location.href = `/movies?keyword=${encodeURIComponent(query)}`;
+            // Determine target page: stay on /tv if currently on /tv, else default to /movies
+            const targetPath = routes.isTv ? "/tv" : "/movies";
+            window.location.href = `${targetPath}?keyword=${encodeURIComponent(query)}&type=${state.subjectType}`;
         };
 
         searchBtn.onclick = handleSearch;
