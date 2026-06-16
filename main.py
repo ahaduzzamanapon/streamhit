@@ -459,12 +459,17 @@ def get_cached_response(key: str) -> dict:
     if key in api_cache:
         expiry, data = api_cache[key]
         if now < expiry:
+            print(f"[Cache Hit] Key: {key}")
             return data
         else:
+            print(f"[Cache Expired] Key: {key}")
             del api_cache[key]
+    else:
+        print(f"[Cache Miss] Key: {key}")
     return None
 
 def set_cached_response(key: str, data: any, ttl: float = API_CACHE_TTL):
+    print(f"[Cache Set] Key: {key}, TTL: {ttl}")
     api_cache[key] = (time.time() + ttl, data)
 
 global_cookies = ""
@@ -1616,86 +1621,28 @@ async def background_search_and_cache(keyword: str, page: int, per_page: int, su
     except Exception as e:
         print(f"[Background Search Cache Error] {e}")
 
-# Search endpoint - queries local db first, queries OneRoom and caches on fallback
+# Search endpoint - queries OneRoom API first, filters/sorts, and falls back to local DB search
 @app.post("/api/search")
 async def search_content(payload: dict):
     keyword = payload.get("keyword", "").strip()
     page = int(payload.get("page", 1))
     per_page = int(payload.get("perPage", 20))
+    genre = payload.get("genre", "*")
+    country = payload.get("country", "*")
+    year = payload.get("year", "*")
+    sort = payload.get("sort", "Latest")
     # Search both movies and TV series together by forcing subject_type to 0
     subject_type = 0
 
     if not keyword:
         return {"code": 0, "data": {"items": []}}
 
-    cache_key = f"search:{keyword}:{page}:{per_page}:{subject_type}"
+    cache_key = f"search:{keyword}:{page}:{per_page}:{subject_type}:{genre}:{country}:{year}:{sort}"
     cached = get_cached_response(cache_key)
     if cached:
         return cached
 
-    # Try local MySQL search
-    offset = (page - 1) * per_page
-    query = "SELECT * FROM subjects WHERE title LIKE %s"
-    params = [f"%{keyword}%"]
-    
-    if subject_type > 0:
-        query += " AND subject_type = %s"
-        params.append(subject_type)
-        
-    query += """
-        ORDER BY (
-            CASE 
-                WHEN title = %s THEN 1
-                WHEN title LIKE %s THEN 2
-                ELSE 3
-            END
-        ) ASC,
-        CHAR_LENGTH(title) ASC,
-        (CASE WHEN subject_type IN (1, 2, 7) THEN 1 ELSE 2 END) ASC,
-        created_at DESC
-        LIMIT %s OFFSET %s
-    """
-    params.extend([keyword, f"{keyword}%", per_page, offset])
-
-    local_results = []
-    pool = await get_db_pool()
-    if pool:
-        try:
-            async with pool.acquire() as conn:
-                async with conn.cursor(aiomysql.DictCursor) as cur:
-                    await cur.execute(query, tuple(params))
-                    rows = await cur.fetchall()
-                    for row in rows:
-                        if row["title"] == "Placeholder":
-                            continue
-                        local_results.append({
-                            "subjectId": row["subject_id"],
-                            "title": row["title"],
-                            "subjectType": row["subject_type"],
-                            "cover": {"url": row["cover"]},
-                            "imdbRatingValue": str(row["rating"]),
-                            "releaseDate": row["release_date"],
-                            "countryName": row["country"],
-                            "genre": row["genre"].split(",") if row["genre"] else [],
-                            "isCam": row["is_cam"]
-                        })
-        except Exception as db_err:
-            print(f"[DB Search Error] {db_err}")
-
-    if local_results:
-        # Serve immediately and pull/update cache in background
-        asyncio.create_task(background_search_and_cache(keyword, page, per_page, subject_type))
-        res = {
-            "code": 0,
-            "data": {
-                "items": local_results,
-                "pager": {"hasMore": len(local_results) == per_page}
-            }
-        }
-        set_cached_response(cache_key, res, ttl=30.0)
-        return res
-
-    # Fetch from API and save missing to DB
+    # 1. Try querying the OneRoom API synchronously first to ensure fresh results
     try:
         api_path = "/wefeed-h5api-bff/subject/search"
         api_payload = {
@@ -1707,13 +1654,33 @@ async def search_content(payload: dict):
         data = await request_h5_api("POST", api_path, api_payload)
         items = data.get("data", {}).get("items", [])
         
-        # Sort API results so that exact/starts-with title matches and main media types come first
+        # Filter items in memory
+        filtered_items = []
+        for item in items:
+            # Genre filter
+            if genre != "*":
+                item_genres = item.get("genre", [])
+                item_genres_list = item_genres if isinstance(item_genres, list) else str(item_genres).split(",")
+                if not any(genre.lower() in g.lower() for g in item_genres_list):
+                    continue
+            # Country filter
+            if country != "*":
+                if item.get("countryName", "").lower() != country.lower():
+                    continue
+            # Year filter
+            if year != "*":
+                rel_date = item.get("releaseDate", "") or item.get("lastReleaseDate", "")
+                if not rel_date.startswith(year):
+                    continue
+            filtered_items.append(item)
+
+        # Sort filtered items
         def sort_key(item):
             title = item.get("title", "").lower()
             kw = keyword.lower()
             st = int(item.get("subjectType", 0))
             
-            # Title match priority
+            # Title closeness
             if title == kw:
                 title_priority = 1
             elif title.startswith(kw):
@@ -1723,26 +1690,108 @@ async def search_content(payload: dict):
             else:
                 title_priority = 4
                 
-            # Shorter titles that match are closer to the search query
             title_len = len(title)
-            
-            # Type priority: movies (1), tv series (2), animations (7) first
             type_priority = 1 if st in (1, 2, 7) else 2
             
-            return (title_priority, title_len, type_priority)
-            
-        if isinstance(items, list):
-            items.sort(key=sort_key)
+            if sort == "Hottest":
+                rating = float(item.get("imdbRatingValue") or 0.0)
+                return (title_priority, -rating, title_len, type_priority)
+            else:
+                return (title_priority, title_len, type_priority)
+
+        filtered_items.sort(key=sort_key)
         
-        # Cache results asynchronously
-        for item in items:
+        # Cache results asynchronously to local DB
+        for item in filtered_items:
             sub_id = item.get("subjectId")
             if sub_id:
                 asyncio.create_task(scrape_subject_details(sub_id))
                 
-        set_cached_response(cache_key, data)
-        return data
+        res = {
+            "code": 0,
+            "data": {
+                "items": filtered_items,
+                "pager": {"hasMore": data.get("data", {}).get("pager", {}).get("hasMore", False)}
+            }
+        }
+        set_cached_response(cache_key, res)
+        return res
+
     except Exception as e:
+        print(f"[API Search Error] {e}. Falling back to local database search...")
+        # Fallback to local database search
+        offset = (page - 1) * per_page
+        
+        conditions = ["title LIKE %s"]
+        params = [f"%{keyword}%"]
+        
+        if genre != "*":
+            conditions.append("genre LIKE %s")
+            params.append(f"%{genre}%")
+        if country != "*":
+            conditions.append("country = %s")
+            params.append(country)
+        if year != "*":
+            conditions.append("release_date LIKE %s")
+            params.append(f"{year}%")
+        if subject_type > 0:
+            conditions.append("subject_type = %s")
+            params.append(subject_type)
+            
+        where_clause = " WHERE " + " AND ".join(conditions)
+        
+        order_clause = """
+            ORDER BY (
+                CASE 
+                    WHEN title = %s THEN 1
+                    WHEN title LIKE %s THEN 2
+                    ELSE 3
+                END
+            ) ASC,
+            CHAR_LENGTH(title) ASC
+        """
+        params_for_order = [keyword, f"{keyword}%"]
+        
+        if sort == "Hottest":
+            order_clause += ", rating DESC"
+        elif sort == "Latest":
+            order_clause += ", release_date DESC"
+            
+        query = f"SELECT * FROM subjects{where_clause}{order_clause} LIMIT %s OFFSET %s"
+        all_params = params + params_for_order + [per_page, offset]
+
+        local_results = []
+        pool = await get_db_pool()
+        if pool:
+            try:
+                async with pool.acquire() as conn:
+                    async with conn.cursor(aiomysql.DictCursor) as cur:
+                        await cur.execute(query, tuple(all_params))
+                        rows = await cur.fetchall()
+                        for row in rows:
+                            if row["title"] == "Placeholder":
+                                continue
+                            local_results.append({
+                                "subjectId": row["subject_id"],
+                                "title": row["title"],
+                                "subjectType": row["subject_type"],
+                                "cover": {"url": row["cover"]},
+                                "imdbRatingValue": str(row["rating"]),
+                                "releaseDate": row["release_date"],
+                                "countryName": row["country"],
+                                "genre": row["genre"].split(",") if row["genre"] else [],
+                                "isCam": row["is_cam"]
+                            })
+            except Exception as db_err:
+                print(f"[DB Fallback Search Error] {db_err}")
+
+        return {
+            "code": 0,
+            "data": {
+                "items": local_results,
+                "pager": {"hasMore": len(local_results) == per_page}
+            }
+        }
         return {"code": 0, "data": {"items": local_results, "pager": {"hasMore": False}}}
 
 async def background_filter_and_cache(genre, country, year, language, sort, subject_type, page, per_page):

@@ -536,7 +536,11 @@ async function loadSearchResults(isAppend = false) {
             keyword: state.currentQuery,
             page: state.currentPage,
             perPage: 20,
-            subjectType: state.subjectType
+            subjectType: state.subjectType,
+            genre: state.activeGenre,
+            country: state.activeCountry,
+            year: state.activeYear,
+            sort: state.activeSort
         };
     } else {
         endpoint = "/api/filter";
