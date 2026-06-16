@@ -18,7 +18,9 @@ const state = {
     availableResources: [],
     availableCaptions: [],
     directMp4Url: "",
-    userInteracted: false
+    userInteracted: false,
+    hasMore: false,
+    loadingMore: false
 };
 
 // Determine current page route
@@ -458,12 +460,29 @@ async function initFilterPage() {
     setupFilterOptions("filterYearOpts", "activeYear");
     setupFilterOptions("filterSortOpts", "activeSort");
 
+    // Infinite scroll listener
+    window.addEventListener("scroll", () => {
+        if (state.loadingMore || !state.hasMore) return;
+        
+        const threshold = 300; // Load next page when within 300px of the bottom
+        if ((window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - threshold)) {
+            state.currentPage++;
+            loadSearchResults(true);
+        }
+    }, { passive: true });
+
     loadSearchResults();
 }
 
 // Load List data
-async function loadSearchResults() {
-    showShimmers(true);
+async function loadSearchResults(isAppend = false) {
+    if (isAppend) {
+        state.loadingMore = true;
+        const loader = document.getElementById("infiniteLoader");
+        if (loader) loader.style.display = "block";
+    } else {
+        showShimmers(true);
+    }
     
     let endpoint = "/api/search";
     let payload = {};
@@ -494,25 +513,50 @@ async function loadSearchResults() {
     
     if (result && result.data) {
         const items = result.data.items || (result.data.results && result.data.results[0] && result.data.results[0].subjects) || [];
-        renderExploreGrid(items);
+        renderExploreGrid(items, isAppend);
         
         // Handle pagination controls
-        const hasMore = result.data.pager ? result.data.pager.hasMore : false;
-        document.getElementById("prevPageBtn").disabled = state.currentPage <= 1;
-        document.getElementById("nextPageBtn").disabled = !hasMore;
-        document.getElementById("pageIndicator").textContent = `Page ${state.currentPage}`;
+        state.hasMore = result.data.pager ? result.data.pager.hasMore : false;
+        
+        const prevBtn = document.getElementById("prevPageBtn");
+        const nextBtn = document.getElementById("nextPageBtn");
+        const pageIndicator = document.getElementById("pageIndicator");
+        if (prevBtn) prevBtn.disabled = state.currentPage <= 1;
+        if (nextBtn) nextBtn.disabled = !state.hasMore;
+        if (pageIndicator) pageIndicator.textContent = `Page ${state.currentPage}`;
     } else {
-        document.getElementById("dynamicGrid").innerHTML = `<div class="no-results"><i class="fa-solid fa-face-frown"></i> No results found. Try adjusting filters.</div>`;
-        document.getElementById("prevPageBtn").disabled = true;
-        document.getElementById("nextPageBtn").disabled = true;
+        state.hasMore = false;
+        if (!isAppend) {
+            const grid = document.getElementById("dynamicGrid");
+            if (grid) grid.innerHTML = `<div class="no-results"><i class="fa-solid fa-face-frown"></i> No results found. Try adjusting filters.</div>`;
+        }
+        const prevBtn = document.getElementById("prevPageBtn");
+        const nextBtn = document.getElementById("nextPageBtn");
+        if (prevBtn) prevBtn.disabled = true;
+        if (nextBtn) nextBtn.disabled = true;
     }
     
-    showShimmers(false);
+    if (isAppend) {
+        state.loadingMore = false;
+        const loader = document.getElementById("infiniteLoader");
+        if (loader) loader.style.display = "none";
+    } else {
+        showShimmers(false);
+    }
 }
 
-function renderExploreGrid(items) {
+function renderExploreGrid(items, isAppend = false) {
     const grid = document.getElementById("dynamicGrid");
-    grid.innerHTML = "";
+    if (!grid) return;
+
+    let existingIds = new Set();
+    if (!isAppend) {
+        grid.innerHTML = "";
+    } else {
+        grid.querySelectorAll(".content-card").forEach(c => {
+            if (c.dataset.id) existingIds.add(c.dataset.id);
+        });
+    }
 
     let subjects = [];
     if (items && items.length > 0) {
@@ -524,32 +568,36 @@ function renderExploreGrid(items) {
             });
             const seen = new Set();
             subjects = subjects.filter(sub => {
-                const duplicate = seen.has(sub.subjectId);
+                const duplicate = seen.has(sub.subjectId) || existingIds.has(String(sub.subjectId));
                 seen.add(sub.subjectId);
                 return !duplicate;
             });
         } else {
-            subjects = items;
+            subjects = items.filter(sub => !existingIds.has(String(sub.subjectId)));
         }
     }
 
     if (!subjects || subjects.length === 0) {
-        grid.innerHTML = `<div class="no-results"><i class="fa-solid fa-face-frown"></i> No results found. Try adjusting your query.</div>`;
+        if (!isAppend) {
+            grid.innerHTML = `<div class="no-results"><i class="fa-solid fa-face-frown"></i> No results found. Try adjusting your query.</div>`;
+        }
         return;
     }
 
     // Update Section Title
-    let titleText = "Latest Releases";
-    if (state.currentQuery) {
-        titleText = `Search Results for "${state.currentQuery}"`;
-    } else if (routes.isMovies) {
-        titleText = "Movies Feed";
-    } else if (routes.isTv) {
-        titleText = "TV Shows Feed";
+    if (!isAppend) {
+        let titleText = "Latest Releases";
+        if (state.currentQuery) {
+            titleText = `Search Results for "${state.currentQuery}"`;
+        } else if (routes.isMovies) {
+            titleText = "Movies Feed";
+        } else if (routes.isTv) {
+            titleText = "TV Shows Feed";
+        }
+        
+        const titleEl = document.getElementById("dynamicTitle");
+        if (titleEl) titleEl.textContent = titleText;
     }
-    
-    const titleEl = document.getElementById("dynamicTitle");
-    if (titleEl) titleEl.textContent = titleText;
 
     subjects.forEach(item => {
         const card = createContentCard(item);
@@ -560,6 +608,7 @@ function renderExploreGrid(items) {
 function createContentCard(item) {
     const card = document.createElement("div");
     card.className = "content-card";
+    card.dataset.id = item.subjectId;
     card.onclick = () => window.location.href = `/watch?id=${item.subjectId}&path=${encodeURIComponent(item.detailPath || '')}`;
 
     const title = item.title;

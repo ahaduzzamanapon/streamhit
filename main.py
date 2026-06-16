@@ -1542,7 +1542,8 @@ async def search_content(payload: dict):
     keyword = payload.get("keyword", "").strip()
     page = int(payload.get("page", 1))
     per_page = int(payload.get("perPage", 20))
-    subject_type = int(payload.get("subjectType", 0))
+    # Search both movies and TV series together by forcing subject_type to 0
+    subject_type = 0
 
     if not keyword:
         return {"code": 0, "data": {"items": []}}
@@ -1564,6 +1565,7 @@ async def search_content(payload: dict):
                 ELSE 3
             END
         ) ASC,
+        CHAR_LENGTH(title) ASC,
         (CASE WHEN subject_type IN (1, 2, 7) THEN 1 ELSE 2 END) ASC,
         created_at DESC
         LIMIT %s OFFSET %s
@@ -1629,13 +1631,18 @@ async def search_content(payload: dict):
                 title_priority = 1
             elif title.startswith(kw):
                 title_priority = 2
-            else:
+            elif kw in title:
                 title_priority = 3
+            else:
+                title_priority = 4
                 
+            # Shorter titles that match are closer to the search query
+            title_len = len(title)
+            
             # Type priority: movies (1), tv series (2), animations (7) first
             type_priority = 1 if st in (1, 2, 7) else 2
             
-            return (title_priority, type_priority)
+            return (title_priority, title_len, type_priority)
             
         if isinstance(items, list):
             items.sort(key=sort_key)
