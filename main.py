@@ -2139,27 +2139,51 @@ async def get_captions(subjectId: str, resourceId: str):
 async def proxy_subtitle(url: str):
     if not url:
         raise HTTPException(status_code=400, detail="Missing subtitle url parameter")
-    try:
-        async with httpx.AsyncClient(trust_env=False) as client:
-            resp = await client.get(url)
-            text = resp.text
+    
+    global last_direct_fail_time
+    now = time.time()
+    skip_direct = (now - last_direct_fail_time < 3600.0)
+    
+    resp_text = None
+    
+    # 1. Try direct first with a short timeout
+    if not skip_direct:
+        try:
+            async with httpx.AsyncClient(trust_env=False, timeout=2.5) as client:
+                resp = await client.get(url)
+                if resp.status_code == 200:
+                    resp_text = resp.text
+        except Exception as e:
+            print(f"[Subtitle Proxy] Direct fetch failed: {e}. Marking direct API as failed, trying via Singapore proxy...")
+            last_direct_fail_time = time.time()
+
+    # 2. Proxy Fallback
+    if resp_text is None:
+        try:
+            proxied_url = f"http://194.127.178.223/?url={urllib.parse.quote(url)}"
+            async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+                resp = await client.get(proxied_url)
+                if resp.status_code == 200:
+                    resp_text = resp.text
+        except Exception as e:
+            print(f"[Subtitle Proxy] Singapore proxy fetch failed: {e}")
+
+    if resp_text is None:
+        raise HTTPException(status_code=502, detail="Failed to retrieve subtitle track")
             
-            # Simple conversion of SRT to VTT if necessary (Plyr prefers VTT)
-            if not text.startswith("WEBVTT"):
-                # Treat SRT to WebVTT simple header replacement
-                text = "WEBVTT\n\n" + text
-                
-            return StreamingResponse(
-                iter([text.encode('utf-8')]),
-                media_type="text/vtt",
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Headers": "*",
-                    "Access-Control-Allow-Methods": "GET, OPTIONS"
-                }
-            )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    # Simple conversion of SRT to VTT if necessary (Plyr prefers VTT)
+    if not resp_text.startswith("WEBVTT"):
+        resp_text = "WEBVTT\n\n" + resp_text
+        
+    return StreamingResponse(
+        iter([resp_text.encode('utf-8')]),
+        media_type="text/vtt",
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS"
+        }
+    )
 
 @app.get("/api/test-proxy-debug")
 async def test_proxy_debug():
