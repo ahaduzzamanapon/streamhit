@@ -87,7 +87,17 @@ db_pool = None
 db_init_lock = None
 worker_index = 0
 active_api_base = "https://h5-api.aoneroom.com"
-http_client = None
+loop_clients = {}
+
+def get_http_client() -> httpx.AsyncClient:
+    current_loop = asyncio.get_running_loop()
+    # clean up closed loops to prevent memory leak
+    for lp in list(loop_clients.keys()):
+        if lp.is_closed():
+            loop_clients.pop(lp, None)
+    if current_loop not in loop_clients:
+        loop_clients[current_loop] = httpx.AsyncClient(trust_env=False, timeout=120.0)
+    return loop_clients[current_loop]
 
 app = FastAPI()
 
@@ -102,6 +112,17 @@ app.add_middleware(
 
 async def get_db_pool():
     global db_pool, db_init_lock
+    current_loop = asyncio.get_running_loop()
+    if db_pool is not None:
+        pool_loop = getattr(db_pool, "_loop", None)
+        if pool_loop is None or pool_loop.is_closed() or pool_loop is not current_loop:
+            try:
+                db_pool.close()
+            except Exception:
+                pass
+            db_pool = None
+            db_init_lock = None
+
     if db_pool is None:
         if db_init_lock is None:
             db_init_lock = asyncio.Lock()
@@ -825,8 +846,7 @@ async def historical_scraper_loop():
 # Start scraper on application startup
 @app.on_event("startup")
 async def startup_event():
-    global http_client
-    http_client = httpx.AsyncClient(trust_env=False, timeout=120.0)
+    get_http_client()
     asyncio.create_task(init_db())
     if os.getenv("RUN_SCRAPER", "false").lower() == "true":
         asyncio.create_task(scraper_loop())
@@ -834,12 +854,21 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    global http_client
-    if http_client:
-        await http_client.aclose()
+    global db_pool
+    # Close all active loop clients
+    for lp, client in list(loop_clients.items()):
+        try:
+            await client.aclose()
+        except Exception:
+            pass
+    loop_clients.clear()
+
     if db_pool:
-        db_pool.close()
-        await db_pool.wait_closed()
+        try:
+            db_pool.close()
+            await db_pool.wait_closed()
+        except Exception:
+            pass
 
 # ==========================================================================
 # 4.5 TMDB TO MOVIEBOX RESOLVER SYSTEM
@@ -2045,7 +2074,6 @@ async def stream_chunks(resp, start=None, end=None):
 
 @app.get("/fetch")
 async def handle_fetch(request: Request, source_url: str):
-    global http_client
     if not source_url:
         raise HTTPException(status_code=400, detail="Missing source_url parameter")
 
@@ -2071,14 +2099,13 @@ async def handle_fetch(request: Request, source_url: str):
     if if_range:
         headers_to_send["If-Range"] = if_range
 
-    if http_client is None:
-        http_client = httpx.AsyncClient(trust_env=False, timeout=120.0)
+    client = get_http_client()
     
     # 1. Try direct proxying first for high-speed, direct range-request streaming
     resp = None
     try:
-        req = http_client.build_request("GET", source_url, headers=headers_to_send)
-        resp = await http_client.send(req, stream=True)
+        req = client.build_request("GET", source_url, headers=headers_to_send)
+        resp = await client.send(req, stream=True)
         if resp.status_code in [200, 206]:
             return build_streaming_response(resp, range_header)
         else:
@@ -2095,8 +2122,8 @@ async def handle_fetch(request: Request, source_url: str):
         worker = get_next_worker()
         proxy_url = f"{worker}/mp4-proxy?url={urllib.parse.quote(source_url)}&headers={urllib.parse.quote(json.dumps(headers_to_send))}"
         
-        req = http_client.build_request(request.method, proxy_url)
-        resp = await http_client.send(req, stream=True)
+        req = client.build_request(request.method, proxy_url)
+        resp = await client.send(req, stream=True)
         if resp.status_code in [200, 206]:
             return build_streaming_response(resp, range_header)
         else:
