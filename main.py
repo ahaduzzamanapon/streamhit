@@ -2198,6 +2198,19 @@ async def proxy_subtitle(url: str):
         }
     )
 
+@app.get("/api/clear-cache-force")
+async def clear_cache_force():
+    pool = await get_db_pool()
+    if pool:
+        try:
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute("DELETE FROM play_resources")
+            return {"status": "success", "message": "play_resources table cleared successfully"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+    return {"status": "error", "message": "Database pool not initialized"}
+
 @app.get("/api/test-proxy-debug")
 async def test_proxy_debug():
     results = {}
