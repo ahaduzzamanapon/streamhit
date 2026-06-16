@@ -1764,7 +1764,7 @@ async def get_season_info(subjectId: str, detailPath: str = ""):
 
 # Play Resource link (resolves and auto-renews CDN links)
 @app.get("/api/resource")
-async def get_resource(subjectId: str, se: int = 0, ep: int = 0):
+async def get_resource(subjectId: str, se: int = 0, ep: int = 0, detailPath: str = ""):
     now = datetime.now()
     pool = await get_db_pool()
 
@@ -1803,20 +1803,29 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0):
 
     # Missing or expired: fetch fresh links from OneRoom
     try:
-        detail_path = ""
-        if pool:
+        detail_path = detailPath
+        if not detail_path and pool:
             try:
                 async with pool.acquire() as conn:
                     async with conn.cursor() as cur:
                         await cur.execute("SELECT detail_path FROM subjects WHERE subject_id = %s", (subjectId,))
                         row = await cur.fetchone()
                         if row:
-                            detail_path = row[0]
+                            detail_path = row[0] or ""
             except Exception as db_err:
                 print(f"[DB detail_path Lookup Error in get_resource] {db_err}")
                     
         if not detail_path:
             detail_path = "details"
+        else:
+            # Self-healing: Update database detail_path if it is missing
+            if pool:
+                try:
+                    async with pool.acquire() as conn:
+                        async with conn.cursor() as cur:
+                            await cur.execute("UPDATE subjects SET detail_path = %s WHERE subject_id = %s AND (detail_path IS NULL OR detail_path = '')", (detail_path, subjectId))
+                except Exception as db_err:
+                    print(f"[DB detail_path Auto-Repair Error] {db_err}")
             
         referer = f"https://123movienow.cc/spa/videoPlayPage/movies/{detail_path}?id={subjectId}&type=/movie/detail"
         origin = "https://123movienow.cc"

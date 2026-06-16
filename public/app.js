@@ -970,7 +970,13 @@ function renderEpisodes(season) {
 }
 
 async function loadPlayResources(subjectId, season = null, episode = null) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const detailPath = urlParams.get("path") || "";
+
     let url = `/api/resource?subjectId=${subjectId}`;
+    if (detailPath) {
+        url += `&detailPath=${encodeURIComponent(detailPath)}`;
+    }
     if (season !== null && episode !== null) {
         url += `&se=${season}&ep=${episode}`;
         // Update player overlay title
