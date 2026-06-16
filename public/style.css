@@ -606,19 +606,18 @@ button, input, select {
 /* Advanced Filter Panel */
 .filter-panel {
     display: none;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) auto;
-    gap: 15px;
-    align-items: flex-end;
+    flex-direction: column;
+    gap: 12px;
     background-color: var(--bg-secondary);
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: var(--border-radius-md);
-    padding: 20px;
-    margin-bottom: 30px;
+    padding: 16px;
+    margin-bottom: 24px;
     animation: slideDown 0.3s ease-out;
 }
 
 .filter-panel.open {
-    display: grid;
+    display: flex;
 }
 
 @keyframes slideDown {
@@ -626,48 +625,60 @@ button, input, select {
     to { opacity: 1; transform: translateY(0); }
 }
 
-.filter-group {
+.filter-row {
     display: flex;
-    flex-direction: column;
-    gap: 8px;
+    align-items: flex-start;
+    gap: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    padding-bottom: 8px;
+    padding-top: 4px;
 }
 
-.filter-group label {
+.filter-row:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.filter-label {
     font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
     color: var(--text-secondary);
     letter-spacing: 0.5px;
+    width: 80px;
+    margin-top: 6px;
+    flex-shrink: 0;
 }
 
-.filter-group select {
+.filter-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.filter-opt {
     background-color: var(--bg-primary);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: var(--text-primary);
-    padding: 10px 14px;
-    border-radius: var(--border-radius-sm);
-    font-size: 13px;
-    cursor: pointer;
-    width: 100%;
-}
-
-.filter-group select:focus {
-    border-color: var(--color-accent-blue);
-}
-
-.apply-filters-btn {
-    background-color: var(--color-accent);
-    color: var(--bg-primary);
-    font-weight: 700;
-    font-size: 13px;
-    padding: 11px 25px;
-    border-radius: var(--border-radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: var(--text-secondary);
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
     cursor: pointer;
     transition: var(--transition-fast);
+    user-select: none;
 }
 
-.apply-filters-btn:hover {
-    opacity: 0.9;
+.filter-opt:hover {
+    color: var(--text-primary);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.filter-opt.active {
+    background-color: var(--text-primary);
+    color: var(--bg-primary);
+    border-color: var(--text-primary);
+    font-weight: 600;
 }
 
 /* ==========================================================================

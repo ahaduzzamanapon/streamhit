@@ -414,31 +414,51 @@ async function initFilterPage() {
         state.subjectType = parseInt(typeParam);
     }
 
-    if (genre) {
-        state.activeGenre = genre;
-        const select = document.getElementById("filterGenre");
-        if (select) select.value = genre;
-    }
-
     if (keyword) {
         document.getElementById("searchInput").value = keyword;
         state.currentQuery = keyword;
     }
 
-    loadSearchResults();
+    // Helper to highlight pre-selected filter value from URL
+    const setSelectedFilterOption = (containerId, val) => {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        const options = container.querySelectorAll(".filter-opt");
+        options.forEach(opt => {
+            if (opt.getAttribute("data-value") === val) {
+                options.forEach(o => o.classList.remove("active"));
+                opt.classList.add("active");
+            }
+        });
+    };
 
-    // Bind filters panel buttons
-    const applyBtn = document.getElementById("applyFiltersBtn");
-    if (applyBtn) {
-        applyBtn.onclick = () => {
-            state.activeGenre = document.getElementById("filterGenre").value;
-            state.activeCountry = document.getElementById("filterCountry").value;
-            state.activeYear = document.getElementById("filterYear").value;
-            state.activeSort = document.getElementById("filterSort").value;
-            state.currentPage = 1;
-            loadSearchResults();
-        };
+    if (genre) {
+        state.activeGenre = genre;
+        setSelectedFilterOption("filterGenreOpts", genre);
     }
+
+    // Helper to setup dynamic tag filter click handlers (auto-apply)
+    const setupFilterOptions = (containerId, stateKey) => {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        const options = container.querySelectorAll(".filter-opt");
+        options.forEach(opt => {
+            opt.onclick = () => {
+                options.forEach(o => o.classList.remove("active"));
+                opt.classList.add("active");
+                state[stateKey] = opt.getAttribute("data-value");
+                state.currentPage = 1;
+                loadSearchResults();
+            };
+        });
+    };
+
+    setupFilterOptions("filterGenreOpts", "activeGenre");
+    setupFilterOptions("filterCountryOpts", "activeCountry");
+    setupFilterOptions("filterYearOpts", "activeYear");
+    setupFilterOptions("filterSortOpts", "activeSort");
+
+    loadSearchResults();
 }
 
 // Load List data
