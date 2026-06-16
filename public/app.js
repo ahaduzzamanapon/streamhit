@@ -1043,21 +1043,25 @@ async function playResources() {
     console.log(`[Player] Loading sources for title: ${state.selectedSubject.title}`);
     videoElement.removeAttribute("crossorigin");
 
-    // Format Plyr native sources
-    const sources = state.availableResources.map(res => ({
-        src: res.resourceLink,
-        type: 'video/mp4',
-        size: res.resolution
-    }));
+    // Format and sanitize Plyr native sources
+    const sources = state.availableResources
+        .filter(res => res && res.resourceLink)
+        .map(res => ({
+            src: res.resourceLink,
+            type: 'video/mp4',
+            size: res.resolution || 720
+        }));
 
-    // Format Plyr native captions
-    const tracks = state.availableCaptions.map(track => ({
-        kind: 'captions',
-        label: track.label,
-        srclang: track.srclang,
-        src: track.src,
-        default: track.default
-    }));
+    // Format and sanitize Plyr native captions
+    const tracks = state.availableCaptions
+        .filter(track => track && track.src)
+        .map(track => ({
+            kind: 'captions',
+            label: track.label || 'Subtitle',
+            srclang: track.srclang || 'en',
+            src: track.src,
+            default: !!track.default
+        }));
 
     if (streamUrl.includes(".m3u8")) {
         if (Hls.isSupported()) {
@@ -1119,10 +1123,15 @@ async function playResources() {
         };
 
         // Force browser to load the new sources by initiating playback.
-        // This triggers the network request and eventually fires the 'canplay' event.
-        playerInstance.play().catch(e => {
-            console.log("[Player] Play triggered to start stream loading:", e);
-        });
+        // We trigger it immediately and inside a small timeout to account for Plyr's async DOM replacement.
+        playerInstance.play().catch(() => {});
+        setTimeout(() => {
+            if (playerInstance) {
+                playerInstance.play().catch(e => {
+                    console.log("[Player] Play triggered to start stream loading:", e);
+                });
+            }
+        }, 150);
     }
 }
 
@@ -1134,11 +1143,12 @@ async function loadSubtitles(subjectId, resourceId) {
         const captions = result.data.extCaptions;
         
         captions.forEach(cap => {
+            if (!cap || !cap.url) return;
             const proxiedUrl = `/api/proxy-subtitle?url=${encodeURIComponent(cap.url)}`;
             const track = {
                 kind: 'captions',
-                label: cap.lanName,
-                srclang: cap.lan,
+                label: cap.lanName || 'Subtitle',
+                srclang: cap.lan || 'en',
                 src: proxiedUrl,
                 default: cap.lan === 'en'
             };
