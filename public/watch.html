@@ -92,123 +92,126 @@
                 
                 <div class="watch-cinema-grid">
                     
-                    <!-- Main column: Video player and details -->
-                    <div class="cinema-player-column">
-                        <div class="player-wrapper">
-                            <!-- Player Loading Overlay -->
-                            <div class="player-loader-overlay" id="playerLoaderOverlay">
-                                <div class="player-spinner"></div>
-                                <span>Loading stream...</span>
+                    <!-- Main Video Player -->
+                    <div class="player-wrapper">
+                        <!-- Player Loading Overlay -->
+                        <div class="player-loader-overlay" id="playerLoaderOverlay">
+                            <div class="player-spinner"></div>
+                            <span>Loading stream...</span>
+                        </div>
+                        <!-- Netflix-style top control bar overlay -->
+                        <div class="player-header-overlay" id="playerHeaderOverlay">
+                            <button class="player-back-btn" onclick="window.history.back()"><i class="fa-solid fa-arrow-left"></i></button>
+                            <div class="player-title-info">
+                                <span id="playerMediaCategory">Streaming</span>
+                                <h2 id="playerMediaTitle">Title</h2>
                             </div>
-                            <!-- Netflix-style top control bar overlay -->
-                            <div class="player-header-overlay" id="playerHeaderOverlay">
-                                <button class="player-back-btn" onclick="window.history.back()"><i class="fa-solid fa-arrow-left"></i></button>
-                                <div class="player-title-info">
-                                    <span id="playerMediaCategory">Streaming</span>
-                                    <h2 id="playerMediaTitle">Title</h2>
-                                </div>
-                                <div class="player-status-badge">
-                                    <span class="status-dot"></span>
-                                    <span id="playerStatusText">1080P Stable</span>
-                                </div>
+                            <div class="player-status-badge">
+                                <span class="status-dot"></span>
+                                <span id="playerStatusText">1080P Stable</span>
                             </div>
-                            <!-- Premium Video Player -->
-                            <video id="player" playsinline controls autoplay></video>
+                        </div>
+                        <!-- Premium Video Player -->
+                        <video id="player" playsinline controls autoplay></video>
+                    </div>
+                    
+                    <!-- Metadata details card -->
+                    <div class="cinema-meta-section">
+                        <h1 id="watchTitle">Title</h1>
+                        
+                        <div class="meta-row">
+                            <span class="rating" id="watchRating"><i class="fa-solid fa-star"></i> --</span>
+                            <span class="year" id="watchYear">----</span>
+                            <span class="country" id="watchCountry">Country</span>
+                            <span class="duration" id="watchDuration">-- min</span>
                         </div>
                         
-                        <!-- Metadata details sit below player -->
-                        <div class="cinema-meta-section">
-                            <h1 id="watchTitle">Title</h1>
-                            
-                            <div class="meta-row">
-                                <span class="rating" id="watchRating"><i class="fa-solid fa-star"></i> --</span>
-                                <span class="year" id="watchYear">----</span>
-                                <span class="country" id="watchCountry">Country</span>
-                                <span class="duration" id="watchDuration">-- min</span>
-                            </div>
-                            
-                            <!-- Premium Actions Row -->
-                            <div class="watch-actions-row">
-                                <button class="action-btn" id="actionAddList"><i class="fa-solid fa-plus"></i> Add to list</button>
-                                <button class="action-btn" id="actionShare"><i class="fa-solid fa-share-nodes"></i> Share</button>
-                                <button class="action-btn" id="actionDownload"><i class="fa-solid fa-arrow-down-to-bracket"></i> Download</button>
-                                <button class="action-btn" id="actionViewDoc"><i class="fa-solid fa-circle-info"></i> Info</button>
-                            </div>
+                        <!-- Premium Actions Row -->
+                        <div class="watch-actions-row">
+                            <button class="action-btn" id="actionAddList"><i class="fa-solid fa-plus"></i> Add to list</button>
+                            <button class="action-btn" id="actionShare"><i class="fa-solid fa-share-nodes"></i> Share</button>
+                            <button class="action-btn" id="actionDownload"><i class="fa-solid fa-arrow-down-to-bracket"></i> Download</button>
+                            <button class="action-btn" id="actionViewDoc"><i class="fa-solid fa-circle-info"></i> Info</button>
+                        </div>
+                    </div>
 
-                            <!-- Resources & Episodes Selector -->
-                            <div class="resources-container">
-                                <div class="resources-header">
-                                    <span>Resources <span class="upload-by">Uploaded by christodrd etc.</span></span>
-                                    <i class="fa-solid fa-circle-question info-icon"></i>
-                                </div>
-                                
-                                <!-- Dub / Language selector (visible when multiple dubs exist) -->
-                                <div class="dub-selector-wrapper" id="watchDubSelectorGroup" style="display: none;">
-                                    <select id="dubLanguageSelect" class="custom-select">
-                                        <!-- Options loaded dynamically -->
-                                    </select>
-                                </div>
-                                
-                                <!-- TV Show Season & Episode grid (hidden for movies) -->
-                                <div class="tv-episode-selector" id="watchTvSelector" style="display: none;">
-                                    <div class="season-tabs" id="watchSeasonTabs">
-                                        <!-- Season buttons loaded dynamically -->
-                                    </div>
-                                    <div class="episode-grid scroll-y" id="watchEpisodeGrid">
-                                        <!-- Episode buttons loaded dynamically -->
-                                    </div>
-                                </div>
+                    <!-- Resources & Episodes Selector (Sidebar on desktop) -->
+                    <div class="resources-container">
+                        <div class="resources-header">
+                            <span>Resources <span class="upload-by">Uploaded by christodrd etc.</span></span>
+                            <i class="fa-solid fa-circle-question info-icon"></i>
+                        </div>
+                        
+                        <!-- Dub / Language selector (visible when multiple dubs exist) -->
+                        <div class="dub-selector-wrapper" id="watchDubSelectorGroup" style="display: none;">
+                            <select id="dubLanguageSelect" class="custom-select">
+                                <!-- Options loaded dynamically -->
+                            </select>
+                        </div>
+                        
+                        <!-- TV Show Season & Episode grid (hidden for movies) -->
+                        <div class="tv-episode-selector" id="watchTvSelector" style="display: none;">
+                            <div class="season-tabs" id="watchSeasonTabs">
+                                <!-- Season buttons loaded dynamically -->
                             </div>
-
-                            <!-- Tabs Section (For you & Comments) -->
-                            <div class="watch-tabs-section">
-                                <div class="watch-tabs-header">
-                                    <button class="tab-header-btn active" id="tabBtnForYou">For you</button>
-                                    <button class="tab-header-btn" id="tabBtnComments">Comments (99+)</button>
-                                </div>
-                                <div class="watch-tabs-content">
-                                    <div class="tab-pane active" id="tabPaneForYou">
-                                        <div class="content-grid" id="watchRecommendationsGrid">
-                                            <!-- Dynamically populated recommendations -->
-                                        </div>
-                                    </div>
-                                    <div class="tab-pane" id="tabPaneComments">
-                                        <div class="comments-list">
-                                            <div class="comment-item">
-                                                <div class="comment-avatar"><i class="fa-solid fa-user"></i></div>
-                                                <div class="comment-details">
-                                                    <div class="comment-meta">
-                                                        <span class="comment-author">apon_streamhit</span>
-                                                        <span class="comment-time">2 hours ago</span>
-                                                    </div>
-                                                    <p class="comment-text">Finally found a site that plays Hindi dub smooth and fast. Kudos!</p>
-                                                </div>
-                                            </div>
-                                            <div class="comment-item">
-                                                <div class="comment-avatar"><i class="fa-solid fa-user"></i></div>
-                                                <div class="comment-details">
-                                                    <div class="comment-meta">
-                                                        <span class="comment-author">john_doe</span>
-                                                        <span class="comment-time">1 day ago</span>
-                                                    </div>
-                                                    <p class="comment-text">Quality is 1080p stream as advertised. Thanks for the fix on TV episodes!</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="tag-container" id="watchGenres">
-                                <!-- Tags loaded dynamically -->
-                            </div>
-                            
-                            <div class="description-box">
-                                <h3>Description</h3>
-                                <p id="watchDescription">Description loading...</p>
+                            <div class="episode-grid scroll-y" id="watchEpisodeGrid">
+                                <!-- Episode buttons loaded dynamically -->
                             </div>
                         </div>
                     </div>
+
+                    <!-- Description & Comments Card -->
+                    <div class="cinema-desc-section">
+                        <div class="tag-container" id="watchGenres">
+                            <!-- Tags loaded dynamically -->
+                        </div>
+                        
+                        <div class="description-box">
+                            <h3>Description</h3>
+                            <p id="watchDescription">Description loading...</p>
+                        </div>
+
+                        <!-- Tabs Section (For you & Comments) -->
+                        <div class="watch-tabs-section">
+                            <div class="watch-tabs-header">
+                                <button class="tab-header-btn active" id="tabBtnForYou">For you</button>
+                                <button class="tab-header-btn" id="tabBtnComments">Comments (99+)</button>
+                            </div>
+                            <div class="watch-tabs-content">
+                                <div class="tab-pane active" id="tabPaneForYou">
+                                    <div class="content-grid" id="watchRecommendationsGrid">
+                                        <!-- Dynamically populated recommendations -->
+                                    </div>
+                                </div>
+                                <div class="tab-pane" id="tabPaneComments">
+                                    <div class="comments-list">
+                                        <div class="comment-item">
+                                            <div class="comment-avatar"><i class="fa-solid fa-user"></i></div>
+                                            <div class="comment-details">
+                                                <div class="comment-meta">
+                                                    <span class="comment-author">apon_streamhit</span>
+                                                    <span class="comment-time">2 hours ago</span>
+                                                </div>
+                                                <p class="comment-text">Finally found a site that plays Hindi dub smooth and fast. Kudos!</p>
+                                            </div>
+                                        </div>
+                                        <div class="comment-item">
+                                            <div class="comment-avatar"><i class="fa-solid fa-user"></i></div>
+                                            <div class="comment-details">
+                                                <div class="comment-meta">
+                                                    <span class="comment-author">john_doe</span>
+                                                    <span class="comment-time">1 day ago</span>
+                                                </div>
+                                                <p class="comment-text">Quality is 1080p stream as advertised. Thanks for the fix on TV episodes!</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div>
                     
                 </div>
             </div>

@@ -986,15 +986,6 @@ function renderEpisodes(season) {
                 // Episode click is a direct user gesture — mark interacted so autoplay works
                 state.userInteracted = true;
 
-                // Synchronously unlock media elements to satisfy strict mobile browser play gesture policies
-                const video = document.getElementById("player");
-                if (video) {
-                    video.play().then(() => video.pause()).catch(e => {});
-                }
-                if (playerInstance) {
-                    playerInstance.play().then(() => playerInstance.pause()).catch(e => {});
-                }
-
                 // Immediately stop current playback so there's no audio bleed
                 if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
 
