@@ -309,6 +309,12 @@ async def db_save_season(subject_id: str, season_number: int, episode_count: int
     if not pool: return
     async with pool.acquire() as conn:
         async with conn.cursor() as cur:
+            # Insert placeholder subject to avoid foreign key failure
+            await cur.execute("""
+                INSERT IGNORE INTO subjects (subject_id, title, subject_type, release_date)
+                VALUES (%s, %s, %s, %s)
+            """, (str(subject_id), "Placeholder", 2, "2026"))
+            
             await cur.execute("""
                 INSERT INTO seasons (subject_id, season_number, episode_count, episodes_list)
                 VALUES (%s, %s, %s, %s)
@@ -320,8 +326,19 @@ async def db_save_season(subject_id: str, season_number: int, episode_count: int
 async def db_save_resource(r: dict):
     pool = await get_db_pool()
     if not pool: return
+    subject_id = str(r["subject_id"])
+    season = int(r.get("season", 0))
+    episode = int(r.get("episode", 0))
+    guess_type = 2 if (season > 0 or episode > 0) else 1
+    
     async with pool.acquire() as conn:
         async with conn.cursor() as cur:
+            # Insert placeholder subject to avoid foreign key failure
+            await cur.execute("""
+                INSERT IGNORE INTO subjects (subject_id, title, subject_type, release_date)
+                VALUES (%s, %s, %s, %s)
+            """, (subject_id, "Placeholder", guess_type, "2026"))
+            
             await cur.execute("""
                 INSERT INTO play_resources (resource_id, subject_id, season, episode, resolution, size, resource_link, expires_at)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
@@ -331,16 +348,23 @@ async def db_save_resource(r: dict):
                     expires_at=VALUES(expires_at),
                     size=VALUES(size)
             """, (
-                str(r["resource_id"]), str(r["subject_id"]), int(r.get("season", 0)), int(r.get("episode", 0)),
+                str(r["resource_id"]), subject_id, season, episode,
                 int(r["resolution"]), int(r.get("size", 0)), r["resource_link"], r.get("expires_at")
             ))
 
 async def db_save_caption(c: dict):
     pool = await get_db_pool()
     if not pool: return
+    subject_id = str(c["subject_id"])
     try:
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
+                # Insert placeholder subject to avoid foreign key failure
+                await cur.execute("""
+                    INSERT IGNORE INTO subjects (subject_id, title, subject_type, release_date)
+                    VALUES (%s, %s, %s, %s)
+                """, (subject_id, "Placeholder", 1, "2026"))
+                
                 await cur.execute("""
                     INSERT INTO captions (caption_id, subject_id, resource_id, label, lang, url)
                     VALUES (%s, %s, %s, %s, %s, %s)
@@ -348,7 +372,7 @@ async def db_save_caption(c: dict):
                         caption_id = VALUES(caption_id),
                         label = VALUES(label),
                         url = VALUES(url)
-                """, (c["caption_id"], c["subject_id"], c["resource_id"], c["label"], c["lang"], c["url"]))
+                """, (c["caption_id"], subject_id, c["resource_id"], c["label"], c["lang"], c["url"]))
     except Exception as e:
         print(f"[Database] Error saving caption: {e}")
 
