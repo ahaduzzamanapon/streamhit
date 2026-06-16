@@ -615,7 +615,8 @@ async function initWatchPage() {
         controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'captions', 'settings', 'pip', 'fullscreen'],
         settings: ['quality', 'speed'],
         quality: { default: 1080, options: [1080, 720, 480, 360], forced: true },
-        keyboard: { global: true, focused: true }
+        keyboard: { global: true, focused: true },
+        captions: { active: true, update: true }
     });
 
     // Custom Player Loading Overlay event bindings
@@ -1005,11 +1006,13 @@ async function loadPlayResources(subjectId, season = null, episode = null) {
             return (prev.resolution > current.resolution) ? prev : current;
         });
 
-        // Load subtitles first
-        await loadSubtitles(state.selectedSubject.subjectId, bestResource.resourceId);
-
-        // Feed all resources and captions to Plyr
+        // Feed all resources to Play player first to play video immediately
         playResources();
+
+        // Load subtitles in the background without blocking video loading/playback
+        loadSubtitles(state.selectedSubject.subjectId, bestResource.resourceId).catch(err => {
+            console.error("[Player] Failed to load subtitles:", err);
+        });
     } else {
         console.error("No play resources found for this item");
         if (loaderOverlay) loaderOverlay.classList.remove("visible");
@@ -1139,6 +1142,9 @@ async function playResources() {
             }
         }, 150);
     }
+
+    // Always apply any cached/loaded subtitles to the media element
+    updatePlayerSubtitles();
 }
 
 async function loadSubtitles(subjectId, resourceId) {
@@ -1159,6 +1165,35 @@ async function loadSubtitles(subjectId, resourceId) {
                 default: cap.lan === 'en'
             };
             state.availableCaptions.push(track);
+        });
+
+        // Add them dynamically to the video element for Plyr to update
+        updatePlayerSubtitles();
+    }
+}
+
+function updatePlayerSubtitles() {
+    const videoElement = playerInstance ? playerInstance.media : document.getElementById("player");
+    if (!videoElement) return;
+
+    console.log("[Player] Injecting dynamic subtitles:", state.availableCaptions);
+
+    // Remove any existing tracks
+    const existingTracks = videoElement.querySelectorAll("track");
+    existingTracks.forEach(t => t.remove());
+
+    // Add new tracks
+    if (state.availableCaptions && state.availableCaptions.length > 0) {
+        state.availableCaptions.forEach(track => {
+            const trackEl = document.createElement("track");
+            trackEl.kind = "captions";
+            trackEl.label = track.label;
+            trackEl.srclang = track.srclang;
+            trackEl.src = track.src;
+            if (track.default) {
+                trackEl.default = true;
+            }
+            videoElement.appendChild(trackEl);
         });
     }
 }

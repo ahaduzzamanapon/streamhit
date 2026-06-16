@@ -9,7 +9,7 @@ import urllib.parse
 import secrets
 import asyncio
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import httpx
 import pymysql
 import warnings
@@ -575,8 +575,8 @@ def get_link_expiration(url: str) -> datetime:
         timestamp = int(match.group(2))
         if timestamp > 9999999999:  # Milliseconds
             timestamp = timestamp // 1000
-        return datetime.fromtimestamp(timestamp)
-    return datetime.now() + timedelta(hours=2)
+        return datetime.fromtimestamp(timestamp, tz=timezone.utc).replace(tzinfo=None)
+    return datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=2)
 
 # ==========================================================================
 # 4. BACKGROUND SCRAPER SYSTEM
@@ -1092,7 +1092,7 @@ async def find_best_subject_for_language(detail_path: str, requested_lang: str, 
         return {"subjectId": fallback_subject_id, "detailPath": detail_path}
 
 async def resolve_tmdb_resource(tmdb_id: str, is_tv: bool, season: int, episode: int, lang: str = "en") -> dict:
-    now = datetime.now()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     
     # 1. Try local MySQL lookup first
     pool = await get_db_pool()
@@ -1935,7 +1935,7 @@ async def get_season_info(subjectId: str, detailPath: str = ""):
 # Play Resource link (resolves and auto-renews CDN links)
 @app.get("/api/resource")
 async def get_resource(subjectId: str, se: int = 0, ep: int = 0, detailPath: str = ""):
-    now = datetime.now()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     pool = await get_db_pool()
 
     # Query MySQL for cached play resources
