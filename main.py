@@ -38,6 +38,7 @@ DB_USER = os.getenv("DB_USER", "root")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_NAME = os.getenv("DB_NAME", "moviebox")
 APP_URL = os.getenv("APP_URL", "http://localhost:3005")
+DEPLOY_SECRET = os.getenv("DEPLOY_SECRET", "streamhit_secret_update_2026")
 
 SECRET_KEY_DEFAULT = "76iRl07s0xSN9jqmEWAt79EBJZulIQIsV64FZr2O"
 USER_AGENT = "com.community.oneroom/50020046 (Linux; U; Android 11; en_US; Redmi Note 10; Build/RP1A.200720.011; Cronet/135.0.7012.3)"
@@ -1884,6 +1885,35 @@ async def get_detail(subjectId: str, detailPath: str = ""):
                 "isCam": False
             }
         }
+
+# Deployment / Auto-Update Endpoint
+import subprocess
+
+@app.get("/api/update-git-deploy")
+@app.post("/api/update-git-deploy")
+async def update_git_deploy(secret: str = ""):
+    if secret != DEPLOY_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden: Invalid Secret")
+        
+    try:
+        script_path = os.path.join(base_dir, "streamhitupdate.sh")
+        if os.path.exists(script_path):
+            if os.name != 'nt':
+                # Run the bash script detached in its own session group so it survives python restart
+                subprocess.Popen(
+                    ["/bin/bash", script_path],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True
+                )
+                return {"status": "success", "message": "Production update script triggered."}
+            else:
+                # Windows (testing/development)
+                return {"status": "success", "message": "Windows environment detected. Update simulated successfully."}
+        else:
+            return {"status": "error", "message": f"Update script not found at {script_path}"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 # TV Seasons/Episodes
 @app.get("/api/season-info")

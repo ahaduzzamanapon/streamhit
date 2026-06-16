@@ -69,6 +69,11 @@ document.addEventListener("DOMContentLoaded", () => {
     detectRoute();
     bindCommonEvents();
 
+    // Set userInteracted to true on any user click on the document to capture gesture
+    document.addEventListener("click", () => {
+        state.userInteracted = true;
+    }, { once: false, passive: true });
+
     if (routes.isHome) {
         initHomePage();
     } else if (routes.isMovies || routes.isTv) {
@@ -597,6 +602,32 @@ function showShimmers(show) {
 // ==========================================================================
 // WATCH / DEDICATED PLAYER PAGE LOGIC
 // ==========================================================================
+function triggerAutoplay(player) {
+    if (!player) return;
+    
+    // Attempt unmuted play first
+    player.play().then(() => {
+        console.log("[Autoplay] Played successfully unmuted");
+    }).catch(e => {
+        console.log("[Autoplay] Unmuted playback prevented, attempting muted play", e);
+        player.muted = true;
+        player.volume = 0;
+        player.play().then(() => {
+            console.log("[Autoplay] Played successfully muted");
+        }).catch(err => {
+            console.log("[Autoplay] Muted playback also prevented", err);
+            const loaderEl = document.getElementById("playerLoaderOverlay");
+            if (loaderEl) {
+                const statusTxt = loaderEl.querySelector("span");
+                if (statusTxt) {
+                    statusTxt.innerHTML = '<i class="fa-solid fa-circle-play" style="margin-right: 8px; font-size: 1.2em;"></i> Click to Play';
+                }
+                loaderEl.classList.add("visible");
+            }
+        });
+    });
+}
+
 async function initWatchPage() {
     const urlParams = new URLSearchParams(window.location.search);
     let subjectId = urlParams.get("id");
@@ -629,12 +660,23 @@ async function initWatchPage() {
         if (loaderOverlay) {
             const statusTxt = loaderOverlay.querySelector("span");
             if (statusTxt) statusTxt.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:8px;"></i>Loading stream...';
+            loaderOverlay.style.background = "rgba(0, 0, 0, 0.8)";
             loaderOverlay.classList.add("visible");
         }
     };
     
     const hideLoader = () => {
-        if (loaderOverlay) loaderOverlay.classList.remove("visible");
+        if (loaderOverlay) {
+            // If playing but muted and no interaction yet, show translucent unmute prompt
+            if (playerInstance && playerInstance.muted && !state.userInteracted) {
+                const statusTxt = loaderOverlay.querySelector("span");
+                if (statusTxt) statusTxt.innerHTML = '<i class="fa-solid fa-volume-high" style="margin-right:8px; font-size: 1.2em;"></i> Click to Unmute';
+                loaderOverlay.style.background = "rgba(0, 0, 0, 0.4)";
+                loaderOverlay.classList.add("visible");
+            } else {
+                loaderOverlay.classList.remove("visible");
+            }
+        }
     };
     
     if (loaderOverlay) {
@@ -642,7 +684,12 @@ async function initWatchPage() {
         loaderOverlay.onclick = () => {
             state.userInteracted = true;
             if (playerInstance) {
+                if (playerInstance.muted) {
+                    playerInstance.muted = false;
+                    playerInstance.volume = 1.0;
+                }
                 playerInstance.play().catch(e => console.log("[Player] Overlay play failed:", e));
+                hideLoader();
             }
         };
     }
@@ -654,6 +701,12 @@ async function initWatchPage() {
     playerInstance.on('play', hideLoader);
     // Mark user interaction on any manual play gesture
     playerInstance.on('play', () => { state.userInteracted = true; });
+    playerInstance.on('volumechange', () => {
+        if (playerInstance && !playerInstance.muted) {
+            state.userInteracted = true;
+            hideLoader();
+        }
+    });
 
     const loading = document.getElementById("watchPageLoading");
     const content = document.getElementById("watchWrapper");
@@ -1086,24 +1139,12 @@ async function playResources() {
             hlsInstance.loadSource(streamUrl);
             hlsInstance.attachMedia(videoElement);
             hlsInstance.on(Hls.Events.MANIFEST_PARSED, function() {
-                playerInstance.play().catch(e => {
-                    console.log("Autoplay prevented:", e);
-                    const statusTxt = document.getElementById("playerLoaderOverlay")?.querySelector("span");
-                    if (statusTxt) {
-                        statusTxt.innerHTML = '<i class="fa-solid fa-circle-play" style="margin-right: 8px; font-size: 1.2em;"></i> Click to Play';
-                    }
-                });
+                triggerAutoplay(playerInstance);
             });
         } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
             videoElement.src = streamUrl;
             videoElement.load();
-            playerInstance.play().catch(e => {
-                console.log("Autoplay prevented:", e);
-                const statusTxt = document.getElementById("playerLoaderOverlay")?.querySelector("span");
-                if (statusTxt) {
-                    statusTxt.innerHTML = '<i class="fa-solid fa-circle-play" style="margin-right: 8px; font-size: 1.2em;"></i> Click to Play';
-                }
-            });
+            triggerAutoplay(playerInstance);
         }
     } else {
         // Set the source natively on Plyr to show settings dropdown
@@ -1111,25 +1152,7 @@ async function playResources() {
         // for the Plyr-level 'canplay' event (which still fires on the instance)
         // rather than calling play() immediately after setting source.
         playerInstance.once('canplay', () => {
-            if (state.userInteracted) {
-                playerInstance.play().catch(e => {
-                    console.log("[Player] Autoplay prevented:", e);
-                    const loaderEl = document.getElementById("playerLoaderOverlay");
-                    const statusTxt = loaderEl?.querySelector("span");
-                    if (statusTxt) {
-                        statusTxt.innerHTML = '<i class="fa-solid fa-circle-play" style="margin-right: 8px; font-size: 1.2em;"></i> Click to Play';
-                    }
-                    if (loaderEl) loaderEl.classList.add("visible");
-                });
-            } else {
-                // First load, no interaction yet — show click-to-play prompt
-                const loaderEl = document.getElementById("playerLoaderOverlay");
-                const statusTxt = loaderEl?.querySelector("span");
-                if (statusTxt) {
-                    statusTxt.innerHTML = '<i class="fa-solid fa-circle-play" style="margin-right: 8px; font-size: 1.2em;"></i> Click to Play';
-                }
-                if (loaderEl) loaderEl.classList.add("visible");
-            }
+            triggerAutoplay(playerInstance);
         });
 
         playerInstance.source = {
