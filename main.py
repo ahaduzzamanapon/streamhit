@@ -2211,6 +2211,28 @@ async def clear_cache_force():
             return {"status": "error", "message": str(e)}
     return {"status": "error", "message": "Database pool not initialized"}
 
+@app.get("/api/check-db")
+async def check_db_endpoint(subjectId: str, se: int = 0, ep: int = 0):
+    pool = await get_db_pool()
+    if pool:
+        try:
+            async with pool.acquire() as conn:
+                async with conn.cursor(aiomysql.DictCursor) as cur:
+                    await cur.execute("""
+                        SELECT * FROM play_resources 
+                        WHERE subject_id = %s AND season = %s AND episode = %s
+                    """, (subjectId, se, ep))
+                    rows = await cur.fetchall()
+                    
+                    # Convert datetimes to strings for JSON serialization
+                    for r in rows:
+                        if r.get("expires_at"):
+                            r["expires_at"] = r["expires_at"].strftime('%Y-%m-%d %H:%M:%S')
+                    return {"rows": rows}
+        except Exception as e:
+            return {"error": str(e)}
+    return {"error": "DB Pool not initialized"}
+
 @app.get("/api/test-proxy-debug")
 async def test_proxy_debug():
     results = {}
