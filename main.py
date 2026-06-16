@@ -2157,16 +2157,17 @@ async def proxy_subtitle(url: str):
             print(f"[Subtitle Proxy] Direct fetch failed: {e}. Marking direct API as failed, trying via Singapore proxy...")
             last_direct_fail_time = time.time()
 
-    # 2. Proxy Fallback
+    # 2. Proxy Fallback (using Cloudflare Worker proxies)
     if resp_text is None:
         try:
-            proxied_url = f"http://194.127.178.223/?url={urllib.parse.quote(url)}"
-            async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+            worker = get_next_worker()
+            proxied_url = f"{worker}/mp4-proxy?url={urllib.parse.quote(url)}&headers={urllib.parse.quote(json.dumps({}))}"
+            async with httpx.AsyncClient(trust_env=False, timeout=6.0) as client:
                 resp = await client.get(proxied_url)
                 if resp.status_code == 200:
                     resp_text = resp.text
         except Exception as e:
-            print(f"[Subtitle Proxy] Singapore proxy fetch failed: {e}")
+            print(f"[Subtitle Proxy] Worker proxy fetch failed: {e}")
 
     if resp_text is None:
         raise HTTPException(status_code=502, detail="Failed to retrieve subtitle track")

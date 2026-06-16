@@ -1009,10 +1009,18 @@ async function loadPlayResources(subjectId, season = null, episode = null) {
         // Feed all resources to Play player first to play video immediately
         playResources();
 
-        // Load subtitles in the background without blocking video loading/playback
-        loadSubtitles(state.selectedSubject.subjectId, bestResource.resourceId).catch(err => {
-            console.error("[Player] Failed to load subtitles:", err);
-        });
+        // Load subtitles in the background after 10 seconds of delay to avoid interfering with playback start
+        setTimeout(() => {
+            if (state.selectedSubject && state.availableResources && state.availableResources.length > 0) {
+                const bestRes = state.availableResources.reduce((prev, current) => {
+                    return (prev.resolution > current.resolution) ? prev : current;
+                });
+                console.log("[Player] Loading subtitles in background after playback start delay...");
+                loadSubtitles(state.selectedSubject.subjectId, bestRes.resourceId).catch(err => {
+                    console.error("[Player] Failed to load subtitles:", err);
+                });
+            }
+        }, 10000);
     } else {
         console.error("No play resources found for this item");
         if (loaderOverlay) loaderOverlay.classList.remove("visible");
