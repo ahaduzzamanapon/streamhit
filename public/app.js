@@ -412,6 +412,28 @@ async function initFilterPage() {
     if (keyword) {
         document.getElementById("searchInput").value = keyword;
         state.currentQuery = keyword;
+
+        // UI adjustments for search mode
+        const sidebarActive = document.querySelector(".sidebar .nav-menu li.active");
+        if (sidebarActive) {
+            sidebarActive.classList.remove("active");
+        }
+        const mobileActive = document.querySelector(".mobile-navigation-bar a.nav-item.active");
+        if (mobileActive) {
+            mobileActive.classList.remove("active");
+        }
+        const filterPanel = document.getElementById("filterPanel");
+        if (filterPanel) {
+            filterPanel.classList.remove("open");
+        }
+        const filterToggleBtn = document.getElementById("filterToggleBtn");
+        if (filterToggleBtn) {
+            filterToggleBtn.classList.remove("active");
+        }
+        const catTab = document.querySelector(".cat-tab");
+        if (catTab) {
+            catTab.textContent = `Search Results for "${keyword}"`;
+        }
     }
 
     // Helper to highlight pre-selected filter value from URL
@@ -1314,9 +1336,8 @@ function bindCommonEvents() {
         const handleSearch = () => {
             const query = searchInput.value.trim();
             if (!query) return;
-            // Determine target page: stay on /tv if currently on /tv, else default to /movies
-            const targetPath = routes.isTv ? "/tv" : "/movies";
-            window.location.href = `${targetPath}?keyword=${encodeURIComponent(query)}&type=${state.subjectType}`;
+            // Always route search queries globally to /movies with type=0
+            window.location.href = `/movies?keyword=${encodeURIComponent(query)}&type=0`;
         };
 
         searchBtn.onclick = handleSearch;
