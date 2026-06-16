@@ -690,7 +690,7 @@ async def scrape_episode_resources(subject_id: str, season: int, episode: int):
         referer = f"https://123movienow.cc/spa/videoPlayPage/movies/{detail_path}?id={subject_id}&type=/movie/detail"
         origin = "https://123movienow.cc"
         
-        path = f"/wefeed-h5-bff/web/subject/download?subjectId={subject_id}&se={season}&ep={episode}"
+        path = f"/wefeed-h5-bff/web/subject/download?subjectId={subject_id}&se={season}&ep={episode}&_t={int(time.time())}"
         download_data = await request_h5_api("GET", path, host="https://h5.aoneroom.com", origin=origin, referer=referer)
         
         inner_data = download_data.get("data", {})
@@ -1218,7 +1218,7 @@ async def resolve_tmdb_resource(tmdb_id: str, is_tv: bool, season: int, episode:
     referer = f"https://123movienow.cc/spa/videoPlayPage/movies/{preferred.get('detailPath') or match['detailPath']}?id={subject_id}&type=/movie/detail"
     origin = "https://123movienow.cc"
     
-    path = f"/wefeed-h5-bff/web/subject/download?subjectId={subject_id}&se={season if is_tv else 0}&ep={episode if is_tv else 0}"
+    path = f"/wefeed-h5-bff/web/subject/download?subjectId={subject_id}&se={season if is_tv else 0}&ep={episode if is_tv else 0}&_t={int(time.time())}"
     download_data = await request_h5_api("GET", path, host="https://h5.aoneroom.com", origin=origin, referer=referer)
     
     inner_data = download_data.get("data", {})
@@ -2012,7 +2012,7 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0, detailPath: str
         referer = f"https://123movienow.cc/spa/videoPlayPage/movies/{detail_path}?id={subjectId}&type=/movie/detail"
         origin = "https://123movienow.cc"
         
-        path = f"/wefeed-h5-bff/web/subject/download?subjectId={subjectId}&se={se}&ep={ep}"
+        path = f"/wefeed-h5-bff/web/subject/download?subjectId={subjectId}&se={se}&ep={ep}&_t={int(time.time())}"
         download_data = await request_h5_api("GET", path, host="https://h5.aoneroom.com", origin=origin, referer=referer)
         
         inner_data = download_data.get("data", {})
