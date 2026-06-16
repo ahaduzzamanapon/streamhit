@@ -2044,6 +2044,82 @@ async def proxy_subtitle(url: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/test-proxy-debug")
+async def test_proxy_debug():
+    results = {}
+    video_url = "https://bcdnxw.hakunaymatata.com/bt/c09098cd94c4d67dceac9ce8f9d47c27.mp4?sign=9eb65e2eb27b4bb199929d912f42d9aa&t=1781587811"
+    headers = {
+        "Origin": "https://fmoviesunblocked.net",
+        "Referer": "https://fmoviesunblocked.net/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "*/*",
+        "Range": "bytes=0-1023"
+    }
+    
+    # Test 1: Direct proxying
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+            resp = await client.get(video_url, headers=headers)
+            results["direct"] = {
+                "status": resp.status_code,
+                "headers": dict(resp.headers),
+                "body_len": len(resp.read())
+            }
+    except Exception as e:
+        results["direct"] = {
+            "error": str(e),
+            "type": str(type(e))
+        }
+        
+    # Test 2: Direct proxying with verify=False
+    try:
+        async with httpx.AsyncClient(trust_env=False, verify=False, timeout=10.0) as client:
+            resp = await client.get(video_url, headers=headers)
+            results["direct_no_verify"] = {
+                "status": resp.status_code,
+                "headers": dict(resp.headers),
+                "body_len": len(resp.read())
+            }
+    except Exception as e:
+        results["direct_no_verify"] = {
+            "error": str(e),
+            "type": str(type(e))
+        }
+
+    # Test 3: Worker proxy
+    worker = "https://frosty-tree-ae87.vidnest-1.workers.dev"
+    proxy_url = f"{worker}/mp4-proxy?url={urllib.parse.quote(video_url)}&headers={urllib.parse.quote(json.dumps(headers))}"
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
+            resp = await client.get(proxy_url)
+            results["worker"] = {
+                "status": resp.status_code,
+                "headers": dict(resp.headers),
+                "body_len": len(resp.read())
+            }
+    except Exception as e:
+        results["worker"] = {
+            "error": str(e),
+            "type": str(type(e))
+        }
+        
+    # Test 4: Worker proxy with verify=False
+    try:
+        async with httpx.AsyncClient(trust_env=False, verify=False, timeout=15.0) as client:
+            resp = await client.get(proxy_url)
+            results["worker_no_verify"] = {
+                "status": resp.status_code,
+                "headers": dict(resp.headers),
+                "body_len": len(resp.read())
+            }
+    except Exception as e:
+        results["worker_no_verify"] = {
+            "error": str(e),
+            "type": str(type(e))
+        }
+
+    return results
+
 # ==========================================================================
 # 6. STREAM PROXYING & REGION LOCK BYPASS
 # ==========================================================================
