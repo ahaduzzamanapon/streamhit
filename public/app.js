@@ -1,6 +1,11 @@
 // Global Plyr player instance
 let playerInstance = null;
 let hlsInstance = null;
+let bufferingCount = 0;
+let lastBufferingTime = 0;
+let isSwitchingQuality = false;
+let userSelectedQuality = false;
+let isProgrammaticQualityChange = false;
 
 // App State
 const state = {
@@ -816,7 +821,35 @@ async function initWatchPage() {
     }
 
     // Plyr events survive source changes — attach once here, they stay alive
-    playerInstance.on('waiting', showLoader);
+    playerInstance.on('waiting', () => {
+        showLoader();
+        
+        // Auto-quality selection logic: if network is slow/buffering, switch resolution
+        if (userSelectedQuality || isSwitchingQuality) return;
+        
+        const now = Date.now();
+        if (now - lastBufferingTime < 15000) {
+            bufferingCount++;
+        } else {
+            bufferingCount = 1;
+        }
+        lastBufferingTime = now;
+        
+        console.log(`[Player Control] Buffering detected. Count: ${bufferingCount}`);
+        
+        if (bufferingCount >= 3) {
+            bufferingCount = 0;
+            autoDowngradeQuality();
+        }
+    });
+    
+    playerInstance.on('qualitychange', (event) => {
+        if (!isProgrammaticQualityChange) {
+            console.log(`[Player Control] User manually selected quality: ${event.detail.quality}p. Disabling auto-quality down.`);
+            userSelectedQuality = true;
+        }
+    });
+
     playerInstance.on('seeking', showLoader);
     playerInstance.on('playing', hideLoader);
     playerInstance.on('play', hideLoader);
@@ -1136,6 +1169,13 @@ function renderEpisodes(season) {
 }
 
 async function loadPlayResources(subjectId, season = null, episode = null) {
+    // Reset auto-quality options on new stream loading
+    userSelectedQuality = false;
+    bufferingCount = 0;
+    lastBufferingTime = 0;
+    isSwitchingQuality = false;
+    isProgrammaticQualityChange = false;
+
     const urlParams = new URLSearchParams(window.location.search);
     const detailPath = urlParams.get("path") || "";
 
@@ -1355,6 +1395,78 @@ function loadDirectMP4Fallback() {
         playerInstance.play();
         console.log("[Player] Direct fallback played.");
     }
+}
+
+function autoDowngradeQuality() {
+    if (!playerInstance || !state.availableResources || state.availableResources.length <= 1) return;
+    if (userSelectedQuality) return;
+
+    const currentQuality = playerInstance.quality;
+    if (!currentQuality) return;
+
+    // Filter and sort available resolutions descending (e.g. [1080, 720, 480, 360])
+    const resolutions = state.availableResources
+        .map(r => r.resolution || 720)
+        .filter((value, idx, self) => self.indexOf(value) === idx)
+        .sort((a, b) => b - a);
+
+    const currentIndex = resolutions.indexOf(currentQuality);
+    if (currentIndex !== -1 && currentIndex < resolutions.length - 1) {
+        const nextLowerQuality = resolutions[currentIndex + 1];
+        
+        console.log(`[Player AutoQuality] Buffering threshold exceeded. Auto downgrading quality from ${currentQuality}p to ${nextLowerQuality}p...`);
+        
+        isSwitchingQuality = true;
+        isProgrammaticQualityChange = true;
+        
+        showPlayerNotification(`Slow connection. Auto switched to ${nextLowerQuality}p.`);
+        
+        playerInstance.quality = nextLowerQuality;
+        
+        setTimeout(() => {
+            isProgrammaticQualityChange = false;
+            isSwitchingQuality = false;
+        }, 1500);
+    }
+}
+
+function showPlayerNotification(message) {
+    let notification = document.getElementById("playerToast");
+    if (!notification) {
+        notification = document.createElement("div");
+        notification.id = "playerToast";
+        notification.style.position = "absolute";
+        notification.style.top = "20px";
+        notification.style.left = "50%";
+        notification.style.transform = "translateX(-50%)";
+        notification.style.backgroundColor = "rgba(24, 27, 34, 0.95)";
+        notification.style.border = "1px solid var(--color-accent)";
+        notification.style.color = "#ffffff";
+        notification.style.padding = "8px 18px";
+        notification.style.borderRadius = "20px";
+        notification.style.fontSize = "12px";
+        notification.style.fontWeight = "600";
+        notification.style.zIndex = "100";
+        notification.style.boxShadow = "var(--shadow-md)";
+        notification.style.pointerEvents = "none";
+        notification.style.transition = "opacity 0.3s ease";
+        
+        const playerContainer = document.querySelector(".plyr");
+        if (playerContainer) {
+            playerContainer.appendChild(notification);
+        } else {
+            document.body.appendChild(notification);
+        }
+    }
+    
+    notification.textContent = message;
+    notification.style.opacity = "1";
+    
+    setTimeout(() => {
+        if (notification) {
+            notification.style.opacity = "0";
+        }
+    }, 4000);
 }
 
 // ==========================================================================
