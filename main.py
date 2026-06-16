@@ -2211,6 +2211,18 @@ async def proxy_subtitle(url: str):
         }
     )
 
+@app.get("/api/read-log")
+async def read_log():
+    log_path = os.path.join(base_dir, "stderr.log")
+    if not os.path.exists(log_path):
+        return {"status": "error", "message": f"Log file not found at {log_path}"}
+    try:
+        with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+            lines = f.readlines()
+            return {"status": "success", "log": "".join(lines[-150:])}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @app.get("/api/clear-cache-force")
 async def clear_cache_force():
     pool = await get_db_pool()
