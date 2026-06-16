@@ -1187,7 +1187,7 @@ async function loadSubtitles(subjectId, resourceId) {
         
         captions.forEach(cap => {
             if (!cap || !cap.url) return;
-            const proxiedUrl = `/api/proxy-subtitle?url=${encodeURIComponent(cap.url)}`;
+            const proxiedUrl = cap.url;
             const track = {
                 kind: 'captions',
                 label: cap.lanName || 'Subtitle',

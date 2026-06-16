@@ -1158,7 +1158,7 @@ async def resolve_tmdb_resource(tmdb_id: str, is_tv: bool, season: int, episode:
                                 captions.append({
                                     "language": c["lang"],
                                     "name": c["label"],
-                                    "url": f"/api/proxy-subtitle?url={urllib.parse.quote(c['url'])}"
+                                    "url": c['url']
                                 })
                                 
                             highest = qualities[-1]["url"] if qualities else ""
@@ -1302,7 +1302,7 @@ async def resolve_tmdb_resource(tmdb_id: str, is_tv: bool, season: int, episode:
         formatted_captions.append({
             "language": cap.get("lan"),
             "name": cap.get("lanName"),
-            "url": f"/api/proxy-subtitle?url={urllib.parse.quote(cap_url)}"
+            "url": cap_url
         })
         
     highest = qualities[-1]["url"] if qualities else ""

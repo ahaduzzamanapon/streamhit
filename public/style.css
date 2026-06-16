@@ -2486,7 +2486,11 @@ button, input, select {
         padding: 0 !important; /* Remove page padding to allow player to be 100% full bleed width */
     }
     .watch-page-body .player-wrapper {
+        position: sticky;
+        top: 0;
+        z-index: 999;
         border-radius: 0px !important; /* Strip player border radius */
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
     }
     .watch-page-body .watch-cinema-grid {
         margin-top: 0 !important;
