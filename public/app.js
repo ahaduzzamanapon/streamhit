@@ -771,10 +771,34 @@ async function initWatchPage() {
     playerInstance = new Plyr('#player', {
         controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'captions', 'settings', 'pip', 'fullscreen'],
         settings: ['quality', 'speed'],
-        quality: { default: 1080, options: [1080, 720, 480, 360], forced: true },
+        quality: { default: 0 },
         keyboard: { global: true, focused: true },
         captions: { active: true, update: true }
     });
+
+    // Start background poller to rewrite "0p" label to "Auto" in settings menu and buttons
+    setInterval(() => {
+        // Quality menu options list
+        const menuItems = document.querySelectorAll('.plyr__menu__container button[value="0"] span, .plyr__menu__container span.plyr__menu__value');
+        menuItems.forEach(el => {
+            if (el.textContent.trim() === '0p') {
+                el.textContent = 'Auto';
+            }
+        });
+        
+        // General fallback check for any elements inside Plyr displaying "0p"
+        const plyrEls = document.querySelectorAll('.plyr [data-plyr="quality"], .plyr .plyr__menu__value, .plyr button');
+        plyrEls.forEach(el => {
+            if (el.textContent.trim() === '0p') {
+                const span = el.querySelector('span');
+                if (span) {
+                    span.textContent = 'Auto';
+                } else {
+                    el.textContent = 'Auto';
+                }
+            }
+        });
+    }, 250);
 
     // Custom Player Loading Overlay event bindings
     // NOTE: We use playerInstance.on() (Plyr events) instead of raw video.addEventListener()
@@ -845,8 +869,14 @@ async function initWatchPage() {
     
     playerInstance.on('qualitychange', (event) => {
         if (!isProgrammaticQualityChange) {
-            console.log(`[Player Control] User manually selected quality: ${event.detail.quality}p. Disabling auto-quality down.`);
-            userSelectedQuality = true;
+            const selectedQ = event.detail.quality;
+            if (selectedQ === 0) {
+                console.log(`[Player Control] User selected Auto quality.`);
+                userSelectedQuality = false;
+            } else {
+                console.log(`[Player Control] User manually selected quality: ${selectedQ}p. Disabling auto-quality down.`);
+                userSelectedQuality = true;
+            }
         }
     });
 
@@ -1268,13 +1298,36 @@ async function playResources() {
     }
 
     // Format and sanitize Plyr native sources
-    const sources = state.availableResources
-        .filter(res => res && res.resourceLink)
-        .map(res => ({
-            src: res.resourceLink,
+    const uniqueResolutions = new Set();
+    const sources = [];
+
+    // Find highest quality resource to use as the default/Auto source
+    if (state.availableResources && state.availableResources.length > 0) {
+        const bestResource = state.availableResources.reduce((prev, current) => {
+            return (prev.resolution > current.resolution) ? prev : current;
+        });
+
+        // Add Auto (size 0) source pointing to best resource
+        sources.push({
+            src: bestResource.resourceLink,
             type: 'video/mp4',
-            size: res.resolution || 720
-        }));
+            size: 0
+        });
+    }
+
+    state.availableResources
+        .filter(res => res && res.resourceLink)
+        .forEach(res => {
+            const resVal = res.resolution || 720;
+            if (!uniqueResolutions.has(resVal)) {
+                uniqueResolutions.add(resVal);
+                sources.push({
+                    src: res.resourceLink,
+                    type: 'video/mp4',
+                    size: resVal
+                });
+            }
+        });
 
     // Format and sanitize Plyr native captions
     const tracks = state.availableCaptions
@@ -1401,14 +1454,20 @@ function autoDowngradeQuality() {
     if (!playerInstance || !state.availableResources || state.availableResources.length <= 1) return;
     if (userSelectedQuality) return;
 
-    const currentQuality = playerInstance.quality;
-    if (!currentQuality) return;
-
+    let currentQuality = playerInstance.quality;
+    
     // Filter and sort available resolutions descending (e.g. [1080, 720, 480, 360])
     const resolutions = state.availableResources
         .map(r => r.resolution || 720)
         .filter((value, idx, self) => self.indexOf(value) === idx)
         .sort((a, b) => b - a);
+
+    if (currentQuality === 0) {
+        // If current quality is Auto (0), we are currently playing the highest resolution
+        currentQuality = resolutions[0];
+    }
+
+    if (!currentQuality) return;
 
     const currentIndex = resolutions.indexOf(currentQuality);
     if (currentIndex !== -1 && currentIndex < resolutions.length - 1) {
