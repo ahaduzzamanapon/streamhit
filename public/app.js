@@ -737,7 +737,7 @@ async function initWatchPage() {
     const content = document.getElementById("watchWrapper");
 
     if (tmdbId) {
-        loading.innerHTML = `<div class="loading-spinner"></div><p style="margin-top: 15px;">Resolving TMDB ID ${tmdbId} via MovieBox...</p>`;
+        loading.innerHTML = `<div class="loading-spinner"></div><p style="margin-top: 15px;">Resolving TMDB ID ${tmdbId} via Streamfit...</p>`;
         const resolution = await apiGet(`/api/resolve-tmdb?tmdbId=${tmdbId}&type=${type}&season=${reqSeason}&episode=${reqEpisode}`);
         if (resolution && resolution.code === 0 && resolution.data && resolution.data.subjectId) {
             subjectId = resolution.data.subjectId;
