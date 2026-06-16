@@ -146,7 +146,8 @@ async def init_db():
             minsize=2,
             maxsize=10,
             autocommit=True,
-            connect_timeout=5
+            connect_timeout=5,
+            init_command="SET time_zone='+00:00'"
         )
         
         async with db_pool.acquire() as conn:
@@ -582,12 +583,24 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
 
 # Extract CDN expiration
 def get_link_expiration(url: str) -> datetime:
-    match = re.search(r'[?&](t|expires|exp)=(\d+)', url)
-    if match:
-        timestamp = int(match.group(2))
+    # Check for t (generation time, valid for 1 hour)
+    match_t = re.search(r'[?&]t=(\d+)', url)
+    if match_t:
+        timestamp = int(match_t.group(1))
+        if timestamp > 9999999999:  # Milliseconds
+            timestamp = timestamp // 1000
+        # Add 1 hour (3600 seconds) for expiration
+        timestamp += 3600
+        return datetime.fromtimestamp(timestamp, tz=timezone.utc).replace(tzinfo=None)
+        
+    # Check for expires or exp (actual expiration time)
+    match_exp = re.search(r'[?&](expires|exp)=(\d+)', url)
+    if match_exp:
+        timestamp = int(match_exp.group(2))
         if timestamp > 9999999999:  # Milliseconds
             timestamp = timestamp // 1000
         return datetime.fromtimestamp(timestamp, tz=timezone.utc).replace(tzinfo=None)
+        
     return datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=2)
 
 # ==========================================================================
