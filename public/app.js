@@ -771,7 +771,7 @@ async function initWatchPage() {
     playerInstance = new Plyr('#player', {
         controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'captions', 'settings', 'pip', 'fullscreen'],
         settings: ['quality', 'speed'],
-        quality: { default: 0 },
+        quality: { default: 0, options: [0, 4320, 2880, 2160, 1440, 1080, 720, 576, 480, 360, 240] },
         keyboard: { global: true, focused: true },
         captions: { active: true, update: true }
     });
