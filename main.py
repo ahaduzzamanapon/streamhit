@@ -190,6 +190,28 @@ async def init_db():
                     print("[Database] Successfully added dubs column to subjects table.")
                 except Exception:
                     pass
+                
+                # Database index migrations for performance optimization
+                try:
+                    await cur.execute("ALTER TABLE subjects ADD INDEX idx_subject_type (subject_type)")
+                except Exception:
+                    pass
+                try:
+                    await cur.execute("ALTER TABLE subjects ADD INDEX idx_release_date (release_date)")
+                except Exception:
+                    pass
+                try:
+                    await cur.execute("ALTER TABLE subjects ADD INDEX idx_rating (rating)")
+                except Exception:
+                    pass
+                try:
+                    await cur.execute("ALTER TABLE subjects ADD INDEX idx_created_at (created_at)")
+                except Exception:
+                    pass
+                try:
+                    await cur.execute("ALTER TABLE subjects ADD INDEX idx_updated_at (updated_at)")
+                except Exception:
+                    pass
                 # 2. Seasons table
                 await cur.execute("""
                     CREATE TABLE IF NOT EXISTS seasons (
@@ -287,6 +309,19 @@ async def db_get_banners():
     if not pool: return []
     async with pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cur:
+            # Query latest created/updated subjects from local DB with cover images first
+            await cur.execute("""
+                SELECT subject_id, title, cover as image_url, detail_path, subject_type 
+                FROM subjects 
+                WHERE cover IS NOT NULL AND cover != '' AND title != 'Placeholder' AND title != ''
+                ORDER BY updated_at DESC, created_at DESC 
+                LIMIT 10
+            """)
+            rows = await cur.fetchall()
+            if rows and len(rows) >= 3:
+                return rows
+            
+            # Fallback to banners table if database is empty/fresh
             await cur.execute("SELECT * FROM banners ORDER BY created_at DESC LIMIT 20")
             return await cur.fetchall()
 
@@ -1891,17 +1926,16 @@ async def filter_content(payload: dict):
         except Exception as db_err:
             print(f"[DB Filter Error] {db_err}")
 
-    if local_results:
-        # Serve immediately and pull/update cache in background
-        asyncio.create_task(background_filter_and_cache(genre, country, year, language, sort, subject_type, page, per_page))
+    # Return local results ONLY if we have a full page of results (to avoid pagination gaps and premature end of scrolling)
+    if len(local_results) >= per_page:
         res = {
             "code": 0,
             "data": {
                 "items": local_results,
-                "pager": {"hasMore": len(local_results) == per_page}
+                "pager": {"hasMore": True}
             }
         }
-        set_cached_response(cache_key, res, ttl=30.0)
+        set_cached_response(cache_key, res, ttl=600.0) # Cache for 10 minutes (600s)
         return res
 
     # Fetch from MovieBox API

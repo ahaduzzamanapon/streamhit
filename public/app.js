@@ -508,16 +508,21 @@ async function initFilterPage() {
     setupFilterOptions("filterYearOpts", "activeYear");
     setupFilterOptions("filterSortOpts", "activeSort");
 
-    // Infinite scroll listener
-    window.addEventListener("scroll", () => {
+    // Infinite scroll listener - highly robust across devices/browsers
+    const handleScroll = () => {
         if (state.loadingMore || !state.hasMore) return;
         
-        const threshold = 300; // Load next page when within 300px of the bottom
-        if ((window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - threshold)) {
+        const scrollHeight = document.documentElement.scrollHeight || document.body.scrollHeight;
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop;
+        const clientHeight = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight;
+        
+        if (scrollHeight - (scrollTop + clientHeight) < 400) {
             state.currentPage++;
             loadSearchResults(true);
         }
-    }, { passive: true });
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("touchmove", handleScroll, { passive: true });
 
     loadSearchResults();
 }

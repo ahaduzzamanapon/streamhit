@@ -826,6 +826,8 @@ button, input, select {
     transition: var(--transition-normal);
     position: relative;
     box-shadow: var(--shadow-sm);
+    content-visibility: auto;
+    contain-intrinsic-size: 140px 244px;
 }
 
 .content-card:hover {
