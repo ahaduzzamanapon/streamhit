@@ -2234,9 +2234,17 @@ async def check_db_endpoint(subjectId: str, se: int = 0, ep: int = 0):
     return {"error": "DB Pool not initialized"}
 
 @app.get("/api/test-proxy-debug")
-async def test_proxy_debug():
+async def test_proxy_debug(request: Request, url: str = None):
     results = {}
-    video_url = "https://bcdnxw.hakunaymatata.com/bt/c09098cd94c4d67dceac9ce8f9d47c27.mp4?sign=9eb65e2eb27b4bb199929d912f42d9aa&t=1781587811"
+    video_url = url or "https://bcdnxw.hakunaymatata.com/bt/c09098cd94c4d67dceac9ce8f9d47c27.mp4?sign=9eb65e2eb27b4bb199929d912f42d9aa&t=1781587811"
+    
+    # Append any query parameters passed to the url parameter
+    query_params = dict(request.query_params)
+    query_params.pop("url", None)
+    if url and query_params:
+        extra_qs = urllib.parse.urlencode(query_params)
+        connector = "&" if "?" in video_url else "?"
+        video_url = f"{video_url}{connector}{extra_qs}"
     headers = {
         "Origin": "https://fmoviesunblocked.net",
         "Referer": "https://fmoviesunblocked.net/",
