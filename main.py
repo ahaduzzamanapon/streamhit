@@ -665,6 +665,7 @@ async def run_historical_scraper():
     for sub_type_str in ["2", "1", "7"]:
         sub_type = int(sub_type_str)
         current_page = progress.get(sub_type_str, 2)
+        retry_count = 0
         
         while current_page <= 300:
             print(f"[Scraper] Scraping historical page {current_page} for subject type {sub_type}...")
@@ -690,6 +691,8 @@ async def run_historical_scraper():
                 
                 if not items:
                     print(f"[Scraper] No more items found on page {current_page} for type {sub_type}. Stopping historical scraper for this type.")
+                    progress[sub_type_str] = 999
+                    save_scraper_progress(progress)
                     break
                 
                 new_items_count = 0
@@ -713,6 +716,7 @@ async def run_historical_scraper():
                         await asyncio.sleep(2.0)
                 
                 print(f"[Scraper] Page {current_page} done. Crawled {new_items_count} new items.")
+                retry_count = 0  # Reset retry count on successful crawl
                 current_page += 1
                 progress[sub_type_str] = current_page
                 save_scraper_progress(progress)
@@ -720,8 +724,23 @@ async def run_historical_scraper():
                 await asyncio.sleep(5.0)
                 
             except Exception as e:
-                print(f"[Scraper] Error during historical crawl of page {current_page} for type {sub_type}: {e}")
-                await asyncio.sleep(15.0)
+                err_msg = str(e)
+                if "HTTP status 400" in err_msg or "API error code 400" in err_msg:
+                    print(f"[Scraper] Page {current_page} is out of bounds (Limit Exceeded). Marking type {sub_type} as completed.")
+                    progress[sub_type_str] = 999
+                    save_scraper_progress(progress)
+                    break
+                
+                retry_count += 1
+                if retry_count >= 3:
+                    print(f"[Scraper] Too many failures ({retry_count}) on page {current_page} for type {sub_type}. Skipping page.")
+                    retry_count = 0
+                    current_page += 1
+                    progress[sub_type_str] = current_page
+                    save_scraper_progress(progress)
+                else:
+                    print(f"[Scraper] Error on page {current_page} for type {sub_type}: {e}. Retrying ({retry_count}/3) in 15s...")
+                    await asyncio.sleep(15.0)
 
 async def historical_scraper_loop():
     await get_db_pool()
