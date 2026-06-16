@@ -2693,31 +2693,201 @@ def build_streaming_response(resp, range_header):
     )
 
 # ==========================================================================
-# 7. FRONTEND PAGE ROUTING
+# 7. FRONTEND PAGE ROUTING WITH SEO & OG METADATA
 # ==========================================================================
+async def get_subject_meta(subject_id: str = None, tmdb_id: str = None, subject_type: int = 1) -> dict:
+    pool = await get_db_pool()
+    meta = {
+        "title": "Streamfit - Premium Movie & TV Series Streaming",
+        "description": "Streamfit - Watch your favorite movies and TV shows online for free in high quality. Support multiple dubs, subtitles and auto-quality.",
+        "cover": "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=1200&q=80"
+    }
+    
+    if subject_id:
+        if pool:
+            try:
+                async with pool.acquire() as conn:
+                    async with conn.cursor(aiomysql.DictCursor) as cur:
+                        await cur.execute("SELECT title, description, cover FROM subjects WHERE subject_id = %s", (str(subject_id),))
+                        row = await cur.fetchone()
+                        if row:
+                            meta["title"] = f"Watch {row['title']} - Streamfit"
+                            if row["description"]:
+                                meta["description"] = row["description"]
+                            else:
+                                meta["description"] = f"Watch {row['title']} online on Streamfit. Free streaming with multi-audio, subtitle selection and auto-quality."
+                            if row["cover"]:
+                                meta["cover"] = row["cover"]
+            except Exception as e:
+                print(f"[Meta Lookup Error] {e}")
+                
+    elif tmdb_id:
+        if pool:
+            try:
+                async with pool.acquire() as conn:
+                    async with conn.cursor(aiomysql.DictCursor) as cur:
+                        await cur.execute("SELECT title, description, cover FROM subjects WHERE tmdb_id = %s AND subject_type = %s", (str(tmdb_id), subject_type))
+                        row = await cur.fetchone()
+                        if row:
+                            meta["title"] = f"Watch {row['title']} - Streamfit"
+                            if row["description"]:
+                                meta["description"] = row["description"]
+                            else:
+                                meta["description"] = f"Watch {row['title']} online on Streamfit. Free streaming with multi-audio, subtitle selection and auto-quality."
+                            if row["cover"]:
+                                meta["cover"] = row["cover"]
+            except Exception as e:
+                print(f"[Meta TMDB Lookup Error] {e}")
+                
+    # Clean up description (truncate to 160 chars for SEO/meta tags)
+    if meta["description"]:
+        meta["description"] = meta["description"].replace('"', '&quot;').replace('\n', ' ').strip()
+        if len(meta["description"]) > 160:
+            meta["description"] = meta["description"][:157] + "..."
+            
+    meta["title"] = meta["title"].replace('"', '&quot;').strip()
+    return meta
+
+
 @app.get("/", response_class=HTMLResponse)
-async def serve_home():
+async def serve_home(request: Request):
     path = os.path.join(base_dir, "public/index.html")
     with open(path, "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
+        html_content = f.read()
+        
+    meta = {
+        "title": "Streamfit - Premium Movie & TV Series Streaming",
+        "description": "Streamfit - Watch your favorite movies and TV shows online for free in high quality. Support multiple dubs, subtitles and auto-quality.",
+        "cover": "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=1200&q=80"
+    }
+    
+    html_content = html_content.replace("<title>Streamfit - Premium Movie & TV Series Streaming</title>", f"<title>{meta['title']}</title>")
+    
+    og_tags = f"""
+    <meta name="description" content="{meta['description']}">
+    <meta name="keywords" content="movies, tv shows, streaming, streamfit, watch free, hd movies, hindi dub, bengali dub, watch online">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{str(request.url)}">
+    <meta property="og:title" content="{meta['title']}">
+    <meta property="og:description" content="{meta['description']}">
+    <meta property="og:image" content="{meta['cover']}">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="{str(request.url)}">
+    <meta property="twitter:title" content="{meta['title']}">
+    <meta property="twitter:description" content="{meta['description']}">
+    <meta property="twitter:image" content="{meta['cover']}">
+    """
+    html_content = html_content.replace("</head>", f"{og_tags}\n</head>")
+    return HTMLResponse(content=html_content)
+
 
 @app.get("/movies", response_class=HTMLResponse)
-async def serve_movies():
+async def serve_movies(request: Request):
     path = os.path.join(base_dir, "public/movies.html")
     with open(path, "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
+        html_content = f.read()
+        
+    meta = {
+        "title": "Explore Movies - Streamfit",
+        "description": "Browse the latest Hollywood, Bollywood, and international movies on Streamfit. High quality free streaming with multilingual dubs.",
+        "cover": "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=1200&q=80"
+    }
+    
+    html_content = html_content.replace("<title>Explore Movies - Streamfit</title>", f"<title>{meta['title']}</title>")
+    
+    og_tags = f"""
+    <meta name="description" content="{meta['description']}">
+    <meta name="keywords" content="movies, tv shows, streaming, streamfit, watch free, hd movies, hindi dub, bengali dub, watch online">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{str(request.url)}">
+    <meta property="og:title" content="{meta['title']}">
+    <meta property="og:description" content="{meta['description']}">
+    <meta property="og:image" content="{meta['cover']}">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="{str(request.url)}">
+    <meta property="twitter:title" content="{meta['title']}">
+    <meta property="twitter:description" content="{meta['description']}">
+    <meta property="twitter:image" content="{meta['cover']}">
+    """
+    html_content = html_content.replace("</head>", f"{og_tags}\n</head>")
+    return HTMLResponse(content=html_content)
+
 
 @app.get("/tv", response_class=HTMLResponse)
-async def serve_tv_shows():
+async def serve_tv_shows(request: Request):
     path = os.path.join(base_dir, "public/tv.html")
     with open(path, "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
+        html_content = f.read()
+        
+    meta = {
+        "title": "Explore TV Series - Streamfit",
+        "description": "Watch trending television shows and web series online for free. Enjoy full seasons with multiple subtitle and language tracks.",
+        "cover": "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=1200&q=80"
+    }
+    
+    html_content = html_content.replace("<title>Explore TV Series - Streamfit</title>", f"<title>{meta['title']}</title>")
+    
+    og_tags = f"""
+    <meta name="description" content="{meta['description']}">
+    <meta name="keywords" content="movies, tv shows, streaming, streamfit, watch free, hd movies, hindi dub, bengali dub, watch online">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{str(request.url)}">
+    <meta property="og:title" content="{meta['title']}">
+    <meta property="og:description" content="{meta['description']}">
+    <meta property="og:image" content="{meta['cover']}">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="{str(request.url)}">
+    <meta property="twitter:title" content="{meta['title']}">
+    <meta property="twitter:description" content="{meta['description']}">
+    <meta property="twitter:image" content="{meta['cover']}">
+    """
+    html_content = html_content.replace("</head>", f"{og_tags}\n</head>")
+    return HTMLResponse(content=html_content)
+
 
 @app.get("/watch", response_class=HTMLResponse)
-async def serve_watch_page():
+async def serve_watch_page(request: Request, id: str = None, tmdb: str = None, type: str = "movie"):
     path = os.path.join(base_dir, "public/watch.html")
     with open(path, "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
+        html_content = f.read()
+        
+    sub_type = 2 if type == "tv" else 1
+    meta = await get_subject_meta(subject_id=id, tmdb_id=tmdb, subject_type=sub_type)
+    
+    html_content = html_content.replace("<title>Watch Online - Streamfit</title>", f"<title>{meta['title']}</title>")
+    
+    og_tags = f"""
+    <meta name="description" content="{meta['description']}">
+    <meta name="keywords" content="movies, tv shows, streaming, streamfit, watch free, hd movies, hindi dub, bengali dub, watch online">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="video.other">
+    <meta property="og:url" content="{str(request.url)}">
+    <meta property="og:title" content="{meta['title']}">
+    <meta property="og:description" content="{meta['description']}">
+    <meta property="og:image" content="{meta['cover']}">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="{str(request.url)}">
+    <meta property="twitter:title" content="{meta['title']}">
+    <meta property="twitter:description" content="{meta['description']}">
+    <meta property="twitter:image" content="{meta['cover']}">
+    """
+    html_content = html_content.replace("</head>", f"{og_tags}\n</head>")
+    return HTMLResponse(content=html_content)
 
 # Mount general static assets
 app.mount("/", StaticFiles(directory=os.path.join(base_dir, "public")), name="public")
