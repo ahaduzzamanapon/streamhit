@@ -99,19 +99,32 @@ async function apiGet(path) {
     }
 }
 
-async function apiPost(path, body) {
-    try {
-        const response = await fetch(path, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body)
-        });
-        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
-        return await response.json();
-    } catch (err) {
-        console.error("API POST Error:", err);
-        return null;
+async function apiPost(path, body, timeoutMs = 5000, retries = 2) {
+    for (let attempt = 1; attempt <= retries + 1; attempt++) {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            const response = await fetch(path, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+                signal: controller.signal
+            });
+            clearTimeout(id);
+            if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+            return await response.json();
+        } catch (err) {
+            clearTimeout(id);
+            console.warn(`[API POST] Attempt ${attempt} failed for ${path}:`, err);
+            if (attempt > retries) {
+                console.error("API POST Error after retries:", err);
+                return null;
+            }
+            // Wait 1 second before retrying
+            await new Promise(r => setTimeout(r, 1000));
+        }
     }
+    return null;
 }
 
 // ==========================================================================
