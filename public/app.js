@@ -365,13 +365,6 @@ async function initCustomCategorySliders() {
 
     const categories = [
         {
-            title: 'Bangla Blockbusters',
-            id: 'bangla',
-            iconClass: 'fa-solid fa-star icon-bangla',
-            seeMoreUrl: '/movies?country=Bangladesh',
-            filter: { country: 'Bangladesh', genre: '*', year: '*', sort: 'Latest', subjectType: 1, page: 1, perPage: 12 }
-        },
-        {
             title: 'Bollywood Hits',
             id: 'bollywood',
             iconClass: 'fa-solid fa-fire icon-bollywood',
