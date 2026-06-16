@@ -1072,7 +1072,7 @@ async function loadPlayResources(subjectId, season = null, episode = null) {
 }
 
 async function playResources() {
-    const videoElement = document.getElementById("player");
+    const videoElement = playerInstance ? playerInstance.media : document.getElementById("player");
     if (!state.availableResources || state.availableResources.length === 0) return;
 
     // Find highest quality resource for download button and fallback url
@@ -1093,16 +1093,18 @@ async function playResources() {
     }
 
     // Reset video element src and load to clear any cached/active streams
-    videoElement.pause();
-    videoElement.removeAttribute("src");
-    try {
-        videoElement.load();
-    } catch (e) {
-        console.log("[Player] Error reloading video tag:", e);
-    }
+    if (videoElement) {
+        videoElement.pause();
+        videoElement.removeAttribute("src");
+        try {
+            videoElement.load();
+        } catch (e) {
+            console.log("[Player] Error reloading video tag:", e);
+        }
 
-    console.log(`[Player] Loading sources for title: ${state.selectedSubject.title}`);
-    videoElement.removeAttribute("crossorigin");
+        console.log(`[Player] Loading sources for title: ${state.selectedSubject.title}`);
+        videoElement.setAttribute("crossorigin", "anonymous");
+    }
 
     // Format and sanitize Plyr native sources
     const sources = state.availableResources
@@ -1225,11 +1227,13 @@ function loadDirectMP4Fallback() {
         hlsInstance.destroy();
         hlsInstance = null;
     }
-    const video = document.getElementById("player");
-    video.src = state.directMp4Url;
-    video.load();
-    playerInstance.play();
-    console.log("[Player] Direct fallback played.");
+    const video = playerInstance ? playerInstance.media : document.getElementById("player");
+    if (video) {
+        video.src = state.directMp4Url;
+        video.load();
+        playerInstance.play();
+        console.log("[Player] Direct fallback played.");
+    }
 }
 
 // ==========================================================================
