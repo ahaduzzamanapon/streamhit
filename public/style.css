@@ -818,6 +818,7 @@ button, input, select {
 .content-card {
     min-width: 140px;
     width: 140px;
+    flex-shrink: 0;
     background-color: var(--bg-secondary);
     border-radius: var(--border-radius-md);
     overflow: hidden;
@@ -971,6 +972,7 @@ button, input, select {
 .card-shimmer {
     min-width: 180px;
     width: 180px;
+    flex-shrink: 0;
     height: 310px;
     border-radius: var(--border-radius-md);
     background-color: var(--bg-secondary);
