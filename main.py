@@ -438,9 +438,10 @@ def get_random_singapore_ip():
 
 global_cookies = ""
 cookies_expiry = 0.0
+last_direct_fail_time = 0.0
 
 async def refresh_cookies_if_needed() -> str:
-    global global_cookies, cookies_expiry
+    global global_cookies, cookies_expiry, last_direct_fail_time
     now = time.time()
     if global_cookies and now < cookies_expiry:
         return global_cookies
@@ -457,23 +458,27 @@ async def refresh_cookies_if_needed() -> str:
         "Referer": "https://h5.aoneroom.com"
     }
 
+    skip_direct = (now - last_direct_fail_time < 3600.0)
+
     # Try direct first
-    try:
-        async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
-            cookie_url = "https://h5.aoneroom.com/wefeed-h5-bff/app/get-latest-app-pkgs?app_name=moviebox"
-            resp = await client.get(cookie_url, headers=headers)
-            if resp.status_code == 200:
-                cookie_headers = resp.headers.get_list("Set-Cookie")
-                parsed_cookies = []
-                for cookie in cookie_headers:
-                    part = cookie.split(";")[0]
-                    parsed_cookies.append(part)
-                global_cookies = "; ".join(parsed_cookies)
-                cookies_expiry = now + 3600.0  # 60 mins cache
-                print(f"[API Auth] Refreshed H5 cookies successfully.")
-                return global_cookies
-    except Exception as e:
-        print(f"[API Auth] Direct cookie refresh failed: {e}. Trying via Singapore proxy...")
+    if not skip_direct:
+        try:
+            async with httpx.AsyncClient(trust_env=False, timeout=3.0) as client:
+                cookie_url = "https://h5.aoneroom.com/wefeed-h5-bff/app/get-latest-app-pkgs?app_name=moviebox"
+                resp = await client.get(cookie_url, headers=headers)
+                if resp.status_code == 200:
+                    cookie_headers = resp.headers.get_list("Set-Cookie")
+                    parsed_cookies = []
+                    for cookie in cookie_headers:
+                        part = cookie.split(";")[0]
+                        parsed_cookies.append(part)
+                    global_cookies = "; ".join(parsed_cookies)
+                    cookies_expiry = now + 3600.0  # 60 mins cache
+                    print(f"[API Auth] Refreshed H5 cookies successfully.")
+                    return global_cookies
+        except Exception as e:
+            print(f"[API Auth] Direct cookie refresh failed: {e}. Marking direct API as failed, trying via Singapore proxy...")
+            last_direct_fail_time = time.time()
 
     # Fallback to Singapore proxy
     try:
@@ -499,6 +504,7 @@ async def refresh_cookies_if_needed() -> str:
     raise Exception("Failed to acquire OneRoom H5 cookies")
 
 async def request_h5_api(method: str, path: str, body_dict: dict = None, host: str = "https://h5-api.aoneroom.com", origin: str = None, referer: str = None) -> dict:
+    global last_direct_fail_time
     cookies = await refresh_cookies_if_needed()
     ip = get_random_singapore_ip()
     
@@ -517,25 +523,29 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
         headers["Origin"] = origin
 
     url = f"{host}{path}"
+    now = time.time()
+    skip_direct = (now - last_direct_fail_time < 3600.0)
     
     # 1. Try direct first
-    try:
-        async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
-            if method.upper() == "POST":
-                resp = await client.post(url, json=body_dict, headers=headers)
-            else:
-                resp = await client.get(url, headers=headers)
-                
-            if resp.status_code == 200:
-                data = resp.json()
-                if data.get("code") == 0 or "data" in data:
-                    return data
+    if not skip_direct:
+        try:
+            async with httpx.AsyncClient(trust_env=False, timeout=3.0) as client:
+                if method.upper() == "POST":
+                    resp = await client.post(url, json=body_dict, headers=headers)
                 else:
-                    raise Exception(data.get("message", f"API error code {data.get('code')}"))
-            else:
-                raise Exception(f"HTTP status {resp.status_code}")
-    except Exception as e:
-        print(f"[API Warning] Direct H5 API request failed for {path}: {e}. Trying via Singapore proxy...")
+                    resp = await client.get(url, headers=headers)
+                    
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get("code") == 0 or "data" in data:
+                        return data
+                    else:
+                        raise Exception(data.get("message", f"API error code {data.get('code')}"))
+                else:
+                    raise Exception(f"HTTP status {resp.status_code}")
+        except Exception as e:
+            print(f"[API Warning] Direct H5 API request failed for {path}: {e}. Marking direct API as failed, trying via Singapore proxy...")
+            last_direct_fail_time = time.time()
 
     # 2. Proxy Fallback
     try:
@@ -1320,6 +1330,55 @@ async def resolve_tmdb_api(tmdbId: str, type: str = "movie", season: int = 1, ep
         raise HTTPException(status_code=502, detail=str(e))
 
 
+async def get_local_operating_list() -> list:
+    pool = await get_db_pool()
+    if not pool:
+        return []
+    
+    sections = [
+        {"title": "Latest Movies", "type": 1, "sort": "latest"},
+        {"title": "Latest TV Shows", "type": 2, "sort": "latest"},
+        {"title": "Top Rated Movies", "type": 1, "sort": "rating"},
+        {"title": "Top Rated TV Shows", "type": 2, "sort": "rating"}
+    ]
+    
+    operating_list = []
+    try:
+        async with pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+                for sec in sections:
+                    order_by = "release_date DESC, created_at DESC" if sec["sort"] == "latest" else "rating DESC"
+                    await cur.execute(f"""
+                        SELECT * FROM subjects 
+                        WHERE subject_type = %s AND title != 'Placeholder'
+                        ORDER BY {order_by} 
+                        LIMIT 12
+                    """, (sec["type"],))
+                    rows = await cur.fetchall()
+                    
+                    subjects = []
+                    for row in rows:
+                        subjects.append({
+                            "subjectId": row["subject_id"],
+                            "title": row["title"],
+                            "subjectType": row["subject_type"],
+                            "cover": {"url": row["cover"]},
+                            "imdbRatingValue": str(row["rating"]),
+                            "releaseDate": row["release_date"],
+                            "countryName": row["country"],
+                            "genre": row["genre"].split(",") if row["genre"] else [],
+                            "isCam": row["is_cam"]
+                        })
+                    
+                    if subjects:
+                        operating_list.append({
+                            "name": sec["title"],
+                            "subjects": subjects
+                        })
+    except Exception as e:
+        print(f"[Home Local Fallback Error] {e}")
+    return operating_list
+
 # Transparent proxy to grab initial feeds and auto-cache subjects
 @app.get("/api/home")
 async def get_home(page: int = 1, tabId: int = 0):
@@ -1339,7 +1398,14 @@ async def get_home(page: int = 1, tabId: int = 0):
         }
         return mapped_data
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        print(f"[Home API] Failed to fetch home data: {e}. Falling back to local database...")
+        local_list = await get_local_operating_list()
+        return {
+            "code": 0,
+            "data": {
+                "items": local_list
+            }
+        }
 
 @app.get("/api/banners")
 async def get_banners():
@@ -1426,6 +1492,24 @@ async def cache_discovered_subjects(home_data: dict):
         }
         await db_save_subject(s_data)
 
+async def background_search_and_cache(keyword: str, page: int, per_page: int, subject_type: int):
+    try:
+        api_path = "/wefeed-h5api-bff/subject/search"
+        api_payload = {
+            "keyword": keyword,
+            "page": page,
+            "perPage": per_page,
+            "subjectType": subject_type
+        }
+        data = await request_h5_api("POST", api_path, api_payload)
+        items = data.get("data", {}).get("items", [])
+        for item in items:
+            sub_id = item.get("subjectId")
+            if sub_id:
+                await scrape_subject_details(sub_id)
+    except Exception as e:
+        print(f"[Background Search Cache Error] {e}")
+
 # Search endpoint - queries local db first, queries OneRoom and caches on fallback
 @app.post("/api/search")
 async def search_content(payload: dict):
@@ -1458,6 +1542,8 @@ async def search_content(payload: dict):
                     await cur.execute(query, tuple(params))
                     rows = await cur.fetchall()
                     for row in rows:
+                        if row["title"] == "Placeholder":
+                            continue
                         local_results.append({
                             "subjectId": row["subject_id"],
                             "title": row["title"],
@@ -1472,8 +1558,9 @@ async def search_content(payload: dict):
         except Exception as db_err:
             print(f"[DB Search Error] {db_err}")
 
-    if len(local_results) >= 5:
-        # Return local results
+    if local_results:
+        # Serve immediately and pull/update cache in background
+        asyncio.create_task(background_search_and_cache(keyword, page, per_page, subject_type))
         return {
             "code": 0,
             "data": {
@@ -1504,6 +1591,34 @@ async def search_content(payload: dict):
     except Exception as e:
         return {"code": 0, "data": {"items": local_results, "pager": {"hasMore": False}}}
 
+async def background_filter_and_cache(genre, country, year, language, sort, subject_type, page, per_page):
+    try:
+        api_payload = {
+            "page": page,
+            "perPage": per_page,
+            "genre": "" if genre == "*" else genre,
+            "country": "" if country == "*" else country,
+            "year": "" if year == "*" else year,
+            "language": "" if language == "*" else language,
+            "sort": sort,
+            "subjectType": subject_type
+        }
+        
+        data = await request_h5_api("POST", "/wefeed-h5api-bff/subject/filter", api_payload)
+        items = data.get("data", {}).get("items", [])
+        
+        if not items and data.get("data", {}).get("results"):
+            results = data.get("data", {}).get("results", [])
+            if results:
+                items = results[0].get("subjects", [])
+                
+        for item in items:
+            sub_id = item.get("subjectId")
+            if sub_id:
+                await scrape_subject_details(sub_id)
+    except Exception as e:
+        print(f"[Background Filter Cache Error] {e}")
+
 # Dynamic Multi-Level Filters
 @app.post("/api/filter")
 async def filter_content(payload: dict):
@@ -1517,7 +1632,7 @@ async def filter_content(payload: dict):
     per_page = int(payload.get("perPage", 20))
 
     # Build MySQL Query
-    conditions = []
+    conditions = ["title != 'Placeholder'"]
     params = []
 
     if genre != "*":
@@ -1568,7 +1683,9 @@ async def filter_content(payload: dict):
         except Exception as db_err:
             print(f"[DB Filter Error] {db_err}")
 
-    if len(local_results) >= 5 or (page > 1 and len(local_results) > 0):
+    if local_results:
+        # Serve immediately and pull/update cache in background
+        asyncio.create_task(background_filter_and_cache(genre, country, year, language, sort, subject_type, page, per_page))
         return {
             "code": 0,
             "data": {
