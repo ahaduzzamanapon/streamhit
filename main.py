@@ -2407,55 +2407,24 @@ async def handle_fetch(request: Request, source_url: str):
         connector = "&" if "?" in source_url else "?"
         source_url = f"{source_url}{connector}{extra_qs}"
 
-    range_header = request.headers.get("Range")
-    if_range = request.headers.get("If-Range")
-
+    worker = get_next_worker()
     headers_to_send = {
         "Origin": "https://fmoviesunblocked.net",
         "Referer": "https://fmoviesunblocked.net/",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "*/*",
     }
+    
+    # Forward client Range headers if present
+    range_header = request.headers.get("Range")
     if range_header:
         headers_to_send["Range"] = range_header
+    if_range = request.headers.get("If-Range")
     if if_range:
         headers_to_send["If-Range"] = if_range
 
-    client = get_http_client()
-    
-    # 1. Try direct proxying first for high-speed, direct range-request streaming
-    resp = None
-    try:
-        req = client.build_request("GET", source_url, headers=headers_to_send)
-        resp = await client.send(req, stream=True)
-        if resp.status_code in [200, 206]:
-            return build_streaming_response(resp, range_header)
-        else:
-            await resp.aclose()
-            print(f"[Proxy] Direct proxy returned status {resp.status_code}. Falling back to worker proxy...")
-    except Exception as e:
-        if resp is not None:
-            await resp.aclose()
-        print(f"[Proxy] Direct proxy failed: {e}. Falling back to worker proxy...")
-
-    # 2. Worker proxy fallback if direct fetch fails (e.g., due to region blocks)
-    resp = None
-    try:
-        worker = get_next_worker()
-        proxy_url = f"{worker}/mp4-proxy?url={urllib.parse.quote(source_url)}&headers={urllib.parse.quote(json.dumps(headers_to_send))}"
-        
-        req = client.build_request(request.method, proxy_url)
-        resp = await client.send(req, stream=True)
-        if resp.status_code in [200, 206]:
-            return build_streaming_response(resp, range_header)
-        else:
-            await resp.aclose()
-    except Exception as e:
-        if resp is not None:
-            await resp.aclose()
-        print(f"[Proxy] Worker proxy failed: {e}")
-
-    raise HTTPException(status_code=502, detail="Streaming proxy failed on all routes")
+    proxy_url = f"{worker}/mp4-proxy?url={urllib.parse.quote(source_url)}&headers={urllib.parse.quote(json.dumps(headers_to_send))}"
+    return RedirectResponse(url=proxy_url)
 
 def build_streaming_response(resp, range_header):
     if range_header and resp.status_code == 200:
