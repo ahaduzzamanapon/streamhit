@@ -16,7 +16,7 @@ const state = {
     activeCountry: "*",
     activeYear: "*",
     activeLang: "*",
-    activeSort: "Latest",
+    activeSort: "Hottest",
     selectedSubject: null,
     selectedSeason: 1,
     selectedEpisode: 1,

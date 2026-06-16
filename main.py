@@ -284,6 +284,32 @@ async def init_db():
                     except Exception as migration_err:
                         print(f"[Database] Error during timezone migration: {migration_err}")
 
+                # Cleanup educational / classroom items from subjects table automatically
+                try:
+                    await cur.execute("""
+                        DELETE FROM subjects 
+                        WHERE title REGEXP 'class[[:space:]]*([0-9]|one|two|three|four|five|six|seven|eight|nine|ten)'
+                           OR title LIKE '%english 1st paper%'
+                           OR title LIKE '%english 2nd paper%'
+                           OR title LIKE '%ssc 20%'
+                           OR title LIKE '%hsc 20%'
+                           OR title LIKE '%jsc 20%'
+                           OR title LIKE '%nctb%'
+                           OR title LIKE '%শ্রেণি%'
+                           OR title LIKE '%শ্রেণী%'
+                           OR title LIKE '%অধ্যায়%'
+                           OR title LIKE '%অধ্যায়%'
+                           OR title LIKE '%শিক্ষা%'
+                           OR title LIKE '%গণিত%'
+                           OR title LIKE '%বিজ্ঞান%'
+                           OR title LIKE '%ব্যাকরণ%'
+                    """)
+                    affected = cur.rowcount
+                    if affected > 0:
+                        print(f"[Database Cleanup] Successfully deleted {affected} educational subjects from database.")
+                except Exception as cleanup_err:
+                    print(f"[Database Cleanup] Error deleting educational subjects: {cleanup_err}")
+
                 print("[Database] MySQL Tables check/creation complete.")
     except Exception as e:
         print(f"[Database] Error initializing database: {e}")
@@ -455,6 +481,29 @@ async def db_save_scraper_progress(subject_type: int, current_page: int):
                 """, (int(subject_type), int(current_page)))
     except Exception as e:
         print(f"[Database] Error saving scraper progress: {e}")
+
+def is_educational_content(title: str) -> bool:
+    if not title:
+        return False
+    title_lower = title.lower()
+    
+    # Check for Bangla class keywords
+    bangla_keywords = ["\u0eb6\u0bb0\u0eb6\u0ba3\u0eb6\u0bbf", "শ্রেণি", "শ্রেণী", "অধ্যায়", "অধ্যায়", "পাঠ্য", "শিক্ষা", "গণিত", "বিজ্ঞান", "ব্যাকরণ"]
+    for kw in bangla_keywords:
+        if kw in title_lower:
+            return True
+            
+    # Regex for "Class X" where X is a digit or word representation
+    if re.search(r'\bclass\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b', title_lower):
+        return True
+        
+    # Other educational / exam keywords
+    edu_keywords = ["english 1st paper", "english 2nd paper", "ssc 20", "hsc 20", "jsc 20", "nctb"]
+    for kw in edu_keywords:
+        if kw in title_lower:
+            return True
+            
+    return False
 
 # ==========================================================================
 # 3. ONEROOM COOKIE-BASED H5 API CLIENT (SIGNATURE-FREE)
@@ -888,6 +937,7 @@ async def run_incremental_scraper():
             for item in items:
                 sub_id = item.get("subjectId")
                 if not sub_id: continue
+                if is_educational_content(item.get("title", "")): continue
                 
                 # Check if already cached
                 pool = await get_db_pool()
@@ -962,6 +1012,7 @@ async def run_historical_scraper():
                 for item in items:
                     sub_id = item.get("subjectId")
                     if not sub_id: continue
+                    if is_educational_content(item.get("title", "")): continue
                     
                     pool = await get_db_pool()
                     exists = None
@@ -1615,6 +1666,7 @@ async def cache_discovered_subjects(home_data: dict):
     for sub in subjects:
         sub_id = sub.get("subjectId")
         if not sub_id or str(sub_id) == "0": continue
+        if is_educational_content(sub.get("title", "")): continue
         
         # Simple metadata extraction
         genres = sub.get("genre", [])
@@ -1833,6 +1885,7 @@ async def search_content(payload: dict):
 
 async def background_filter_and_cache(genre, country, year, language, sort, subject_type, page, per_page):
     try:
+        api_sort = "Rating" if sort == "Hottest" else sort
         api_payload = {
             "page": page,
             "perPage": per_page,
@@ -1840,7 +1893,7 @@ async def background_filter_and_cache(genre, country, year, language, sort, subj
             "country": "" if country == "*" else country,
             "year": "" if year == "*" else year,
             "language": "" if language == "*" else language,
-            "sort": sort,
+            "sort": api_sort,
             "subjectType": subject_type
         }
         
@@ -1853,6 +1906,9 @@ async def background_filter_and_cache(genre, country, year, language, sort, subj
                 items = results[0].get("subjects", [])
                 
         for item in items:
+            title = item.get("title", "")
+            if is_educational_content(title):
+                continue
             sub_id = item.get("subjectId")
             if sub_id:
                 await scrape_subject_details(sub_id)
@@ -1907,7 +1963,7 @@ async def filter_content(payload: dict):
     if sort == "Hottest":
         order_clause = " ORDER BY rating DESC, release_date DESC, created_at DESC"
     elif sort == "Latest":
-        order_clause = " ORDER BY release_date DESC, rating DESC, created_at DESC"
+        order_clause = " ORDER BY (rating > 0) DESC, release_date DESC, rating DESC, created_at DESC"
 
     offset = (page - 1) * per_page
     query = f"SELECT * FROM subjects{where_clause}{order_clause} LIMIT %s OFFSET %s"
@@ -1922,6 +1978,8 @@ async def filter_content(payload: dict):
                     await cur.execute(query, tuple(params))
                     rows = await cur.fetchall()
                     for row in rows:
+                        if is_educational_content(row["title"]):
+                            continue
                         local_results.append({
                             "subjectId": row["subject_id"],
                             "title": row["title"],
@@ -1942,7 +2000,7 @@ async def filter_content(payload: dict):
         if sort == "Hottest":
             local_results.sort(key=lambda x: (safe_float_rating(x.get("imdbRatingValue")), x.get("releaseDate", "") or ""), reverse=True)
         elif sort == "Latest":
-            local_results.sort(key=lambda x: (x.get("releaseDate", "") or "", safe_float_rating(x.get("imdbRatingValue"))), reverse=True)
+            local_results.sort(key=lambda x: (safe_float_rating(x.get("imdbRatingValue")) > 0, x.get("releaseDate", "") or "", safe_float_rating(x.get("imdbRatingValue"))), reverse=True)
         else:
             local_results.sort(key=lambda x: (safe_float_rating(x.get("imdbRatingValue")), x.get("releaseDate", "") or ""), reverse=True)
             
@@ -1958,6 +2016,7 @@ async def filter_content(payload: dict):
 
     # Fetch from MovieBox API
     try:
+        api_sort = "Rating" if sort == "Hottest" else sort
         api_payload = {
             "page": page,
             "perPage": per_page,
@@ -1965,7 +2024,7 @@ async def filter_content(payload: dict):
             "country": "" if country == "*" else country,
             "year": "" if year == "*" else year,
             "language": "" if language == "*" else language,
-            "sort": sort,
+            "sort": api_sort,
             "subjectType": subject_type
         }
         
@@ -1977,16 +2036,33 @@ async def filter_content(payload: dict):
             if results:
                 items = results[0].get("subjects", [])
                 
+        filtered_items = []
         for item in items:
+            title = item.get("title", "")
+            if is_educational_content(title):
+                continue
+                
+            item_type = int(item.get("subjectType", 1))
+            # Filter strictly by subjectType if requested (1 = Movie, 2 = TV Show, etc.)
+            if subject_type > 0 and item_type != subject_type:
+                continue
+            # If subjectType is 0 (All), exclude short clips/music junk and keep movies, TV shows, and anime
+            if subject_type == 0 and item_type not in (1, 2, 7):
+                continue
+                
+            filtered_items.append(item)
+            
             sub_id = item.get("subjectId")
             if sub_id:
                 asyncio.create_task(scrape_subject_details(sub_id))
+
+        items = filtered_items
 
         # Sort in memory based on rating/latest requirements
         if sort == "Hottest":
             items.sort(key=lambda x: (safe_float_rating(x.get("imdbRatingValue")), x.get("releaseDate", "") or ""), reverse=True)
         elif sort == "Latest":
-            items.sort(key=lambda x: (x.get("releaseDate", "") or "", safe_float_rating(x.get("imdbRatingValue"))), reverse=True)
+            items.sort(key=lambda x: (safe_float_rating(x.get("imdbRatingValue")) > 0, x.get("releaseDate", "") or "", safe_float_rating(x.get("imdbRatingValue"))), reverse=True)
         else:
             items.sort(key=lambda x: (safe_float_rating(x.get("imdbRatingValue")), x.get("releaseDate", "") or ""), reverse=True)
 
