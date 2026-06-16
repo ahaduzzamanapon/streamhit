@@ -1556,8 +1556,19 @@ async def search_content(payload: dict):
         query += " AND subject_type = %s"
         params.append(subject_type)
         
-    query += " ORDER BY created_at DESC LIMIT %s OFFSET %s"
-    params.extend([per_page, offset])
+    query += """
+        ORDER BY (
+            CASE 
+                WHEN title = %s THEN 1
+                WHEN title LIKE %s THEN 2
+                ELSE 3
+            END
+        ) ASC,
+        (CASE WHEN subject_type IN (1, 2, 7) THEN 1 ELSE 2 END) ASC,
+        created_at DESC
+        LIMIT %s OFFSET %s
+    """
+    params.extend([keyword, f"{keyword}%", per_page, offset])
 
     local_results = []
     pool = await get_db_pool()
@@ -1606,6 +1617,28 @@ async def search_content(payload: dict):
         }
         data = await request_h5_api("POST", api_path, api_payload)
         items = data.get("data", {}).get("items", [])
+        
+        # Sort API results so that exact/starts-with title matches and main media types come first
+        def sort_key(item):
+            title = item.get("title", "").lower()
+            kw = keyword.lower()
+            st = int(item.get("subjectType", 0))
+            
+            # Title match priority
+            if title == kw:
+                title_priority = 1
+            elif title.startswith(kw):
+                title_priority = 2
+            else:
+                title_priority = 3
+                
+            # Type priority: movies (1), tv series (2), animations (7) first
+            type_priority = 1 if st in (1, 2, 7) else 2
+            
+            return (title_priority, type_priority)
+            
+        if isinstance(items, list):
+            items.sort(key=sort_key)
         
         # Cache results asynchronously
         for item in items:
