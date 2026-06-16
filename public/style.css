@@ -44,12 +44,16 @@
     box-sizing: border-box;
 }
 
+html, body {
+    width: 100%;
+    overflow-x: hidden;
+}
+
 body {
     background-color: var(--bg-primary);
     color: var(--text-primary);
     font-family: 'Plus Jakarta Sans', sans-serif;
     -webkit-font-smoothing: antialiased;
-    overflow-x: hidden;
 }
 
 a {
@@ -1364,7 +1368,7 @@ button, input, select {
 /* Cinema Grid Layout */
 .watch-cinema-grid {
     display: grid;
-    grid-template-columns: 1fr 380px;
+    grid-template-columns: minmax(0, 1fr) 380px;
     gap: 30px;
     margin-top: 25px;
     align-items: start;
@@ -1372,7 +1376,7 @@ button, input, select {
 
 @media (max-width: 1200px) {
     .watch-cinema-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
         gap: 30px;
     }
 }
@@ -1381,6 +1385,7 @@ button, input, select {
 .cinema-player-column {
     display: flex;
     flex-direction: column;
+    min-width: 0;
 }
 
 .cinema-meta-section {
@@ -2485,6 +2490,8 @@ button, input, select {
     }
     .watch-page-body .watch-cinema-grid {
         margin-top: 0 !important;
+        display: block !important;
+        width: 100% !important;
     }
     .watch-page-body .cinema-meta-section {
         margin: 15px !important;
