@@ -1117,6 +1117,12 @@ async function playResources() {
             sources: sources,
             tracks: tracks
         };
+
+        // Force browser to load the new sources by initiating playback.
+        // This triggers the network request and eventually fires the 'canplay' event.
+        playerInstance.play().catch(e => {
+            console.log("[Player] Play triggered to start stream loading:", e);
+        });
     }
 }
 

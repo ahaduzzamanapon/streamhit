@@ -2456,6 +2456,10 @@ button, input, select {
         grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
         gap: 12px !important;
     }
+    .content-card {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
     .content-card .card-poster {
         height: 190px !important;
     }
