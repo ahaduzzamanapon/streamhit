@@ -450,6 +450,23 @@ def get_random_singapore_ip():
     random_long = random.randint(start_long, end_long)
     return long_to_ip(random_long)
 
+# In-Memory Cache for API responses
+api_cache = {}  # key -> (expiry_timestamp, response_data)
+API_CACHE_TTL = 600.0  # 10 minutes cache TTL
+
+def get_cached_response(key: str) -> dict:
+    now = time.time()
+    if key in api_cache:
+        expiry, data = api_cache[key]
+        if now < expiry:
+            return data
+        else:
+            del api_cache[key]
+    return None
+
+def set_cached_response(key: str, data: any, ttl: float = API_CACHE_TTL):
+    api_cache[key] = (time.time() + ttl, data)
+
 global_cookies = ""
 cookies_expiry = 0.0
 last_direct_fail_time = 0.0
@@ -473,12 +490,12 @@ async def refresh_cookies_if_needed() -> str:
     }
 
     skip_direct = (now - last_direct_fail_time < 3600.0)
+    cookie_url = "https://h5.aoneroom.com/wefeed-h5-bff/app/get-latest-app-pkgs?app_name=moviebox"
 
-    # Try direct first
+    # Stage 1: Try direct first
     if not skip_direct:
         try:
-            async with httpx.AsyncClient(trust_env=False, timeout=3.0) as client:
-                cookie_url = "https://h5.aoneroom.com/wefeed-h5-bff/app/get-latest-app-pkgs?app_name=moviebox"
+            async with httpx.AsyncClient(trust_env=False, timeout=2.5) as client:
                 resp = await client.get(cookie_url, headers=headers)
                 if resp.status_code == 200:
                     cookie_headers = resp.headers.get_list("Set-Cookie")
@@ -494,10 +511,9 @@ async def refresh_cookies_if_needed() -> str:
             print(f"[API Auth] Direct cookie refresh failed: {e}. Marking direct API as failed, trying via Singapore proxy...")
             last_direct_fail_time = time.time()
 
-    # Fallback to Singapore proxy
+    # Stage 2: Fallback to Singapore proxy
     try:
-        async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
-            cookie_url = "https://h5.aoneroom.com/wefeed-h5-bff/app/get-latest-app-pkgs?app_name=moviebox"
+        async with httpx.AsyncClient(trust_env=False, timeout=6.0) as client:
             proxied_url = f"http://194.127.178.223/?url={urllib.parse.quote(cookie_url)}"
             resp = await client.get(proxied_url, headers=headers)
             if resp.status_code == 200:
@@ -539,16 +555,43 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
     url = f"{host}{path}"
     now = time.time()
     skip_direct = (now - last_direct_fail_time < 3600.0)
-    
-    # 1. Try direct first
-    if not skip_direct:
-        try:
-            async with httpx.AsyncClient(trust_env=False, timeout=3.0) as client:
-                if method.upper() == "POST":
-                    resp = await client.post(url, json=body_dict, headers=headers)
-                else:
+
+    # If GET request, run Direct -> CF Worker -> Singapore Proxy fallback loop
+    if method.upper() == "GET":
+        # Stage 1: Try Direct
+        if not skip_direct:
+            try:
+                async with httpx.AsyncClient(trust_env=False, timeout=2.5) as client:
                     resp = await client.get(url, headers=headers)
-                    
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        if data.get("code") == 0 or "data" in data:
+                            return data
+                        else:
+                            raise Exception(data.get("message", f"API error code {data.get('code')}"))
+                    else:
+                        raise Exception(f"HTTP status {resp.status_code}")
+            except Exception as e:
+                print(f"[API Warning] Direct GET request failed for {path}: {e}. Trying via Cloudflare Worker...")
+                last_direct_fail_time = time.time()
+        
+        # Stage 2: Try Cloudflare Worker Proxy (GET only)
+        try:
+            worker = get_next_worker()
+            worker_headers = {
+                "Cookie": cookies,
+                "Referer": headers["Referer"],
+                "X-Forwarded-For": ip,
+                "X-Real-IP": ip,
+                "User-Agent": headers["User-Agent"],
+                "Accept": headers["Accept"]
+            }
+            if origin:
+                worker_headers["Origin"] = origin
+                
+            proxied_url = f"{worker}/mp4-proxy?url={urllib.parse.quote(url)}&headers={urllib.parse.quote(json.dumps(worker_headers))}"
+            async with httpx.AsyncClient(trust_env=False, timeout=5.0) as client:
+                resp = await client.get(proxied_url)
                 if resp.status_code == 200:
                     data = resp.json()
                     if data.get("code") == 0 or "data" in data:
@@ -558,29 +601,60 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
                 else:
                     raise Exception(f"HTTP status {resp.status_code}")
         except Exception as e:
-            print(f"[API Warning] Direct H5 API request failed for {path}: {e}. Marking direct API as failed, trying via Singapore proxy...")
-            last_direct_fail_time = time.time()
+            print(f"[API Warning] Worker GET request failed for {path}: {e}. Trying via Singapore proxy...")
 
-    # 2. Proxy Fallback
-    try:
-        proxied_url = f"http://194.127.178.223/?url={urllib.parse.quote(url)}"
-        async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
-            if method.upper() == "POST":
-                resp = await client.post(proxied_url, json=body_dict, headers=headers)
-            else:
+        # Stage 3: Try Singapore Proxy
+        try:
+            proxied_url = f"http://194.127.178.223/?url={urllib.parse.quote(url)}"
+            async with httpx.AsyncClient(trust_env=False, timeout=8.0) as client:
                 resp = await client.get(proxied_url, headers=headers)
-                
-            if resp.status_code == 200:
-                data = resp.json()
-                if data.get("code") == 0 or "data" in data:
-                    return data
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get("code") == 0 or "data" in data:
+                        return data
+                    else:
+                        raise Exception(data.get("message", f"API error code {data.get('code')}"))
                 else:
-                    raise Exception(data.get("message", f"API error code {data.get('code')}"))
-            else:
-                raise Exception(f"HTTP status {resp.status_code}")
-    except Exception as e:
-        print(f"[API Error] Proxied H5 API request failed for {path}: {e}")
-        raise e
+                    raise Exception(f"HTTP status {resp.status_code}")
+        except Exception as e:
+            print(f"[API Error] Proxied GET request failed for {path}: {e}")
+            raise e
+
+    # If POST request, run Direct -> Singapore Proxy fallback loop
+    else:
+        # Stage 1: Try Direct
+        if not skip_direct:
+            try:
+                async with httpx.AsyncClient(trust_env=False, timeout=3.0) as client:
+                    resp = await client.post(url, json=body_dict, headers=headers)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        if data.get("code") == 0 or "data" in data:
+                            return data
+                        else:
+                            raise Exception(data.get("message", f"API error code {data.get('code')}"))
+                    else:
+                        raise Exception(f"HTTP status {resp.status_code}")
+            except Exception as e:
+                print(f"[API Warning] Direct POST request failed for {path}: {e}. Trying via Singapore proxy...")
+                last_direct_fail_time = time.time()
+
+        # Stage 2: Try Singapore Proxy
+        try:
+            proxied_url = f"http://194.127.178.223/?url={urllib.parse.quote(url)}"
+            async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+                resp = await client.post(proxied_url, json=body_dict, headers=headers)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get("code") == 0 or "data" in data:
+                        return data
+                    else:
+                        raise Exception(data.get("message", f"API error code {data.get('code')}"))
+                else:
+                    raise Exception(f"HTTP status {resp.status_code}")
+        except Exception as e:
+            print(f"[API Error] Proxied POST request failed for {path}: {e}")
+            raise e
 
 # Extract CDN expiration
 def get_link_expiration(url: str) -> datetime:
@@ -1408,6 +1482,11 @@ async def get_local_operating_list() -> list:
 # Transparent proxy to grab initial feeds and auto-cache subjects
 @app.get("/api/home")
 async def get_home(page: int = 1, tabId: int = 0):
+    cache_key = f"home:{page}:{tabId}"
+    cached = get_cached_response(cache_key)
+    if cached:
+        return cached
+
     try:
         api_path = f"/wefeed-h5api-bff/tab-operating?page={page}&tabId={tabId}"
         data = await request_h5_api("GET", api_path)
@@ -1422,6 +1501,7 @@ async def get_home(page: int = 1, tabId: int = 0):
                 "items": operating_list
             }
         }
+        set_cached_response(cache_key, mapped_data)
         return mapped_data
     except Exception as e:
         print(f"[Home API] Failed to fetch home data: {e}. Falling back to local database...")
@@ -1548,6 +1628,11 @@ async def search_content(payload: dict):
     if not keyword:
         return {"code": 0, "data": {"items": []}}
 
+    cache_key = f"search:{keyword}:{page}:{per_page}:{subject_type}"
+    cached = get_cached_response(cache_key)
+    if cached:
+        return cached
+
     # Try local MySQL search
     offset = (page - 1) * per_page
     query = "SELECT * FROM subjects WHERE title LIKE %s"
@@ -1600,13 +1685,15 @@ async def search_content(payload: dict):
     if local_results:
         # Serve immediately and pull/update cache in background
         asyncio.create_task(background_search_and_cache(keyword, page, per_page, subject_type))
-        return {
+        res = {
             "code": 0,
             "data": {
                 "items": local_results,
                 "pager": {"hasMore": len(local_results) == per_page}
             }
         }
+        set_cached_response(cache_key, res, ttl=30.0)
+        return res
 
     # Fetch from API and save missing to DB
     try:
@@ -1653,6 +1740,7 @@ async def search_content(payload: dict):
             if sub_id:
                 asyncio.create_task(scrape_subject_details(sub_id))
                 
+        set_cached_response(cache_key, data)
         return data
     except Exception as e:
         return {"code": 0, "data": {"items": local_results, "pager": {"hasMore": False}}}
@@ -1696,6 +1784,11 @@ async def filter_content(payload: dict):
     subject_type = int(payload.get("subjectType", 0))
     page = int(payload.get("page", 1))
     per_page = int(payload.get("perPage", 20))
+
+    cache_key = f"filter:{genre}:{country}:{year}:{language}:{sort}:{subject_type}:{page}:{per_page}"
+    cached = get_cached_response(cache_key)
+    if cached:
+        return cached
 
     # Build MySQL Query
     conditions = ["title != 'Placeholder'"]
@@ -1752,13 +1845,15 @@ async def filter_content(payload: dict):
     if local_results:
         # Serve immediately and pull/update cache in background
         asyncio.create_task(background_filter_and_cache(genre, country, year, language, sort, subject_type, page, per_page))
-        return {
+        res = {
             "code": 0,
             "data": {
                 "items": local_results,
                 "pager": {"hasMore": len(local_results) == per_page}
             }
         }
+        set_cached_response(cache_key, res, ttl=30.0)
+        return res
 
     # Fetch from MovieBox API
     try:
@@ -1786,6 +1881,7 @@ async def filter_content(payload: dict):
             if sub_id:
                 asyncio.create_task(scrape_subject_details(sub_id))
                 
+        set_cached_response(cache_key, data)
         return data
     except Exception as e:
         print(f"[Filter Endpoint] Error: {e}")

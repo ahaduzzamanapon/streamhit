@@ -127,6 +127,18 @@ async function apiPost(path, body, timeoutMs = 5000, retries = 2) {
     return null;
 }
 
+// Eagerly start fetching home data immediately as the script is loaded
+let eagerHomePromise = null;
+let eagerBannersPromise = null;
+
+const initialPath = window.location.pathname.toLowerCase();
+const isInitialHome = !initialPath.includes("/movies") && !initialPath.includes("/tv") && !initialPath.includes("/watch") && !new URLSearchParams(window.location.search).get("keyword");
+
+if (isInitialHome) {
+    eagerBannersPromise = apiGet("/api/banners");
+    eagerHomePromise = apiGet("/api/home?page=1&tabId=0");
+}
+
 // ==========================================================================
 // HOME PAGE LOGIC
 // ==========================================================================
@@ -143,14 +155,17 @@ async function initHomePage() {
 
     showShimmers(true);
     
-    // Fetch and render cached banners from database instantly
-    const bannersResult = await apiGet("/api/banners");
+    // Use eagerly started fetch promises or start them if not already started
+    if (!eagerBannersPromise) eagerBannersPromise = apiGet("/api/banners");
+    if (!eagerHomePromise) eagerHomePromise = apiGet("/api/home?page=1&tabId=0");
+    
+    // Fetch banner and home data feed concurrently using Promise.all
+    const [bannersResult, result] = await Promise.all([eagerBannersPromise, eagerHomePromise]);
+
     if (bannersResult && bannersResult.data && bannersResult.data.list && bannersResult.data.list.length > 0) {
         renderHeroBanner(bannersResult.data.list);
     }
     
-    // Fetch home data feed
-    const result = await apiGet("/api/home?page=1&tabId=0");
     if (result && result.data && result.data.items) {
         const items = result.data.items;
         
