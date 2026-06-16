@@ -1859,6 +1859,14 @@ async def background_filter_and_cache(genre, country, year, language, sort, subj
     except Exception as e:
         print(f"[Background Filter Cache Error] {e}")
 
+def safe_float_rating(val) -> float:
+    if not val:
+        return 0.0
+    try:
+        return float(val)
+    except ValueError:
+        return 0.0
+
 # Dynamic Multi-Level Filters
 @app.post("/api/filter")
 async def filter_content(payload: dict):
@@ -1930,6 +1938,14 @@ async def filter_content(payload: dict):
 
     # Return local results ONLY if we have a full page of results (to avoid pagination gaps and premature end of scrolling)
     if len(local_results) >= per_page:
+        # Sort in memory for consistency
+        if sort == "Hottest":
+            local_results.sort(key=lambda x: (safe_float_rating(x.get("imdbRatingValue")), x.get("releaseDate", "") or ""), reverse=True)
+        elif sort == "Latest":
+            local_results.sort(key=lambda x: (x.get("releaseDate", "") or "", safe_float_rating(x.get("imdbRatingValue"))), reverse=True)
+        else:
+            local_results.sort(key=lambda x: (safe_float_rating(x.get("imdbRatingValue")), x.get("releaseDate", "") or ""), reverse=True)
+            
         res = {
             "code": 0,
             "data": {
@@ -1965,6 +1981,21 @@ async def filter_content(payload: dict):
             sub_id = item.get("subjectId")
             if sub_id:
                 asyncio.create_task(scrape_subject_details(sub_id))
+
+        # Sort in memory based on rating/latest requirements
+        if sort == "Hottest":
+            items.sort(key=lambda x: (safe_float_rating(x.get("imdbRatingValue")), x.get("releaseDate", "") or ""), reverse=True)
+        elif sort == "Latest":
+            items.sort(key=lambda x: (x.get("releaseDate", "") or "", safe_float_rating(x.get("imdbRatingValue"))), reverse=True)
+        else:
+            items.sort(key=lambda x: (safe_float_rating(x.get("imdbRatingValue")), x.get("releaseDate", "") or ""), reverse=True)
+
+        # Update data dictionary before caching and returning
+        if "data" in data:
+            if "items" in data["data"]:
+                data["data"]["items"] = items
+            elif "results" in data["data"] and data["data"]["results"]:
+                data["data"]["results"][0]["subjects"] = items
                 
         set_cached_response(cache_key, data)
         return data
