@@ -1788,9 +1788,11 @@ async def search_content(payload: dict):
         params_for_order = [keyword, f"{keyword}%"]
         
         if sort == "Hottest":
-            order_clause += ", rating DESC"
+            order_clause += ", rating DESC, release_date DESC"
         elif sort == "Latest":
-            order_clause += ", release_date DESC"
+            order_clause += ", release_date DESC, rating DESC"
+        else:
+            order_clause += ", rating DESC"
             
         query = f"SELECT * FROM subjects{where_clause}{order_clause} LIMIT %s OFFSET %s"
         all_params = params + params_for_order + [per_page, offset]
@@ -1893,11 +1895,11 @@ async def filter_content(payload: dict):
 
     where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
     
-    order_clause = " ORDER BY created_at DESC"
+    order_clause = " ORDER BY rating DESC, created_at DESC"
     if sort == "Hottest":
-        order_clause = " ORDER BY rating DESC"
+        order_clause = " ORDER BY rating DESC, release_date DESC, created_at DESC"
     elif sort == "Latest":
-        order_clause = " ORDER BY release_date DESC"
+        order_clause = " ORDER BY release_date DESC, rating DESC, created_at DESC"
 
     offset = (page - 1) * per_page
     query = f"SELECT * FROM subjects{where_clause}{order_clause} LIMIT %s OFFSET %s"
