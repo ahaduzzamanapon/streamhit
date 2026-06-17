@@ -24,6 +24,7 @@ const state = {
     availableCaptions: [],
     directMp4Url: "",
     userInteracted: false,
+    hasAutounmuted: false,
     hasMore: false,
     loadingMore: false
 };
@@ -79,6 +80,15 @@ document.addEventListener("DOMContentLoaded", () => {
     // Set userInteracted to true on any user click on the document to capture gesture
     document.addEventListener("click", () => {
         state.userInteracted = true;
+        if (playerInstance && playerInstance.muted && !state.hasAutounmuted) {
+            playerInstance.muted = false;
+            playerInstance.volume = 1.0;
+            state.hasAutounmuted = true;
+            const loaderOverlay = document.getElementById("playerLoaderOverlay");
+            if (loaderOverlay) {
+                loaderOverlay.classList.remove("visible");
+            }
+        }
     }, { once: false, passive: true });
 
     if (routes.isHome) {
@@ -778,7 +788,7 @@ async function initWatchPage() {
 
     // Initialize Plyr player with simple controls on mobile and full controls on desktop
     const isMobile = window.innerWidth <= 768;
-    const mobileControls = ['play', 'progress', 'current-time', 'duration', 'pip', 'fullscreen'];
+    const mobileControls = ['play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'pip', 'fullscreen'];
     const desktopControls = ['play-large', 'play', 'rewind', 'fast-forward', 'progress', 'current-time', 'mute', 'volume', 'captions', 'settings', 'pip', 'fullscreen'];
 
     playerInstance = new Plyr('#player', {
@@ -787,7 +797,8 @@ async function initWatchPage() {
         quality: { default: 0, options: [0, 4320, 2880, 2160, 1440, 1080, 720, 576, 480, 360, 240] },
         keyboard: { global: true, focused: true },
         captions: { active: true, update: true },
-        volume: 1
+        volume: 1,
+        muted: false
     });
 
     // Double-tap/click seek handlers
@@ -963,7 +974,14 @@ async function initWatchPage() {
     playerInstance.on('playing', hideLoader);
     playerInstance.on('play', hideLoader);
     // Mark user interaction on any manual play gesture
-    playerInstance.on('play', () => { state.userInteracted = true; });
+    playerInstance.on('play', () => { 
+        state.userInteracted = true; 
+        if (playerInstance && playerInstance.muted && !state.hasAutounmuted) {
+            playerInstance.muted = false;
+            playerInstance.volume = 1.0;
+            state.hasAutounmuted = true;
+        }
+    });
     playerInstance.on('volumechange', () => {
         if (playerInstance && !playerInstance.muted) {
             state.userInteracted = true;
