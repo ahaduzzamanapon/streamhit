@@ -505,6 +505,35 @@ def is_educational_content(title: str) -> bool:
             
     return False
 
+async def cache_item_metadata_only(item: dict):
+    try:
+        sub_id = item.get("subjectId")
+        if not sub_id or str(sub_id) == "0":
+            return
+        genres = item.get("genre", [])
+        genres_str = ",".join(genres) if isinstance(genres, list) else str(genres or "")
+        cover_val = item.get("cover")
+        cover_url = cover_val.get("url") if isinstance(cover_val, dict) else str(cover_val or "")
+        
+        s_data = {
+            "subject_id": str(sub_id),
+            "title": item.get("title", ""),
+            "subject_type": int(item.get("subjectType", 1)),
+            "cover": cover_url,
+            "backdrop": cover_url,
+            "rating": float(item.get("imdbRatingValue") or 0.0),
+            "release_date": item.get("releaseDate", ""),
+            "country": item.get("countryName", "") or item.get("country", ""),
+            "genre": genres_str,
+            "description": "",
+            "is_cam": bool(item.get("isCam", False)),
+            "detail_path": item.get("detailPath"),
+            "dubs": None
+        }
+        await db_save_subject(s_data)
+    except Exception as e:
+        print(f"[Metadata Cache Error] {e}")
+
 # ==========================================================================
 # 3. ONEROOM COOKIE-BASED H5 API CLIENT (SIGNATURE-FREE)
 # ==========================================================================
@@ -1780,19 +1809,14 @@ async def search_content(payload: dict):
             title_len = len(title)
             type_priority = 1 if st in (1, 2, 7) else 2
             
-            if sort == "Hottest":
-                rating = float(item.get("imdbRatingValue") or 0.0)
-                return (title_priority, -rating, title_len, type_priority)
-            else:
-                return (title_priority, title_len, type_priority)
+            rating = float(item.get("imdbRatingValue") or 0.0)
+            return (title_priority, -rating, title_len, type_priority)
 
         filtered_items.sort(key=sort_key)
         
-        # Cache results asynchronously to local DB
+        # Cache results asynchronously to local DB (metadata only, no API calls)
         for item in filtered_items:
-            sub_id = item.get("subjectId")
-            if sub_id:
-                asyncio.create_task(scrape_subject_details(sub_id))
+            asyncio.create_task(cache_item_metadata_only(item))
                 
         res = {
             "code": 0,
@@ -2017,46 +2041,120 @@ async def filter_content(payload: dict):
     # Fetch from MovieBox API
     try:
         api_sort = "Rating" if sort == "Hottest" else sort
-        api_payload = {
-            "page": page,
-            "perPage": per_page,
-            "genre": "" if genre == "*" else genre,
-            "country": "" if country == "*" else country,
-            "year": "" if year == "*" else year,
-            "language": "" if language == "*" else language,
-            "sort": api_sort,
-            "subjectType": subject_type
-        }
-        
-        data = await request_h5_api("POST", "/wefeed-h5api-bff/subject/filter", api_payload)
-        items = data.get("data", {}).get("items", [])
-        
-        if not items and data.get("data", {}).get("results"):
-            results = data.get("data", {}).get("results", [])
-            if results:
-                items = results[0].get("subjects", [])
-                
         filtered_items = []
-        for item in items:
-            title = item.get("title", "")
-            if is_educational_content(title):
-                continue
-                
-            item_type = int(item.get("subjectType", 1))
-            # Filter strictly by subjectType if requested (1 = Movie, 2 = TV Show, etc.)
-            if subject_type > 0 and item_type != subject_type:
-                continue
-            # If subjectType is 0 (All), exclude short clips/music junk and keep movies, TV shows, and anime
-            if subject_type == 0 and item_type not in (1, 2, 7):
-                continue
-                
-            filtered_items.append(item)
+        current_api_page = page
+        attempts = 0
+        max_attempts = 3
+        has_more_pages = True
+        last_data = {}
+        
+        while len(filtered_items) < per_page and attempts < max_attempts and has_more_pages:
+            attempts += 1
+            api_payload = {
+                "page": current_api_page,
+                "perPage": per_page,
+                "genre": "" if genre == "*" else genre,
+                "country": "" if country == "*" else country,
+                "year": "" if year == "*" else year,
+                "language": "" if language == "*" else language,
+                "sort": api_sort,
+                "subjectType": subject_type
+            }
             
-            sub_id = item.get("subjectId")
-            if sub_id:
-                asyncio.create_task(scrape_subject_details(sub_id))
+            try:
+                data = await request_h5_api("POST", "/wefeed-h5api-bff/subject/filter", api_payload)
+                last_data = data
+                items = data.get("data", {}).get("items", [])
+                if not items and data.get("data", {}).get("results"):
+                    results = data.get("data", {}).get("results", [])
+                    if results:
+                        items = results[0].get("subjects", [])
+                        
+                if not items:
+                    has_more_pages = False
+                    break
+                    
+                has_more_pages = data.get("data", {}).get("pager", {}).get("hasMore", False)
+                
+                page_filtered = []
+                for item in items:
+                    title = item.get("title", "")
+                    if is_educational_content(title):
+                        continue
+                        
+                    item_type = int(item.get("subjectType", 1))
+                    # Filter strictly by subjectType if requested (1 = Movie, 2 = TV Show, etc.)
+                    if subject_type > 0 and item_type != subject_type:
+                        continue
+                    # If subjectType is 0 (All), exclude short clips/music junk and keep movies, TV shows, and anime
+                    if subject_type == 0 and item_type not in (1, 2, 7):
+                        continue
+                        
+                    page_filtered.append(item)
+                    
+                    sub_id = item.get("subjectId")
+                    if sub_id:
+                        asyncio.create_task(cache_item_metadata_only(item))
+                        
+                filtered_items.extend(page_filtered)
+                if not has_more_pages:
+                    break
+            except Exception as page_err:
+                print(f"[Filter Page Fetch Error] Page {current_api_page}: {page_err}")
+                if not filtered_items:
+                    raise page_err
+                break
+                
+            current_api_page += 1
 
         items = filtered_items
+
+        # Fallback to alternative sorts if ForYou returns no results
+        if not items and sort == "ForYou":
+            print(f"[Filter Endpoint] ForYou returned 0 items. Trying fallback sorts...")
+            for fallback_sort in ["Latest", "Hottest"]:
+                api_sort = "Rating" if fallback_sort == "Hottest" else fallback_sort
+                api_payload = {
+                    "page": page,
+                    "perPage": per_page,
+                    "genre": "" if genre == "*" else genre,
+                    "country": "" if country == "*" else country,
+                    "year": "" if year == "*" else year,
+                    "language": "" if language == "*" else language,
+                    "sort": api_sort,
+                    "subjectType": subject_type
+                }
+                try:
+                    data = await request_h5_api("POST", "/wefeed-h5api-bff/subject/filter", api_payload)
+                    last_data = data
+                    fb_items = data.get("data", {}).get("items", [])
+                    if not fb_items and data.get("data", {}).get("results"):
+                        results = data.get("data", {}).get("results", [])
+                        if results:
+                            fb_items = results[0].get("subjects", [])
+                            
+                    if fb_items:
+                        page_filtered = []
+                        for fb_item in fb_items:
+                            title = fb_item.get("title", "")
+                            if is_educational_content(title):
+                                continue
+                            item_type = int(fb_item.get("subjectType", 1))
+                            if subject_type > 0 and item_type != subject_type:
+                                continue
+                            if subject_type == 0 and item_type not in (1, 2, 7):
+                                continue
+                            page_filtered.append(fb_item)
+                            sub_id = fb_item.get("subjectId")
+                            if sub_id:
+                                asyncio.create_task(cache_item_metadata_only(fb_item))
+                        if page_filtered:
+                            items = page_filtered
+                            has_more_pages = data.get("data", {}).get("pager", {}).get("hasMore", False)
+                            print(f"[Filter Endpoint] Fallback to {fallback_sort} succeeded with {len(items)} items.")
+                            break
+                except Exception as fb_err:
+                    print(f"[Filter Endpoint Fallback Error] {fb_err}")
 
         # Sort in memory based on rating/latest requirements
         if sort == "Hottest":
@@ -2067,14 +2165,17 @@ async def filter_content(payload: dict):
             items.sort(key=lambda x: (safe_float_rating(x.get("imdbRatingValue")), x.get("releaseDate", "") or ""), reverse=True)
 
         # Update data dictionary before caching and returning
-        if "data" in data:
-            if "items" in data["data"]:
-                data["data"]["items"] = items
-            elif "results" in data["data"] and data["data"]["results"]:
-                data["data"]["results"][0]["subjects"] = items
+        if last_data and "data" in last_data:
+            if "items" in last_data["data"]:
+                last_data["data"]["items"] = items
+            elif "results" in last_data["data"] and last_data["data"]["results"]:
+                last_data["data"]["results"][0]["subjects"] = items
                 
-        set_cached_response(cache_key, data)
-        return data
+            if "pager" in last_data["data"]:
+                last_data["data"]["pager"]["hasMore"] = has_more_pages
+                
+            set_cached_response(cache_key, last_data)
+            return last_data
     except Exception as e:
         print(f"[Filter Endpoint] Error: {e}")
 
