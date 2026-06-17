@@ -1,23 +1,22 @@
-import httpx
+import urllib.request
+import urllib.parse
+import json
 
-def main():
-    url = "https://streamhit.lc-synergy.ltd/api/read-log"
-    print("Fetching live log from", url)
+SECRET = "streamhit_secret_update_2026"
+BASE_URL = "https://streamhit.lc-synergy.ltd"
+
+def read_log():
+    url = f"{BASE_URL}/api/read-log?secret={SECRET}"
     try:
-        resp = httpx.get(url, timeout=10.0)
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("status") == "success":
-                output_file = "scratch/live_stderr.log"
-                with open(output_file, "w", encoding="utf-8") as f:
-                    f.write(data.get("log"))
-                print("Successfully wrote live log to", output_file)
-            else:
-                print("Error from API:", data.get("message"))
-        else:
-            print("HTTP Error:", resp.status_code)
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=10) as response:
+            return json.loads(response.read().decode('utf-8'))
     except Exception as e:
-        print("Fetch failed:", e)
+        return {"error": str(e)}
 
-if __name__ == "__main__":
-    main()
+res = read_log()
+if "log" in res:
+    print("=== LIVE LOGS ===")
+    print(res["log"])
+else:
+    print("Error getting log:", res)

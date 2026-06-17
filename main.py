@@ -889,6 +889,11 @@ async def scrape_subject_details(subject_id: str) -> dict:
         genres = detail.get("genre", [])
         genres_str = ",".join(genres) if isinstance(genres, list) else str(genres)
         
+        # Check if educational content or blocked genres
+        if is_educational_content(detail.get("title", ""), genres_str):
+            print(f"[Scraper] Discarding educational/blocked content: {detail.get('title', '')} (genre: {genres_str})")
+            return {}
+            
         cover_val = detail.get("cover")
         cover_url = cover_val.get("url") if isinstance(cover_val, dict) else str(cover_val)
         
@@ -2279,6 +2284,12 @@ async def get_detail(subjectId: str, detailPath: str = ""):
         if not subject_info:
             raise Exception("Subject not found in H5 API")
             
+        # Check if educational or blocked
+        genres = subject_info.get("genre", "")
+        genres_str = ",".join(genres) if isinstance(genres, list) else str(genres)
+        if is_educational_content(subject_info.get("title", ""), genres_str):
+            raise HTTPException(status_code=403, detail="This content is not allowed (blocked genre or educational)")
+            
         # Async background scrape details to DB
         asyncio.create_task(scrape_subject_details(subjectId))
         
@@ -3036,6 +3047,17 @@ async def get_subject_meta(subject_id: str = None, tmdb_id: str = None, subject_
                                 meta["description"] = f"Watch {row['title']} online on Streamfit. Free streaming with multi-audio, subtitle selection and auto-quality."
                             if row["cover"]:
                                 meta["cover"] = row["cover"]
+                        else:
+                            # Directly/synchronously scrape it!
+                            scraped = await scrape_subject_details(str(subject_id))
+                            if scraped:
+                                meta["title"] = f"Watch {scraped['title']} - Streamfit"
+                                if scraped.get("description"):
+                                    meta["description"] = scraped["description"]
+                                else:
+                                    meta["description"] = f"Watch {scraped['title']} online on Streamfit. Free streaming with multi-audio, subtitle selection and auto-quality."
+                                if scraped.get("cover"):
+                                    meta["cover"] = scraped["cover"]
             except Exception as e:
                 print(f"[Meta Lookup Error] {e}")
                 
