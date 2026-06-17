@@ -2698,10 +2698,5 @@ button, input, select {
         padding-left: 0 !important;
         display: inline-block !important;
     }
-    /* Force show volume control on mobile */
-    .plyr__volume {
-        display: flex !important;
-        align-items: center;
-    }
 }
 

@@ -788,7 +788,7 @@ async function initWatchPage() {
 
     // Initialize Plyr player with simple controls on mobile and full controls on desktop
     const isMobile = window.innerWidth <= 768;
-    const mobileControls = ['play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'pip', 'fullscreen'];
+    const mobileControls = ['play', 'progress', 'current-time', 'duration', 'mute', 'pip', 'fullscreen'];
     const desktopControls = ['play-large', 'play', 'rewind', 'fast-forward', 'progress', 'current-time', 'mute', 'volume', 'captions', 'settings', 'pip', 'fullscreen'];
 
     playerInstance = new Plyr('#player', {
