@@ -75,6 +75,50 @@ function highlightActiveMobileNav() {
     }
 }
 
+// Utility function to enable mouse drag-to-scroll and mouse wheel horizontal scrolling
+function enableDragScroll(el) {
+    if (!el) return;
+    let isDown = false;
+    let startX;
+    let scrollLeft;
+
+    el.addEventListener('mousedown', (e) => {
+        // Only trigger on left-click
+        if (e.button !== 0) return;
+        isDown = true;
+        el.classList.add('dragging');
+        startX = e.pageX - el.offsetLeft;
+        scrollLeft = el.scrollLeft;
+        el.style.scrollBehavior = 'auto';
+    });
+
+    el.addEventListener('mouseleave', () => {
+        isDown = false;
+        el.classList.remove('dragging');
+    });
+
+    el.addEventListener('mouseup', () => {
+        isDown = false;
+        el.classList.remove('dragging');
+    });
+
+    el.addEventListener('mousemove', (e) => {
+        if (!isDown) return;
+        e.preventDefault();
+        const x = e.pageX - el.offsetLeft;
+        const walk = (x - startX) * 1.5; // Drag speed multiplier
+        el.scrollLeft = scrollLeft - walk;
+    });
+
+    el.addEventListener('wheel', (e) => {
+        if (e.deltaY !== 0) {
+            e.preventDefault();
+            el.style.scrollBehavior = 'auto';
+            el.scrollLeft += e.deltaY;
+        }
+    }, { passive: false });
+}
+
 // Initial Load
 document.addEventListener("DOMContentLoaded", () => {
     detectRoute();
@@ -366,6 +410,9 @@ function setupSliderNavigation(gridEl) {
 
     wrapper.appendChild(prevBtn);
     wrapper.appendChild(nextBtn);
+
+    // Apply drag scroll to slider
+    enableDragScroll(gridEl);
 }
 
 function createCustomSliderSection(title, id, iconClass, seeMoreUrl) {
@@ -1631,6 +1678,9 @@ async function loadSeasonEpisodes(subjectId, detailPath = "") {
         const activeSeasonObj = seasons.find(s => s.se === state.selectedSeason) || seasons[0];
         state.selectedSeason = activeSeasonObj.se;
         renderEpisodes(activeSeasonObj);
+
+        // Apply drag scroll to season tabs
+        enableDragScroll(seasonTabs);
     } else {
         seasonTabs.innerHTML = "<span>No seasons found.</span>";
     }

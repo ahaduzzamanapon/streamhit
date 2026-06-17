@@ -2201,7 +2201,7 @@ button, input, select {
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 4; /* Above video, below loading overlay (z-index 5) */
+    z-index: 40 !important; /* On top of player video wrapper and loader overlay */
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.2s ease;
@@ -2222,8 +2222,8 @@ button, input, select {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: rgba(29, 209, 113, 0.2);
-    border: 1px solid rgba(29, 209, 113, 0.3);
+    background: rgba(255, 42, 58, 0.15);
+    border: 1px solid rgba(255, 42, 58, 0.3);
     color: var(--color-accent);
     width: 70px;
     height: 70px;
@@ -2936,3 +2936,11 @@ button, input, select {
     }
 }
 
+/* Drag to scroll grabbing cursor utility */
+.season-tabs, .content-slider {
+    cursor: grab;
+}
+.dragging {
+    cursor: grabbing !important;
+    user-select: none;
+}
