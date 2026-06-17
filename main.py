@@ -300,7 +300,7 @@ async def init_db():
                     except Exception as migration_err:
                         print(f"[Database] Error during timezone migration: {migration_err}")
 
-                # Cleanup educational / classroom items from subjects table automatically
+                # Cleanup educational / classroom items and blocked genres from subjects table automatically
                 try:
                     await cur.execute("""
                         DELETE FROM subjects 
@@ -313,18 +313,26 @@ async def init_db():
                            OR title LIKE '%nctb%'
                            OR title LIKE '%শ্রেণি%'
                            OR title LIKE '%শ্রেণী%'
-                           OR title LIKE '%অধ্যায়%'
                            OR title LIKE '%অধ্যায়%'
                            OR title LIKE '%শিক্ষা%'
                            OR title LIKE '%গণিত%'
                            OR title LIKE '%বিজ্ঞান%'
                            OR title LIKE '%ব্যাকরণ%'
+                           OR genre LIKE '%Basketball%'
+                           OR genre LIKE '%Football%'
+                           OR genre LIKE '%Mobile Game%'
+                           OR genre LIKE '%PC Game%'
+                           OR genre LIKE '%Reality%'
+                           OR genre LIKE '%Wrestling%'
+                           OR genre LIKE '%Yoruba%'
+                           OR genre LIKE '%Gameplay%'
+                           OR genre LIKE '%Volleyball%'
                     """)
                     affected = cur.rowcount
                     if affected > 0:
-                        print(f"[Database Cleanup] Successfully deleted {affected} educational subjects from database.")
+                        print(f"[Database Cleanup] Successfully deleted {affected} educational/blocked-genre subjects from database.")
                 except Exception as cleanup_err:
-                    print(f"[Database Cleanup] Error deleting educational subjects: {cleanup_err}")
+                    print(f"[Database Cleanup] Error deleting educational/blocked subjects: {cleanup_err}")
 
                 print("[Database] MySQL Tables check/creation complete.")
     except Exception as e:
@@ -498,27 +506,40 @@ async def db_save_scraper_progress(subject_type: int, current_page: int):
     except Exception as e:
         print(f"[Database] Error saving scraper progress: {e}")
 
-def is_educational_content(title: str) -> bool:
+# Genres that should never be scraped or shown
+BLOCKED_GENRES = {
+    "basketball", "football", "mobile game", "pc game",
+    "reality", "wrestling", "yoruba", "gameplay", "volleyball"
+}
+
+def is_educational_content(title: str, genre: str = "") -> bool:
     if not title:
         return False
     title_lower = title.lower()
-    
+
+    # Block unwanted genres
+    if genre:
+        genre_lower = genre.lower()
+        for blocked in BLOCKED_GENRES:
+            if blocked in genre_lower:
+                return True
+
     # Check for Bangla class keywords
-    bangla_keywords = ["\u0eb6\u0bb0\u0eb6\u0ba3\u0eb6\u0bbf", "শ্রেণি", "শ্রেণী", "অধ্যায়", "অধ্যায়", "পাঠ্য", "শিক্ষা", "গণিত", "বিজ্ঞান", "ব্যাকরণ"]
+    bangla_keywords = ["শ্রেণি", "শ্রেণী", "অধ্যায়", "পাঠ্য", "শিক্ষা", "গণিত", "বিজ্ঞান", "ব্যাকরণ"]
     for kw in bangla_keywords:
         if kw in title_lower:
             return True
-            
+
     # Regex for "Class X" where X is a digit or word representation
     if re.search(r'\bclass\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b', title_lower):
         return True
-        
+
     # Other educational / exam keywords
     edu_keywords = ["english 1st paper", "english 2nd paper", "ssc 20", "hsc 20", "jsc 20", "nctb"]
     for kw in edu_keywords:
         if kw in title_lower:
             return True
-            
+
     return False
 
 async def cache_item_metadata_only(item: dict):
