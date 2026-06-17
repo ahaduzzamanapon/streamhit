@@ -272,6 +272,22 @@ async def init_db():
                         current_page INT NOT NULL
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
+                # 7. API Cache table
+                await cur.execute("""
+                    CREATE TABLE IF NOT EXISTS api_cache (
+                        cache_key VARCHAR(255) PRIMARY KEY,
+                        response_data LONGTEXT NOT NULL,
+                        expires_at TIMESTAMP NOT NULL,
+                        INDEX idx_expires_at (expires_at)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                try:
+                    await cur.execute("DELETE FROM api_cache WHERE expires_at < NOW()")
+                    affected = cur.rowcount
+                    if affected > 0:
+                        print(f"[Database Cleanup] Successfully deleted {affected} expired cache entries.")
+                except Exception as cleanup_err:
+                    print(f"[Database Cleanup] Error deleting expired cache entries: {cleanup_err}")
 
                 # One-time migration to clear play_resources timezone cache
                 migration_flag = os.path.join(base_dir, ".db_timezone_migration_done")
@@ -2206,6 +2222,149 @@ async def filter_content(payload: dict):
         }
     }
 
+async def resolve_details_via_tmdb(subject_id: str, path_to_use: str, db_row: dict = None) -> dict:
+    if not path_to_use or "subjectId" in path_to_use or "details" in path_to_use:
+        return None
+        
+    path_clean = path_to_use.split("?")[0]
+    parts = path_clean.split("-")
+    if len(parts) > 1:
+        last_part = parts[-1]
+        # Check if last part is alphanumeric hash of length >= 8
+        if len(last_part) >= 8 and any(c.isupper() for c in last_part) and any(c.islower() for c in last_part):
+            title_parts = parts[:-1]
+        else:
+            title_parts = parts
+        title_str = " ".join(title_parts).strip()
+    else:
+        title_str = path_to_use
+        
+    title_str = title_str.replace("_", " ").title()
+    if not title_str:
+        return None
+        
+    is_tv = True
+    if db_row:
+        is_tv = (db_row.get("subject_type") == 2)
+    else:
+        is_tv = any(k in path_to_use.lower() for k in ["season", "series", "episode", "got", "thrones"])
+        
+    print(f"[TMDB Details Fallback] Searching TMDB for '{title_str}' (is_tv={is_tv})")
+    
+    search_type = "tv" if is_tv else "movie"
+    url = f"{TMDB_BASE_URL}/search/{search_type}?api_key={TMDB_API_KEY}&query={urllib.parse.quote(title_str)}"
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=5.0) as client:
+            resp = await client.get(url)
+            if resp.status_code == 200:
+                results = resp.json().get("results", [])
+                if not results and not db_row:
+                    search_type = "movie" if is_tv else "tv"
+                    url2 = f"{TMDB_BASE_URL}/search/{search_type}?api_key={TMDB_API_KEY}&query={urllib.parse.quote(title_str)}"
+                    resp2 = await client.get(url2)
+                    if resp2.status_code == 200:
+                        results = resp2.json().get("results", [])
+                        if results:
+                            is_tv = not is_tv
+                            
+                if results:
+                    match = results[0]
+                    tmdb_id = match.get("id")
+                    
+                    details_path = f"/tv/{tmdb_id}" if is_tv else f"/movie/{tmdb_id}"
+                    details_url = f"{TMDB_BASE_URL}{details_path}?api_key={TMDB_API_KEY}"
+                    resp_details = await client.get(details_url)
+                    if resp_details.status_code == 200:
+                        td = resp_details.json()
+                        
+                        title = td.get("name") or td.get("title")
+                        release_date = td.get("first_air_date") or td.get("release_date") or ""
+                        rating = td.get("vote_average", 7.5)
+                        genres = [g.get("name") for g in td.get("genres", [])]
+                        genres_str = ",".join(genres)
+                        description = td.get("overview") or "No description available."
+                        
+                        poster_path = td.get("poster_path")
+                        cover_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ""
+                        
+                        backdrop_path = td.get("backdrop_path")
+                        backdrop_url = f"https://image.tmdb.org/t/p/original{backdrop_path}" if backdrop_path else ""
+                        
+                        countries = td.get("production_countries", [])
+                        country = countries[0].get("name") if countries else (td.get("origin_country", ["USA"])[0] if td.get("origin_country") else "USA")
+                        
+                        episode_run_time = td.get("episode_run_time", [])
+                        duration = episode_run_time[0] if (is_tv and episode_run_time) else td.get("runtime", 0)
+                        duration_str = f"{duration} min" if duration else "-- min"
+                        
+                        # Save to database
+                        pool = await get_db_pool()
+                        if pool:
+                            try:
+                                async with pool.acquire() as conn:
+                                    async with conn.cursor() as cur:
+                                        await cur.execute("""
+                                            INSERT INTO subjects (subject_id, title, subject_type, cover, backdrop, rating, release_date, country, genre, description, is_cam, detail_path, tmdb_id)
+                                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                            ON DUPLICATE KEY UPDATE
+                                                title=VALUES(title),
+                                                cover=VALUES(cover),
+                                                backdrop=VALUES(backdrop),
+                                                rating=VALUES(rating),
+                                                release_date=VALUES(release_date),
+                                                country=VALUES(country),
+                                                genre=VALUES(genre),
+                                                description=VALUES(description),
+                                                detail_path=VALUES(detail_path),
+                                                tmdb_id=VALUES(tmdb_id)
+                                        """, (
+                                            str(subject_id), title, 2 if is_tv else 1, cover_url, backdrop_url,
+                                            rating, release_date, country, genres_str, description, False,
+                                            path_to_use, str(tmdb_id)
+                                        ))
+                                        
+                                        # Also resolve and save seasons if it is TV series
+                                        if is_tv:
+                                            seasons_list = td.get("seasons", [])
+                                            for se in seasons_list:
+                                                se_num = se.get("season_number")
+                                                # Skip season 0 (specials) unless it's the only one
+                                                if se_num == 0 and len(seasons_list) > 1:
+                                                    continue
+                                                max_ep = se.get("episode_count", 0)
+                                                if max_ep > 0:
+                                                    episodes_str = ",".join(str(i) for i in range(1, max_ep + 1))
+                                                    # Insert/update season
+                                                    await cur.execute("""
+                                                        INSERT INTO seasons (subject_id, season_number, episode_count, episodes_list)
+                                                        VALUES (%s, %s, %s, %s)
+                                                        ON DUPLICATE KEY UPDATE
+                                                            episode_count=VALUES(episode_count),
+                                                            episodes_list=VALUES(episodes_list)
+                                                    """, (str(subject_id), int(se_num), int(max_ep), episodes_str))
+                                                    
+                                print(f"[TMDB Details Fallback] Successfully resolved and cached '{title}' to database.")
+                            except Exception as db_err:
+                                print(f"[TMDB Details Fallback DB Save Error] {db_err}")
+                                
+                        return {
+                            "subjectId": str(subject_id),
+                            "title": title,
+                            "subjectType": 2 if is_tv else 1,
+                            "cover": {"url": cover_url},
+                            "imdbRatingValue": str(rating),
+                            "releaseDate": release_date,
+                            "countryName": country,
+                            "genre": genres,
+                            "description": description,
+                            "isCam": False,
+                            "duration": duration_str,
+                            "dubs": []
+                        }
+    except Exception as e:
+        print(f"[TMDB Details Fallback Error] {e}")
+    return None
+
 # Details Endpoint
 @app.get("/api/detail")
 async def get_detail(subjectId: str, detailPath: str = ""):
@@ -2233,7 +2392,7 @@ async def get_detail(subjectId: str, detailPath: str = ""):
                 dubs_data = json.loads(row["dubs"])
             except Exception:
                 pass
-        if row["description"]:
+        if row["description"] and row["title"] != "Placeholder" and "temporarily unavailable" not in row["description"]:
             return {
                 "code": 0,
                 "data": {
@@ -2295,6 +2454,12 @@ async def get_detail(subjectId: str, detailPath: str = ""):
         return {"code": 0, "data": formatted_detail}
     except Exception as e:
         print(f"[Details API Fallback] Failed to fetch details for {subjectId} path {path_to_use}: {e}")
+        
+        # Try resolving via TMDB fallback
+        tmdb_resolved = await resolve_details_via_tmdb(subjectId, path_to_use, row)
+        if tmdb_resolved:
+            return {"code": 0, "data": tmdb_resolved}
+            
         if row:
             dubs_data = []
             if row.get("dubs"):
@@ -2433,6 +2598,28 @@ async def get_season_info(subjectId: str, detailPath: str = ""):
         return {"code": 0, "data": {"seasons": formatted_seasons}}
     except Exception as e:
         print(f"[Season Info API Fallback] Failed to fetch seasons for {subjectId} path {path_to_use}: {e}")
+        
+        # Try resolving details (including seasons) via TMDB
+        tmdb_resolved = await resolve_details_via_tmdb(subjectId, path_to_use)
+        if tmdb_resolved and pool:
+            # Query seasons table again
+            try:
+                async with pool.acquire() as conn:
+                    async with conn.cursor(aiomysql.DictCursor) as cur:
+                        await cur.execute("SELECT * FROM seasons WHERE subject_id = %s ORDER BY season_number", (subjectId,))
+                        rows = await cur.fetchall()
+                        if rows:
+                            seasons_res = []
+                            for r in rows:
+                                seasons_res.append({
+                                    "se": r["season_number"],
+                                    "episodeCount": r["episode_count"],
+                                    "allEp": r["episodes_list"]
+                                })
+                            return {"code": 0, "data": {"seasons": seasons_res}}
+            except Exception as db_err:
+                print(f"[DB Season Info Re-Lookup Error] {db_err}")
+                
         return {"code": 0, "data": {"seasons": [{"se": 1, "episodeCount": 1, "allEp": "1"}]}}
 
 # Play Resource link (resolves and auto-renews CDN links)
