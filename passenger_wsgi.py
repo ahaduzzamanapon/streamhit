@@ -9,11 +9,25 @@ error_log = os.path.join(base_dir, "scratch/passenger_error.log")
 try:
     from a2wsgi import ASGIMiddleware
     from main import app
+    import threading
 
-    application = ASGIMiddleware(app)
+    class LazyASGIMiddleware:
+        def __init__(self, app):
+            self.app = app
+            self._middleware = None
+            self._lock = threading.Lock()
+
+        def __call__(self, environ, start_response):
+            if self._middleware is None:
+                with self._lock:
+                    if self._middleware is None:
+                        self._middleware = ASGIMiddleware(self.app)
+            return self._middleware(environ, start_response)
+
+    application = LazyASGIMiddleware(app)
     
     with open(error_log, "a") as f:
-        f.write("Passenger WSGI loaded application successfully!\n")
+        f.write("Passenger WSGI loaded application wrapper successfully!\n")
 except Exception as e:
     import traceback
     with open(error_log, "a") as f:
