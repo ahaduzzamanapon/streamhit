@@ -2609,6 +2609,11 @@ button, input, select {
     }
     
     /* Watch Page Specific Mobile Responsive rules */
+    .watch-page-body,
+    .watch-page-body html {
+        overflow-x: visible !important;
+        overflow: visible !important;
+    }
     .watch-page-body .header {
         display: none !important;
     }
