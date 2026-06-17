@@ -86,6 +86,7 @@ CLIENT_INFO_STR = json.dumps(CLIENT_INFO, separators=(',', ':'))
 # Global state
 db_pool = None
 db_init_locks = {}
+db_migrated = False
 worker_index = 0
 active_api_base = "https://h5-api.aoneroom.com"
 loop_clients = {}
@@ -141,7 +142,7 @@ async def get_db_pool():
 # 2. DATABASE HELPER
 # ==========================================================================
 async def init_db():
-    global db_pool
+    global db_pool, db_migrated
     try:
         db_pool = await aiomysql.create_pool(
             host=DB_HOST,
@@ -156,6 +157,9 @@ async def init_db():
             init_command="SET time_zone='+00:00'"
         )
         
+        if db_migrated:
+            return
+            
         async with db_pool.acquire() as conn:
             async with conn.cursor() as cur:
                 # 1. Subjects table
@@ -339,6 +343,7 @@ async def init_db():
                 except Exception as cleanup_err:
                     print(f"[Database Cleanup] Error deleting educational/blocked subjects: {cleanup_err}")
 
+                db_migrated = True
                 print("[Database] MySQL Tables check/creation complete.")
     except Exception as e:
         print(f"[Database] Error initializing database: {e}")
