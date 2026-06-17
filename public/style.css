@@ -2158,6 +2158,66 @@ button, input, select {
     padding: 6px !important;
 }
 
+/* Custom Seek Gesture Feedback */
+.seek-feedback {
+    position: absolute;
+    top: 0;
+    width: 50%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 4; /* Above video, below loading overlay (z-index 5) */
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    background: rgba(0, 0, 0, 0.2);
+}
+.seek-feedback-left {
+    left: 0;
+    border-top-left-radius: var(--border-radius-lg);
+    border-bottom-left-radius: var(--border-radius-lg);
+}
+.seek-feedback-right {
+    right: 0;
+    border-top-right-radius: var(--border-radius-lg);
+    border-bottom-right-radius: var(--border-radius-lg);
+}
+.seek-icon-circle {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(29, 209, 113, 0.2);
+    border: 1px solid rgba(29, 209, 113, 0.3);
+    color: var(--color-accent);
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    transform: scale(0.8);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.seek-icon-circle i {
+    font-size: 20px;
+}
+.seek-icon-circle span {
+    font-size: 11px;
+    font-weight: 700;
+    margin-top: 2px;
+}
+.seek-feedback.active {
+    opacity: 1;
+}
+.seek-feedback.active .seek-icon-circle {
+    transform: scale(1);
+    animation: seek-pulse 0.5s ease-out;
+}
+@keyframes seek-pulse {
+    0% { transform: scale(0.8); opacity: 0.5; }
+    50% { transform: scale(1.1); opacity: 1; }
+    100% { transform: scale(1); opacity: 0.8; }
+}
+
 /* ==========================================================================
    RESPONSIVE LAYOUT & MOBILE CUSTOMIZATIONS
    ========================================================================== */
@@ -2593,10 +2653,31 @@ button, input, select {
         gap: 10px;
     }
     .plyr__controls {
-        padding: 10px 8px !important;
+        padding: 8px 10px 12px 10px !important;
+        gap: 6px !important;
     }
     .player-header-overlay {
         padding: 10px 15px !important;
+    }
+    /* Hide volume slider and PIP on mobile to save space */
+    .plyr__volume input[type="range"] {
+        display: none !important;
+    }
+    .plyr__control[data-plyr="pip"] {
+        display: none !important;
+    }
+    .plyr__controls .plyr__control:not(.plyr__menu__container .plyr__control) {
+        width: 32px !important;
+        height: 32px !important;
+        padding: 0 !important;
+    }
+    .plyr__controls .plyr__control:not(.plyr__menu__container .plyr__control) svg {
+        width: 14px !important;
+        height: 14px !important;
+    }
+    .plyr__time {
+        font-size: 11px !important;
+        padding: 0 4px !important;
     }
 }
 

@@ -774,12 +774,77 @@ async function initWatchPage() {
 
     // Initialize Plyr player
     playerInstance = new Plyr('#player', {
-        controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'captions', 'settings', 'pip', 'fullscreen'],
+        controls: ['play-large', 'play', 'rewind', 'fast-forward', 'progress', 'current-time', 'mute', 'volume', 'captions', 'settings', 'pip', 'fullscreen'],
         settings: ['quality', 'speed'],
         quality: { default: 0, options: [0, 4320, 2880, 2160, 1440, 1080, 720, 576, 480, 360, 240] },
         keyboard: { global: true, focused: true },
         captions: { active: true, update: true }
     });
+
+    // Double-tap/click seek handlers
+    setTimeout(() => {
+        const wrapper = document.querySelector('.player-wrapper');
+        const fbLeft = document.getElementById('seekFeedbackLeft');
+        const fbRight = document.getElementById('seekFeedbackRight');
+        let seekTimerLeft = null;
+        let seekTimerRight = null;
+
+        const triggerSeek = (direction) => {
+            if (!playerInstance) return;
+            if (direction === 'left') {
+                playerInstance.currentTime = Math.max(0, playerInstance.currentTime - 10);
+                if (fbLeft) {
+                    fbLeft.classList.add('active');
+                    clearTimeout(seekTimerLeft);
+                    seekTimerLeft = setTimeout(() => fbLeft.classList.remove('active'), 500);
+                }
+            } else {
+                playerInstance.currentTime = Math.min(playerInstance.duration || 0, playerInstance.currentTime + 10);
+                if (fbRight) {
+                    fbRight.classList.add('active');
+                    clearTimeout(seekTimerRight);
+                    seekTimerRight = setTimeout(() => fbRight.classList.remove('active'), 500);
+                }
+            }
+        };
+
+        let lastTapTime = 0;
+        if (wrapper) {
+            // Touch screen double tap
+            wrapper.addEventListener('touchstart', (e) => {
+                if (e.touches.length !== 1) return;
+                // Ignore if clicked controls or header overlays
+                if (e.target.closest('.plyr__controls') || e.target.closest('.player-header-overlay')) return;
+                
+                const now = Date.now();
+                const delay = now - lastTapTime;
+                if (delay < 300 && delay > 0) {
+                    const rect = wrapper.getBoundingClientRect();
+                    const touchX = e.touches[0].clientX - rect.left;
+                    if (touchX < rect.width / 2) {
+                        triggerSeek('left');
+                    } else {
+                        triggerSeek('right');
+                    }
+                    e.preventDefault();
+                }
+                lastTapTime = now;
+            }, { passive: false });
+
+            // Desktop double click
+            wrapper.addEventListener('dblclick', (e) => {
+                if (e.target.closest('.plyr__controls') || e.target.closest('.player-header-overlay')) return;
+                
+                const rect = wrapper.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                if (clickX < rect.width / 2) {
+                    triggerSeek('left');
+                } else {
+                    triggerSeek('right');
+                }
+            });
+        }
+    }, 100);
 
     // Start background poller to rewrite "0p" label to "Auto" in settings menu and buttons
     setInterval(() => {
