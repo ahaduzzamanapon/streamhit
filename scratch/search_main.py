@@ -9,4 +9,4 @@ def search_keywords(keywords):
         if any(kw in line for kw in keywords):
             print(f"{idx+1}: {line.strip()}")
 
-search_keywords(["startup", "on_event", "lifespan"])
+search_keywords(["/api/read-log", "read_log"])
