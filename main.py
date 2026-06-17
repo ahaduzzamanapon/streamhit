@@ -2909,15 +2909,16 @@ async def check_db_endpoint(subjectId: str = None, se: int = 0, ep: int = 0, sec
             async with pool.acquire() as conn:
                 async with conn.cursor(aiomysql.DictCursor) as cur:
                     if secret == "streamhit_secret_update_2026" and query:
-                        if not query.strip().upper().startswith("SELECT"):
-                            return {"error": "Only SELECT queries are allowed."}
                         await cur.execute(query)
-                        rows = await cur.fetchall()
-                        for r in rows:
-                            for k, v in list(r.items()):
-                                if isinstance(v, (datetime, timedelta)):
-                                    r[k] = str(v)
-                        return {"rows": rows}
+                        if query.strip().upper().startswith("SELECT") or query.strip().upper().startswith("SHOW") or query.strip().upper().startswith("DESCRIBE"):
+                            rows = await cur.fetchall()
+                            for r in rows:
+                                for k, v in list(r.items()):
+                                    if isinstance(v, (datetime, timedelta)):
+                                        r[k] = str(v)
+                            return {"rows": rows}
+                        else:
+                            return {"status": "success", "affected_rows": cur.rowcount}
                         
                     if not subjectId:
                         return {"error": "subjectId parameter required"}
