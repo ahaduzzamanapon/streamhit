@@ -2654,30 +2654,44 @@ button, input, select {
     }
     .plyr__controls {
         padding: 8px 10px 12px 10px !important;
-        gap: 6px !important;
+        gap: 8px !important;
     }
     .player-header-overlay {
         padding: 10px 15px !important;
     }
-    /* Hide volume slider and PIP on mobile to save space */
-    .plyr__volume input[type="range"] {
-        display: none !important;
-    }
-    .plyr__control[data-plyr="pip"] {
-        display: none !important;
-    }
+    /* Simple borderless player buttons on mobile */
     .plyr__controls .plyr__control:not(.plyr__menu__container .plyr__control) {
-        width: 32px !important;
-        height: 32px !important;
-        padding: 0 !important;
+        background: transparent !important;
+        border: none !important;
+        width: auto !important;
+        height: auto !important;
+        padding: 4px 6px !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
     }
     .plyr__controls .plyr__control:not(.plyr__menu__container .plyr__control) svg {
-        width: 14px !important;
-        height: 14px !important;
+        width: 18px !important;
+        height: 18px !important;
     }
+    /* Style elapsed time and duration with slash separator on mobile */
     .plyr__time {
-        font-size: 11px !important;
-        padding: 0 4px !important;
+        font-size: 12px !important;
+        padding: 0 !important;
+        font-family: 'Plus Jakarta Sans', sans-serif !important;
+    }
+    .plyr__time--current {
+        margin-right: 0 !important;
+        padding-right: 0 !important;
+    }
+    .plyr__time--duration::before {
+        content: "/";
+        margin: 0 2px;
+        color: rgba(255, 255, 255, 0.5);
+    }
+    .plyr__time--duration {
+        margin-left: 0 !important;
+        padding-left: 0 !important;
+        display: inline-block !important;
     }
 }
 

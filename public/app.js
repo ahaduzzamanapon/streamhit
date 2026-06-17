@@ -772,9 +772,13 @@ async function initWatchPage() {
         return;
     }
 
-    // Initialize Plyr player
+    // Initialize Plyr player with simple controls on mobile and full controls on desktop
+    const isMobile = window.innerWidth <= 768;
+    const mobileControls = ['play', 'progress', 'current-time', 'duration', 'pip', 'fullscreen'];
+    const desktopControls = ['play-large', 'play', 'rewind', 'fast-forward', 'progress', 'current-time', 'mute', 'volume', 'captions', 'settings', 'pip', 'fullscreen'];
+
     playerInstance = new Plyr('#player', {
-        controls: ['play-large', 'play', 'rewind', 'fast-forward', 'progress', 'current-time', 'mute', 'volume', 'captions', 'settings', 'pip', 'fullscreen'],
+        controls: isMobile ? mobileControls : desktopControls,
         settings: ['quality', 'speed'],
         quality: { default: 0, options: [0, 4320, 2880, 2160, 1440, 1080, 720, 576, 480, 360, 240] },
         keyboard: { global: true, focused: true },
