@@ -1009,6 +1009,7 @@ async function initWatchPage() {
             window.screen.orientation.unlock();
         }
     });
+} // end of initWatchPage
 
 async function initDetailsPage() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -1410,6 +1411,7 @@ async function initWatchPage() {
     });
 
     const loading = document.getElementById("watchPageLoading");
+    const content = document.getElementById("watchWrapper");
 
     if (tmdbId) {
         if (loading) loading.innerHTML = `<div class="loading-spinner"></div><p style="margin-top: 15px;">Resolving TMDB ID ${tmdbId} via Streamfit...</p>`;
@@ -1440,19 +1442,88 @@ async function initWatchPage() {
         if (categoryEl) categoryEl.textContent = mediaTypeLabel;
         if (titleEl) titleEl.textContent = detail.title;
 
-        // Load stream resources directly
+        // Populate description
+        const descEl = document.getElementById("watchDescription");
+        if (descEl) descEl.textContent = detail.description || "No description available.";
+
+        // Populate genre tags
+        const genreEl = document.getElementById("watchGenres");
+        if (genreEl && detail.genre && detail.genre.length > 0) {
+            genreEl.innerHTML = detail.genre.map(g => `<span class="tag">${g}</span>`).join('');
+            genreEl.style.display = "flex";
+        }
+
+        // Setup Dub / Language selector
+        const dubSelectorGroup = document.getElementById("watchDubSelectorGroup");
+        const dubSelect = document.getElementById("dubLanguageSelect");
+        if (dubSelectorGroup && dubSelect) {
+            if (detail.dubs && detail.dubs.length > 0) {
+                dubSelectorGroup.style.display = "block";
+                dubSelect.innerHTML = "";
+                detail.dubs.forEach(dub => {
+                    const opt = document.createElement("option");
+                    opt.value = dub.subjectId;
+                    opt.textContent = dub.lanName || (dub.original ? "Original Audio" : (dub.lanCode ? dub.lanCode.toUpperCase() : "Unknown Dub"));
+                    if (String(dub.subjectId) === String(subjectId)) opt.selected = true;
+                    opt.dataset.path = dub.detailPath || "";
+                    dubSelect.appendChild(opt);
+                });
+                dubSelect.onchange = () => {
+                    const selectedOpt = dubSelect.options[dubSelect.selectedIndex];
+                    const targetSubjectId = selectedOpt.value;
+                    const targetDetailPath = selectedOpt.dataset.path || "";
+                    let newUrl = `/watch?id=${targetSubjectId}&path=${encodeURIComponent(targetDetailPath)}`;
+                    if (state.selectedSubject && state.selectedSubject.subjectType === 2) {
+                        newUrl += `&season=${state.selectedSeason}&episode=${state.selectedEpisode}`;
+                    }
+                    window.location.href = newUrl;
+                };
+            } else {
+                dubSelectorGroup.style.display = "none";
+            }
+        }
+
+        // Setup Tabs
+        const tabBtnForYou = document.getElementById("tabBtnForYou");
+        const tabBtnComments = document.getElementById("tabBtnComments");
+        const tabPaneForYou = document.getElementById("tabPaneForYou");
+        const tabPaneComments = document.getElementById("tabPaneComments");
+        if (tabBtnForYou && tabBtnComments && tabPaneForYou && tabPaneComments) {
+            tabBtnForYou.onclick = () => {
+                tabBtnForYou.classList.add("active"); tabBtnComments.classList.remove("active");
+                tabPaneForYou.classList.add("active"); tabPaneComments.classList.remove("active");
+            };
+            tabBtnComments.onclick = () => {
+                tabBtnComments.classList.add("active"); tabBtnForYou.classList.remove("active");
+                tabPaneComments.classList.add("active"); tabPaneForYou.classList.remove("active");
+            };
+        }
+
+        // TV Show episode selector
         const isTv = detail.seNum > 0 || detail.subjectType === 2;
+        const tvSelector = document.getElementById("watchTvSelector");
+        if (isTv) {
+            if (tvSelector) tvSelector.style.display = "block";
+            await loadSeasonEpisodes(subjectId, detailPath);
+        } else {
+            if (tvSelector) tvSelector.style.display = "none";
+        }
+
+        // Load stream resources
         if (isTv) {
             await loadPlayResources(subjectId, state.selectedSeason, state.selectedEpisode);
         } else {
             await loadPlayResources(subjectId);
         }
 
+        // Load recommendations
+        loadRecommendations(detail);
+
         if (loading) loading.style.display = "none";
+        if (content) content.style.display = "block";
     } else {
         if (loading) loading.innerHTML = "<p><i class='fa-solid fa-triangle-exclamation'></i> Failed to load player resources. Go back home.</p>";
     }
-}
 }
 
 async function loadRecommendations(detail) {

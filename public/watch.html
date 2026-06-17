@@ -22,80 +22,209 @@
     
     <!-- Custom Style Sheet -->
     <link rel="stylesheet" href="style.css?v=3.3">
-    
-    <style>
-        /* Specific full screen layout for cinema page */
-        body.watch-page-body {
-            background-color: #0b0c0e !important;
-            margin: 0;
-            padding: 0;
-            width: 100vw;
-            height: 100vh;
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .cinema-player-container {
-            width: 100vw;
-            height: 100vh;
-            background-color: #000;
-            position: relative;
-        }
-        .cinema-player-container .player-wrapper {
-            width: 100%;
-            height: 100%;
-            border-radius: 0 !important;
-            box-shadow: none !important;
-        }
-        .cinema-player-container .plyr {
-            height: 100% !important;
-            width: 100% !important;
-        }
-        .cinema-player-container video {
-            height: 100% !important;
-            width: 100% !important;
-            object-fit: contain;
-        }
-    </style>
 </head>
 <body class="watch-page-body">
  
-    <div class="cinema-player-container">
-        <!-- Main Video Player Wrapper -->
-        <div class="player-wrapper">
-            <!-- Player Loading Overlay -->
-            <div class="player-loader-overlay" id="playerLoaderOverlay">
-                <div class="player-spinner"></div>
-                <span>Loading stream...</span>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand" onclick="window.location.href='/'" style="cursor: pointer;">
+                <i class="fa-solid fa-play play-logo"></i>
+                <span class="logo-text">Stream<span>fit</span></span>
             </div>
             
-            <!-- Netflix-style top control bar overlay -->
-            <div class="player-header-overlay" id="playerHeaderOverlay">
-                <button class="player-back-btn" onclick="window.history.back()"><i class="fa-solid fa-arrow-left"></i></button>
-                <div class="player-title-info">
-                    <span id="playerMediaCategory">Streaming</span>
-                    <h2 id="playerMediaTitle">Title</h2>
-                </div>
-            </div>
+            <nav class="nav-menu">
+                <div class="menu-label">Navigation</div>
+                <ul>
+                    <li><a href="/"><i class="fa-solid fa-house"></i> Home</a></li>
+                    <li><a href="/movies"><i class="fa-solid fa-film"></i> Movies</a></li>
+                    <li><a href="/tv"><i class="fa-solid fa-tv"></i> TV Series</a></li>
+                </ul>
+
+                <div class="menu-label">Categories</div>
+                <ul>
+                    <li><a href="/movies?genre=Action"><i class="fa-solid fa-gun"></i> Action</a></li>
+                    <li><a href="/movies?genre=Comedy"><i class="fa-solid fa-face-laugh-beam"></i> Comedy</a></li>
+                    <li><a href="/tv?genre=Animation"><i class="fa-solid fa-face-smile"></i> Animation</a></li>
+                </ul>
+            </nav>
             
-            <!-- Premium Video Player -->
-            <video id="player" playsinline controls autoplay></video>
-            
-            <!-- Seek Gesture Feedback Overlays -->
-            <div class="seek-feedback seek-feedback-left" id="seekFeedbackLeft">
-                <div class="seek-icon-circle">
-                    <i class="fa-solid fa-backward"></i>
-                    <span>-10s</span>
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <span class="dot"></span>
+                    <span class="status-txt">Scraper Active</span>
                 </div>
             </div>
-            <div class="seek-feedback seek-feedback-right" id="seekFeedbackRight">
-                <div class="seek-icon-circle">
-                    <i class="fa-solid fa-forward"></i>
-                    <span>+10s</span>
+        </aside>
+
+        <!-- Main Content Panel -->
+        <main class="main-content">
+            <!-- Header section -->
+            <header class="header">
+                <!-- Mobile Brand Logo -->
+                <div class="mobile-brand" onclick="window.location.href='/'">
+                    <i class="fa-solid fa-play play-logo"></i>
+                    <span class="logo-text">Stream<span>fit</span></span>
+                </div>
+                <!-- Search bar -->
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" id="searchInput" placeholder="Search movies/shows...">
+                    <button id="searchBtn">Search</button>
+                </div>
+                
+                <!-- Right Controls -->
+                <div class="header-controls">
+                    <div class="language-selector" onclick="window.history.back()" style="cursor:pointer;">
+                        <i class="fa-solid fa-arrow-left"></i>
+                        <span>Back</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Loading Shimmer / Spinner -->
+            <div id="watchPageLoading" class="watch-loading-container">
+                <div class="loading-spinner"></div>
+                <p>Loading player, please wait...</p>
+            </div>
+
+            <!-- Main Watch Content Wrapper (Hidden until loaded) -->
+            <div class="watch-wrapper" id="watchWrapper" style="display: none;">
+                
+                <div class="watch-cinema-grid">
+                    
+                    <!-- Sticky Player Section -->
+                    <div class="cinema-player-section">
+                        <!-- Main Video Player Wrapper -->
+                        <div class="player-wrapper">
+                            <!-- Player Loading Overlay -->
+                            <div class="player-loader-overlay" id="playerLoaderOverlay">
+                                <div class="player-spinner"></div>
+                                <span>Loading stream...</span>
+                            </div>
+                            
+                            <!-- Netflix-style top control bar overlay -->
+                            <div class="player-header-overlay" id="playerHeaderOverlay">
+                                <button class="player-back-btn" onclick="window.history.back()"><i class="fa-solid fa-arrow-left"></i></button>
+                                <div class="player-title-info">
+                                    <span id="playerMediaCategory">Streaming</span>
+                                    <h2 id="playerMediaTitle">Title</h2>
+                                </div>
+                            </div>
+                            
+                            <!-- Premium Video Player -->
+                            <video id="player" playsinline controls autoplay></video>
+                            
+                            <!-- Seek Gesture Feedback Overlays -->
+                            <div class="seek-feedback seek-feedback-left" id="seekFeedbackLeft">
+                                <div class="seek-icon-circle">
+                                    <i class="fa-solid fa-backward"></i>
+                                    <span>-10s</span>
+                                </div>
+                            </div>
+                            <div class="seek-feedback seek-feedback-right" id="seekFeedbackRight">
+                                <div class="seek-icon-circle">
+                                    <i class="fa-solid fa-forward"></i>
+                                    <span>+10s</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Description & Comments Card -->
+                    <div class="cinema-desc-section">
+                        <div class="tag-container" id="watchGenres" style="display: none;"></div>
+                        
+                        <div class="description-box">
+                            <h3>Description</h3>
+                            <p id="watchDescription">Description loading...</p>
+                        </div>
+
+                        <!-- Tabs Section (For you & Comments) -->
+                        <div class="watch-tabs-section">
+                            <div class="watch-tabs-header">
+                                <button class="tab-header-btn active" id="tabBtnForYou">For you</button>
+                                <button class="tab-header-btn" id="tabBtnComments">Comments (99+)</button>
+                            </div>
+                            <div class="watch-tabs-content">
+                                <div class="tab-pane active" id="tabPaneForYou">
+                                    <div class="content-grid" id="watchRecommendationsGrid">
+                                        <!-- Dynamically populated recommendations -->
+                                    </div>
+                                </div>
+                                <div class="tab-pane" id="tabPaneComments">
+                                    <div class="comments-list">
+                                        <div class="comment-item">
+                                            <div class="comment-avatar"><i class="fa-solid fa-user"></i></div>
+                                            <div class="comment-details">
+                                                <div class="comment-meta">
+                                                    <span class="comment-author">apon_streamhit</span>
+                                                    <span class="comment-time">2 hours ago</span>
+                                                </div>
+                                                <p class="comment-text">Finally found a site that plays Hindi dub smooth and fast. Kudos!</p>
+                                            </div>
+                                        </div>
+                                        <div class="comment-item">
+                                            <div class="comment-avatar"><i class="fa-solid fa-user"></i></div>
+                                            <div class="comment-details">
+                                                <div class="comment-meta">
+                                                    <span class="comment-author">john_doe</span>
+                                                    <span class="comment-time">1 day ago</span>
+                                                </div>
+                                                <p class="comment-text">Quality is 1080p stream as advertised. Thanks for the fix on TV episodes!</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Resources & Episodes Selector (Right sidebar on desktop) -->
+                    <div class="resources-container">
+                        <div class="resources-header">
+                            <span>Resources <span class="upload-by">Uploaded by Streamfit team</span></span>
+                            <i class="fa-solid fa-circle-question info-icon"></i>
+                        </div>
+                        
+                        <!-- Dub / Language selector (visible when multiple dubs exist) -->
+                        <div class="dub-selector-wrapper" id="watchDubSelectorGroup" style="display: none;">
+                            <select id="dubLanguageSelect" class="custom-select">
+                                <!-- Options loaded dynamically -->
+                            </select>
+                        </div>
+                        
+                        <!-- TV Show Season & Episode grid (hidden for movies) -->
+                        <div class="tv-episode-selector" id="watchTvSelector" style="display: none;">
+                            <div class="season-tabs" id="watchSeasonTabs">
+                                <!-- Season buttons loaded dynamically -->
+                            </div>
+                            <div class="episode-grid scroll-y" id="watchEpisodeGrid">
+                                <!-- Episode grid populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                    
                 </div>
             </div>
-        </div>
+
+        </main>
+    </div>
+
+    <!-- Mobile Sticky Bottom Navigation Bar -->
+    <div class="mobile-navigation-bar">
+        <a href="/" class="nav-item" id="mobileNavHome">
+            <i class="fa-solid fa-house"></i>
+            <span>Home</span>
+        </a>
+        <a href="/movies" class="nav-item" id="mobileNavMovies">
+            <i class="fa-solid fa-film"></i>
+            <span>Movies</span>
+        </a>
+        <a href="/tv" class="nav-item" id="mobileNavTv">
+            <i class="fa-solid fa-tv"></i>
+            <span>TV Series</span>
+        </a>
     </div>
 
     <!-- Plyr Library JS -->
