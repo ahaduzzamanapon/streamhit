@@ -1196,6 +1196,12 @@ async function initDetailsPage() {
 }
 
 async function initWatchPage() {
+    // Dynamic overflow visibility override to ensure CSS position: sticky functions correctly on mobile
+    document.documentElement.style.overflow = 'visible';
+    document.documentElement.style.overflowX = 'visible';
+    document.body.style.overflow = 'visible';
+    document.body.style.overflowX = 'visible';
+
     const urlParams = new URLSearchParams(window.location.search);
     let subjectId = urlParams.get("id");
     const tmdbId = urlParams.get("tmdb");
@@ -1603,6 +1609,7 @@ async function loadSeasonEpisodes(subjectId, detailPath = "") {
                 document.querySelectorAll(".season-tab").forEach(b => b.classList.remove("active"));
                 btn.classList.add("active");
                 state.selectedSeason = season.se;
+                state.selectedEpisode = season.allEp ? Number(season.allEp.split(',')[0]) : 1;
                 renderEpisodes(season);
             };
             seasonTabs.appendChild(btn);
@@ -1636,11 +1643,31 @@ function renderEpisodes(season) {
                 btn.appendChild(eq);
             }
 
-            btn.onclick = () => {
+            btn.onclick = async () => {
+                if (Number(epNum) === state.selectedEpisode) return; // already playing
+
                 state.selectedEpisode = Number(epNum);
+
+                // Update URL silently (no page reload)
                 const urlParams = new URLSearchParams(window.location.search);
                 const detailPath = urlParams.get("path") || "";
-                window.location.href = `/watch?id=${state.selectedSubject.subjectId}&path=${encodeURIComponent(detailPath)}&season=${state.selectedSeason}&episode=${state.selectedEpisode}`;
+                const newUrl = `/watch?id=${state.selectedSubject.subjectId}&path=${encodeURIComponent(detailPath)}&season=${state.selectedSeason}&episode=${state.selectedEpisode}`;
+                history.pushState({}, "", newUrl);
+
+                // Highlight active episode button
+                grid.querySelectorAll(".episode-btn").forEach(b => {
+                    b.classList.remove("active");
+                    const ind = b.querySelector(".playing-indicator");
+                    if (ind) ind.remove();
+                });
+                btn.classList.add("active");
+                const eq = document.createElement("span");
+                eq.className = "playing-indicator";
+                eq.innerHTML = "<span></span><span></span><span></span>";
+                btn.appendChild(eq);
+
+                // Load the new episode stream directly — no reload
+                await loadPlayResources(state.selectedSubject.subjectId, state.selectedSeason, state.selectedEpisode);
             };
             grid.appendChild(btn);
         });
