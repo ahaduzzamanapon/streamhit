@@ -2397,6 +2397,40 @@ async def update_git_deploy(secret: str = ""):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+@app.get("/api/debug-resource")
+async def debug_resource(subjectId: str, se: int = 1, ep: int = 1):
+    pool = await get_db_pool()
+    detail_path = "details"
+    if pool:
+        try:
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute("SELECT detail_path FROM subjects WHERE subject_id = %s", (subjectId,))
+                    row = await cur.fetchone()
+                    if row and row[0]:
+                        detail_path = row[0]
+        except Exception as e:
+            detail_path = str(e)
+            
+    referer = f"https://123movienow.cc/spa/videoPlayPage/movies/{detail_path}?id={subjectId}&type=/movie/detail"
+    origin = "https://123movienow.cc"
+    path = f"/wefeed-h5-bff/web/subject/download?subjectId={subjectId}&se={se}&ep={ep}&_t={int(time.time())}"
+    try:
+        download_data = await request_h5_api("GET", path, host="https://h5.aoneroom.com", origin=origin, referer=referer)
+        return {
+            "detail_path": detail_path,
+            "path": path,
+            "referer": referer,
+            "response": download_data
+        }
+    except Exception as e:
+        return {
+            "detail_path": detail_path,
+            "path": path,
+            "referer": referer,
+            "error": str(e)
+        }
+
 # TV Seasons/Episodes
 @app.get("/api/season-info")
 async def get_season_info(subjectId: str, detailPath: str = ""):
