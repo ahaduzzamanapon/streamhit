@@ -966,6 +966,22 @@ async function initWatchPage() {
         }
     });
 
+    // Automatically lock to landscape mode on mobile entering fullscreen
+    playerInstance.on('enterfullscreen', () => {
+        if (window.screen && window.screen.orientation && window.screen.orientation.lock) {
+            window.screen.orientation.lock('landscape').catch(err => {
+                console.warn('Failed to lock orientation:', err);
+            });
+        }
+    });
+
+    // Unlock screen orientation on exiting fullscreen
+    playerInstance.on('exitfullscreen', () => {
+        if (window.screen && window.screen.orientation && window.screen.orientation.unlock) {
+            window.screen.orientation.unlock();
+        }
+    });
+
     const loading = document.getElementById("watchPageLoading");
     const content = document.getElementById("watchWrapper");
 
