@@ -1003,18 +1003,23 @@ async def run_incremental_scraper():
                 if not sub_id: continue
                 if is_educational_content(item.get("title", "")): continue
                 
-                # Check if already cached
+                # Check if already fully cached (has description and resources)
                 pool = await get_db_pool()
-                exists = None
+                needs_scrape = True
                 if pool:
                     async with pool.acquire() as conn:
                         async with conn.cursor() as cur:
-                            await cur.execute("SELECT 1 FROM subjects WHERE subject_id = %s", (str(sub_id),))
-                            exists = await cur.fetchone()
+                            await cur.execute(
+                                "SELECT subject_id FROM subjects WHERE subject_id = %s AND description IS NOT NULL AND description != '' AND title != 'Placeholder'",
+                                (str(sub_id),)
+                            )
+                            row = await cur.fetchone()
+                            if row:
+                                needs_scrape = False
                         
-                if not exists:
+                if needs_scrape:
                     safe_title = item.get('title', '').encode('ascii', 'replace').decode('ascii')
-                    print(f"[Scraper] New title found: {safe_title}. Fetching full details...")
+                    print(f"[Scraper] New/incomplete title found: {safe_title}. Fetching full details...")
                     await scrape_subject_details(sub_id)
                     await asyncio.sleep(1.0)
     except Exception as e:
@@ -1032,8 +1037,8 @@ async def scraper_loop():
             await run_incremental_scraper()
         except Exception as e:
             print(f"[Scraper Loop] Error: {e}")
-        # Run every 10 minutes
-        await asyncio.sleep(600)
+        # Run every 20 minutes
+        await asyncio.sleep(1200)
 
 async def run_historical_scraper():
     progress = await db_read_scraper_progress()
@@ -1067,9 +1072,16 @@ async def run_historical_scraper():
                         items = results[0].get("subjects", [])
                 
                 if not items:
-                    print(f"[Scraper] No more items found on page {current_page} for type {sub_type}. Stopping historical scraper for this type.")
-                    progress[sub_type_str] = 999
-                    await db_save_scraper_progress(sub_type, 999)
+                    # Only mark as done if we're past page 5 to avoid marking done on network blip
+                    if current_page > 5:
+                        print(f"[Scraper] No more items on page {current_page} for type {sub_type}. Marking as completed.")
+                        progress[sub_type_str] = 999
+                        await db_save_scraper_progress(sub_type, 999)
+                    else:
+                        print(f"[Scraper] No items on early page {current_page} for type {sub_type}. Skipping (may be network issue).")
+                        current_page += 1
+                        progress[sub_type_str] = current_page
+                        await db_save_scraper_progress(sub_type, current_page)
                     break
                 
                 new_items_count = 0
@@ -1079,22 +1091,28 @@ async def run_historical_scraper():
                     if is_educational_content(item.get("title", "")): continue
                     
                     pool = await get_db_pool()
-                    exists = None
+                    needs_full_scrape = True
                     if pool:
                         async with pool.acquire() as conn:
                             async with conn.cursor() as cur:
-                                await cur.execute("SELECT 1 FROM subjects WHERE subject_id = %s", (str(sub_id),))
-                                exists = await cur.fetchone()
+                                # Subject needs scraping if: missing, or has no description, or is Placeholder
+                                await cur.execute(
+                                    "SELECT subject_id FROM subjects WHERE subject_id = %s AND description IS NOT NULL AND description != '' AND title != 'Placeholder'",
+                                    (str(sub_id),)
+                                )
+                                row = await cur.fetchone()
+                                if row:
+                                    needs_full_scrape = False
                             
-                    if not exists:
+                    if needs_full_scrape:
                         safe_title = item.get('title', '').encode('ascii', 'replace').decode('ascii')
                         print(f"[Scraper] Historical crawl: Found '{safe_title}' (ID: {sub_id}). Scraping details...")
                         await scrape_subject_details(sub_id)
                         new_items_count += 1
                         await asyncio.sleep(2.0)
                 
-                print(f"[Scraper] Page {current_page} done. Crawled {new_items_count} new items.")
-                retry_count = 0  # Reset retry count on successful crawl
+                print(f"[Scraper] Page {current_page} done. Crawled {new_items_count} new/incomplete items.")
+                retry_count = 0
                 current_page += 1
                 progress[sub_type_str] = current_page
                 await db_save_scraper_progress(sub_type, current_page)
@@ -1104,7 +1122,7 @@ async def run_historical_scraper():
             except Exception as e:
                 err_msg = str(e)
                 if "HTTP status 400" in err_msg or "API error code 400" in err_msg:
-                    print(f"[Scraper] Page {current_page} is out of bounds (Limit Exceeded). Marking type {sub_type} as completed.")
+                    print(f"[Scraper] Page {current_page} is out of bounds. Marking type {sub_type} as completed.")
                     progress[sub_type_str] = 999
                     await db_save_scraper_progress(sub_type, 999)
                     break
@@ -1120,9 +1138,51 @@ async def run_historical_scraper():
                     print(f"[Scraper] Error on page {current_page} for type {sub_type}: {e}. Retrying ({retry_count}/3) in 15s...")
                     await asyncio.sleep(15.0)
 
+async def run_missing_resources_scraper():
+    """Background task: find subjects in DB that have no play_resources and scrape them."""
+    print("[Scraper] Starting missing-resources scraper...")
+    pool = await get_db_pool()
+    if not pool:
+        return
+    try:
+        async with pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+                # Find up to 50 subjects with description but no play_resources
+                await cur.execute("""
+                    SELECT s.subject_id, s.subject_type, s.title
+                    FROM subjects s
+                    LEFT JOIN play_resources pr ON pr.subject_id = s.subject_id
+                    WHERE s.title != 'Placeholder'
+                      AND s.description IS NOT NULL AND s.description != ''
+                      AND pr.subject_id IS NULL
+                    LIMIT 50
+                """)
+                missing = await cur.fetchall()
+        
+        if not missing:
+            print("[Scraper] No subjects missing resources. Skipping.")
+            return
+        
+        print(f"[Scraper] Found {len(missing)} subjects missing play_resources. Scraping...")
+        for row in missing:
+            sub_id = row["subject_id"]
+            sub_type = row["subject_type"]
+            safe_title = row["title"].encode('ascii', 'replace').decode('ascii')
+            print(f"[Scraper] Fetching resources for: {safe_title} (ID: {sub_id})")
+            try:
+                if sub_type == 2:
+                    # TV show — scrape season 1, episode 1 resources
+                    await scrape_episode_resources(sub_id, 1, 1)
+                else:
+                    await scrape_episode_resources(sub_id, 0, 0)
+            except Exception as e:
+                print(f"[Scraper] Failed fetching resources for {sub_id}: {e}")
+            await asyncio.sleep(1.5)
+    except Exception as e:
+        print(f"[Scraper] Missing-resources scraper error: {e}")
+
 async def historical_scraper_loop():
     await get_db_pool()
-        
     await asyncio.sleep(30)
     
     while True:
@@ -1130,7 +1190,20 @@ async def historical_scraper_loop():
             await run_historical_scraper()
         except Exception as e:
             print(f"[Historical Scraper Loop] Error: {e}")
+        # After full historical scrape, wait 1 hour then try again
         await asyncio.sleep(3600)
+
+async def missing_resources_loop():
+    """Loop that repeatedly fills in missing play_resources for known subjects."""
+    await get_db_pool()
+    await asyncio.sleep(60)  # Wait 1 min after startup
+    while True:
+        try:
+            await run_missing_resources_scraper()
+        except Exception as e:
+            print(f"[Missing Resources Loop] Error: {e}")
+        # Run every 5 minutes
+        await asyncio.sleep(300)
 
 # Start scraper on application startup
 @app.on_event("startup")
@@ -1140,6 +1213,7 @@ async def startup_event():
     if os.getenv("RUN_SCRAPER", "false").lower() == "true":
         asyncio.create_task(scraper_loop())
         asyncio.create_task(historical_scraper_loop())
+        asyncio.create_task(missing_resources_loop())
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -1642,31 +1716,16 @@ async def get_home(page: int = 1, tabId: int = 0):
     if cached:
         return cached
 
-    try:
-        api_path = f"/wefeed-h5api-bff/tab-operating?page={page}&tabId={tabId}"
-        data = await request_h5_api("GET", api_path)
-        
-        # Async background save discovered movies to db
-        asyncio.create_task(cache_discovered_subjects(data))
-        
-        operating_list = data.get("data", {}).get("operatingList", [])
-        mapped_data = {
-            "code": 0,
-            "data": {
-                "items": operating_list
-            }
+    # Always serve from local database — fast response
+    local_list = await get_local_operating_list()
+    result = {
+        "code": 0,
+        "data": {
+            "items": local_list
         }
-        set_cached_response(cache_key, mapped_data)
-        return mapped_data
-    except Exception as e:
-        print(f"[Home API] Failed to fetch home data: {e}. Falling back to local database...")
-        local_list = await get_local_operating_list()
-        return {
-            "code": 0,
-            "data": {
-                "items": local_list
-            }
-        }
+    }
+    set_cached_response(cache_key, result, ttl=120.0)  # Cache for 2 minutes
+    return result
 
 @app.get("/api/banners")
 async def get_banners():
@@ -1772,7 +1831,7 @@ async def background_search_and_cache(keyword: str, page: int, per_page: int, su
     except Exception as e:
         print(f"[Background Search Cache Error] {e}")
 
-# Search endpoint - queries OneRoom API first, filters/sorts, and falls back to local DB search
+# Search endpoint — DB only for instant response, background cache from API
 @app.post("/api/search")
 async def search_content(payload: dict):
     keyword = payload.get("keyword", "").strip()
@@ -1782,8 +1841,7 @@ async def search_content(payload: dict):
     country = payload.get("country", "*")
     year = payload.get("year", "*")
     sort = payload.get("sort", "Latest")
-    # Search both movies and TV series together by forcing subject_type to 0
-    subject_type = 0
+    subject_type = int(payload.get("subjectType", 0))
 
     if not keyword:
         return {"code": 0, "data": {"items": []}}
@@ -1793,154 +1851,76 @@ async def search_content(payload: dict):
     if cached:
         return cached
 
-    # 1. Try querying the OneRoom API synchronously first to ensure fresh results
-    try:
-        api_path = "/wefeed-h5api-bff/subject/search"
-        api_payload = {
-            "keyword": keyword,
-            "page": page,
-            "perPage": per_page,
-            "subjectType": subject_type
+    # Query local database first (instant)
+    offset = (page - 1) * per_page
+    conditions = ["title LIKE %s", "title != 'Placeholder'"]
+    params = [f"%{keyword}%"]
+
+    if genre != "*":
+        conditions.append("genre LIKE %s")
+        params.append(f"%{genre}%")
+    if country != "*":
+        conditions.append("country = %s")
+        params.append(country)
+    if year != "*":
+        conditions.append("release_date LIKE %s")
+        params.append(f"{year}%")
+    if subject_type > 0:
+        conditions.append("subject_type = %s")
+        params.append(subject_type)
+
+    where_clause = " WHERE " + " AND ".join(conditions)
+    order_clause = """
+        ORDER BY (
+            CASE
+                WHEN title = %s THEN 1
+                WHEN title LIKE %s THEN 2
+                ELSE 3
+            END
+        ) ASC, CHAR_LENGTH(title) ASC, rating DESC
+    """
+    params_for_order = [keyword, f"{keyword}%"]
+    query = f"SELECT * FROM subjects{where_clause}{order_clause} LIMIT %s OFFSET %s"
+    all_params = params + params_for_order + [per_page, offset]
+
+    local_results = []
+    pool = await get_db_pool()
+    if pool:
+        try:
+            async with pool.acquire() as conn:
+                async with conn.cursor(aiomysql.DictCursor) as cur:
+                    await cur.execute(query, tuple(all_params))
+                    rows = await cur.fetchall()
+                    for row in rows:
+                        if is_educational_content(row["title"]):
+                            continue
+                        local_results.append({
+                            "subjectId": row["subject_id"],
+                            "title": row["title"],
+                            "subjectType": row["subject_type"],
+                            "cover": {"url": row["cover"]},
+                            "imdbRatingValue": str(row["rating"]),
+                            "releaseDate": row["release_date"],
+                            "countryName": row["country"],
+                            "genre": row["genre"].split(",") if row["genre"] else [],
+                            "isCam": row["is_cam"]
+                        })
+        except Exception as db_err:
+            print(f"[DB Search Error] {db_err}")
+
+    # Trigger background search+cache from upstream API if local results are few
+    if len(local_results) < per_page:
+        asyncio.create_task(background_search_and_cache(keyword, page, per_page, subject_type))
+
+    res = {
+        "code": 0,
+        "data": {
+            "items": local_results,
+            "pager": {"hasMore": len(local_results) == per_page}
         }
-        data = await request_h5_api("POST", api_path, api_payload)
-        items = data.get("data", {}).get("items", [])
-        
-        # Filter items in memory
-        filtered_items = []
-        for item in items:
-            # Genre filter
-            if genre != "*":
-                item_genres = item.get("genre", [])
-                item_genres_list = item_genres if isinstance(item_genres, list) else str(item_genres).split(",")
-                if not any(genre.lower() in g.lower() for g in item_genres_list):
-                    continue
-            # Country filter
-            if country != "*":
-                if item.get("countryName", "").lower() != country.lower():
-                    continue
-            # Year filter
-            if year != "*":
-                rel_date = item.get("releaseDate", "") or item.get("lastReleaseDate", "")
-                if not rel_date.startswith(year):
-                    continue
-            filtered_items.append(item)
-
-        # Sort filtered items
-        def sort_key(item):
-            title = item.get("title", "").lower()
-            kw = keyword.lower()
-            st = int(item.get("subjectType", 0))
-            
-            # Title closeness
-            if title == kw:
-                title_priority = 1
-            elif title.startswith(kw):
-                title_priority = 2
-            elif kw in title:
-                title_priority = 3
-            else:
-                title_priority = 4
-                
-            title_len = len(title)
-            type_priority = 1 if st in (1, 2, 7) else 2
-            
-            rating = float(item.get("imdbRatingValue") or 0.0)
-            return (title_priority, -rating, title_len, type_priority)
-
-        filtered_items.sort(key=sort_key)
-        
-        # Cache results asynchronously to local DB (metadata only, no API calls)
-        for item in filtered_items:
-            asyncio.create_task(cache_item_metadata_only(item))
-                
-        res = {
-            "code": 0,
-            "data": {
-                "items": filtered_items,
-                "pager": {"hasMore": data.get("data", {}).get("pager", {}).get("hasMore", False)}
-            }
-        }
-        set_cached_response(cache_key, res)
-        return res
-
-    except Exception as e:
-        print(f"[API Search Error] {e}. Falling back to local database search...")
-        # Fallback to local database search
-        offset = (page - 1) * per_page
-        
-        conditions = ["title LIKE %s"]
-        params = [f"%{keyword}%"]
-        
-        if genre != "*":
-            conditions.append("genre LIKE %s")
-            params.append(f"%{genre}%")
-        if country != "*":
-            conditions.append("country = %s")
-            params.append(country)
-        if year != "*":
-            conditions.append("release_date LIKE %s")
-            params.append(f"{year}%")
-        if subject_type > 0:
-            conditions.append("subject_type = %s")
-            params.append(subject_type)
-            
-        where_clause = " WHERE " + " AND ".join(conditions)
-        
-        order_clause = """
-            ORDER BY (
-                CASE 
-                    WHEN title = %s THEN 1
-                    WHEN title LIKE %s THEN 2
-                    ELSE 3
-                END
-            ) ASC,
-            CHAR_LENGTH(title) ASC
-        """
-        params_for_order = [keyword, f"{keyword}%"]
-        
-        if sort == "Hottest":
-            order_clause += ", rating DESC, release_date DESC"
-        elif sort == "Latest":
-            order_clause += ", release_date DESC, rating DESC"
-        else:
-            order_clause += ", rating DESC"
-            
-        query = f"SELECT * FROM subjects{where_clause}{order_clause} LIMIT %s OFFSET %s"
-        all_params = params + params_for_order + [per_page, offset]
-
-        local_results = []
-        pool = await get_db_pool()
-        if pool:
-            try:
-                async with pool.acquire() as conn:
-                    async with conn.cursor(aiomysql.DictCursor) as cur:
-                        await cur.execute(query, tuple(all_params))
-                        rows = await cur.fetchall()
-                        for row in rows:
-                            if row["title"] == "Placeholder":
-                                continue
-                            local_results.append({
-                                "subjectId": row["subject_id"],
-                                "title": row["title"],
-                                "subjectType": row["subject_type"],
-                                "cover": {"url": row["cover"]},
-                                "imdbRatingValue": str(row["rating"]),
-                                "releaseDate": row["release_date"],
-                                "countryName": row["country"],
-                                "genre": row["genre"].split(",") if row["genre"] else [],
-                                "isCam": row["is_cam"]
-                            })
-            except Exception as db_err:
-                print(f"[DB Fallback Search Error] {db_err}")
-
-        return {
-            "code": 0,
-            "data": {
-                "items": local_results,
-                "pager": {"hasMore": len(local_results) == per_page}
-            }
-        }
-        return {"code": 0, "data": {"items": local_results, "pager": {"hasMore": False}}}
+    }
+    set_cached_response(cache_key, res, ttl=60.0)
+    return res
 
 async def background_filter_and_cache(genre, country, year, language, sort, subject_type, page, per_page):
     try:
@@ -1982,14 +1962,14 @@ def safe_float_rating(val) -> float:
     except ValueError:
         return 0.0
 
-# Dynamic Multi-Level Filters
+# Dynamic Multi-Level Filters — DB only, always fast
 @app.post("/api/filter")
 async def filter_content(payload: dict):
     genre = payload.get("genre", "*")
     country = payload.get("country", "*")
     year = payload.get("year", "*")
     language = payload.get("language", "*")
-    sort = payload.get("sort", "ForYou")
+    sort = payload.get("sort", "Latest")
     subject_type = int(payload.get("subjectType", 0))
     page = int(payload.get("page", 1))
     per_page = int(payload.get("perPage", 20))
@@ -1999,8 +1979,8 @@ async def filter_content(payload: dict):
     if cached:
         return cached
 
-    # Build MySQL Query
-    conditions = ["title != 'Placeholder'"]
+    # Build MySQL Query — only from local database
+    conditions = ["title != 'Placeholder'", "title != ''", "cover IS NOT NULL", "cover != ''"]
     params = []
 
     if genre != "*":
@@ -2016,19 +1996,24 @@ async def filter_content(payload: dict):
         conditions.append("subject_type = %s")
         params.append(subject_type)
 
-    where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
-    
-    order_clause = " ORDER BY rating DESC, created_at DESC"
+    where_clause = " WHERE " + " AND ".join(conditions)
+
     if sort == "Hottest":
         order_clause = " ORDER BY rating DESC, release_date DESC, created_at DESC"
     elif sort == "Latest":
+        order_clause = " ORDER BY (rating > 0) DESC, release_date DESC, rating DESC, created_at DESC"
+    else:
         order_clause = " ORDER BY (rating > 0) DESC, release_date DESC, rating DESC, created_at DESC"
 
     offset = (page - 1) * per_page
     query = f"SELECT * FROM subjects{where_clause}{order_clause} LIMIT %s OFFSET %s"
     params.extend([per_page, offset])
 
+    # Count total for hasMore
+    count_query = f"SELECT COUNT(*) as cnt FROM subjects{where_clause}"
+
     local_results = []
+    has_more = False
     pool = await get_db_pool()
     if pool:
         try:
@@ -2050,177 +2035,19 @@ async def filter_content(payload: dict):
                             "genre": row["genre"].split(",") if row["genre"] else [],
                             "isCam": row["is_cam"]
                         })
+                    has_more = len(rows) == per_page
         except Exception as db_err:
             print(f"[DB Filter Error] {db_err}")
 
-    # Return local results ONLY if we have a full page of results (to avoid pagination gaps and premature end of scrolling)
-    if len(local_results) >= per_page:
-        # Sort in memory for consistency
-        if sort == "Hottest":
-            local_results.sort(key=lambda x: (safe_float_rating(x.get("imdbRatingValue")), x.get("releaseDate", "") or ""), reverse=True)
-        elif sort == "Latest":
-            local_results.sort(key=lambda x: (safe_float_rating(x.get("imdbRatingValue")) > 0, x.get("releaseDate", "") or "", safe_float_rating(x.get("imdbRatingValue"))), reverse=True)
-        else:
-            local_results.sort(key=lambda x: (safe_float_rating(x.get("imdbRatingValue")), x.get("releaseDate", "") or ""), reverse=True)
-            
-        res = {
-            "code": 0,
-            "data": {
-                "items": local_results,
-                "pager": {"hasMore": True}
-            }
-        }
-        set_cached_response(cache_key, res, ttl=600.0) # Cache for 10 minutes (600s)
-        return res
-
-    # Fetch from MovieBox API
-    try:
-        api_sort = "Rating" if sort == "Hottest" else sort
-        filtered_items = []
-        current_api_page = page
-        attempts = 0
-        max_attempts = 3
-        has_more_pages = True
-        last_data = {}
-        
-        while len(filtered_items) < per_page and attempts < max_attempts and has_more_pages:
-            attempts += 1
-            api_payload = {
-                "page": current_api_page,
-                "perPage": per_page,
-                "genre": "" if genre == "*" else genre,
-                "country": "" if country == "*" else country,
-                "year": "" if year == "*" else year,
-                "language": "" if language == "*" else language,
-                "sort": api_sort,
-                "subjectType": subject_type
-            }
-            
-            try:
-                data = await request_h5_api("POST", "/wefeed-h5api-bff/subject/filter", api_payload)
-                last_data = data
-                items = data.get("data", {}).get("items", [])
-                if not items and data.get("data", {}).get("results"):
-                    results = data.get("data", {}).get("results", [])
-                    if results:
-                        items = results[0].get("subjects", [])
-                        
-                if not items:
-                    has_more_pages = False
-                    break
-                    
-                has_more_pages = data.get("data", {}).get("pager", {}).get("hasMore", False)
-                
-                page_filtered = []
-                for item in items:
-                    title = item.get("title", "")
-                    if is_educational_content(title):
-                        continue
-                        
-                    item_type = int(item.get("subjectType", 1))
-                    # Filter strictly by subjectType if requested (1 = Movie, 2 = TV Show, etc.)
-                    if subject_type > 0 and item_type != subject_type:
-                        continue
-                    # If subjectType is 0 (All), exclude short clips/music junk and keep movies, TV shows, and anime
-                    if subject_type == 0 and item_type not in (1, 2, 7):
-                        continue
-                        
-                    page_filtered.append(item)
-                    
-                    sub_id = item.get("subjectId")
-                    if sub_id:
-                        asyncio.create_task(cache_item_metadata_only(item))
-                        
-                filtered_items.extend(page_filtered)
-                if not has_more_pages:
-                    break
-            except Exception as page_err:
-                print(f"[Filter Page Fetch Error] Page {current_api_page}: {page_err}")
-                if not filtered_items:
-                    raise page_err
-                break
-                
-            current_api_page += 1
-
-        items = filtered_items
-
-        # Fallback to alternative sorts if ForYou returns no results
-        if not items and sort == "ForYou":
-            print(f"[Filter Endpoint] ForYou returned 0 items. Trying fallback sorts...")
-            for fallback_sort in ["Latest", "Hottest"]:
-                api_sort = "Rating" if fallback_sort == "Hottest" else fallback_sort
-                api_payload = {
-                    "page": page,
-                    "perPage": per_page,
-                    "genre": "" if genre == "*" else genre,
-                    "country": "" if country == "*" else country,
-                    "year": "" if year == "*" else year,
-                    "language": "" if language == "*" else language,
-                    "sort": api_sort,
-                    "subjectType": subject_type
-                }
-                try:
-                    data = await request_h5_api("POST", "/wefeed-h5api-bff/subject/filter", api_payload)
-                    last_data = data
-                    fb_items = data.get("data", {}).get("items", [])
-                    if not fb_items and data.get("data", {}).get("results"):
-                        results = data.get("data", {}).get("results", [])
-                        if results:
-                            fb_items = results[0].get("subjects", [])
-                            
-                    if fb_items:
-                        page_filtered = []
-                        for fb_item in fb_items:
-                            title = fb_item.get("title", "")
-                            if is_educational_content(title):
-                                continue
-                            item_type = int(fb_item.get("subjectType", 1))
-                            if subject_type > 0 and item_type != subject_type:
-                                continue
-                            if subject_type == 0 and item_type not in (1, 2, 7):
-                                continue
-                            page_filtered.append(fb_item)
-                            sub_id = fb_item.get("subjectId")
-                            if sub_id:
-                                asyncio.create_task(cache_item_metadata_only(fb_item))
-                        if page_filtered:
-                            items = page_filtered
-                            has_more_pages = data.get("data", {}).get("pager", {}).get("hasMore", False)
-                            print(f"[Filter Endpoint] Fallback to {fallback_sort} succeeded with {len(items)} items.")
-                            break
-                except Exception as fb_err:
-                    print(f"[Filter Endpoint Fallback Error] {fb_err}")
-
-        # Sort in memory based on rating/latest requirements
-        if sort == "Hottest":
-            items.sort(key=lambda x: (safe_float_rating(x.get("imdbRatingValue")), x.get("releaseDate", "") or ""), reverse=True)
-        elif sort == "Latest":
-            items.sort(key=lambda x: (safe_float_rating(x.get("imdbRatingValue")) > 0, x.get("releaseDate", "") or "", safe_float_rating(x.get("imdbRatingValue"))), reverse=True)
-        else:
-            items.sort(key=lambda x: (safe_float_rating(x.get("imdbRatingValue")), x.get("releaseDate", "") or ""), reverse=True)
-
-        # Update data dictionary before caching and returning
-        if last_data and "data" in last_data:
-            if "items" in last_data["data"]:
-                last_data["data"]["items"] = items
-            elif "results" in last_data["data"] and last_data["data"]["results"]:
-                last_data["data"]["results"][0]["subjects"] = items
-                
-            if "pager" in last_data["data"]:
-                last_data["data"]["pager"]["hasMore"] = has_more_pages
-                
-            set_cached_response(cache_key, last_data)
-            return last_data
-    except Exception as e:
-        print(f"[Filter Endpoint] Error: {e}")
-
-    return {
+    res = {
         "code": 0,
         "data": {
             "items": local_results,
-            "pager": {"hasMore": False}
+            "pager": {"hasMore": has_more}
         }
     }
+    set_cached_response(cache_key, res, ttl=120.0)
+    return res
 
 async def resolve_details_via_tmdb(subject_id: str, path_to_use: str, db_row: dict = None) -> dict:
     if not path_to_use or "subjectId" in path_to_use or "details" in path_to_use:
