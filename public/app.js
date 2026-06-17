@@ -1448,6 +1448,19 @@ async function initWatchPage() {
         if (categoryEl) categoryEl.textContent = mediaTypeLabel;
         if (titleEl) titleEl.textContent = detail.title;
 
+        // Populate cinema metadata section on the page
+        const metaTitle = document.getElementById("watchMetaTitle");
+        const metaRating = document.getElementById("watchMetaRating");
+        const metaYear = document.getElementById("watchMetaYear");
+        const metaCountry = document.getElementById("watchMetaCountry");
+        const metaDuration = document.getElementById("watchMetaDuration");
+
+        if (metaTitle) metaTitle.textContent = detail.title;
+        if (metaRating) metaRating.innerHTML = `<i class="fa-solid fa-star"></i> ${detail.imdbRatingValue || '--'}`;
+        if (metaYear) metaYear.innerHTML = `<i class="fa-regular fa-calendar"></i> ${detail.releaseDate ? detail.releaseDate.split('-')[0] : '----'}`;
+        if (metaCountry) metaCountry.innerHTML = `<i class="fa-solid fa-earth-americas"></i> ${detail.countryName || 'USA'}`;
+        if (metaDuration) metaDuration.innerHTML = `<i class="fa-regular fa-clock"></i> ${detail.duration || '-- min'}`;
+
         // Populate description
         const descEl = document.getElementById("watchDescription");
         if (descEl) descEl.textContent = detail.description || "No description available.";
