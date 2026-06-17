@@ -2539,10 +2539,15 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0, detailPath: str
                     async with conn.cursor() as cur:
                         await cur.execute("SELECT detail_path FROM subjects WHERE subject_id = %s", (subjectId,))
                         row = await cur.fetchone()
-                        if row:
-                            detail_path = row[0] or ""
+                        if row and row[0]:
+                            detail_path = row[0]
+                        else:
+                            print(f"[api/resource] Subject {subjectId} detail_path missing. Scraping details...")
+                            scraped = await scrape_subject_details(subjectId)
+                            if scraped and scraped.get("detail_path"):
+                                detail_path = scraped["detail_path"]
             except Exception as db_err:
-                print(f"[DB detail_path Lookup Error in get_resource] {db_err}")
+                print(f"[DB detail_path Lookup/Scrape Error in get_resource] {db_err}")
                     
         if not detail_path:
             detail_path = "details"
