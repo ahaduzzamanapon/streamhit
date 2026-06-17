@@ -2219,6 +2219,181 @@ button, input, select {
 }
 
 /* ==========================================================================
+   DETAILS PAGE HERO CARD STYLES
+   ========================================================================== */
+.details-hero-card {
+    position: relative;
+    width: 100%;
+    min-height: 380px;
+    background: rgba(20, 21, 26, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--border-radius-lg);
+    overflow: hidden;
+    margin-bottom: 25px;
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    align-items: center;
+}
+
+.details-hero-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    filter: blur(40px) brightness(0.25);
+    z-index: 1;
+    pointer-events: none;
+    transform: scale(1.1);
+}
+
+.details-hero-content {
+    position: relative;
+    z-index: 2;
+    padding: 30px;
+    display: flex;
+    gap: 30px;
+    width: 100%;
+}
+
+.details-poster-col {
+    flex-shrink: 0;
+    width: 190px;
+    height: 270px;
+    border-radius: var(--border-radius-md);
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.details-poster-col img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.details-info-col {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.genre-badge-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+.genre-badge-list span {
+    background: rgba(29, 209, 113, 0.15);
+    color: var(--color-accent);
+    padding: 4px 12px;
+    border-radius: 50px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.details-hero-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin: 0 0 15px 0;
+    line-height: 1.2;
+    letter-spacing: -0.5px;
+}
+
+.details-hero-meta {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 25px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.details-hero-meta .rating {
+    background: rgba(255, 193, 7, 0.15);
+    color: #ffc107;
+    padding: 3px 8px;
+    border-radius: var(--border-radius-sm);
+    font-weight: 700;
+}
+
+.details-hero-meta .rating i {
+    margin-right: 3px;
+}
+
+.details-action-buttons {
+    margin-top: 10px;
+}
+
+.btn-watch-now {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: linear-gradient(135deg, var(--color-accent) 0%, #10b981 100%);
+    color: #0b0c0e;
+    border: none;
+    padding: 14px 28px;
+    border-radius: 50px;
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(29, 209, 113, 0.4);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+}
+
+.btn-watch-now:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 25px rgba(29, 209, 113, 0.6);
+    background: linear-gradient(135deg, #22c55e 0%, #059669 100%);
+}
+
+.btn-watch-now i {
+    font-size: 14px;
+}
+
+@media (max-width: 768px) {
+    .details-hero-card {
+        min-height: auto;
+        padding: 20px 0;
+        background: transparent !important;
+        border: none !important;
+    }
+    .details-hero-content {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 20px;
+        gap: 20px;
+    }
+    .details-poster-col {
+        width: 150px;
+        height: 210px;
+    }
+    .details-hero-title {
+        font-size: 24px;
+    }
+    .details-hero-meta {
+        justify-content: center;
+    }
+    .genre-badge-list {
+        justify-content: center;
+    }
+    .btn-watch-now {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* ==========================================================================
    RESPONSIVE LAYOUT & MOBILE CUSTOMIZATIONS
    ========================================================================== */
 

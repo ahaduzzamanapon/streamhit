@@ -3099,6 +3099,179 @@ async def get_subject_meta(subject_id: str = None, tmdb_id: str = None, subject_
     return meta
 
 
+# Cache sitemap list in memory to keep it high performance
+_sitemap_urls_cache = None
+_sitemap_cache_time = 0
+
+async def get_all_sitemap_urls():
+    global _sitemap_urls_cache, _sitemap_cache_time
+    now = time.time()
+    # Cache for 10 minutes
+    if _sitemap_urls_cache is not None and (now - _sitemap_cache_time) < 600:
+        return _sitemap_urls_cache
+
+    urls = []
+    pool = await get_db_pool()
+    if not pool:
+        return []
+
+    try:
+        async with pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+                # 1. Fetch all subjects
+                await cur.execute("SELECT subject_id, title, subject_type, cover, detail_path FROM subjects ORDER BY updated_at DESC")
+                subjects = await cur.fetchall()
+
+                # 2. Fetch all seasons to construct episode links
+                await cur.execute("SELECT subject_id, season_number, episodes_list FROM seasons")
+                seasons = await cur.fetchall()
+
+        # Map seasons to subjects
+        seasons_map = {}
+        for s in seasons:
+            sub_id = s["subject_id"]
+            if sub_id not in seasons_map:
+                seasons_map[sub_id] = []
+            seasons_map[sub_id].append(s)
+
+        # Build URL entries
+        for sub in subjects:
+            sub_id = sub["subject_id"]
+            title = sub["title"]
+            cover_url = sub["cover"] if sub["cover"] else ""
+            if cover_url and not cover_url.startswith("http"):
+                cover_url = "" # Avoid invalid urls
+            
+            detail_path = sub["detail_path"] or ""
+            subject_type = sub["subject_type"]
+            
+            # Base details URL
+            escaped_path = urllib.parse.quote(detail_path)
+            
+            # Main Details Page
+            urls.append({
+                "loc": f"{APP_URL}/details?id={sub_id}&amp;path={escaped_path}",
+                "image": cover_url,
+                "title": title,
+                "lastmod": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            })
+
+            # For TV Shows, add episodes
+            if subject_type == 2 and sub_id in seasons_map:
+                for season in seasons_map[sub_id]:
+                    se_num = season["season_number"]
+                    ep_list_str = season["episodes_list"]
+                    if ep_list_str:
+                        ep_nums = [ep.strip() for ep in ep_list_str.split(",") if ep.strip()]
+                        for ep_num in ep_nums:
+                            urls.append({
+                                "loc": f"{APP_URL}/details?id={sub_id}&amp;path={escaped_path}&amp;season={se_num}&amp;episode={ep_num}",
+                                "image": cover_url,
+                                "title": f"{title} - Season {se_num} Episode {ep_num}",
+                                "lastmod": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                            })
+
+    except Exception as e:
+        print(f"[Sitemap Generation Error] {e}")
+
+    _sitemap_urls_cache = urls
+    _sitemap_cache_time = now
+    return urls
+
+
+from fastapi import Response
+
+@app.get("/sitemap.xml")
+async def sitemap_index():
+    import math
+    urls = await get_all_sitemap_urls()
+    total_details_pages = math.ceil(len(urls) / 100)
+    
+    xml = []
+    xml.append('<?xml version="1.0" encoding="UTF-8"?>')
+    xml.append('<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
+    
+    # Add static sitemap
+    xml.append(f'  <sitemap>')
+    xml.append(f'    <loc>{APP_URL}/sitemaps/static.xml</loc>')
+    xml.append(f'  </sitemap>')
+    
+    # Add details pages sitemaps
+    for p in range(1, total_details_pages + 1):
+        xml.append(f'  <sitemap>')
+        xml.append(f'    <loc>{APP_URL}/sitemaps/details_{p}.xml</loc>')
+        xml.append(f'  </sitemap>')
+        
+    xml.append('</sitemapindex>')
+    return Response(content="\n".join(xml), media_type="application/xml")
+
+
+@app.get("/sitemaps/static.xml")
+async def sitemap_static():
+    static_urls = [
+        {"loc": f"{APP_URL}/", "priority": "1.0", "changefreq": "daily"},
+        {"loc": f"{APP_URL}/movies", "priority": "0.9", "changefreq": "daily"},
+        {"loc": f"{APP_URL}/tv", "priority": "0.9", "changefreq": "daily"}
+    ]
+    
+    # Add category genres
+    genres = ["Action", "Comedy", "Animation", "Adventure", "Sci-Fi", "Drama", "Thriller", "Horror", "Mystery", "Fantasy", "Romance", "Crime", "Family", "Documentary"]
+    for g in genres:
+        static_urls.append({"loc": f"{APP_URL}/movies?genre={urllib.parse.quote(g)}", "priority": "0.7", "changefreq": "weekly"})
+        static_urls.append({"loc": f"{APP_URL}/tv?genre={urllib.parse.quote(g)}", "priority": "0.7", "changefreq": "weekly"})
+        
+    # Add countries
+    countries = ["USA", "India", "Bangladesh", "South Korea", "Japan", "UK", "Canada"]
+    for c in countries:
+        static_urls.append({"loc": f"{APP_URL}/movies?country={urllib.parse.quote(c)}", "priority": "0.6", "changefreq": "weekly"})
+        static_urls.append({"loc": f"{APP_URL}/tv?country={urllib.parse.quote(c)}", "priority": "0.6", "changefreq": "weekly"})
+
+    xml = []
+    xml.append('<?xml version="1.0" encoding="UTF-8"?>')
+    xml.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
+    for u in static_urls:
+        xml.append('  <url>')
+        xml.append(f'    <loc>{u["loc"]}</loc>')
+        xml.append(f'    <changefreq>{u["changefreq"]}</changefreq>')
+        xml.append(f'    <priority>{u["priority"]}</priority>')
+        xml.append('  </url>')
+    xml.append('</urlset>')
+    return Response(content="\n".join(xml), media_type="application/xml")
+
+
+@app.get("/sitemaps/details_{page_number}.xml")
+async def sitemap_details(page_number: int):
+    urls = await get_all_sitemap_urls()
+    start_idx = (page_number - 1) * 100
+    end_idx = start_idx + 100
+    page_urls = urls[start_idx:end_idx]
+    
+    if not page_urls:
+        raise HTTPException(status_code=404, detail="Sitemap page not found")
+        
+    xml = []
+    xml.append('<?xml version="1.0" encoding="UTF-8"?>')
+    xml.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">')
+    
+    for u in page_urls:
+        xml.append('  <url>')
+        xml.append(f'    <loc>{u["loc"]}</loc>')
+        xml.append(f'    <lastmod>{u["lastmod"]}</lastmod>')
+        xml.append('    <changefreq>weekly</changefreq>')
+        xml.append('    <priority>0.8</priority>')
+        if u["image"]:
+            escaped_img = u["image"].replace("&", "&amp;")
+            escaped_title = u["title"].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+            xml.append('    <image:image>')
+            xml.append(f'      <image:loc>{escaped_img}</image:loc>')
+            xml.append(f'      <image:title>{escaped_title}</image:title>')
+            xml.append('    </image:image>')
+        xml.append('  </url>')
+        
+    xml.append('</urlset>')
+    return Response(content="\n".join(xml), media_type="application/xml")
+
+
 @app.get("/", response_class=HTMLResponse)
 async def serve_home(request: Request):
     path = os.path.join(base_dir, "public/index.html")
@@ -3207,8 +3380,52 @@ async def serve_tv_shows(request: Request):
     return HTMLResponse(content=html_content)
 
 
+@app.get("/details", response_class=HTMLResponse)
+async def serve_details_page(request: Request, id: str = None, tmdb: str = None, type: str = "movie"):
+    path = os.path.join(base_dir, "public/details.html")
+    with open(path, "r", encoding="utf-8") as f:
+        html_content = f.read()
+        
+    sub_type = 2 if type == "tv" else 1
+    meta = await get_subject_meta(subject_id=id, tmdb_id=tmdb, subject_type=sub_type)
+    
+    html_content = html_content.replace("<title>Details - Streamfit</title>", f"<title>{meta['title']}</title>")
+    
+    og_tags = f"""
+    <meta name="description" content="{meta['description']}">
+    <meta name="keywords" content="movies, tv shows, streaming, streamfit, watch free, hd movies, hindi dub, bengali dub, watch online">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="video.other">
+    <meta property="og:url" content="{str(request.url)}">
+    <meta property="og:title" content="{meta['title']}">
+    <meta property="og:description" content="{meta['description']}">
+    <meta property="og:image" content="{meta['cover']}">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="{str(request.url)}">
+    <meta property="twitter:title" content="{meta['title']}">
+    <meta property="twitter:description" content="{meta['description']}">
+    <meta property="twitter:image" content="{meta['cover']}">
+    """
+    html_content = html_content.replace("</head>", f"{og_tags}\n</head>")
+    return HTMLResponse(content=html_content)
+
+
 @app.get("/watch", response_class=HTMLResponse)
 async def serve_watch_page(request: Request, id: str = None, tmdb: str = None, type: str = "movie"):
+    # Server-side crawler bot detection and block
+    user_agent = request.headers.get("user-agent", "").lower()
+    bot_keywords = [
+        "googlebot", "bingbot", "yandexbot", "baiduspider", "duckduckbot", "exabot", "sogou", 
+        "facebot", "facebookexternalhit", "ia_archiver", "twitterbot", "discordbot", "telegrambot", 
+        "slackbot", "bot", "crawler", "spider", "crawl", "slurp", "screaming frog"
+    ]
+    if any(keyword in user_agent for keyword in bot_keywords):
+        print(f"[Bot Blocked] IP: {request.client.host if request.client else 'Unknown'} | User-Agent: {user_agent}")
+        raise HTTPException(status_code=403, detail="Forbidden")
+
     path = os.path.join(base_dir, "public/watch.html")
     with open(path, "r", encoding="utf-8") as f:
         html_content = f.read()
@@ -3219,6 +3436,7 @@ async def serve_watch_page(request: Request, id: str = None, tmdb: str = None, t
     html_content = html_content.replace("<title>Watch Online - Streamfit</title>", f"<title>{meta['title']}</title>")
     
     og_tags = f"""
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
     <meta name="description" content="{meta['description']}">
     <meta name="keywords" content="movies, tv shows, streaming, streamfit, watch free, hd movies, hindi dub, bengali dub, watch online">
     

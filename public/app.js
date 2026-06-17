@@ -34,6 +34,7 @@ const routes = {
     isHome: false,
     isMovies: false,
     isTv: false,
+    isDetails: false,
     isWatch: false
 };
 
@@ -45,6 +46,8 @@ function detectRoute() {
     } else if (path.includes("/tv")) {
         routes.isTv = true;
         state.subjectType = 2;
+    } else if (path.includes("/details")) {
+        routes.isDetails = true;
     } else if (path.includes("/watch")) {
         routes.isWatch = true;
     } else {
@@ -95,6 +98,8 @@ document.addEventListener("DOMContentLoaded", () => {
         initHomePage();
     } else if (routes.isMovies || routes.isTv) {
         initFilterPage();
+    } else if (routes.isDetails) {
+        initDetailsPage();
     } else if (routes.isWatch) {
         initWatchPage();
     }
@@ -147,7 +152,7 @@ let eagerHomePromise = null;
 let eagerBannersPromise = null;
 
 const initialPath = window.location.pathname.toLowerCase();
-const isInitialHome = !initialPath.includes("/movies") && !initialPath.includes("/tv") && !initialPath.includes("/watch") && !new URLSearchParams(window.location.search).get("keyword");
+const isInitialHome = !initialPath.includes("/movies") && !initialPath.includes("/tv") && !initialPath.includes("/details") && !initialPath.includes("/watch") && !new URLSearchParams(window.location.search).get("keyword");
 
 if (isInitialHome) {
     eagerBannersPromise = apiGet("/api/banners");
@@ -274,7 +279,7 @@ function renderHeroBanner(banners) {
                     <span>${country}</span>
                 </div>
                 <div class="hero-buttons">
-                    <button class="btn-primary" onclick="window.location.href='/watch?id=${item.subjectId}&path=${encodeURIComponent(item.detailPath || sub.detailPath || '')}'">
+                    <button class="btn-primary" onclick="window.location.href='/details?id=${item.subjectId}&path=${encodeURIComponent(item.detailPath || sub.detailPath || '')}'">
                         <i class="fa-solid fa-play"></i> Watch Now
                     </button>
                 </div>
@@ -676,7 +681,7 @@ function createContentCard(item) {
     const card = document.createElement("div");
     card.className = "content-card";
     card.dataset.id = item.subjectId;
-    card.onclick = () => window.location.href = `/watch?id=${item.subjectId}&path=${encodeURIComponent(item.detailPath || '')}`;
+    card.onclick = () => window.location.href = `/details?id=${item.subjectId}&path=${encodeURIComponent(item.detailPath || '')}`;
 
     const title = item.title;
     const coverUrl = item.cover ? (item.cover.url || item.cover) : "https://via.placeholder.com/180x250?text=No+Cover";
@@ -1005,18 +1010,31 @@ async function initWatchPage() {
         }
     });
 
+async function initDetailsPage() {
+    const urlParams = new URLSearchParams(window.location.search);
+    let subjectId = urlParams.get("id");
+    const tmdbId = urlParams.get("tmdb");
+    const type = urlParams.get("type") || "movie";
+    const reqSeason = urlParams.get("season") ? parseInt(urlParams.get("season")) : 1;
+    const reqEpisode = urlParams.get("episode") ? parseInt(urlParams.get("episode")) : 1;
+    
+    if (!subjectId && !tmdbId) {
+        window.location.href = "/";
+        return;
+    }
+
     const loading = document.getElementById("watchPageLoading");
     const content = document.getElementById("watchWrapper");
 
     if (tmdbId) {
-        loading.innerHTML = `<div class="loading-spinner"></div><p style="margin-top: 15px;">Resolving TMDB ID ${tmdbId} via Streamfit...</p>`;
+        if (loading) loading.innerHTML = `<div class="loading-spinner"></div><p style="margin-top: 15px;">Resolving TMDB ID ${tmdbId} via Streamfit...</p>`;
         const resolution = await apiGet(`/api/resolve-tmdb?tmdbId=${tmdbId}&type=${type}&season=${reqSeason}&episode=${reqEpisode}`);
         if (resolution && resolution.code === 0 && resolution.data && resolution.data.subjectId) {
             subjectId = resolution.data.subjectId;
             state.selectedSeason = resolution.data.season;
             state.selectedEpisode = resolution.data.episode;
         } else {
-            loading.innerHTML = "<p><i class='fa-solid fa-triangle-exclamation'></i> Failed to resolve TMDB ID. Go back home.</p>";
+            if (loading) loading.innerHTML = "<p><i class='fa-solid fa-triangle-exclamation'></i> Failed to resolve TMDB ID. Go back home.</p>";
             return;
         }
     } else {
@@ -1032,33 +1050,44 @@ async function initWatchPage() {
         state.selectedSubject = detail;
 
         // Set Details UI
-        document.getElementById("watchTitle").textContent = detail.title;
-        document.getElementById("watchDescription").textContent = detail.description || "No description available.";
-        document.getElementById("watchRating").innerHTML = `<i class="fa-solid fa-star"></i> ${detail.imdbRatingValue || '--'}`;
-        document.getElementById("watchYear").textContent = detail.releaseDate ? detail.releaseDate.split('-')[0] : '----';
-        document.getElementById("watchCountry").textContent = detail.countryName || 'USA';
-        document.getElementById("watchDuration").textContent = detail.duration || '-- min';
+        const detailsTitle = document.getElementById("detailsTitle");
+        const detailsPoster = document.getElementById("detailsPoster");
+        const detailsHeroBackdrop = document.getElementById("detailsHeroBackdrop");
+        const detailsRating = document.getElementById("detailsRating");
+        const detailsYear = document.getElementById("detailsYear");
+        const detailsCountry = document.getElementById("detailsCountry");
+        const detailsDuration = document.getElementById("detailsDuration");
+        const detailsGenresList = document.getElementById("detailsGenresList");
+        const watchDescription = document.getElementById("watchDescription");
 
-        // Set player header overlay details
-        const mediaTypeLabel = detail.seNum > 0 || detail.subjectType === 2 ? "TV Show" : "Movie";
-        const categoryEl = document.getElementById("playerMediaCategory");
-        const titleEl = document.getElementById("playerMediaTitle");
-        if (categoryEl) categoryEl.textContent = mediaTypeLabel;
-        if (titleEl) titleEl.textContent = detail.title;
-
-        // Load backdrop image
-        const backdropUrl = detail.cover ? (detail.cover.url || detail.cover) : "";
-        document.getElementById("watchBackdrop").style.backgroundImage = `url('${backdropUrl}')`;
+        if (detailsTitle) detailsTitle.textContent = detail.title;
+        if (detailsPoster) detailsPoster.src = detail.cover ? (detail.cover.url || detail.cover) : "https://via.placeholder.com/180x250?text=No+Cover";
+        if (detailsHeroBackdrop) {
+            const backdropUrl = detail.cover ? (detail.cover.url || detail.cover) : "";
+            detailsHeroBackdrop.style.backgroundImage = `url('${backdropUrl}')`;
+        }
+        if (detailsRating) detailsRating.innerHTML = `<i class="fa-solid fa-star"></i> ${detail.imdbRatingValue || '--'}`;
+        if (detailsYear) detailsYear.textContent = detail.releaseDate ? detail.releaseDate.split('-')[0] : '----';
+        if (detailsCountry) detailsCountry.textContent = detail.countryName || 'USA';
+        if (detailsDuration) detailsDuration.textContent = detail.duration || '-- min';
+        
+        if (watchDescription) watchDescription.textContent = detail.description || "No description available.";
 
         // Render genres
-        const genreContainer = document.getElementById("watchGenres");
-        genreContainer.innerHTML = "";
-        if (detail.genre) {
-            detail.genre.forEach(g => {
-                const span = document.createElement("span");
-                span.textContent = g;
-                genreContainer.appendChild(span);
-            });
+        if (detailsGenresList && detail.genre) {
+            detailsGenresList.innerHTML = detail.genre.map(g => `<span>${g}</span>`).join('');
+        }
+
+        // Watch Online button click handler
+        const btnDetailsPlay = document.getElementById("btnDetailsPlay");
+        if (btnDetailsPlay) {
+            btnDetailsPlay.onclick = () => {
+                let url = `/watch?id=${subjectId}&path=${encodeURIComponent(detailPath)}`;
+                if (detail.subjectType === 2) {
+                    url += `&season=${state.selectedSeason}&episode=${state.selectedEpisode}`;
+                }
+                window.location.href = url;
+            };
         }
 
         // TV / Show episode selector
@@ -1066,11 +1095,10 @@ async function initWatchPage() {
         const tvSelector = document.getElementById("watchTvSelector");
         
         if (isTv) {
-            tvSelector.style.display = "block";
+            if (tvSelector) tvSelector.style.display = "block";
             await loadSeasonEpisodes(subjectId, detailPath);
         } else {
-            tvSelector.style.display = "none";
-            await loadPlayResources(subjectId);
+            if (tvSelector) tvSelector.style.display = "none";
         }
 
         // Setup Dub / Language selector dropdown
@@ -1097,7 +1125,7 @@ async function initWatchPage() {
                     const targetSubjectId = selectedOpt.value;
                     const targetDetailPath = selectedOpt.dataset.path || "";
                     
-                    let newUrl = `/watch?id=${targetSubjectId}&path=${encodeURIComponent(targetDetailPath)}`;
+                    let newUrl = `/details?id=${targetSubjectId}&path=${encodeURIComponent(targetDetailPath)}`;
                     if (state.selectedSubject && state.selectedSubject.subjectType === 2) {
                         newUrl += `&season=${state.selectedSeason}&episode=${state.selectedEpisode}`;
                     }
@@ -1119,17 +1147,13 @@ async function initWatchPage() {
         if (actionShare) {
             actionShare.onclick = () => {
                 navigator.clipboard.writeText(window.location.href);
-                alert("Watch link copied to clipboard!");
+                alert("Link copied to clipboard!");
             };
         }
         const actionDownload = document.getElementById("actionDownload");
         if (actionDownload) {
             actionDownload.onclick = () => {
-                if (state.directMp4Url) {
-                    window.open(state.directMp4Url, "_blank");
-                } else {
-                    alert("Download link is not ready yet.");
-                }
+                alert("To download, click 'Watch Online' and use the download option on the player page.");
             };
         }
         const actionViewDoc = document.getElementById("actionViewDoc");
@@ -1163,11 +1187,272 @@ async function initWatchPage() {
         // Load recommendations
         loadRecommendations(detail);
 
-        loading.style.display = "none";
-        content.style.display = "block";
+        if (loading) loading.style.display = "none";
+        if (content) content.style.display = "block";
     } else {
-        loading.innerHTML = "<p><i class='fa-solid fa-triangle-exclamation'></i> Failed to load media details. Go back home.</p>";
+        if (loading) loading.innerHTML = "<p><i class='fa-solid fa-triangle-exclamation'></i> Failed to load media details. Go back home.</p>";
     }
+}
+
+async function initWatchPage() {
+    const urlParams = new URLSearchParams(window.location.search);
+    let subjectId = urlParams.get("id");
+    const tmdbId = urlParams.get("tmdb");
+    const type = urlParams.get("type") || "movie";
+    const reqSeason = urlParams.get("season") ? parseInt(urlParams.get("season")) : 1;
+    const reqEpisode = urlParams.get("episode") ? parseInt(urlParams.get("episode")) : 1;
+    
+    if (!subjectId && !tmdbId) {
+        window.location.href = "/";
+        return;
+    }
+
+    // Initialize Plyr player with simple controls on mobile and full controls on desktop
+    const isMobile = window.innerWidth <= 768;
+    const mobileControls = ['play', 'progress', 'current-time', 'duration', 'mute', 'pip', 'fullscreen'];
+    const desktopControls = ['play-large', 'play', 'rewind', 'fast-forward', 'progress', 'current-time', 'mute', 'volume', 'captions', 'settings', 'pip', 'fullscreen'];
+
+    playerInstance = new Plyr('#player', {
+        controls: isMobile ? mobileControls : desktopControls,
+        settings: ['quality', 'speed'],
+        quality: { default: 0, options: [0, 4320, 2880, 2160, 1440, 1080, 720, 576, 480, 360, 240] },
+        keyboard: { global: true, focused: true },
+        captions: { active: true, update: true },
+        volume: 1,
+        muted: false
+    });
+
+    // Double-tap/click seek handlers
+    setTimeout(() => {
+        const wrapper = document.querySelector('.player-wrapper');
+        const fbLeft = document.getElementById('seekFeedbackLeft');
+        const fbRight = document.getElementById('seekFeedbackRight');
+        let seekTimerLeft = null;
+        let seekTimerRight = null;
+
+        const triggerSeek = (direction) => {
+            if (!playerInstance) return;
+            if (direction === 'left') {
+                playerInstance.currentTime = Math.max(0, playerInstance.currentTime - 10);
+                if (fbLeft) {
+                    fbLeft.classList.add('active');
+                    clearTimeout(seekTimerLeft);
+                    seekTimerLeft = setTimeout(() => fbLeft.classList.remove('active'), 500);
+                }
+            } else {
+                playerInstance.currentTime = Math.min(playerInstance.duration || 0, playerInstance.currentTime + 10);
+                if (fbRight) {
+                    fbRight.classList.add('active');
+                    clearTimeout(seekTimerRight);
+                    seekTimerRight = setTimeout(() => fbRight.classList.remove('active'), 500);
+                }
+            }
+        };
+
+        let lastTapTime = 0;
+        if (wrapper) {
+            // Touch screen double tap
+            wrapper.addEventListener('touchstart', (e) => {
+                if (e.touches.length !== 1) return;
+                // Ignore if clicked controls or header overlays
+                if (e.target.closest('.plyr__controls') || e.target.closest('.player-header-overlay')) return;
+                
+                const now = Date.now();
+                const delay = now - lastTapTime;
+                if (delay < 300 && delay > 0) {
+                    const rect = wrapper.getBoundingClientRect();
+                    const touchX = e.touches[0].clientX - rect.left;
+                    if (touchX < rect.width / 2) {
+                        triggerSeek('left');
+                    } else {
+                        triggerSeek('right');
+                    }
+                    e.preventDefault();
+                }
+                lastTapTime = now;
+            }, { passive: false });
+
+            // Desktop double click
+            wrapper.addEventListener('dblclick', (e) => {
+                if (e.target.closest('.plyr__controls') || e.target.closest('.player-header-overlay')) return;
+                
+                const rect = wrapper.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                if (clickX < rect.width / 2) {
+                    triggerSeek('left');
+                } else {
+                    triggerSeek('right');
+                }
+            });
+        }
+    }, 100);
+
+    // Start background poller to rewrite "0p" label to "Auto" in settings menu and buttons
+    setInterval(() => {
+        const menuItems = document.querySelectorAll('.plyr__menu__container button[value="0"] span, .plyr__menu__container span.plyr__menu__value');
+        menuItems.forEach(el => {
+            if (el.textContent.trim() === '0p') {
+                el.textContent = 'Auto';
+            }
+        });
+        
+        const plyrEls = document.querySelectorAll('.plyr [data-plyr="quality"], .plyr .plyr__menu__value, .plyr button');
+        plyrEls.forEach(el => {
+            if (el.textContent.trim() === '0p') {
+                const span = el.querySelector('span');
+                if (span) {
+                    span.textContent = 'Auto';
+                } else {
+                    el.textContent = 'Auto';
+                }
+            }
+        });
+    }, 250);
+
+    // Custom Player Loading Overlay event bindings
+    const loaderOverlay = document.getElementById("playerLoaderOverlay");
+    
+    const showLoader = () => {
+        if (loaderOverlay) {
+            const statusTxt = loaderOverlay.querySelector("span");
+            if (statusTxt) statusTxt.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:8px;"></i>Loading stream...';
+            loaderOverlay.style.background = "rgba(0, 0, 0, 0.8)";
+            loaderOverlay.classList.add("visible");
+        }
+    };
+    
+    const hideLoader = () => {
+        if (loaderOverlay) {
+            if (playerInstance && playerInstance.muted && !state.userInteracted) {
+                const statusTxt = loaderOverlay.querySelector("span");
+                if (statusTxt) statusTxt.innerHTML = '<i class="fa-solid fa-volume-high" style="margin-right:8px; font-size: 1.2em;"></i> Click to Unmute';
+                loaderOverlay.style.background = "rgba(0, 0, 0, 0.4)";
+                loaderOverlay.classList.add("visible");
+            } else {
+                loaderOverlay.classList.remove("visible");
+            }
+        }
+    };
+    
+    if (loaderOverlay) {
+        loaderOverlay.style.cursor = "pointer";
+        loaderOverlay.onclick = () => {
+            state.userInteracted = true;
+            if (playerInstance) {
+                if (playerInstance.muted) {
+                    playerInstance.muted = false;
+                    playerInstance.volume = 1.0;
+                }
+                playerInstance.play().catch(e => console.log("[Player] Overlay play failed:", e));
+                hideLoader();
+            }
+        };
+    }
+
+    // Plyr events
+    playerInstance.on('waiting', () => {
+        showLoader();
+        if (userSelectedQuality || isSwitchingQuality) return;
+        const now = Date.now();
+        if (now - lastBufferingTime < 15000) {
+            bufferingCount++;
+        } else {
+            bufferingCount = 1;
+        }
+        lastBufferingTime = now;
+        if (bufferingCount >= 3) {
+            bufferingCount = 0;
+            autoDowngradeQuality();
+        }
+    });
+    
+    playerInstance.on('qualitychange', (event) => {
+        if (!isProgrammaticQualityChange) {
+            const selectedQ = event.detail.quality;
+            if (selectedQ === 0) {
+                userSelectedQuality = false;
+            } else {
+                userSelectedQuality = true;
+            }
+        }
+    });
+
+    playerInstance.on('seeking', showLoader);
+    playerInstance.on('playing', hideLoader);
+    playerInstance.on('play', hideLoader);
+    playerInstance.on('play', () => { 
+        state.userInteracted = true; 
+        if (playerInstance && playerInstance.muted && !state.hasAutounmuted) {
+            playerInstance.muted = false;
+            playerInstance.volume = 1.0;
+            state.hasAutounmuted = true;
+        }
+    });
+    playerInstance.on('volumechange', () => {
+        if (playerInstance && !playerInstance.muted) {
+            state.userInteracted = true;
+            hideLoader();
+        }
+    });
+
+    playerInstance.on('enterfullscreen', () => {
+        if (window.screen && window.screen.orientation && window.screen.orientation.lock) {
+            window.screen.orientation.lock('landscape').catch(err => {
+                console.warn('Failed to lock orientation:', err);
+            });
+        }
+    });
+
+    playerInstance.on('exitfullscreen', () => {
+        if (window.screen && window.screen.orientation && window.screen.orientation.unlock) {
+            window.screen.orientation.unlock();
+        }
+    });
+
+    const loading = document.getElementById("watchPageLoading");
+
+    if (tmdbId) {
+        if (loading) loading.innerHTML = `<div class="loading-spinner"></div><p style="margin-top: 15px;">Resolving TMDB ID ${tmdbId} via Streamfit...</p>`;
+        const resolution = await apiGet(`/api/resolve-tmdb?tmdbId=${tmdbId}&type=${type}&season=${reqSeason}&episode=${reqEpisode}`);
+        if (resolution && resolution.code === 0 && resolution.data && resolution.data.subjectId) {
+            subjectId = resolution.data.subjectId;
+            state.selectedSeason = resolution.data.season;
+            state.selectedEpisode = resolution.data.episode;
+        } else {
+            if (loading) loading.innerHTML = "<p><i class='fa-solid fa-triangle-exclamation'></i> Failed to resolve TMDB ID. Go back home.</p>";
+            return;
+        }
+    } else {
+        state.selectedSeason = reqSeason;
+        state.selectedEpisode = reqEpisode;
+    }
+
+    const detailPath = urlParams.get("path") || "";
+    const result = await apiGet(`/api/detail?subjectId=${subjectId}&detailPath=${encodeURIComponent(detailPath)}`);
+    if (result && result.data) {
+        const detail = result.data;
+        state.selectedSubject = detail;
+
+        // Set player header overlay details
+        const mediaTypeLabel = detail.seNum > 0 || detail.subjectType === 2 ? "TV Show" : "Movie";
+        const categoryEl = document.getElementById("playerMediaCategory");
+        const titleEl = document.getElementById("playerMediaTitle");
+        if (categoryEl) categoryEl.textContent = mediaTypeLabel;
+        if (titleEl) titleEl.textContent = detail.title;
+
+        // Load stream resources directly
+        const isTv = detail.seNum > 0 || detail.subjectType === 2;
+        if (isTv) {
+            await loadPlayResources(subjectId, state.selectedSeason, state.selectedEpisode);
+        } else {
+            await loadPlayResources(subjectId);
+        }
+
+        if (loading) loading.style.display = "none";
+    } else {
+        if (loading) loading.innerHTML = "<p><i class='fa-solid fa-triangle-exclamation'></i> Failed to load player resources. Go back home.</p>";
+    }
+}
 }
 
 async function loadRecommendations(detail) {
@@ -1262,6 +1547,7 @@ async function loadSeasonEpisodes(subjectId, detailPath = "") {
 
 function renderEpisodes(season) {
     const grid = document.getElementById("watchEpisodeGrid");
+    if (!grid) return;
     grid.innerHTML = "";
 
     if (season.allEp) {
@@ -1279,27 +1565,11 @@ function renderEpisodes(season) {
                 btn.appendChild(eq);
             }
 
-            btn.onclick = async () => {
-                // Episode click is a direct user gesture — mark interacted so autoplay works
-                state.userInteracted = true;
-
-                // Immediately stop current playback so there's no audio bleed
-                if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
-
-                document.querySelectorAll(".episode-btn").forEach(b => {
-                    b.classList.remove("active");
-                    const eqEl = b.querySelector(".playing-indicator");
-                    if (eqEl) eqEl.remove();
-                });
-                btn.classList.add("active");
-
-                const eq = document.createElement("span");
-                eq.className = "playing-indicator";
-                eq.innerHTML = "<span></span><span></span><span></span>";
-                btn.appendChild(eq);
-
+            btn.onclick = () => {
                 state.selectedEpisode = Number(epNum);
-                await loadPlayResources(state.selectedSubject.subjectId, state.selectedSeason, state.selectedEpisode);
+                const urlParams = new URLSearchParams(window.location.search);
+                const detailPath = urlParams.get("path") || "";
+                window.location.href = `/watch?id=${state.selectedSubject.subjectId}&path=${encodeURIComponent(detailPath)}&season=${state.selectedSeason}&episode=${state.selectedEpisode}`;
             };
             grid.appendChild(btn);
         });
@@ -1307,7 +1577,6 @@ function renderEpisodes(season) {
         if (!eps.includes(String(state.selectedEpisode))) {
             state.selectedEpisode = Number(eps[0]);
         }
-        loadPlayResources(state.selectedSubject.subjectId, state.selectedSeason, state.selectedEpisode);
     }
 }
 
