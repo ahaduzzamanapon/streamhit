@@ -85,7 +85,7 @@ CLIENT_INFO_STR = json.dumps(CLIENT_INFO, separators=(',', ':'))
 
 # Global state
 db_pool = None
-db_init_lock = None
+db_init_locks = {}
 worker_index = 0
 active_api_base = "https://h5-api.aoneroom.com"
 loop_clients = {}
@@ -112,8 +112,14 @@ app.add_middleware(
 )
 
 async def get_db_pool():
-    global db_pool, db_init_lock
+    global db_pool
     current_loop = asyncio.get_running_loop()
+    
+    # clean up closed loops to prevent memory leak
+    for lp in list(db_init_locks.keys()):
+        if lp.is_closed():
+            db_init_locks.pop(lp, None)
+            
     if db_pool is not None:
         pool_loop = getattr(db_pool, "_loop", None)
         if pool_loop is None or pool_loop.is_closed() or pool_loop is not current_loop:
@@ -122,12 +128,11 @@ async def get_db_pool():
             except Exception:
                 pass
             db_pool = None
-            db_init_lock = None
 
     if db_pool is None:
-        if db_init_lock is None:
-            db_init_lock = asyncio.Lock()
-        async with db_init_lock:
+        if current_loop not in db_init_locks:
+            db_init_locks[current_loop] = asyncio.Lock()
+        async with db_init_locks[current_loop]:
             if db_pool is None:
                 await init_db()
     return db_pool
