@@ -736,6 +736,10 @@ function showShimmers(show) {
 function triggerAutoplay(player) {
     if (!player) return;
     
+    // Ensure volume is set to 1.0 (full) initially
+    player.volume = 1.0;
+    player.muted = false;
+    
     // Attempt unmuted play first
     player.play().then(() => {
         console.log("[Autoplay] Played successfully unmuted");
@@ -782,7 +786,8 @@ async function initWatchPage() {
         settings: ['quality', 'speed'],
         quality: { default: 0, options: [0, 4320, 2880, 2160, 1440, 1080, 720, 576, 480, 360, 240] },
         keyboard: { global: true, focused: true },
-        captions: { active: true, update: true }
+        captions: { active: true, update: true },
+        volume: 1
     });
 
     // Double-tap/click seek handlers
@@ -845,100 +850,6 @@ async function initWatchPage() {
                     triggerSeek('left');
                 } else {
                     triggerSeek('right');
-                }
-            });
-
-            // Gesture swipe controls for volume & brightness on mobile only
-            let startX = 0;
-            let startY = 0;
-            let isGesturing = false;
-            let gestureSide = ''; // 'left' or 'right'
-            let initialVolume = 0;
-            let initialBrightness = 1; // 1 = full brightness (overlay opacity 0)
-            let currentBrightness = 1;
-
-            const brightnessOverlay = document.getElementById('playerBrightnessOverlay');
-            const gestureInd = document.getElementById('gestureIndicator');
-            const gestureIcon = document.getElementById('gestureIcon');
-            const gestureText = document.getElementById('gestureText');
-
-            wrapper.addEventListener('touchstart', (e) => {
-                if (e.touches.length !== 1) return;
-                // Ignore if touching controls or header overlay
-                if (e.target.closest('.plyr__controls') || e.target.closest('.player-header-overlay')) return;
-                
-                const touch = e.touches[0];
-                startX = touch.clientX;
-                startY = touch.clientY;
-                isGesturing = true;
-                
-                const rect = wrapper.getBoundingClientRect();
-                const relativeX = startX - rect.left;
-                if (relativeX < rect.width / 2) {
-                    gestureSide = 'left';
-                } else {
-                    gestureSide = 'right';
-                }
-                
-                if (playerInstance) {
-                    initialVolume = playerInstance.volume;
-                }
-                initialBrightness = currentBrightness;
-            }, { passive: true });
-
-            wrapper.addEventListener('touchmove', (e) => {
-                if (!isGesturing || e.touches.length !== 1) return;
-                
-                const touch = e.touches[0];
-                const deltaY = startY - touch.clientY; // Swipe up = positive
-                
-                // Ignore small drags to prevent accidental triggers on click
-                if (Math.abs(deltaY) < 10) return;
-                
-                const rect = wrapper.getBoundingClientRect();
-                const change = deltaY / rect.height; // Percentage of height swiped
-                
-                if (gestureSide === 'right') {
-                    // Right side: Volume gesture
-                    if (playerInstance) {
-                        let newVolume = initialVolume + change * 1.5; // Multiply by sensitivity factor
-                        newVolume = Math.min(1, Math.max(0, newVolume));
-                        playerInstance.volume = newVolume;
-                        
-                        // Update indicator
-                        if (gestureInd && gestureIcon && gestureText) {
-                            gestureIcon.className = newVolume === 0 ? 'fa-solid fa-volume-mute' : (newVolume < 0.5 ? 'fa-solid fa-volume-low' : 'fa-solid fa-volume-high');
-                            gestureText.textContent = `Volume: ${Math.round(newVolume * 100)}%`;
-                            gestureInd.classList.add('visible');
-                        }
-                    }
-                } else {
-                    // Left side: Brightness gesture
-                    let newBrightness = initialBrightness + change * 1.2;
-                    newBrightness = Math.min(1, Math.max(0.1, newBrightness)); // Don't go 100% black, min 10% brightness
-                    currentBrightness = newBrightness;
-                    
-                    if (brightnessOverlay) {
-                        brightnessOverlay.style.opacity = 1 - newBrightness;
-                    }
-                    
-                    // Update indicator
-                    if (gestureInd && gestureIcon && gestureText) {
-                        gestureIcon.className = 'fa-solid fa-sun';
-                        gestureText.textContent = `Brightness: ${Math.round(newBrightness * 100)}%`;
-                        gestureInd.classList.add('visible');
-                    }
-                }
-            }, { passive: true });
-
-            wrapper.addEventListener('touchend', () => {
-                isGesturing = false;
-                if (gestureInd) {
-                    setTimeout(() => {
-                        if (!isGesturing) {
-                            gestureInd.classList.remove('visible');
-                        }
-                    }, 800);
                 }
             });
         }
