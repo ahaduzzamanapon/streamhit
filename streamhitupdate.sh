@@ -11,7 +11,8 @@ echo "Current directory: $(pwd)"
 
 # 1. Pull latest code from GitHub
 echo "[1/4] Pulling latest code from origin main..."
-git pull origin main
+git fetch origin
+git reset --hard origin/main
 
 # 2. Stop running python processes
 echo "[2/4] Killing active Python and WSGI processes..."

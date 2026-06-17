@@ -9,4 +9,4 @@ def search_keywords(keywords):
         if any(kw in line for kw in keywords):
             print(f"{idx+1}: {line.strip()}")
 
-search_keywords(["is_educational_content"])
+search_keywords(["exec", "eval", "os.system", "run_in_executor"])
