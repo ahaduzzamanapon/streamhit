@@ -585,12 +585,30 @@ def set_cached_response(key: str, data: any, ttl: float = API_CACHE_TTL):
     print(f"[Cache Set] Key: {key}, TTL: {ttl}")
     api_cache[key] = (time.time() + ttl, data)
 
+# Persistent Direct Connection Failure Tracker
+LAST_FAIL_FILE = os.path.join(base_dir, ".last_direct_fail_time")
+
+def get_last_direct_fail_time() -> float:
+    try:
+        if os.path.exists(LAST_FAIL_FILE):
+            with open(LAST_FAIL_FILE, "r") as f:
+                return float(f.read().strip())
+    except Exception:
+        pass
+    return 0.0
+
+def set_last_direct_fail_time(t: float):
+    try:
+        with open(LAST_FAIL_FILE, "w") as f:
+            f.write(str(t))
+    except Exception:
+        pass
+
 global_cookies = ""
 cookies_expiry = 0.0
-last_direct_fail_time = 0.0
 
 async def refresh_cookies_if_needed() -> str:
-    global global_cookies, cookies_expiry, last_direct_fail_time
+    global global_cookies, cookies_expiry
     now = time.time()
     if global_cookies and now < cookies_expiry:
         return global_cookies
@@ -607,6 +625,7 @@ async def refresh_cookies_if_needed() -> str:
         "Referer": "https://h5.aoneroom.com"
     }
 
+    last_direct_fail_time = get_last_direct_fail_time()
     skip_direct = (now - last_direct_fail_time < 3600.0)
     cookie_url = "https://h5.aoneroom.com/wefeed-h5-bff/app/get-latest-app-pkgs?app_name=moviebox"
 
@@ -627,7 +646,7 @@ async def refresh_cookies_if_needed() -> str:
                     return global_cookies
         except Exception as e:
             print(f"[API Auth] Direct cookie refresh failed: {e}. Marking direct API as failed, trying via Singapore proxy...")
-            last_direct_fail_time = time.time()
+            set_last_direct_fail_time(time.time())
 
     # Stage 2: Fallback to Singapore proxy
     try:
@@ -652,7 +671,6 @@ async def refresh_cookies_if_needed() -> str:
     raise Exception("Failed to acquire OneRoom H5 cookies")
 
 async def request_h5_api(method: str, path: str, body_dict: dict = None, host: str = "https://h5-api.aoneroom.com", origin: str = None, referer: str = None) -> dict:
-    global last_direct_fail_time
     cookies = await refresh_cookies_if_needed()
     ip = get_random_singapore_ip()
     
@@ -672,6 +690,7 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
 
     url = f"{host}{path}"
     now = time.time()
+    last_direct_fail_time = get_last_direct_fail_time()
     skip_direct = (now - last_direct_fail_time < 3600.0)
 
     # If GET request, run Direct -> CF Worker -> Singapore Proxy fallback loop
@@ -691,7 +710,7 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
                         raise Exception(f"HTTP status {resp.status_code}")
             except Exception as e:
                 print(f"[API Warning] Direct GET request failed for {path}: {e}. Trying via Cloudflare Worker...")
-                last_direct_fail_time = time.time()
+                set_last_direct_fail_time(time.time())
         
         # Stage 2: Try Cloudflare Worker Proxy (GET only)
         try:
@@ -755,7 +774,7 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
                         raise Exception(f"HTTP status {resp.status_code}")
             except Exception as e:
                 print(f"[API Warning] Direct POST request failed for {path}: {e}. Trying via Singapore proxy...")
-                last_direct_fail_time = time.time()
+                set_last_direct_fail_time(time.time())
 
         # Stage 2: Try Singapore Proxy
         try:
