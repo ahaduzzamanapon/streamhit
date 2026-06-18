@@ -773,6 +773,12 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
     # Rotation Strategy: Direct -> Worker -> External Proxy
     attempts = ["direct", "worker", "proxy"]
     if skip_direct: attempts.remove("direct")
+    
+    # Cloudflare Workers only reliably support GET with query-string header injection.
+    # Skip workers for POST requests (filter/search) to avoid unnecessary 403/404 errors.
+    if method.upper() != "GET" and "worker" in attempts:
+        attempts.remove("worker")
+        
     print(f"[API Network] Rotation attempts for {path}: {attempts}")
 
     for mode in attempts:
