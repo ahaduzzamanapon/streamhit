@@ -770,8 +770,8 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
     last_direct_fail_time = get_last_direct_fail_time()
     skip_direct = (now - last_direct_fail_time < 3600.0)
 
-    # Rotation Strategy: Direct -> Worker -> External Proxy
-    attempts = ["direct", "worker", "proxy"]
+    # Rotation Strategy
+    attempts = ["direct", "proxy"]
     if skip_direct: attempts.remove("direct")
 
     for mode in attempts:
