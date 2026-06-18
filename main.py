@@ -585,43 +585,29 @@ async def cache_item_metadata_only(item: dict):
 # 3. PROXY & H5 API CLIENT (MULTI-PROXY ROTATION)
 # ==========================================================================
 
-import ipaddress
+SINGAPORE_IP_RANGES = [
+    ((1, 21, 224, 0), (1, 21, 255, 255)),
+    ((1, 32, 128, 0), (1, 32, 191, 255)),
+    ((101, 100, 160, 0), (101, 100, 255, 255)),
+    ((101, 127, 0, 0), (101, 127, 255, 255)),
+    ((101, 32, 104, 0), (101, 32, 175, 255)),
+    ((103, 1, 136, 0), (103, 1, 139, 255)),
+    ((103, 10, 100, 0), (103, 10, 103, 255)),
+    ((103, 11, 188, 0), (103, 11, 191, 255)),
+    ((103, 14, 212, 0), (103, 14, 215, 255)),
+    ((103, 15, 100, 0), (103, 15, 103, 255)),
+]
 
-def load_singapore_ips():
-    ranges = []
-    ip_file = os.path.join(base_dir, "singapore_ips.txt")
-    if os.path.exists(ip_file):
-        try:
-            with open(ip_file, "r") as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith("#"):
-                        try:
-                            # Convert CIDR to integer range
-                            network = ipaddress.IPv4Network(line, strict=False)
-                            ranges.append((int(network.network_address), int(network.broadcast_address)))
-                        except Exception:
-                            pass
-        except Exception as e:
-            print(f"[IP Manager] Error loading {ip_file}: {e}")
-            
-    if not ranges:
-        # Fallback to a single hardcoded block if file missing/empty
-        network = ipaddress.IPv4Network("103.14.212.0/22", strict=False)
-        ranges.append((int(network.network_address), int(network.broadcast_address)))
-    return ranges
+def ip_to_long(ip):
+    return (ip[0] << 24) | (ip[1] << 16) | (ip[2] << 8) | ip[3]
 
-SINGAPORE_IP_RANGES = load_singapore_ips()
-
-def long_to_ip(long_ip):
-    return str(ipaddress.IPv4Address(long_ip))
+def long_to_ip(long):
+    return f"{(long >> 24) & 255}.{(long >> 16) & 255}.{(long >> 8) & 255}.{long & 255}"
 
 def get_random_singapore_ip():
-    global SINGAPORE_IP_RANGES
-    if not SINGAPORE_IP_RANGES:
-        SINGAPORE_IP_RANGES = load_singapore_ips()
-    
-    start_long, end_long = random.choice(SINGAPORE_IP_RANGES)
+    start_ip, end_ip = random.choice(SINGAPORE_IP_RANGES)
+    start_long = ip_to_long(start_ip)
+    end_long = ip_to_long(end_ip)
     random_long = random.randint(start_long, end_long)
     return long_to_ip(random_long)
 
