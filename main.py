@@ -980,6 +980,15 @@ async def scrape_subject_details(subject_id: str) -> dict:
     print(f"[Scraper Error] All proxy attempts failed for subject {subject_id}. Skipping for now. Last error: {last_error}")
     return {}
 
+async def scrape_all_episodes_for_season(subject_id: str, season: int, max_ep: int):
+    """Background task: scrape all episodes of a season that wasn't previously in DB."""
+    for ep_num in range(1, max_ep + 1):
+        try:
+            await scrape_episode_resources(subject_id, season, ep_num)
+            await asyncio.sleep(0.5)
+        except Exception as e:
+            print(f"[Season Scraper] Error on S{season}E{ep_num} for {subject_id}: {e}")
+
 async def scrape_episode_resources(subject_id: str, season: int, episode: int):
     try:
         detail_path = ""
@@ -2439,8 +2448,11 @@ async def get_season_info(subjectId: str, detailPath: str = ""):
         except Exception as db_err:
             print(f"[DB Season Info Lookup Error] {db_err}")
                 
-    if seasons:
-        return {"code": 0, "data": {"seasons": seasons}}
+    db_season_count = len(seasons)
+    db_season_nums = {s["se"] for s in seasons}
+
+    # Always fetch from API to check if there are more seasons than what's in DB
+    # (e.g. "From S1-S4" was scraped with only S1 saved — API has S1-S4)
 
     # Try to get detail path from db
     db_detail_path = ""
@@ -2476,8 +2488,13 @@ async def get_season_info(subjectId: str, detailPath: str = ""):
             max_ep = int(se.get("maxEp", 0))
             episodes_list = ",".join(str(i) for i in range(1, max_ep + 1))
             
-            # Save to DB asynchronously
+            # Save to DB (INSERT OR UPDATE)
             await db_save_season(subjectId, se_num, max_ep, episodes_list)
+
+            # If this season wasn't in DB before, scrape its episode resources in background
+            if se_num not in db_season_nums and max_ep > 0:
+                print(f"[Season Info] New season {se_num} found for {subjectId}. Scraping {max_ep} episodes in background...")
+                asyncio.create_task(scrape_all_episodes_for_season(subjectId, se_num, max_ep))
             
             formatted_seasons.append({
                 "se": se_num,
@@ -2488,6 +2505,9 @@ async def get_season_info(subjectId: str, detailPath: str = ""):
         return {"code": 0, "data": {"seasons": formatted_seasons}}
     except Exception as e:
         print(f"[Season Info API Fallback] Failed to fetch seasons for {subjectId} path {path_to_use}: {e}")
+        # Fall back to whatever we already have in DB
+        if seasons:
+            return {"code": 0, "data": {"seasons": seasons}}
         
         # Try resolving details (including seasons) via TMDB
         tmdb_resolved = await resolve_details_via_tmdb(subjectId, path_to_use)
