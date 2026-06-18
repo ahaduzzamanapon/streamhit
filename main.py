@@ -799,12 +799,12 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
                 elif mode == "worker":
                     worker = proxy_manager.get_next_worker()
                     worker_headers = {**headers}
-                    proxied_url = f"{worker}/mp4-proxy?url={urllib.parse.quote(url)}"
+                    # Always pass headers via URL for workers to avoid header stripping
+                    proxied_url = f"{worker}/mp4-proxy?url={urllib.parse.quote(url)}&headers={urllib.parse.quote(json.dumps(worker_headers))}"
                     if method.upper() == "GET":
-                        resp = await client.get(proxied_url, headers=worker_headers)
+                        resp = await client.get(proxied_url)
                     else:
-                        # Some workers don't support POST well via query params, so we try anyway
-                        resp = await client.post(proxied_url, json=body_dict, headers=worker_headers)
+                        resp = await client.post(proxied_url, json=body_dict)
                 else:
                     proxy_ip = proxy_manager.get_next_proxy()
                     proxied_url = f"http://{proxy_ip}/?url={urllib.parse.quote(url)}"
