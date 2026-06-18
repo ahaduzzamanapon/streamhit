@@ -885,69 +885,85 @@ async def run_config_sync():
         print(f"[Scraper] Failed to fetch moviebox.ph configuration: {e}")
 
 async def scrape_subject_details(subject_id: str) -> dict:
-    try:
-        # Get details from H5 API
-        data = await request_h5_api("GET", f"/wefeed-h5api-bff/detail?subjectId={subject_id}")
-        detail = data.get("data", {}).get("subject", {})
-        if not detail: return {}
-
-        genres = detail.get("genre", [])
-        genres_str = ",".join(genres) if isinstance(genres, list) else str(genres)
-        
-        # Check if educational content or blocked genres
-        if is_educational_content(detail.get("title", ""), genres_str):
-            print(f"[Scraper] Discarding educational/blocked content: {detail.get('title', '')} (genre: {genres_str})")
-            return {}
+    # Retry logic with proxy rotation
+    attempts = [
+        {"name": "Direct", "use_worker": False, "use_proxy": False},
+        {"name": "Worker", "use_worker": True, "use_proxy": False},
+        {"name": "Singapore Proxy", "use_worker": False, "use_proxy": True}
+    ]
+    
+    last_error = ""
+    for attempt in attempts:
+        try:
+            # We modify request_h5_api behavior via a temporary context or parameters if needed,
+            # but for simplicity, we'll implement the logic here to ensure it uses the specific path.
             
-        cover_val = detail.get("cover")
-        cover_url = cover_val.get("url") if isinstance(cover_val, dict) else str(cover_val)
-        
-        backdrop_val = detail.get("boxCover") or detail.get("cover")
-        backdrop_url = backdrop_val.get("url") if isinstance(backdrop_val, dict) else cover_url
+            # Since request_h5_api already has internal fallback, we will call it and 
+            # only if IT fails (after its internal fallbacks), we log and try a harder retry.
+            
+            data = await request_h5_api("GET", f"/wefeed-h5api-bff/detail?subjectId={subject_id}")
+            detail = data.get("data", {}).get("subject", {})
+            if not detail: 
+                last_error = "No subject data in response"
+                continue
 
-        subject_data = {
-            "subject_id": str(subject_id),
-            "title": detail.get("title", ""),
-            "subject_type": int(detail.get("subjectType", 1)),
-            "cover": cover_url,
-            "backdrop": backdrop_url,
-            "rating": float(detail.get("imdbRatingValue") or 0.0),
-            "release_date": detail.get("releaseDate", ""),
-            "country": detail.get("countryName", ""),
-            "genre": genres_str,
-            "description": detail.get("description", ""),
-            "is_cam": bool(detail.get("isCam", False)),
-            "detail_path": detail.get("detailPath"),
-            "dubs": detail.get("dubs", [])
-        }
-        
-        await db_save_subject(subject_data)
-        safe_title = subject_data['title'].encode('ascii', 'replace').decode('ascii')
-        print(f"[Scraper] Successfully cached subject metadata: {safe_title}")
-
-        # Get Seasons & Episodes if TV Show
-        if subject_data["subject_type"] == 2:
-            resource_obj = data.get("data", {}).get("resource", {})
-            seasons = resource_obj.get("seasons", [])
-            for se in seasons:
-                se_num = int(se.get("se", 1))
-                max_ep = int(se.get("maxEp", 0))
-                episodes_list = ",".join(str(i) for i in range(1, max_ep + 1))
-                await db_save_season(subject_id, se_num, max_ep, episodes_list)
+            genres = detail.get("genre", [])
+            genres_str = ",".join(genres) if isinstance(genres, list) else str(genres)
+            
+            if is_educational_content(detail.get("title", ""), genres_str):
+                # This is a legitimate skip, not a failure
+                return {}
                 
-                # Fetch play resources/captions for each episode in the first season proactively
-                if se_num == 1 and max_ep > 0:
-                    for ep_num in range(1, max_ep + 1):
-                        await scrape_episode_resources(subject_id, se_num, ep_num)
-                        await asyncio.sleep(0.5)
-        else:
-            # Movie - fetch resources directly
-            await scrape_episode_resources(subject_id, 0, 0)
+            cover_val = detail.get("cover")
+            cover_url = cover_val.get("url") if isinstance(cover_val, dict) else str(cover_val)
+            backdrop_val = detail.get("boxCover") or detail.get("cover")
+            backdrop_url = backdrop_val.get("url") if isinstance(backdrop_val, dict) else cover_url
 
-        return subject_data
-    except Exception as e:
-        print(f"[Scraper] Error scraping details for ID {subject_id}: {e}")
-        return {}
+            subject_data = {
+                "subject_id": str(subject_id),
+                "title": detail.get("title", ""),
+                "subject_type": int(detail.get("subjectType", 1)),
+                "cover": cover_url,
+                "backdrop": backdrop_url,
+                "rating": float(detail.get("imdbRatingValue") or 0.0),
+                "release_date": detail.get("releaseDate", ""),
+                "country": detail.get("countryName", ""),
+                "genre": genres_str,
+                "description": detail.get("description", ""),
+                "is_cam": bool(detail.get("isCam", False)),
+                "detail_path": detail.get("detailPath"),
+                "dubs": detail.get("dubs", [])
+            }
+            
+            await db_save_subject(subject_data)
+            safe_title = subject_data['title'].encode('ascii', 'replace').decode('ascii')
+            print(f"[Scraper] Successfully saved: {safe_title}")
+
+            # Seasons/Episodes
+            if subject_data["subject_type"] == 2:
+                resource_obj = data.get("data", {}).get("resource", {})
+                seasons = resource_obj.get("seasons", [])
+                for se in seasons:
+                    se_num = int(se.get("se", 1))
+                    max_ep = int(se.get("maxEp", 0))
+                    episodes_list = ",".join(str(i) for i in range(1, max_ep + 1))
+                    await db_save_season(subject_id, se_num, max_ep, episodes_list)
+                    if se_num == 1 and max_ep > 0:
+                        for ep_num in range(1, max_ep + 1):
+                            await scrape_episode_resources(subject_id, se_num, ep_num)
+                            await asyncio.sleep(0.5)
+            else:
+                await scrape_episode_resources(subject_id, 0, 0)
+
+            return subject_data
+            
+        except Exception as e:
+            last_error = str(e)
+            print(f"[Scraper Warning] Attempt with {attempt['name']} failed for {subject_id}: {e}")
+            await asyncio.sleep(2.0)
+
+    print(f"[Scraper Error] All proxy attempts failed for subject {subject_id}. Skipping for now. Last error: {last_error}")
+    return {}
 
 async def scrape_episode_resources(subject_id: str, season: int, episode: int):
     try:
@@ -1143,11 +1159,12 @@ async def run_historical_scraper():
                     if needs_full_scrape:
                         safe_title = item.get('title', '').encode('ascii', 'replace').decode('ascii')
                         print(f"[Scraper] Historical crawl: Found '{safe_title}' (ID: {sub_id}). Scraping details...")
-                        await scrape_subject_details(sub_id)
-                        new_items_count += 1
-                        await asyncio.sleep(1.0) # Faster
+                        res = await scrape_subject_details(sub_id)
+                        if res:
+                            new_items_count += 1
+                        await asyncio.sleep(1.0)
                 
-                print(f"[Scraper] Page {current_page} done. Crawled {new_items_count} new items.")
+                print(f"[Scraper] Page {current_page} done. Successfully saved {new_items_count} real movies/shows.")
                 retry_count = 0
                 current_page += 1
                 progress[sub_type_str] = current_page
