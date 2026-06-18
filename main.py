@@ -1085,7 +1085,7 @@ async def run_historical_scraper():
         current_page = progress.get(sub_type_str, 2)
         retry_count = 0
         
-        while current_page <= 300:
+        while current_page <= 2000:
             print(f"[Scraper] Scraping historical page {current_page} for subject type {sub_type}...")
             try:
                 payload = {
