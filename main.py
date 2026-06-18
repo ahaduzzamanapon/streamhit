@@ -1080,7 +1080,8 @@ async def run_historical_scraper():
     progress = await db_read_scraper_progress()
     print(f"[Scraper] Starting historical scraping cycle. Current progress: {progress}")
     
-    for sub_type_str in ["2", "1", "7"]:
+    # Re-order to prioritize Movies (1) then TV (2) then Anime (7)
+    for sub_type_str in ["1", "2", "7"]:
         sub_type = int(sub_type_str)
         current_page = progress.get(sub_type_str, 2)
         retry_count = 0
@@ -1088,6 +1089,7 @@ async def run_historical_scraper():
         while current_page <= 2000:
             print(f"[Scraper] Scraping historical page {current_page} for subject type {sub_type}...")
             try:
+                # ... payload construction ...
                 payload = {
                     "page": current_page,
                     "perPage": 20,
@@ -1108,13 +1110,12 @@ async def run_historical_scraper():
                         items = results[0].get("subjects", [])
                 
                 if not items:
-                    # Only mark as done if we're past page 5 to avoid marking done on network blip
                     if current_page > 5:
                         print(f"[Scraper] No more items on page {current_page} for type {sub_type}. Marking as completed.")
                         progress[sub_type_str] = 999
                         await db_save_scraper_progress(sub_type, 999)
                     else:
-                        print(f"[Scraper] No items on early page {current_page} for type {sub_type}. Skipping (may be network issue).")
+                        print(f"[Scraper] No items on early page {current_page} for type {sub_type}. Skipping.")
                         current_page += 1
                         progress[sub_type_str] = current_page
                         await db_save_scraper_progress(sub_type, current_page)
@@ -1131,7 +1132,6 @@ async def run_historical_scraper():
                     if pool:
                         async with pool.acquire() as conn:
                             async with conn.cursor() as cur:
-                                # Subject needs scraping if: missing, or has no description, or is Placeholder
                                 await cur.execute(
                                     "SELECT subject_id FROM subjects WHERE subject_id = %s AND description IS NOT NULL AND description != '' AND title != 'Placeholder'",
                                     (str(sub_id),)
@@ -1145,15 +1145,15 @@ async def run_historical_scraper():
                         print(f"[Scraper] Historical crawl: Found '{safe_title}' (ID: {sub_id}). Scraping details...")
                         await scrape_subject_details(sub_id)
                         new_items_count += 1
-                        await asyncio.sleep(2.0)
+                        await asyncio.sleep(1.0) # Faster
                 
-                print(f"[Scraper] Page {current_page} done. Crawled {new_items_count} new/incomplete items.")
+                print(f"[Scraper] Page {current_page} done. Crawled {new_items_count} new items.")
                 retry_count = 0
                 current_page += 1
                 progress[sub_type_str] = current_page
                 await db_save_scraper_progress(sub_type, current_page)
                 
-                await asyncio.sleep(5.0)
+                await asyncio.sleep(2.0) # Faster delay between pages
                 
             except Exception as e:
                 err_msg = str(e).lower()
