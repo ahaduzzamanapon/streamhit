@@ -584,6 +584,69 @@ async def cache_item_metadata_only(item: dict):
 # ==========================================================================
 # 3. PROXY & H5 API CLIENT (MULTI-PROXY ROTATION)
 # ==========================================================================
+
+SINGAPORE_IP_RANGES = [
+    ((1, 21, 224, 0), (1, 21, 255, 255)),
+    ((1, 32, 128, 0), (1, 32, 191, 255)),
+    ((101, 100, 160, 0), (101, 100, 255, 255)),
+    ((101, 127, 0, 0), (101, 127, 255, 255)),
+    ((101, 32, 104, 0), (101, 32, 175, 255)),
+    ((103, 1, 136, 0), (103, 1, 139, 255)),
+    ((103, 10, 100, 0), (103, 10, 103, 255)),
+    ((103, 11, 188, 0), (103, 11, 191, 255)),
+    ((103, 14, 212, 0), (103, 14, 215, 255)),
+    ((103, 15, 100, 0), (103, 15, 103, 255)),
+]
+
+def ip_to_long(ip):
+    return (ip[0] << 24) | (ip[1] << 16) | (ip[2] << 8) | ip[3]
+
+def long_to_ip(long):
+    return f"{(long >> 24) & 255}.{(long >> 16) & 255}.{(long >> 8) & 255}.{long & 255}"
+
+def get_random_singapore_ip():
+    start_ip, end_ip = random.choice(SINGAPORE_IP_RANGES)
+    start_long = ip_to_long(start_ip)
+    end_long = ip_to_long(end_ip)
+    random_long = random.randint(start_long, end_long)
+    return long_to_ip(random_long)
+
+# In-Memory Cache for API responses
+api_cache = {}  # key -> (expiry_timestamp, response_data)
+API_CACHE_TTL = 600.0  # 10 minutes cache TTL
+
+def get_cached_response(key: str) -> dict:
+    now = time.time()
+    if key in api_cache:
+        expiry, data = api_cache[key]
+        if now < expiry:
+            return data
+        else:
+            del api_cache[key]
+    return None
+
+def set_cached_response(key: str, data: any, ttl: float = API_CACHE_TTL):
+    api_cache[key] = (time.time() + ttl, data)
+
+# Persistent Direct Connection Failure Tracker
+LAST_FAIL_FILE = os.path.join(base_dir, ".last_direct_fail_time")
+
+def get_last_direct_fail_time() -> float:
+    try:
+        if os.path.exists(LAST_FAIL_FILE):
+            with open(LAST_FAIL_FILE, "r") as f:
+                return float(f.read().strip())
+    except Exception:
+        pass
+    return 0.0
+
+def set_last_direct_fail_time(t: float):
+    try:
+        with open(LAST_FAIL_FILE, "w") as f:
+            f.write(str(t))
+    except Exception:
+        pass
+
 class ProxyManager:
     def __init__(self):
         self.workers = WORKER_PROXIES
@@ -2685,7 +2748,7 @@ async def proxy_subtitle(url: str):
 @app.get("/api/read-log")
 async def read_log(file: str = "stderr.log"):
     # Security: only allow reading specific log files
-    allowed_files = ["stderr.log", "scraper.log", "passenger_error.log"]
+    allowed_files = ["stderr.log", "scraper.log", "passenger_error.log", "main.py"]
     if file not in allowed_files:
         return {"status": "error", "message": "Access denied to this file"}
         
