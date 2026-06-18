@@ -548,12 +548,6 @@ BLOCKED_GENRES = {
     "reality", "wrestling", "yoruba", "gameplay", "volleyball"
 }
 
-# Title keywords that indicate content to block from scraping
-BLOCKED_TITLE_KEYWORDS = [
-    "[cam]", "(cam)", "[cam rip]", "camrip",
-    "[ts]", "(ts)", "[telesync]",
-    "[hdts]", "[hdcam]",
-]
 
 def is_educational_content(title: str, genre: str = "") -> bool:
     if not title:
@@ -580,11 +574,6 @@ def is_educational_content(title: str, genre: str = "") -> bool:
     # Other educational / exam keywords
     edu_keywords = ["english 1st paper", "english 2nd paper", "ssc 20", "hsc 20", "jsc 20", "nctb"]
     for kw in edu_keywords:
-        if kw in title_lower:
-            return True
-
-    # Block CAM / TS / low-quality rip labels in title
-    for kw in BLOCKED_TITLE_KEYWORDS:
         if kw in title_lower:
             return True
 
