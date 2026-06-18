@@ -773,14 +773,10 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
     # Rotation Strategy: Direct -> Worker -> External Proxy
     attempts = ["direct", "worker", "proxy"]
     if skip_direct: attempts.remove("direct")
-    
-    # Cloudflare Workers only reliably support GET with query-string header injection.
-    # Skip workers for POST requests (filter/search) to avoid unnecessary 403/404 errors.
-    if method.upper() != "GET" and "worker" in attempts:
-        attempts.remove("worker")
-        
+
     print(f"[API Network] Rotation attempts for {path}: {attempts}")
 
+    last_status_code = None
     for mode in attempts:
         try:
             async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
@@ -793,10 +789,11 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
                     worker = proxy_manager.get_next_worker()
                     worker_headers = {**headers}
                     if method.upper() == "GET":
-                        # Pass headers via query string so the worker injects them (X-Forwarded-For)
+                        # Pass headers via query string so the worker injects them
                         proxied_url = f"{worker}/mp4-proxy?url={urllib.parse.quote(url)}&headers={urllib.parse.quote(json.dumps(worker_headers))}"
                         resp = await client.get(proxied_url)
                     else:
+                        # Workers support POST too
                         proxied_url = f"{worker}/mp4-proxy?url={urllib.parse.quote(url)}"
                         resp = await client.post(proxied_url, json=body_dict, headers=worker_headers)
                 else:
@@ -807,6 +804,7 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
                     else:
                         resp = await client.post(proxied_url, json=body_dict, headers=headers)
 
+                last_status_code = resp.status_code
                 if resp.status_code == 200:
                     data = resp.json()
                     if data.get("code") == 0 or "data" in data:
@@ -820,7 +818,9 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
             print(f"[API Warning] Request via {mode} failed for {path}: {e}")
             if mode == "direct": set_last_direct_fail_time(time.time())
 
-    raise Exception(f"Failed to request {path} after all proxy attempts")
+    # Include last HTTP status in exception so callers can detect 400 (out-of-bounds), 403 etc.
+    status_hint = f" [HTTP {last_status_code}]" if last_status_code else ""
+    raise Exception(f"Failed to request {path} after all proxy attempts{status_hint}")
 
 
 # Extract CDN expiration
@@ -1164,12 +1164,12 @@ async def run_historical_scraper():
                 
             except Exception as e:
                 err_msg = str(e).lower()
-                # Only mark as completed if it's a real "Out of bounds" error (often 400 on this API)
-                # but NOT if it's a "token" or "auth" or "sign" related error.
+                # Mark as completed if HTTP 400 (out of bounds on this API).
+                # HTTP 400 propagates either as "http status 400" or "[http 400]" in error message.
                 is_out_of_bounds = ("400" in err_msg) and not any(x in err_msg for x in ["token", "auth", "sign", "cookie"])
                 
                 if is_out_of_bounds:
-                    print(f"[Scraper] Page {current_page} returned 400 (Out of bounds). Marking type {sub_type} as completed.")
+                    print(f"[Scraper] Page {current_page} returned 400 (Out of bounds or API limit). Marking type {sub_type} as completed.")
                     progress[sub_type_str] = 999
                     await db_save_scraper_progress(sub_type, 999)
                     break
