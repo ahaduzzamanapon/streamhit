@@ -28,7 +28,9 @@ touch passenger_wsgi.py
 
 # 4. Start the background scraper using the specific virtualenv path
 echo "[4/4] Starting scraper in background..."
-nohup env RUN_SCRAPER=true /home/lcsyxfen/virtualenv/streamhit.lc-synergy.ltd/3.10/bin/python main.py > /dev/null 2>&1 &
+nohup env RUN_SCRAPER=true /home/lcsyxfen/virtualenv/streamhit.lc-synergy.ltd/3.10/bin/python main.py >> scraper.log 2>&1 &
+
+echo "Scraper logs are being written to scraper.log"
 
 echo "============================================="
 echo "   Update complete! Website has reloaded.     "

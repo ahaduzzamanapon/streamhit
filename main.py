@@ -1156,16 +1156,20 @@ async def run_historical_scraper():
                 await asyncio.sleep(5.0)
                 
             except Exception as e:
-                err_msg = str(e)
-                if "HTTP status 400" in err_msg or "API error code 400" in err_msg:
-                    print(f"[Scraper] Page {current_page} is out of bounds. Marking type {sub_type} as completed.")
+                err_msg = str(e).lower()
+                # Only mark as completed if it's a real "Out of bounds" error (often 400 on this API)
+                # but NOT if it's a "token" or "auth" or "sign" related error.
+                is_out_of_bounds = ("400" in err_msg) and not any(x in err_msg for x in ["token", "auth", "sign", "cookie"])
+                
+                if is_out_of_bounds:
+                    print(f"[Scraper] Page {current_page} returned 400 (Out of bounds). Marking type {sub_type} as completed.")
                     progress[sub_type_str] = 999
                     await db_save_scraper_progress(sub_type, 999)
                     break
                 
                 retry_count += 1
                 if retry_count >= 3:
-                    print(f"[Scraper] Too many failures ({retry_count}) on page {current_page} for type {sub_type}. Skipping page.")
+                    print(f"[Scraper] Too many failures ({retry_count}) on page {current_page} for type {sub_type}. Skipping page. Error: {e}")
                     retry_count = 0
                     current_page += 1
                     progress[sub_type_str] = current_page
@@ -2751,14 +2755,20 @@ async def proxy_subtitle(url: str):
     )
 
 @app.get("/api/read-log")
-async def read_log():
-    log_path = os.path.join(base_dir, "stderr.log")
+async def read_log(file: str = "stderr.log"):
+    # Security: only allow reading specific log files
+    allowed_files = ["stderr.log", "scraper.log", "passenger_error.log"]
+    if file not in allowed_files:
+        return {"status": "error", "message": "Access denied to this file"}
+        
+    log_path = os.path.join(base_dir, file)
     if not os.path.exists(log_path):
         return {"status": "error", "message": f"Log file not found at {log_path}"}
     try:
+        # Read last 200 lines to be safe
         with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
             lines = f.readlines()
-            return {"status": "success", "log": "".join(lines[-150:])}
+            return {"status": "success", "file": file, "log": "".join(lines[-200:])}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
