@@ -773,6 +773,7 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
     # Rotation Strategy: Direct -> Worker -> External Proxy
     attempts = ["direct", "worker", "proxy"]
     if skip_direct: attempts.remove("direct")
+    print(f"[API Network] Rotation attempts for {path}: {attempts}")
 
     for mode in attempts:
         try:
