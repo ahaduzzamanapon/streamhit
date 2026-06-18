@@ -1128,8 +1128,14 @@ async def run_historical_scraper():
                 new_items_count = 0
                 for item in items:
                     sub_id = item.get("subjectId")
+                    item_type = item.get("subjectType")
+                    
                     if not sub_id: continue
-                    # Re-enable filtering to skip junk and avoid 403 rate limits
+                    
+                    # Core Filter: Only process Movies (1) and TV Series (2). Everything else (like 8 for user uploads/games) is junk.
+                    if item_type not in [1, 2]:
+                        continue
+                        
                     if is_educational_content(item.get("title", "")): continue
                     
                     pool = await get_db_pool()

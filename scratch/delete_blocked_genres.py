@@ -19,7 +19,7 @@ def run_query(query, label=""):
         return None
 
 # Also delete Gameplay and Volleyball
-extra = ["Gameplay", "Volleyball"]
+extra = ["Gameplay", "Volleyball","Mobile Game","PC Game"]
 for genre in extra:
     q = f"DELETE FROM subjects WHERE genre LIKE '%{genre}%'"
     run_query(q, f"DELETE {genre}")
