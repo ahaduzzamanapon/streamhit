@@ -884,8 +884,8 @@ async def scrape_subject_details(subject_id: str) -> dict:
             genres_str = ",".join(genres) if isinstance(genres, list) else str(genres)
             
             # Disable educational/genre filtering to get "all data"
-            # if is_educational_content(detail.get("title", ""), genres_str):
-            #     return {}
+            if is_educational_content(detail.get("title", ""), genres_str):
+                return {}
                 
             cover_val = detail.get("cover")
             cover_url = cover_val.get("url") if isinstance(cover_val, dict) else str(cover_val)
