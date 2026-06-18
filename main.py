@@ -1129,8 +1129,8 @@ async def run_historical_scraper():
                 for item in items:
                     sub_id = item.get("subjectId")
                     if not sub_id: continue
-                    # Disable strict educational/genre filtering for historical scraper to get "all data"
-                    # if is_educational_content(item.get("title", "")): continue
+                    # Re-enable filtering to skip junk and avoid 403 rate limits
+                    if is_educational_content(item.get("title", "")): continue
                     
                     pool = await get_db_pool()
                     needs_full_scrape = True
