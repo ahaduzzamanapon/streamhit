@@ -954,7 +954,8 @@ async def scrape_subject_details(subject_id: str) -> dict:
             safe_title = subject_data['title'].encode('ascii', 'replace').decode('ascii')
             print(f"[Scraper] Successfully saved ({attempt['name']}): {safe_title}")
 
-            # Seasons/Episodes
+            # Seasons/Episodes — only save season metadata + scrape S1E1.
+            # Other episodes are fetched on-demand via /api/resource when the user watches them.
             if subject_data["subject_type"] == 2:
                 resource_obj = data.get("data", {}).get("resource", {})
                 seasons = resource_obj.get("seasons", [])
@@ -963,10 +964,8 @@ async def scrape_subject_details(subject_id: str) -> dict:
                     max_ep = int(se.get("maxEp", 0))
                     episodes_list = ",".join(str(i) for i in range(1, max_ep + 1))
                     await db_save_season(subject_id, se_num, max_ep, episodes_list)
-                    if se_num == 1 and max_ep > 0:
-                        for ep_num in range(1, max_ep + 1):
-                            await scrape_episode_resources(subject_id, se_num, ep_num)
-                            await asyncio.sleep(0.5)
+                # Only pre-fetch S1E1 — avoids hundreds of API calls for long-running shows
+                await scrape_episode_resources(subject_id, 1, 1)
             else:
                 await scrape_episode_resources(subject_id, 0, 0)
 
