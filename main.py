@@ -619,6 +619,9 @@ class ProxyManager:
 
 proxy_manager = ProxyManager()
 
+global_cookies = ""
+cookies_expiry = 0.0
+
 # ... (refresh_cookies_if_needed update) ...
 async def refresh_cookies_if_needed() -> str:
     global global_cookies, cookies_expiry
@@ -817,9 +820,9 @@ async def scrape_subject_details(subject_id: str) -> dict:
             genres = detail.get("genre", [])
             genres_str = ",".join(genres) if isinstance(genres, list) else str(genres)
             
-            if is_educational_content(detail.get("title", ""), genres_str):
-                # This is a legitimate skip, not a failure
-                return {}
+            # Disable educational/genre filtering to get "all data"
+            # if is_educational_content(detail.get("title", ""), genres_str):
+            #     return {}
                 
             cover_val = detail.get("cover")
             cover_url = cover_val.get("url") if isinstance(cover_val, dict) else str(cover_val)
@@ -844,7 +847,7 @@ async def scrape_subject_details(subject_id: str) -> dict:
             
             await db_save_subject(subject_data)
             safe_title = subject_data['title'].encode('ascii', 'replace').decode('ascii')
-            print(f"[Scraper] Successfully saved: {safe_title}")
+            print(f"[Scraper] Successfully saved ({attempt['name']}): {safe_title}")
 
             # Seasons/Episodes
             if subject_data["subject_type"] == 2:
