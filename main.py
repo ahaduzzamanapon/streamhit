@@ -21,6 +21,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
 # Load env variables from .env using absolute path
@@ -101,7 +102,32 @@ def get_http_client() -> httpx.AsyncClient:
         loop_clients[current_loop] = httpx.AsyncClient(trust_env=False, timeout=120.0)
     return loop_clients[current_loop]
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ---- startup ----
+    get_http_client()
+    await init_db()  # wait for DB to be ready before starting scrapers
+    if os.getenv("RUN_SCRAPER", "false").lower() == "true":
+        asyncio.create_task(scraper_loop())
+        asyncio.create_task(historical_scraper_loop())
+        asyncio.create_task(missing_resources_loop())
+    yield
+    # ---- shutdown ----
+    global db_pool
+    for lp, client in list(loop_clients.items()):
+        try:
+            await client.aclose()
+        except Exception:
+            pass
+    loop_clients.clear()
+    if db_pool:
+        try:
+            db_pool.close()
+            await db_pool.wait_closed()
+        except Exception:
+            pass
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -1252,33 +1278,7 @@ async def missing_resources_loop():
         # Run every 5 minutes
         await asyncio.sleep(300)
 
-# Start scraper on application startup
-@app.on_event("startup")
-async def startup_event():
-    get_http_client()
-    asyncio.create_task(init_db())
-    if os.getenv("RUN_SCRAPER", "false").lower() == "true":
-        asyncio.create_task(scraper_loop())
-        asyncio.create_task(historical_scraper_loop())
-        asyncio.create_task(missing_resources_loop())
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    global db_pool
-    # Close all active loop clients
-    for lp, client in list(loop_clients.items()):
-        try:
-            await client.aclose()
-        except Exception:
-            pass
-    loop_clients.clear()
-
-    if db_pool:
-        try:
-            db_pool.close()
-            await db_pool.wait_closed()
-        except Exception:
-            pass
+# Startup/shutdown is handled by the lifespan context manager above (app = FastAPI(lifespan=lifespan))
 
 # ==========================================================================
 # 4.5 TMDB TO MOVIEBOX RESOLVER SYSTEM
