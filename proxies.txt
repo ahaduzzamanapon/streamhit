@@ -1,0 +1,10 @@
+# Add your proxies here, one per line (IP:Port or Domain:Port)
+# Example:
+# 1.2.3.4:8080
+# myproxy.com:3128
+
+194.127.178.223
+103.14.215.160
+103.10.100.20
+103.11.188.50
+101.100.160.10

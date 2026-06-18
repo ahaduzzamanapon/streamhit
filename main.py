@@ -582,78 +582,44 @@ async def cache_item_metadata_only(item: dict):
         print(f"[Metadata Cache Error] {e}")
 
 # ==========================================================================
-# 3. ONEROOM COOKIE-BASED H5 API CLIENT (SIGNATURE-FREE)
+# 3. PROXY & H5 API CLIENT (MULTI-PROXY ROTATION)
 # ==========================================================================
-SINGAPORE_IP_RANGES = [
-    ((1, 21, 224, 0), (1, 21, 255, 255)),
-    ((1, 32, 128, 0), (1, 32, 191, 255)),
-    ((101, 100, 160, 0), (101, 100, 255, 255)),
-    ((101, 127, 0, 0), (101, 127, 255, 255)),
-    ((101, 32, 104, 0), (101, 32, 175, 255)),
-    ((103, 1, 136, 0), (103, 1, 139, 255)),
-    ((103, 10, 100, 0), (103, 10, 103, 255)),
-    ((103, 11, 188, 0), (103, 11, 191, 255)),
-    ((103, 14, 212, 0), (103, 14, 215, 255)),
-    ((103, 15, 100, 0), (103, 15, 103, 255)),
-]
+class ProxyManager:
+    def __init__(self):
+        self.workers = WORKER_PROXIES
+        self.worker_index = 0
+        self.external_proxies = []
+        self.proxy_index = 0
+        self.load_external_proxies()
 
-def ip_to_long(ip):
-    return (ip[0] << 24) | (ip[1] << 16) | (ip[2] << 8) | ip[3]
-
-def long_to_ip(long):
-    return f"{(long >> 24) & 255}.{(long >> 16) & 255}.{(long >> 8) & 255}.{long & 255}"
-
-def get_random_singapore_ip():
-    start_ip, end_ip = random.choice(SINGAPORE_IP_RANGES)
-    start_long = ip_to_long(start_ip)
-    end_long = ip_to_long(end_ip)
-    random_long = random.randint(start_long, end_long)
-    return long_to_ip(random_long)
-
-# In-Memory Cache for API responses
-api_cache = {}  # key -> (expiry_timestamp, response_data)
-API_CACHE_TTL = 600.0  # 10 minutes cache TTL
-
-def get_cached_response(key: str) -> dict:
-    now = time.time()
-    if key in api_cache:
-        expiry, data = api_cache[key]
-        if now < expiry:
-            print(f"[Cache Hit] Key: {key}")
-            return data
+    def load_external_proxies(self):
+        proxy_file = os.path.join(base_dir, "proxies.txt")
+        if os.path.exists(proxy_file):
+            try:
+                with open(proxy_file, "r") as f:
+                    self.external_proxies = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+                print(f"[ProxyManager] Loaded {len(self.external_proxies)} external proxies from proxies.txt")
+            except Exception as e:
+                print(f"[ProxyManager] Error loading proxies.txt: {e}")
         else:
-            print(f"[Cache Expired] Key: {key}")
-            del api_cache[key]
-    else:
-        print(f"[Cache Miss] Key: {key}")
-    return None
+            # Default fallback list if file doesn't exist yet
+            self.external_proxies = ["194.127.178.223"]
 
-def set_cached_response(key: str, data: any, ttl: float = API_CACHE_TTL):
-    print(f"[Cache Set] Key: {key}, TTL: {ttl}")
-    api_cache[key] = (time.time() + ttl, data)
+    def get_next_worker(self):
+        worker = self.workers[self.worker_index % len(self.workers)]
+        self.worker_index += 1
+        return worker
 
-# Persistent Direct Connection Failure Tracker
-LAST_FAIL_FILE = os.path.join(base_dir, ".last_direct_fail_time")
+    def get_next_proxy(self):
+        if not self.external_proxies:
+            return "194.127.178.223"
+        proxy = self.external_proxies[self.proxy_index % len(self.external_proxies)]
+        self.proxy_index += 1
+        return proxy
 
-def get_last_direct_fail_time() -> float:
-    try:
-        if os.path.exists(LAST_FAIL_FILE):
-            with open(LAST_FAIL_FILE, "r") as f:
-                return float(f.read().strip())
-    except Exception:
-        pass
-    return 0.0
+proxy_manager = ProxyManager()
 
-def set_last_direct_fail_time(t: float):
-    try:
-        with open(LAST_FAIL_FILE, "w") as f:
-            f.write(str(t))
-    except Exception:
-        pass
-
-global_cookies = ""
-cookies_expiry = 0.0
-
+# ... (refresh_cookies_if_needed update) ...
 async def refresh_cookies_if_needed() -> str:
     global global_cookies, cookies_expiry
     now = time.time()
@@ -676,11 +642,24 @@ async def refresh_cookies_if_needed() -> str:
     skip_direct = (now - last_direct_fail_time < 3600.0)
     cookie_url = "https://h5.aoneroom.com/wefeed-h5-bff/app/get-latest-app-pkgs?app_name=moviebox"
 
-    # Stage 1: Try direct first
-    if not skip_direct:
+    # Try Direct -> Workers -> Random Proxy
+    attempts = ["direct", "worker", "proxy"]
+    if skip_direct: attempts.remove("direct")
+
+    for mode in attempts:
         try:
-            async with httpx.AsyncClient(trust_env=False, timeout=2.5) as client:
-                resp = await client.get(cookie_url, headers=headers)
+            async with httpx.AsyncClient(trust_env=False, timeout=6.0) as client:
+                if mode == "direct":
+                    resp = await client.get(cookie_url, headers=headers)
+                elif mode == "worker":
+                    worker = proxy_manager.get_next_worker()
+                    proxied_url = f"{worker}/mp4-proxy?url={urllib.parse.quote(cookie_url)}"
+                    resp = await client.get(proxied_url, headers=headers)
+                else:
+                    proxy_ip = proxy_manager.get_next_proxy()
+                    proxied_url = f"http://{proxy_ip}/?url={urllib.parse.quote(cookie_url)}"
+                    resp = await client.get(proxied_url, headers=headers)
+
                 if resp.status_code == 200:
                     cookie_headers = resp.headers.get_list("Set-Cookie")
                     parsed_cookies = []
@@ -688,34 +667,18 @@ async def refresh_cookies_if_needed() -> str:
                         part = cookie.split(";")[0]
                         parsed_cookies.append(part)
                     global_cookies = "; ".join(parsed_cookies)
-                    cookies_expiry = now + 3600.0  # 60 mins cache
-                    print(f"[API Auth] Refreshed H5 cookies successfully.")
+                    cookies_expiry = now + 3600.0
+                    print(f"[API Auth] Refreshed H5 cookies successfully via {mode}.")
                     return global_cookies
         except Exception as e:
-            print(f"[API Auth] Direct cookie refresh failed: {e}. Marking direct API as failed, trying via Singapore proxy...")
-            set_last_direct_fail_time(time.time())
+            if mode == "direct":
+                print(f"[API Auth] Direct cookie refresh failed. Marking direct API as failed.")
+                set_last_direct_fail_time(time.time())
+            else:
+                print(f"[API Auth] Cookie refresh failed via {mode}: {e}")
 
-    # Stage 2: Fallback to Singapore proxy
-    try:
-        async with httpx.AsyncClient(trust_env=False, timeout=6.0) as client:
-            proxied_url = f"http://194.127.178.223/?url={urllib.parse.quote(cookie_url)}"
-            resp = await client.get(proxied_url, headers=headers)
-            if resp.status_code == 200:
-                cookie_headers = resp.headers.get_list("Set-Cookie")
-                parsed_cookies = []
-                for cookie in cookie_headers:
-                    part = cookie.split(";")[0]
-                    parsed_cookies.append(part)
-                global_cookies = "; ".join(parsed_cookies)
-                cookies_expiry = now + 3600.0
-                print(f"[API Auth] Refreshed H5 cookies via Singapore proxy successfully.")
-                return global_cookies
-    except Exception as e:
-        print(f"[API Auth] Proxied cookie refresh failed: {e}")
-    
-    if global_cookies:
-        return global_cookies
-    raise Exception("Failed to acquire OneRoom H5 cookies")
+    if global_cookies: return global_cookies
+    raise Exception("Failed to acquire OneRoom H5 cookies after multiple attempts")
 
 async def request_h5_api(method: str, path: str, body_dict: dict = None, host: str = "https://h5-api.aoneroom.com", origin: str = None, referer: str = None) -> dict:
     cookies = await refresh_cookies_if_needed()
@@ -732,113 +695,57 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
         "Referer": referer or "https://h5.aoneroom.com",
         "Cookie": cookies
     }
-    if origin:
-        headers["Origin"] = origin
+    if origin: headers["Origin"] = origin
 
     url = f"{host}{path}"
     now = time.time()
     last_direct_fail_time = get_last_direct_fail_time()
     skip_direct = (now - last_direct_fail_time < 3600.0)
 
-    # If GET request, run Direct -> CF Worker -> Singapore Proxy fallback loop
-    if method.upper() == "GET":
-        # Stage 1: Try Direct
-        if not skip_direct:
-            try:
-                async with httpx.AsyncClient(trust_env=False, timeout=2.5) as client:
-                    resp = await client.get(url, headers=headers)
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        if data.get("code") == 0 or "data" in data:
-                            return data
-                        else:
-                            raise Exception(data.get("message", f"API error code {data.get('code')}"))
-                    else:
-                        raise Exception(f"HTTP status {resp.status_code}")
-            except Exception as e:
-                print(f"[API Warning] Direct GET request failed for {path}: {e}. Trying via Cloudflare Worker...")
-                set_last_direct_fail_time(time.time())
-        
-        # Stage 2: Try Cloudflare Worker Proxy (GET only)
-        try:
-            worker = get_next_worker()
-            worker_headers = {
-                "Cookie": cookies,
-                "Referer": headers["Referer"],
-                "X-Forwarded-For": ip,
-                "X-Real-IP": ip,
-                "User-Agent": headers["User-Agent"],
-                "Accept": headers["Accept"]
-            }
-            if origin:
-                worker_headers["Origin"] = origin
-                
-            proxied_url = f"{worker}/mp4-proxy?url={urllib.parse.quote(url)}&headers={urllib.parse.quote(json.dumps(worker_headers))}"
-            async with httpx.AsyncClient(trust_env=False, timeout=5.0) as client:
-                resp = await client.get(proxied_url)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    if data.get("code") == 0 or "data" in data:
-                        return data
-                    else:
-                        raise Exception(data.get("message", f"API error code {data.get('code')}"))
-                else:
-                    raise Exception(f"HTTP status {resp.status_code}")
-        except Exception as e:
-            print(f"[API Warning] Worker GET request failed for {path}: {e}. Trying via Singapore proxy...")
+    # Rotation Strategy: Direct -> Worker -> External Proxy
+    attempts = ["direct", "worker", "proxy"]
+    if skip_direct: attempts.remove("direct")
 
-        # Stage 3: Try Singapore Proxy
+    for mode in attempts:
         try:
-            proxied_url = f"http://194.127.178.223/?url={urllib.parse.quote(url)}"
-            async with httpx.AsyncClient(trust_env=False, timeout=8.0) as client:
-                resp = await client.get(proxied_url, headers=headers)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    if data.get("code") == 0 or "data" in data:
-                        return data
-                    else:
-                        raise Exception(data.get("message", f"API error code {data.get('code')}"))
-                else:
-                    raise Exception(f"HTTP status {resp.status_code}")
-        except Exception as e:
-            print(f"[API Error] Proxied GET request failed for {path}: {e}")
-            raise e
-
-    # If POST request, run Direct -> Singapore Proxy fallback loop
-    else:
-        # Stage 1: Try Direct
-        if not skip_direct:
-            try:
-                async with httpx.AsyncClient(trust_env=False, timeout=3.0) as client:
-                    resp = await client.post(url, json=body_dict, headers=headers)
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        if data.get("code") == 0 or "data" in data:
-                            return data
-                        else:
-                            raise Exception(data.get("message", f"API error code {data.get('code')}"))
-                    else:
-                        raise Exception(f"HTTP status {resp.status_code}")
-            except Exception as e:
-                print(f"[API Warning] Direct POST request failed for {path}: {e}. Trying via Singapore proxy...")
-                set_last_direct_fail_time(time.time())
-
-        # Stage 2: Try Singapore Proxy
-        try:
-            proxied_url = f"http://194.127.178.223/?url={urllib.parse.quote(url)}"
             async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
-                resp = await client.post(proxied_url, json=body_dict, headers=headers)
+                if mode == "direct":
+                    if method.upper() == "GET":
+                        resp = await client.get(url, headers=headers)
+                    else:
+                        resp = await client.post(url, json=body_dict, headers=headers)
+                elif mode == "worker":
+                    worker = proxy_manager.get_next_worker()
+                    worker_headers = {**headers}
+                    proxied_url = f"{worker}/mp4-proxy?url={urllib.parse.quote(url)}"
+                    if method.upper() == "GET":
+                        resp = await client.get(proxied_url, headers=worker_headers)
+                    else:
+                        # Some workers don't support POST well via query params, so we try anyway
+                        resp = await client.post(proxied_url, json=body_dict, headers=worker_headers)
+                else:
+                    proxy_ip = proxy_manager.get_next_proxy()
+                    proxied_url = f"http://{proxy_ip}/?url={urllib.parse.quote(url)}"
+                    if method.upper() == "GET":
+                        resp = await client.get(proxied_url, headers=headers)
+                    else:
+                        resp = await client.post(proxied_url, json=body_dict, headers=headers)
+
                 if resp.status_code == 200:
                     data = resp.json()
                     if data.get("code") == 0 or "data" in data:
                         return data
                     else:
-                        raise Exception(data.get("message", f"API error code {data.get('code')}"))
+                        raise Exception(f"API Error {data.get('code')}: {data.get('message')}")
                 else:
-                    raise Exception(f"HTTP status {resp.status_code}")
+                    raise Exception(f"HTTP Status {resp.status_code}")
+
         except Exception as e:
-            print(f"[API Error] Proxied POST request failed for {path}: {e}")
-            raise e
+            print(f"[API Warning] Request via {mode} failed for {path}: {e}")
+            if mode == "direct": set_last_direct_fail_time(time.time())
+
+    raise Exception(f"Failed to request {path} after all proxy attempts")
+
 
 # Extract CDN expiration
 def get_link_expiration(url: str) -> datetime:
@@ -1141,7 +1048,8 @@ async def run_historical_scraper():
                 for item in items:
                     sub_id = item.get("subjectId")
                     if not sub_id: continue
-                    if is_educational_content(item.get("title", "")): continue
+                    # Disable strict educational/genre filtering for historical scraper to get "all data"
+                    # if is_educational_content(item.get("title", "")): continue
                     
                     pool = await get_db_pool()
                     needs_full_scrape = True
@@ -1158,13 +1066,13 @@ async def run_historical_scraper():
                             
                     if needs_full_scrape:
                         safe_title = item.get('title', '').encode('ascii', 'replace').decode('ascii')
-                        print(f"[Scraper] Historical crawl: Found '{safe_title}' (ID: {sub_id}). Scraping details...")
+                        print(f"[Scraper] Page {current_page} | Found '{safe_title}' (ID: {sub_id}). Scraping details...")
                         res = await scrape_subject_details(sub_id)
                         if res:
                             new_items_count += 1
-                        await asyncio.sleep(1.0)
+                        await asyncio.sleep(0.5) # Fast
                 
-                print(f"[Scraper] Page {current_page} done. Successfully saved {new_items_count} real movies/shows.")
+                print(f"[Scraper] Page {current_page} done. Successfully saved {new_items_count} items.")
                 retry_count = 0
                 current_page += 1
                 progress[sub_type_str] = current_page
