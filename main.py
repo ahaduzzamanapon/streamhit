@@ -548,6 +548,13 @@ BLOCKED_GENRES = {
     "reality", "wrestling", "yoruba", "gameplay", "volleyball"
 }
 
+# Title keywords that indicate content to block from scraping
+BLOCKED_TITLE_KEYWORDS = [
+    "[cam]", "(cam)", "[cam rip]", "camrip",
+    "[ts]", "(ts)", "[telesync]",
+    "[hdts]", "[hdcam]",
+]
+
 def is_educational_content(title: str, genre: str = "") -> bool:
     if not title:
         return False
@@ -573,6 +580,11 @@ def is_educational_content(title: str, genre: str = "") -> bool:
     # Other educational / exam keywords
     edu_keywords = ["english 1st paper", "english 2nd paper", "ssc 20", "hsc 20", "jsc 20", "nctb"]
     for kw in edu_keywords:
+        if kw in title_lower:
+            return True
+
+    # Block CAM / TS / low-quality rip labels in title
+    for kw in BLOCKED_TITLE_KEYWORDS:
         if kw in title_lower:
             return True
 
@@ -799,6 +811,11 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
     # Rotation Strategy: Direct -> Worker -> External Proxy
     attempts = ["direct", "worker", "proxy"]
     if skip_direct: attempts.remove("direct")
+
+    # Workers (Cloudflare) return 403 for POST requests (filter/search endpoints).
+    # Only use workers for GET requests.
+    if method.upper() != "GET" and "worker" in attempts:
+        attempts.remove("worker")
 
     print(f"[API Network] Rotation attempts for {path}: {attempts}")
 
