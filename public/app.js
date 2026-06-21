@@ -810,6 +810,7 @@ function handleResumePlayback(player) {
     const applySeek = () => {
         const duration = player.duration;
         if (duration && (savedTime / duration) < 0.95) {
+            console.log("[Player Resume] Seeking to:", savedTime);
             player.currentTime = savedTime;
             
             // Show toast prompt
@@ -847,17 +848,19 @@ function handleResumePlayback(player) {
         }
     };
     
-    if (player.duration) {
+    if (player.playing) {
         applySeek();
     } else {
-        player.once('durationchange', applySeek);
-        player.once('loadedmetadata', applySeek);
+        player.once('playing', applySeek);
     }
 }
 
 function triggerAutoplay(player) {
     if (!player) return;
     
+    // Register resume playback listener BEFORE play is triggered
+    handleResumePlayback(player);
+
     // Ensure volume is set to 1.0 (full) initially
     player.volume = 1.0;
     player.muted = false;
@@ -865,14 +868,12 @@ function triggerAutoplay(player) {
     // Attempt unmuted play first
     player.play().then(() => {
         console.log("[Autoplay] Played successfully unmuted");
-        handleResumePlayback(player);
     }).catch(e => {
         console.log("[Autoplay] Unmuted playback prevented, attempting muted play", e);
         player.muted = true;
         player.volume = 0;
         player.play().then(() => {
             console.log("[Autoplay] Played successfully muted");
-            handleResumePlayback(player);
         }).catch(err => {
             console.log("[Autoplay] Muted playback also prevented", err);
             const loaderEl = document.getElementById("playerLoaderOverlay");
