@@ -1950,8 +1950,8 @@ button, input, select {
     display: flex;
     align-items: center;
     gap: 20px;
-    /* Must appear above player-loader-overlay (z-index 5) but below Plyr's menus (~9999) */
-    z-index: 6;
+    /* Must appear above player-loader-overlay (z-index 5) and Plyr's click wrappers, but below Plyr's menus (~9999) */
+    z-index: 50;
     border-radius: 0 !important;
     opacity: 0;
     pointer-events: none;
@@ -1964,11 +1964,13 @@ button, input, select {
     pointer-events: auto;
 }
 
-/* Show header overlay when player is hovered or controls are shown */
+/* Show header overlay when player is hovered, controls are shown, player is paused, or loader overlay is visible */
 .player-wrapper:hover .player-header-overlay,
 .player-wrapper:focus-within .player-header-overlay,
-.plyr--hover .player-header-overlay,
-.plyr--paused .player-header-overlay {
+.plyr--hover ~ .player-header-overlay,
+.plyr--paused ~ .player-header-overlay,
+.plyr:not(.plyr--hide-controls) ~ .player-header-overlay,
+.player-loader-overlay.visible ~ .player-header-overlay {
     opacity: 1;
     pointer-events: auto;
 }
