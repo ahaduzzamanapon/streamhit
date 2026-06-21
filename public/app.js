@@ -1497,6 +1497,7 @@ async function initWatchPage() {
     });
 
     playerInstance.on('seeking', showLoader);
+    playerInstance.on('seeked', hideLoader);
     playerInstance.on('playing', hideLoader);
     playerInstance.on('play', hideLoader);
     playerInstance.on('play', () => { 
