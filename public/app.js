@@ -736,7 +736,7 @@ function createContentCard(item) {
     card.onclick = () => window.location.href = `/details?id=${item.subjectId}&path=${encodeURIComponent(item.detailPath || '')}`;
 
     const title = item.title;
-    const coverUrl = item.cover ? (item.cover.url || item.cover) : "https://via.placeholder.com/180x250?text=No+Cover";
+    const coverUrl = item.cover ? (item.cover.url || item.cover) : "/default-cover.png";
     const rating = item.imdbRatingValue || '7.5';
     const releaseDate = item.releaseDate || '2026';
     const releaseYear = releaseDate.split('-')[0];
@@ -753,7 +753,7 @@ function createContentCard(item) {
 
     card.innerHTML = `
         <div class="card-poster">
-            <img src="${coverUrl}" alt="${title}" loading="lazy">
+            <img src="${coverUrl}" alt="${title}" onerror="this.onerror=null; this.src='/default-cover.png';" loading="lazy">
             <div class="card-badges">
                 ${langBadge}
                 ${camBadge}
@@ -1114,7 +1114,7 @@ async function initDetailsPage() {
         const watchDescription = document.getElementById("watchDescription");
 
         if (detailsTitle) detailsTitle.textContent = detail.title;
-        if (detailsPoster) detailsPoster.src = detail.cover ? (detail.cover.url || detail.cover) : "https://via.placeholder.com/180x250?text=No+Cover";
+        if (detailsPoster) detailsPoster.src = detail.cover ? (detail.cover.url || detail.cover) : "/default-cover.png";
         if (detailsHeroBackdrop) {
             const backdropUrl = detail.cover ? (detail.cover.url || detail.cover) : "";
             detailsHeroBackdrop.style.backgroundImage = `url('${backdropUrl}')`;
@@ -1546,7 +1546,8 @@ async function initWatchPage() {
             history = JSON.parse(localStorage.getItem("streamfit_history")) || [];
         } catch (e) {}
         
-        history = history.filter(item => !(item.subjectId === subjectId && item.season === season && item.episode === episode));
+        // Remove any previous entry for this show/subject to avoid duplicates
+        history = history.filter(item => item.subjectId !== subjectId);
         
         const progressPercent = Math.round((currentTime / duration) * 100);
         if (currentTime > 5 && progressPercent < 95) {
@@ -2425,11 +2426,11 @@ function renderContinueWatchingSection() {
             window.location.href = url;
         };
         
-        const coverUrl = item.cover || "https://via.placeholder.com/180x120?text=No+Cover";
+        const coverUrl = item.cover || "/default-cover.png";
         
         card.innerHTML = `
             <div class="continue-poster-wrapper">
-                <img src="${coverUrl}" alt="${item.title}" loading="lazy">
+                <img src="${coverUrl}" alt="${item.title}" onerror="this.onerror=null; this.src='/default-cover.png';" loading="lazy">
                 <div class="continue-play-overlay">
                     <i class="fa-solid fa-play"></i>
                 </div>

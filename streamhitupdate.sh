@@ -14,10 +14,10 @@ echo "[1/4] Pulling latest code from origin main..."
 git fetch origin
 git reset --hard origin/main
 
-# 2. Stop running python processes
-echo "[2/4] Killing active Python and WSGI processes..."
-pkill -9 -u $(whoami) -f python 2>/dev/null
-pkill -9 -u $(whoami) -f lswsgi 2>/dev/null
+# # 2. Stop running python processes
+# echo "[2/4] Killing active Python and WSGI processes..."
+# pkill -9 -u $(whoami) -f python 2>/dev/null
+# pkill -9 -u $(whoami) -f lswsgi 2>/dev/null
 
 # 3. Clear stderr logs and touch passenger_wsgi.py to restart the passenger WSGI server
 echo "[3/4] Resetting error logs & triggering Passenger reload..."
