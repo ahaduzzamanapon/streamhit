@@ -148,6 +148,32 @@
                 <!-- Premium Video Player -->
                 <video id="player" playsinline controls autoplay></video>
 
+                <!-- Next Episode Overlay -->
+                <div class="next-episode-overlay" id="nextEpisodeOverlay">
+                  <div class="next-overlay-content">
+                    <div class="next-title-label">Up Next</div>
+                    <div class="next-episode-title" id="nextEpisodeTitle">Loading next episode...</div>
+                    <div class="next-countdown-container">
+                      <svg class="next-countdown-circle" viewBox="0 0 80 80">
+                        <circle class="bg-circle" cx="40" cy="40" r="36"></circle>
+                        <circle class="progress-circle" id="nextCountdownCircleProgress" cx="40" cy="40" r="36"></circle>
+                      </svg>
+                      <div class="next-countdown-text" id="nextCountdownText">10</div>
+                    </div>
+                    <div class="next-btn-group">
+                      <button class="next-btn-play" id="nextEpisodePlayBtn">Play Now</button>
+                      <button class="next-btn-cancel" id="nextEpisodeCancelBtn">Cancel</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Resume Watching Toast -->
+                <div class="resume-toast" id="resumeToast">
+                  <span id="resumeToastText">Resumed from 00:00</span>
+                  <button class="resume-toast-btn" id="resumeToastStartOverBtn">Start Over</button>
+                  <button class="resume-toast-btn secondary" id="resumeToastDismissBtn">Dismiss</button>
+                </div>
+
                 <!-- Seek Gesture Feedback Overlays -->
                 <div
                   class="seek-feedback seek-feedback-left"

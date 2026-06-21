@@ -207,6 +207,7 @@ if (isInitialHome) {
 // HOME PAGE LOGIC
 // ==========================================================================
 async function initHomePage() {
+    renderContinueWatchingSection();
     // Check if query string contains keyword (forwarded search)
     const urlParams = new URLSearchParams(window.location.search);
     const keyword = urlParams.get("keyword");
@@ -795,6 +796,65 @@ function showShimmers(show) {
 // ==========================================================================
 // WATCH / DEDICATED PLAYER PAGE LOGIC
 // ==========================================================================
+function handleResumePlayback(player) {
+    if (!player || !state.selectedSubject) return;
+    const subjectId = state.selectedSubject.subjectId;
+    const isTv = state.selectedSubject.seNum > 0 || state.selectedSubject.subjectType === 2;
+    const season = isTv ? state.selectedSeason : 0;
+    const episode = isTv ? state.selectedEpisode : 0;
+    const progressKey = `streamfit_progress_${subjectId}_${season}_${episode}`;
+    
+    const savedTime = parseFloat(localStorage.getItem(progressKey) || "0");
+    if (savedTime <= 10) return;
+    
+    const applySeek = () => {
+        const duration = player.duration;
+        if (duration && (savedTime / duration) < 0.95) {
+            player.currentTime = savedTime;
+            
+            // Show toast prompt
+            const resumeToast = document.getElementById("resumeToast");
+            const toastText = document.getElementById("resumeToastText");
+            if (resumeToast) {
+                const mins = Math.floor(savedTime / 60);
+                const secs = Math.floor(savedTime % 60).toString().padStart(2, '0');
+                if (toastText) toastText.textContent = `Resumed from ${mins}:${secs}`;
+                resumeToast.classList.add("visible");
+                
+                const startOverBtn = document.getElementById("resumeToastStartOverBtn");
+                if (startOverBtn) {
+                     startOverBtn.onclick = (e) => {
+                         e.stopPropagation();
+                         player.currentTime = 0;
+                         localStorage.removeItem(progressKey);
+                         resumeToast.classList.remove("visible");
+                     };
+                }
+                
+                const dismissBtn = document.getElementById("resumeToastDismissBtn");
+                if (dismissBtn) {
+                     dismissBtn.onclick = (e) => {
+                         e.stopPropagation();
+                         resumeToast.classList.remove("visible");
+                     };
+                }
+                
+                // Auto dismiss after 6 seconds
+                setTimeout(() => {
+                    resumeToast.classList.remove("visible");
+                }, 6000);
+            }
+        }
+    };
+    
+    if (player.duration) {
+        applySeek();
+    } else {
+        player.once('durationchange', applySeek);
+        player.once('loadedmetadata', applySeek);
+    }
+}
+
 function triggerAutoplay(player) {
     if (!player) return;
     
@@ -805,12 +865,14 @@ function triggerAutoplay(player) {
     // Attempt unmuted play first
     player.play().then(() => {
         console.log("[Autoplay] Played successfully unmuted");
+        handleResumePlayback(player);
     }).catch(e => {
         console.log("[Autoplay] Unmuted playback prevented, attempting muted play", e);
         player.muted = true;
         player.volume = 0;
         player.play().then(() => {
             console.log("[Autoplay] Played successfully muted");
+            handleResumePlayback(player);
         }).catch(err => {
             console.log("[Autoplay] Muted playback also prevented", err);
             const loaderEl = document.getElementById("playerLoaderOverlay");
@@ -1425,8 +1487,10 @@ async function initWatchPage() {
             const selectedQ = event.detail.quality;
             if (selectedQ === 0) {
                 userSelectedQuality = false;
+                localStorage.removeItem("streamfit_preferred_quality");
             } else {
                 userSelectedQuality = true;
+                localStorage.setItem("streamfit_preferred_quality", selectedQ);
             }
         }
     });
@@ -1462,6 +1526,168 @@ async function initWatchPage() {
             window.screen.orientation.unlock();
         }
     });
+
+    // Playback progress event listeners
+    let progressSaveTimeout = null;
+    
+    const saveProgress = () => {
+        const video = playerInstance ? playerInstance.media : null;
+        if (!video || !state.selectedSubject) return;
+        const currentTime = video.currentTime;
+        const duration = video.duration;
+        if (!duration || duration <= 0) return;
+        
+        const subjectId = state.selectedSubject.subjectId;
+        const isTv = state.selectedSubject.seNum > 0 || state.selectedSubject.subjectType === 2;
+        const season = isTv ? state.selectedSeason : 0;
+        const episode = isTv ? state.selectedEpisode : 0;
+        const progressKey = `streamfit_progress_${subjectId}_${season}_${episode}`;
+        
+        localStorage.setItem(progressKey, currentTime);
+        
+        // Update global Continue Watching history
+        let history = [];
+        try {
+            history = JSON.parse(localStorage.getItem("streamfit_history")) || [];
+        } catch (e) {}
+        
+        history = history.filter(item => !(item.subjectId === subjectId && item.season === season && item.episode === episode));
+        
+        const progressPercent = Math.round((currentTime / duration) * 100);
+        if (currentTime > 5 && progressPercent < 95) {
+            const newItem = {
+                subjectId: subjectId,
+                title: state.selectedSubject.title,
+                cover: state.selectedSubject.cover ? (state.selectedSubject.cover.url || state.selectedSubject.cover) : "",
+                season: season,
+                episode: episode,
+                currentTime: currentTime,
+                duration: duration,
+                progressPercent: progressPercent,
+                detailPath: new URLSearchParams(window.location.search).get("path") || "",
+                lastWatched: Date.now()
+            };
+            history.unshift(newItem);
+            if (history.length > 12) history = history.slice(0, 12);
+            localStorage.setItem("streamfit_history", JSON.stringify(history));
+        } else if (progressPercent >= 95) {
+            localStorage.setItem("streamfit_history", JSON.stringify(history));
+            localStorage.removeItem(progressKey);
+        }
+    };
+
+    playerInstance.on('timeupdate', () => {
+        if (!progressSaveTimeout) {
+            progressSaveTimeout = setTimeout(() => {
+                saveProgress();
+                progressSaveTimeout = null;
+            }, 5000);
+        }
+    });
+
+    playerInstance.on('pause', saveProgress);
+
+    window.addEventListener('beforeunload', saveProgress);
+
+    // Auto-Play next episode event listener
+    playerInstance.on('ended', () => {
+        saveProgress();
+        const isTv = state.selectedSubject && (state.selectedSubject.seNum > 0 || state.selectedSubject.subjectType === 2);
+        if (isTv) {
+            const nextEp = state.selectedEpisode + 1;
+            const episodeButtons = document.querySelectorAll("#watchEpisodeGrid .episode-btn");
+            let nextBtn = null;
+            episodeButtons.forEach(btn => {
+                if (parseInt(btn.textContent.trim()) === nextEp) {
+                    nextBtn = btn;
+                }
+            });
+            
+            if (nextBtn) {
+                showNextEpisodeCountdown(nextBtn);
+            } else {
+                const seasonTabs = document.querySelectorAll("#watchSeasonTabs .season-tab");
+                let nextSeasonBtn = null;
+                seasonTabs.forEach((tab, index) => {
+                    if (tab.classList.contains("active") && index < seasonTabs.length - 1) {
+                        nextSeasonBtn = seasonTabs[index + 1];
+                    }
+                });
+                if (nextSeasonBtn) {
+                    showNextEpisodeCountdown(null, nextSeasonBtn);
+                }
+            }
+        }
+    });
+
+    // Helper functions for countdown overlay
+    let nextEpisodeTimer = null;
+    const showNextEpisodeCountdown = (nextBtn, nextSeasonBtn = null) => {
+        const overlay = document.getElementById("nextEpisodeOverlay");
+        const titleEl = document.getElementById("nextEpisodeTitle");
+        const textEl = document.getElementById("nextCountdownText");
+        const circleProgress = document.getElementById("nextCountdownCircleProgress");
+        const playBtn = document.getElementById("nextEpisodePlayBtn");
+        const cancelBtn = document.getElementById("nextEpisodeCancelBtn");
+        
+        if (!overlay || !titleEl) return;
+        if (nextEpisodeTimer) clearInterval(nextEpisodeTimer);
+        
+        let nextTitle = "";
+        if (nextBtn) {
+            nextTitle = `Season ${state.selectedSeason} - Episode ${state.selectedEpisode + 1}`;
+        } else if (nextSeasonBtn) {
+            nextTitle = `Season ${state.selectedSeason + 1} - Episode 01`;
+        }
+        
+        titleEl.textContent = nextTitle;
+        overlay.classList.add("visible");
+        
+        if (circleProgress) {
+            circleProgress.style.transition = "none";
+            circleProgress.style.strokeDashoffset = "0";
+            circleProgress.getBoundingClientRect();
+            circleProgress.style.transition = "stroke-dashoffset 10s linear";
+            circleProgress.style.strokeDashoffset = "226";
+        }
+        
+        let secondsLeft = 10;
+        if (textEl) textEl.textContent = secondsLeft;
+        
+        const triggerNextPlay = () => {
+            overlay.classList.remove("visible");
+            if (nextEpisodeTimer) clearInterval(nextEpisodeTimer);
+            if (nextBtn) {
+                nextBtn.click();
+            } else if (nextSeasonBtn) {
+                nextSeasonBtn.click();
+                setTimeout(() => {
+                    const firstEpBtn = document.querySelector("#watchEpisodeGrid .episode-btn");
+                    if (firstEpBtn) firstEpBtn.click();
+                }, 600);
+            }
+        };
+        
+        nextEpisodeTimer = setInterval(() => {
+            secondsLeft--;
+            if (textEl) textEl.textContent = secondsLeft;
+            if (secondsLeft <= 0) {
+                triggerNextPlay();
+            }
+        }, 1000);
+        
+        if (playBtn) {
+            playBtn.onclick = () => {
+                triggerNextPlay();
+            };
+        }
+        if (cancelBtn) {
+            cancelBtn.onclick = () => {
+                overlay.classList.remove("visible");
+                if (nextEpisodeTimer) clearInterval(nextEpisodeTimer);
+            };
+        }
+    };
 
     const loading = document.getElementById("watchPageLoading");
     const content = document.getElementById("watchWrapper");
@@ -1902,6 +2128,15 @@ async function playResources() {
         // for the Plyr-level 'canplay' event (which still fires on the instance)
         // rather than calling play() immediately after setting source.
         playerInstance.once('canplay', () => {
+            const preferredQ = parseInt(localStorage.getItem("streamfit_preferred_quality") || "0");
+            if (preferredQ > 0) {
+                const availableQs = state.availableResources.map(r => r.resolution || 720);
+                if (availableQs.includes(preferredQ)) {
+                    isProgrammaticQualityChange = true;
+                    playerInstance.quality = preferredQ;
+                    setTimeout(() => { isProgrammaticQualityChange = false; }, 1000);
+                }
+            }
             triggerAutoplay(playerInstance);
         });
 
@@ -2120,6 +2355,83 @@ function bindCommonEvents() {
         nextBtn.onclick = () => {
             state.currentPage++;
             loadSearchResults();
+        };
+    }
+}
+
+function renderContinueWatchingSection() {
+    const section = document.getElementById("continueWatchingSection");
+    const grid = document.getElementById("continueWatchingGrid");
+    const clearBtn = document.getElementById("clearContinueWatchingBtn");
+    if (!section || !grid) return;
+    
+    let history = [];
+    try {
+        history = JSON.parse(localStorage.getItem("streamfit_history")) || [];
+    } catch(e) {}
+    
+    if (history.length === 0) {
+        section.style.display = "none";
+        return;
+    }
+    
+    section.style.display = "block";
+    grid.innerHTML = "";
+    
+    history.forEach(item => {
+        const card = document.createElement("div");
+        card.className = "continue-card";
+        
+        let subTitle = "";
+        if (item.season > 0) {
+            subTitle = `S${item.season}E${item.episode}`;
+        } else {
+            subTitle = "Movie";
+        }
+        
+        card.onclick = () => {
+            let url = `/watch?id=${item.subjectId}&path=${encodeURIComponent(item.detailPath)}`;
+            if (item.season > 0) {
+                url += `&season=${item.season}&episode=${item.episode}`;
+            }
+            window.location.href = url;
+        };
+        
+        const coverUrl = item.cover || "https://via.placeholder.com/180x120?text=No+Cover";
+        
+        card.innerHTML = `
+            <div class="continue-poster-wrapper">
+                <img src="${coverUrl}" alt="${item.title}" loading="lazy">
+                <div class="continue-play-overlay">
+                    <i class="fa-solid fa-play"></i>
+                </div>
+                <div class="continue-progress-container">
+                    <div class="continue-progress-bar" style="width: ${item.progressPercent}%"></div>
+                </div>
+            </div>
+            <div class="continue-info">
+                <div class="continue-title" title="${item.title}">${item.title}</div>
+                <div class="continue-sub-title">${subTitle} (${item.progressPercent}% watched)</div>
+            </div>
+        `;
+        grid.appendChild(card);
+    });
+    
+    if (clearBtn) {
+        clearBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (confirm("Clear your Continue Watching history?")) {
+                localStorage.removeItem("streamfit_history");
+                // Clear all progress keys
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith("streamfit_progress_")) {
+                        localStorage.removeItem(key);
+                        i--;
+                    }
+                }
+                renderContinueWatchingSection();
+            }
         };
     }
 }
