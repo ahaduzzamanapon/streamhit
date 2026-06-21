@@ -22,6 +22,8 @@ const state = {
     selectedEpisode: 1,
     playingSeason: null,
     playingEpisode: null,
+    pendingResumeTime: null,
+    nextEpisodeTimer: null,
     availableResources: [],
     availableCaptions: [],
     directMp4Url: "",
@@ -798,71 +800,9 @@ function showShimmers(show) {
 // ==========================================================================
 // WATCH / DEDICATED PLAYER PAGE LOGIC
 // ==========================================================================
-function handleResumePlayback(player) {
-    if (!player || !state.selectedSubject) return;
-    const subjectId = state.selectedSubject.subjectId;
-    const isTv = state.selectedSubject.seNum > 0 || state.selectedSubject.subjectType === 2;
-    const season = isTv ? state.selectedSeason : 0;
-    const episode = isTv ? state.selectedEpisode : 0;
-    const progressKey = `streamfit_progress_${subjectId}_${season}_${episode}`;
-    
-    const savedTime = parseFloat(localStorage.getItem(progressKey) || "0");
-    if (savedTime <= 10) return;
-    
-    const applySeek = () => {
-        const duration = player.duration;
-        if (duration && (savedTime / duration) < 0.95) {
-            console.log("[Player Resume] Seeking to:", savedTime);
-            player.currentTime = savedTime;
-            
-            // Show toast prompt
-            const resumeToast = document.getElementById("resumeToast");
-            const toastText = document.getElementById("resumeToastText");
-            if (resumeToast) {
-                const mins = Math.floor(savedTime / 60);
-                const secs = Math.floor(savedTime % 60).toString().padStart(2, '0');
-                if (toastText) toastText.textContent = `Resumed from ${mins}:${secs}`;
-                resumeToast.classList.add("visible");
-                
-                const startOverBtn = document.getElementById("resumeToastStartOverBtn");
-                if (startOverBtn) {
-                     startOverBtn.onclick = (e) => {
-                         e.stopPropagation();
-                         player.currentTime = 0;
-                         localStorage.removeItem(progressKey);
-                         resumeToast.classList.remove("visible");
-                     };
-                }
-                
-                const dismissBtn = document.getElementById("resumeToastDismissBtn");
-                if (dismissBtn) {
-                     dismissBtn.onclick = (e) => {
-                         e.stopPropagation();
-                         resumeToast.classList.remove("visible");
-                     };
-                }
-                
-                // Auto dismiss after 6 seconds
-                setTimeout(() => {
-                    resumeToast.classList.remove("visible");
-                }, 6000);
-            }
-        }
-    };
-    
-    if (player.playing) {
-        applySeek();
-    } else {
-        player.once('playing', applySeek);
-    }
-}
-
 function triggerAutoplay(player) {
     if (!player) return;
     
-    // Register resume playback listener BEFORE play is triggered
-    handleResumePlayback(player);
-
     // Ensure volume is set to 1.0 (full) initially
     player.volume = 1.0;
     player.muted = false;
@@ -1501,6 +1441,57 @@ async function initWatchPage() {
     playerInstance.on('seeking', showLoader);
     playerInstance.on('seeked', hideLoader);
     playerInstance.on('playing', hideLoader);
+    playerInstance.on('playing', () => {
+        if (state.pendingResumeTime !== null) {
+            const seekTime = state.pendingResumeTime;
+            state.pendingResumeTime = null; // Clear immediately
+            
+            const duration = playerInstance.duration;
+            if (duration && (seekTime / duration) < 0.95) {
+                console.log("[Player Resume] Seeking to pending resume time:", seekTime);
+                playerInstance.currentTime = seekTime;
+                
+                // Show toast prompt
+                const resumeToast = document.getElementById("resumeToast");
+                const toastText = document.getElementById("resumeToastText");
+                if (resumeToast) {
+                    const mins = Math.floor(seekTime / 60);
+                    const secs = Math.floor(seekTime % 60).toString().padStart(2, '0');
+                    if (toastText) toastText.textContent = `Resumed from ${mins}:${secs}`;
+                    resumeToast.classList.add("visible");
+                    
+                    const startOverBtn = document.getElementById("resumeToastStartOverBtn");
+                    if (startOverBtn) {
+                         startOverBtn.onclick = (e) => {
+                             e.stopPropagation();
+                             playerInstance.currentTime = 0;
+                             
+                             const subId = state.selectedSubject.subjectId;
+                             const isTv = state.selectedSubject.seNum > 0 || state.selectedSubject.subjectType === 2;
+                             const season = isTv ? state.selectedSeason : 0;
+                             const episode = isTv ? state.selectedEpisode : 0;
+                             const progressKey = `streamfit_progress_${subId}_${season}_${episode}`;
+                             localStorage.removeItem(progressKey);
+                             
+                             resumeToast.classList.remove("visible");
+                         };
+                    }
+                    
+                    const dismissBtn = document.getElementById("resumeToastDismissBtn");
+                    if (dismissBtn) {
+                         dismissBtn.onclick = (e) => {
+                             e.stopPropagation();
+                             resumeToast.classList.remove("visible");
+                         };
+                    }
+                    
+                    setTimeout(() => {
+                        resumeToast.classList.remove("visible");
+                    }, 6000);
+                }
+            }
+        }
+    });
     playerInstance.on('play', hideLoader);
     playerInstance.on('play', () => { 
         state.userInteracted = true; 
@@ -1625,7 +1616,6 @@ async function initWatchPage() {
     });
 
     // Helper functions for countdown overlay
-    let nextEpisodeTimer = null;
     const showNextEpisodeCountdown = (nextBtn, nextSeasonBtn = null) => {
         const overlay = document.getElementById("nextEpisodeOverlay");
         const titleEl = document.getElementById("nextEpisodeTitle");
@@ -1635,7 +1625,7 @@ async function initWatchPage() {
         const cancelBtn = document.getElementById("nextEpisodeCancelBtn");
         
         if (!overlay || !titleEl) return;
-        if (nextEpisodeTimer) clearInterval(nextEpisodeTimer);
+        if (state.nextEpisodeTimer) clearInterval(state.nextEpisodeTimer);
         
         let nextTitle = "";
         if (nextBtn) {
@@ -1660,7 +1650,8 @@ async function initWatchPage() {
         
         const triggerNextPlay = () => {
             overlay.classList.remove("visible");
-            if (nextEpisodeTimer) clearInterval(nextEpisodeTimer);
+            if (state.nextEpisodeTimer) clearInterval(state.nextEpisodeTimer);
+            state.nextEpisodeTimer = null;
             if (nextBtn) {
                 nextBtn.click();
             } else if (nextSeasonBtn) {
@@ -1672,7 +1663,7 @@ async function initWatchPage() {
             }
         };
         
-        nextEpisodeTimer = setInterval(() => {
+        state.nextEpisodeTimer = setInterval(() => {
             secondsLeft--;
             if (textEl) textEl.textContent = secondsLeft;
             if (secondsLeft <= 0) {
@@ -1688,7 +1679,8 @@ async function initWatchPage() {
         if (cancelBtn) {
             cancelBtn.onclick = () => {
                 overlay.classList.remove("visible");
-                if (nextEpisodeTimer) clearInterval(nextEpisodeTimer);
+                if (state.nextEpisodeTimer) clearInterval(state.nextEpisodeTimer);
+                state.nextEpisodeTimer = null;
             };
         }
     };
@@ -1979,8 +1971,36 @@ async function loadPlayResources(subjectId, season = null, episode = null) {
     isSwitchingQuality = false;
     isProgrammaticQualityChange = false;
 
+    // Clear any active next episode countdown timer and hide overlay
+    if (state.nextEpisodeTimer) {
+        clearInterval(state.nextEpisodeTimer);
+        state.nextEpisodeTimer = null;
+    }
+    const nextEpisodeOverlay = document.getElementById("nextEpisodeOverlay");
+    if (nextEpisodeOverlay) {
+        nextEpisodeOverlay.classList.remove("visible");
+    }
+
+    // Hide resume toast immediately on loading new episode/movie
+    const resumeToast = document.getElementById("resumeToast");
+    if (resumeToast) {
+        resumeToast.classList.remove("visible");
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const detailPath = urlParams.get("path") || "";
+
+    // Check for saved playback progress for this resource
+    const isTv = state.selectedSubject && (state.selectedSubject.seNum > 0 || state.selectedSubject.subjectType === 2);
+    const se = isTv ? (season || 1) : 0;
+    const ep = isTv ? (episode || 1) : 0;
+    const progressKey = `streamfit_progress_${subjectId}_${se}_${ep}`;
+    const savedTime = parseFloat(localStorage.getItem(progressKey) || "0");
+    if (savedTime > 10) {
+        state.pendingResumeTime = savedTime;
+    } else {
+        state.pendingResumeTime = null;
+    }
 
     let url = `/api/resource?subjectId=${subjectId}`;
     if (detailPath) {
