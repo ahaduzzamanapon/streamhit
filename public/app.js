@@ -20,6 +20,8 @@ const state = {
     selectedSubject: null,
     selectedSeason: 1,
     selectedEpisode: 1,
+    playingSeason: null,
+    playingEpisode: null,
     availableResources: [],
     availableCaptions: [],
     directMp4Url: "",
@@ -1935,7 +1937,7 @@ function renderEpisodes(season) {
             }
 
             btn.onclick = async () => {
-                if (Number(epNum) === state.selectedEpisode) return; // already playing
+                if (state.playingSeason === state.selectedSeason && Number(epNum) === state.playingEpisode) return; // already playing
 
                 state.selectedEpisode = Number(epNum);
 
@@ -1985,6 +1987,8 @@ async function loadPlayResources(subjectId, season = null, episode = null) {
         url += `&detailPath=${encodeURIComponent(detailPath)}`;
     }
     if (season !== null && episode !== null) {
+        state.playingSeason = season;
+        state.playingEpisode = episode;
         url += `&se=${season}&ep=${episode}`;
         // Update player overlay title
         const titleEl = document.getElementById("playerMediaTitle");
@@ -1992,6 +1996,8 @@ async function loadPlayResources(subjectId, season = null, episode = null) {
             titleEl.textContent = `${state.selectedSubject.title} - S${season}E${String(episode).padStart(2, '0')}`;
         }
     } else {
+        state.playingSeason = 0;
+        state.playingEpisode = 0;
         const titleEl = document.getElementById("playerMediaTitle");
         if (titleEl && state.selectedSubject) {
             titleEl.textContent = state.selectedSubject.title;
