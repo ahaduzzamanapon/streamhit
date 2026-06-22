@@ -2731,6 +2731,29 @@ button, input, select {
         color: var(--color-accent);
         font-weight: 600;
     }
+    .mobile-navigation-bar .nav-item.download-app-btn {
+        background: none !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        color: var(--text-secondary);
+        font-weight: 500;
+        font-size: 10px;
+        gap: 3px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+    .mobile-navigation-bar .nav-item.download-app-btn i {
+        font-size: 18px;
+    }
+    .mobile-navigation-bar .nav-item.download-app-btn:hover {
+        background: none !important;
+        transform: none !important;
+        box-shadow: none !important;
+        color: var(--color-accent) !important;
+    }
     
     /* Header layout for mobile - Grid template areas */
     .header {
