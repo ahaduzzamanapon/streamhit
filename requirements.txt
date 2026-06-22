@@ -6,3 +6,4 @@ pymysql
 a2wsgi
 python-dotenv
 asgiref
+python-multipart

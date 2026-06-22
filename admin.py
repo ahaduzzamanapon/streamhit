@@ -2,6 +2,7 @@ import os
 import time
 import secrets
 import hashlib
+import hmac
 import aiomysql
 from fastapi import APIRouter, Request, HTTPException, Response, UploadFile, File
 from fastapi.responses import RedirectResponse, JSONResponse
@@ -17,9 +18,31 @@ DB_PORT = int(os.getenv("DB_PORT", "3306"))
 DB_USER = os.getenv("DB_USER", "root")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_NAME = os.getenv("DB_NAME", "moviebox")
+DEPLOY_SECRET = os.getenv("DEPLOY_SECRET", "streamhit_secret_update_2026")
 
 router = APIRouter()
-ADMIN_SESSIONS = {}
+
+def generate_signed_token(username: str) -> str:
+    expires = int(time.time()) + 86400  # 1 day
+    payload = f"{username}:{expires}"
+    sig = hmac.new(DEPLOY_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    return f"{payload}.{sig}"
+
+def verify_signed_token(token: str) -> str:
+    if not token or "." not in token:
+        return None
+    try:
+        payload, sig = token.rsplit(".", 1)
+        expected_sig = hmac.new(DEPLOY_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected_sig):
+            return None
+        username, expires_str = payload.split(":", 1)
+        expires = int(expires_str)
+        if time.time() > expires:
+            return None
+        return username
+    except Exception:
+        return None
 
 def check_admin_auth(request: Request):
     token = request.headers.get("Authorization")
@@ -28,15 +51,11 @@ def check_admin_auth(request: Request):
     else:
         token = request.cookies.get("admin_token")
         
-    if not token or token not in ADMIN_SESSIONS:
+    username = verify_signed_token(token)
+    if not username:
         raise HTTPException(status_code=401, detail="Unauthorized")
         
-    session = ADMIN_SESSIONS[token]
-    if time.time() > session["expires"]:
-        ADMIN_SESSIONS.pop(token, None)
-        raise HTTPException(status_code=401, detail="Session expired")
-        
-    return session
+    return {"username": username}
 
 @router.post("/api/admin/login")
 async def admin_login(data: dict, response: Response):
@@ -67,20 +86,13 @@ async def admin_login(data: dict, response: Response):
         raise HTTPException(status_code=401, detail="Invalid username or password")
         
     # Generate token
-    token = secrets.token_hex(32)
-    ADMIN_SESSIONS[token] = {
-        "username": username,
-        "expires": time.time() + 86400
-    }
+    token = generate_signed_token(username)
     
     response.set_cookie(key="admin_token", value=token, max_age=86400, httponly=True)
     return {"code": 0, "token": token, "message": "Login successful"}
 
 @router.post("/api/admin/logout")
 async def admin_logout(request: Request, response: Response):
-    token = request.cookies.get("admin_token")
-    if token:
-        ADMIN_SESSIONS.pop(token, None)
     response.delete_cookie("admin_token")
     return {"code": 0, "message": "Logged out successfully"}
 
