@@ -170,6 +170,22 @@ async def get_db_pool():
 async def init_db():
     global db_pool, db_migrated
     try:
+        # Connect to MySQL first without specifying the DB to verify/create it
+        try:
+            temp_conn = await aiomysql.connect(
+                host=DB_HOST,
+                port=DB_PORT,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                autocommit=True
+            )
+            async with temp_conn.cursor() as temp_cur:
+                await temp_cur.execute(f"CREATE DATABASE IF NOT EXISTS {DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+            temp_conn.close()
+            print(f"[Database] Verified or created database: {DB_NAME}")
+        except Exception as db_create_err:
+            print(f"[Database] Pre-init database check/creation failed: {db_create_err}")
+
         db_pool = await aiomysql.create_pool(
             host=DB_HOST,
             port=DB_PORT,
@@ -369,6 +385,50 @@ async def init_db():
                 except Exception as cleanup_err:
                     print(f"[Database Cleanup] Error deleting educational/blocked subjects: {cleanup_err}")
 
+                # 8. Admins table
+                await cur.execute("""
+                    CREATE TABLE IF NOT EXISTS admins (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        username VARCHAR(50) UNIQUE NOT NULL,
+                        password_hash VARCHAR(255) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                
+                # Seed default admin if table is empty
+                await cur.execute("SELECT COUNT(*) FROM admins")
+                admin_count = (await cur.fetchone())[0]
+                if admin_count == 0:
+                    default_user = "admin"
+                    default_pass = "admin123"
+                    h = hashlib.sha256((default_pass + "streamfit_secure_salt_2026").encode('utf-8')).hexdigest()
+                    await cur.execute("INSERT INTO admins (username, password_hash) VALUES (%s, %s)", (default_user, h))
+                    print("[Database] Seeded default admin account: admin / admin123")
+
+                # 9. App Versions table
+                await cur.execute("""
+                    CREATE TABLE IF NOT EXISTS app_versions (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        version_code INT UNIQUE NOT NULL,
+                        version_name VARCHAR(50) NOT NULL,
+                        apk_url VARCHAR(255) NOT NULL,
+                        must_update BOOLEAN DEFAULT FALSE,
+                        release_notes TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+
+                # 10. Notifications table
+                await cur.execute("""
+                    CREATE TABLE IF NOT EXISTS notifications (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        title VARCHAR(255) NOT NULL,
+                        message TEXT NOT NULL,
+                        subject_id VARCHAR(50) DEFAULT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+
                 db_migrated = True
                 print("[Database] MySQL Tables check/creation complete.")
     except Exception as e:
@@ -395,7 +455,13 @@ async def db_get_banners():
     if not pool: return []
     async with pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cur:
-            # Query latest created/updated subjects from local DB with cover images first
+            # Query custom banners explicitly added by admin first
+            await cur.execute("SELECT * FROM banners ORDER BY created_at DESC LIMIT 20")
+            rows = await cur.fetchall()
+            if rows:
+                return rows
+            
+            # Fallback to latest created/updated subjects if banners table is empty
             await cur.execute("""
                 SELECT subject_id, title, cover as image_url, detail_path, subject_type 
                 FROM subjects 
@@ -403,12 +469,6 @@ async def db_get_banners():
                 ORDER BY updated_at DESC, created_at DESC 
                 LIMIT 10
             """)
-            rows = await cur.fetchall()
-            if rows and len(rows) >= 3:
-                return rows
-            
-            # Fallback to banners table if database is empty/fresh
-            await cur.execute("SELECT * FROM banners ORDER BY created_at DESC LIMIT 20")
             return await cur.fetchall()
 
 async def db_save_subject(s: dict):
@@ -3502,7 +3562,12 @@ async def serve_watch_page(request: Request, id: str = None, tmdb: str = None, t
     <meta property="twitter:image" content="{meta['cover']}">
     """
     html_content = html_content.replace("</head>", f"{og_tags}\n</head>")
+    html_content = html_content.replace("</head>", f"{og_tags}\n</head>")
     return HTMLResponse(content=html_content)
+
+
+from admin import router as admin_router
+app.include_router(admin_router)
 
 # Mount general static assets
 app.mount("/", StaticFiles(directory=os.path.join(base_dir, "public")), name="public")

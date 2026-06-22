@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Streamfit - Admin Panel</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #090A0F;
+            --surface-color: #141620;
+            --card-color: #1A1D2E;
+            --accent-color: #FF2A54;
+            --accent-glow: rgba(255, 42, 84, 0.4);
+            --secondary-accent: #00F0FF;
+            --text-color: #FFFFFF;
+            --text-muted: #8E95A5;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --gradient: linear-gradient(135deg, #FF2A54 0%, #FF5E3A 100%);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        h1, h2, h3, .brand {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        /* Background Glows */
+        .glow-1 {
+            position: absolute;
+            top: -150px;
+            left: -150px;
+            width: 400px;
+            height: 400px;
+            border-radius: 50%;
+            background: var(--accent-color);
+            opacity: 0.15;
+            filter: blur(100px);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .glow-2 {
+            position: absolute;
+            bottom: -150px;
+            right: -150px;
+            width: 400px;
+            height: 400px;
+            border-radius: 50%;
+            background: var(--secondary-accent);
+            opacity: 0.08;
+            filter: blur(100px);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Container Layout */
+        .wrapper {
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 24px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header Navigation */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            background: rgba(20, 22, 32, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 24px;
+        }
+
+        .brand {
+            font-size: 26px;
+            font-weight: 900;
+            color: var(--text-color);
+            text-decoration: none;
+        }
+
+        .brand span {
+            color: var(--accent-color);
+            text-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        .user-nav {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logout-btn {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+            padding: 8px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .logout-btn:hover {
+            color: var(--text-color);
+            border-color: var(--text-color);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Tabs Interface */
+        .tab-buttons {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .tab-btn {
+            background: rgba(20, 22, 32, 0.5);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 12px 24px;
+            border-radius: 14px;
+            cursor: pointer;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            font-size: 15px;
+            transition: all 0.2s ease;
+        }
+
+        .tab-btn:hover {
+            background: rgba(255, 255, 255, 0.02);
+            color: var(--text-color);
+        }
+
+        .tab-btn.active {
+            background: var(--gradient);
+            color: var(--text-color);
+            border-color: transparent;
+            box-shadow: 0 4px 15px var(--accent-glow);
+        }
+
+        /* Tab Content panels */
+        .tab-panel {
+            display: none;
+            background: rgba(20, 22, 32, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 24px;
+            border: 1px solid var(--border-color);
+            padding: 32px;
+            flex-grow: 1;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        /* Grid layouts */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+        }
+
+        @media (max-width: 900px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Cards & Section headers */
+        h2 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card {
+            background: var(--card-color);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        /* Form styling */
+        .form-group {
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            font-family: 'Outfit', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input[type="text"], input[type="password"], textarea, select {
+            width: 100%;
+            background: rgba(9, 10, 15, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 14px 16px;
+            color: var(--text-color);
+            font-family: inherit;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        input[type="text"]:focus, input[type="password"]:focus, textarea:focus, select:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 5px rgba(255, 42, 84, 0.2);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            user-select: none;
+            margin-bottom: 20px;
+        }
+
+        .checkbox-group input {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent-color);
+        }
+
+        .checkbox-group label {
+            margin-bottom: 0;
+            text-transform: none;
+            font-size: 14px;
+            color: var(--text-color);
+            cursor: pointer;
+        }
+
+        /* Action Buttons */
+        .btn {
+            background: var(--gradient);
+            color: var(--text-color);
+            border: none;
+            border-radius: 12px;
+            padding: 14px 28px;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 15px rgba(255, 42, 84, 0.2);
+        }
+
+        .btn:hover {
+            opacity: 0.95;
+            box-shadow: 0 4px 20px rgba(255, 42, 84, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            box-shadow: none;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.05);
+            box-shadow: none;
+        }
+
+        .btn-danger {
+            background: #E01D40;
+            box-shadow: none;
+        }
+
+        .btn-danger:hover {
+            background: #FF2E52;
+            box-shadow: 0 4px 15px rgba(255, 0, 0, 0.2);
+        }
+
+        /* Login Screen Overlay */
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(9, 10, 15, 0.9);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .login-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .login-card {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 40px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+
+        .login-card h2 {
+            justify-content: center;
+            font-size: 26px;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+
+        .login-subtitle {
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+
+        /* Search Panel & Dropdowns */
+        .search-results {
+            background: rgba(9, 10, 15, 0.8);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            max-height: 250px;
+            overflow-y: auto;
+            position: absolute;
+            width: 100%;
+            z-index: 10;
+            display: none;
+            margin-top: 4px;
+        }
+
+        .search-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+
+        .search-item:hover {
+            background: rgba(255, 42, 84, 0.1);
+        }
+
+        .search-item img {
+            width: 32px;
+            height: 48px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+
+        .search-item-info {
+            flex-grow: 1;
+        }
+
+        .search-item-title {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .search-item-meta {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* List Items Lists */
+        .banner-list, .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .banner-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px 16px;
+        }
+
+        .banner-item img {
+            width: 48px;
+            height: 72px;
+            object-fit: cover;
+            border-radius: 6px;
+        }
+
+        .banner-item-info {
+            flex-grow: 1;
+        }
+
+        .banner-item-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .banner-item-meta {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Attached preview */
+        .attached-subject-preview {
+            display: none;
+            align-items: center;
+            gap: 16px;
+            background: rgba(255, 42, 84, 0.05);
+            border: 1px dashed var(--accent-color);
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .attached-subject-preview img {
+            width: 40px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 6px;
+        }
+
+        .remove-attach-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .remove-attach-btn:hover {
+            color: var(--accent-color);
+        }
+
+        /* Notification item history */
+        .history-item {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .history-item-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+        .history-item-title {
+            font-weight: 700;
+            font-size: 15px;
+        }
+
+        .history-item-date {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .history-item-body {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .history-item-badge {
+            display: inline-block;
+            background: rgba(0, 240, 255, 0.1);
+            color: var(--secondary-accent);
+            border: 1px solid rgba(0, 240, 255, 0.2);
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 20px;
+            margin-top: 8px;
+            font-weight: 600;
+        }
+
+        /* File Upload styling */
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 16px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .upload-area:hover {
+            border-color: var(--accent-color);
+            background: rgba(255, 42, 84, 0.02);
+        }
+
+        .upload-area input[type="file"] {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .upload-area-icon {
+            font-size: 40px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            display: none;
+            margin-top: 15px;
+            text-align: left;
+        }
+
+        .progress-bar-bg {
+            height: 8px;
+            width: 100%;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 6px;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--gradient);
+            border-radius: 10px;
+            transition: width 0.1s ease;
+        }
+
+        .progress-text {
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Toast notification styling */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: var(--card-color);
+            border: 1px solid var(--accent-color);
+            border-radius: 12px;
+            padding: 16px 24px;
+            color: var(--text-color);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 1100;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast-icon {
+            color: var(--accent-color);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="glow-1"></div>
+    <div class="glow-2"></div>
+
+    <!-- Login Dialog overlay -->
+    <div id="loginOverlay" class="login-overlay">
+        <div class="login-card">
+            <h2>Stream<span>fit</span> Admin</h2>
+            <p class="login-subtitle">Sign in to manage banners, version control & notifications</p>
+            
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label for="loginUser">Username</label>
+                    <input type="text" id="loginUser" required autocomplete="username" placeholder="e.g. admin">
+                </div>
+                <div class="form-group" style="margin-bottom: 30px;">
+                    <label for="loginPass">Password</label>
+                    <input type="password" id="loginPass" required autocomplete="current-password" placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn" style="width: 100%;">Sign In</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Admin Panel interface -->
+    <div class="wrapper">
+        <header>
+            <a href="/" class="brand">Stream<span>fit</span> Panel</a>
+            <div class="user-nav">
+                <span id="adminUsername" style="font-weight: 600; font-size: 14px;">admin</span>
+                <button onclick="handleLogout()" class="logout-btn">Log Out</button>
+            </div>
+        </header>
+
+        <div class="tab-buttons">
+            <button onclick="switchTab('banners')" id="btn-banners" class="tab-btn active">Banners Configuration</button>
+            <button onclick="switchTab('notifications')" id="btn-notifications" class="tab-btn">Push Notifications</button>
+            <button onclick="switchTab('version')" id="btn-version" class="tab-btn">Version Control & APK</button>
+        </div>
+
+        <!-- Banners Tab Panel -->
+        <div id="panel-banners" class="tab-panel active">
+            <div class="grid-2">
+                <div>
+                    <h2>Active Banners Slider</h2>
+                    <div id="activeBannersList" class="banner-list">
+                        <!-- Filled dynamically -->
+                        <div class="banner-item"><p style="color: var(--text-muted);">Loading active banners...</p></div>
+                    </div>
+                </div>
+
+                <div>
+                    <h2>Add Banner Media</h2>
+                    <div class="card" style="position: relative;">
+                        <div class="form-group">
+                            <label>Search Subjects DB</label>
+                            <input type="text" id="bannerSearchInput" oninput="handleSubjectSearch(this, 'banner')" placeholder="Type movie or TV series title to search...">
+                            <div id="bannerSearchResults" class="search-results"></div>
+                        </div>
+
+                        <!-- Manual/Preview form -->
+                        <div id="bannerFormArea" style="display: none; margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+                            <h3 style="font-size: 18px; margin-bottom: 15px;">Selected Item Details</h3>
+                            <div class="form-group">
+                                <label>Subject ID</label>
+                                <input type="text" id="bannerSubjectId" readonly>
+                            </div>
+                            <div class="form-group">
+                                <label>Title</label>
+                                <input type="text" id="bannerTitle">
+                            </div>
+                            <div class="form-group">
+                                <label>Banner Cover URL</label>
+                                <input type="text" id="bannerCoverUrl">
+                            </div>
+                            <div class="form-group">
+                                <label>Detail Path</label>
+                                <input type="text" id="bannerDetailPath">
+                            </div>
+                            <div class="form-group">
+                                <label>Subject Type</label>
+                                <select id="bannerSubjectType">
+                                    <option value="1">Movie (1)</option>
+                                    <option value="2">TV Series (2)</option>
+                                </select>
+                            </div>
+                            <button onclick="saveCustomBanner()" class="btn" style="width: 100%;">Add to Banners</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notifications Tab Panel -->
+        <div id="panel-notifications" class="tab-panel">
+            <div class="grid-2">
+                <div>
+                    <h2>Send Push Notification Alert</h2>
+                    <div class="card">
+                        <form id="notificationForm" onsubmit="handleSendNotification(event)">
+                            <div class="form-group">
+                                <label for="notiTitle">Notification Title</label>
+                                <input type="text" id="notiTitle" required placeholder="e.g. New Blockbuster Uploaded!">
+                            </div>
+                            <div class="form-group">
+                                <label for="notiMessage">Message text</label>
+                                <textarea id="notiMessage" required rows="3" placeholder="e.g. Watch Batman vs Superman in HD now on Streamfit!"></textarea>
+                            </div>
+                            
+                            <!-- Search & Attach Subject for deep link -->
+                            <div class="form-group" style="position: relative;">
+                                <label>Deep Link Media (Optional)</label>
+                                <input type="text" id="notiSearchInput" oninput="handleSubjectSearch(this, 'noti')" placeholder="Search movie/TV show to deep link...">
+                                <div id="notiSearchResults" class="search-results"></div>
+                            </div>
+
+                            <!-- Attached Preview Box -->
+                            <div id="attachedSubjectPreview" class="attached-subject-preview">
+                                <img id="attachedCover" src="" alt="cover">
+                                <div class="banner-item-info">
+                                    <div id="attachedTitle" class="banner-item-title" style="font-size: 14px;">Attached Item</div>
+                                    <div id="attachedMeta" class="banner-item-meta">Subject ID: --</div>
+                                </div>
+                                <span class="remove-attach-btn" onclick="removeAttachedSubject()">&times;</span>
+                                <input type="hidden" id="attachedSubjectId" value="">
+                            </div>
+
+                            <button type="submit" class="btn" style="width: 100%;">Broadcast Notification</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div>
+                    <h2>Notification History</h2>
+                    <div id="notificationHistoryList" class="history-list">
+                        <!-- Filled dynamically -->
+                        <div class="history-item"><p style="color: var(--text-muted);">Loading notification history...</p></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Version Control Tab Panel -->
+        <div id="panel-version" class="tab-panel">
+            <div class="grid-2">
+                <div>
+                    <h2>APK File Uploader</h2>
+                    <div class="card">
+                        <div class="upload-area">
+                            <div class="upload-area-icon">📥</div>
+                            <h3>Drag & Drop APK file</h3>
+                            <p style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">or click to browse filesystem</p>
+                            <input type="file" id="apkFileInput" accept=".apk" onchange="handleApkFileUpload(this)">
+                        </div>
+
+                        <!-- Progress Bar -->
+                        <div id="uploadProgressContainer" class="progress-container">
+                            <div class="progress-text">
+                                <span id="uploadStatus">Uploading...</span>
+                                <span id="uploadPercent">0%</span>
+                            </div>
+                            <div class="progress-bar-bg">
+                                <div id="uploadProgressBarFill" class="progress-bar-fill"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2>Current Version Profile</h2>
+                    <div class="card" id="currentVersionCard">
+                        <!-- Filled dynamically -->
+                        <p style="color: var(--text-muted);">Loading active version info...</p>
+                    </div>
+                </div>
+
+                <div>
+                    <h2>Configure Version Control</h2>
+                    <div class="card">
+                        <form id="versionForm" onsubmit="handleSaveVersion(event)">
+                            <div class="form-group">
+                                <label for="verCode">Version Code (Integer)</label>
+                                <input type="text" id="verCode" required placeholder="e.g. 2">
+                            </div>
+                            <div class="form-group">
+                                <label for="verName">Version Name (String)</label>
+                                <input type="text" id="verName" required placeholder="e.g. 1.0.1">
+                            </div>
+                            <div class="form-group">
+                                <label for="verApkUrl">Download APK URL</label>
+                                <input type="text" id="verApkUrl" required placeholder="e.g. /uploads/apks/app-release.apk">
+                            </div>
+                            
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="verMustUpdate">
+                                <label for="verMustUpdate">Force Update (Users must update to use the app)</label>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="verReleaseNotes">Release Notes / Changelog</label>
+                                <textarea id="verReleaseNotes" rows="4" placeholder="What's new in this version..."></textarea>
+                            </div>
+
+                            <button type="submit" class="btn" style="width: 100%;">Save Version Parameters</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification element -->
+    <div id="toast" class="toast">
+        <span class="toast-icon">✓</span>
+        <span id="toastMessage">Action completed successfully</span>
+    </div>
+
+    <script>
+        // Check session token
+        let token = localStorage.getItem('admin_token') || '';
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!token) {
+                showLoginModal(true);
+            } else {
+                initializeApp();
+            }
+        });
+
+        function showLoginModal(show) {
+            const overlay = document.getElementById('loginOverlay');
+            if (show) {
+                overlay.classList.add('active');
+            } else {
+                overlay.classList.remove('active');
+            }
+        }
+
+        function showToast(message, isSuccess = true) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMessage');
+            const toastIcon = toast.querySelector('.toast-icon');
+            
+            toastMsg.textContent = message;
+            if (isSuccess) {
+                toast.style.borderColor = 'var(--accent-color)';
+                toastIcon.textContent = '✓';
+                toastIcon.style.color = 'var(--accent-color)';
+            } else {
+                toast.style.borderColor = '#FF3838';
+                toastIcon.textContent = '✗';
+                toastIcon.style.color = '#FF3838';
+            }
+            
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const username = document.getElementById('loginUser').value;
+            const password = document.getElementById('loginPass').value;
+
+            try {
+                const res = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await res.json();
+                if (res.ok && data.code === 0) {
+                    token = data.token;
+                    localStorage.setItem('admin_token', token);
+                    document.getElementById('adminUsername').textContent = username;
+                    showLoginModal(false);
+                    showToast('Successfully logged in!');
+                    initializeApp();
+                } else {
+                    showToast(data.detail || 'Login failed. Try again.', false);
+                }
+            } catch (err) {
+                showToast('Server connection error.', false);
+            }
+        }
+
+        async function handleLogout() {
+            try {
+                await fetch('/api/admin/logout', { method: 'POST' });
+            } catch(_) {}
+            token = '';
+            localStorage.removeItem('admin_token');
+            showLoginModal(true);
+            showToast('Logged out.');
+        }
+
+        // Initialize UI data fetches
+        function initializeApp() {
+            fetchActiveBanners();
+            fetchNotificationHistory();
+            fetchCurrentVersion();
+        }
+
+        function switchTab(tab) {
+            // Update buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`btn-${tab}`).classList.add('active');
+            
+            // Update panels
+            document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+            document.getElementById(`panel-${tab}`).classList.add('active');
+        }
+
+        // --- BANNERS TAB LOGIC ---
+        async function fetchActiveBanners() {
+            try {
+                const res = await fetch('/api/admin/banners', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.status === 401) { handleLogout(); return; }
+                const data = await res.json();
+                
+                const container = document.getElementById('activeBannersList');
+                container.innerHTML = '';
+                
+                if (!data.list || data.list.length === 0) {
+                    container.innerHTML = `<div class="banner-item"><p style="color: var(--text-muted);">No custom banners configured. Fallback trending list is active.</p></div>`;
+                    return;
+                }
+                
+                data.list.forEach(b => {
+                    container.innerHTML += `
+                        <div class="banner-item">
+                            <img src="${b.coverUrl || 'default-cover.png'}" onerror="this.src='default-cover.png'" alt="cover">
+                            <div class="banner-item-info">
+                                <div class="banner-item-title">${b.title}</div>
+                                <div class="banner-item-meta">ID: ${b.subjectId} | Type: ${b.subjectType == 2 ? 'TV Series' : 'Movie'}</div>
+                            </div>
+                            <button onclick="deleteBanner('${b.subjectId}')" class="logout-btn" style="color:#FF3838; border-color:rgba(255,0,0,0.15)">Delete</button>
+                        </div>
+                    `;
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Subject Searcher for deep linking and banner selections
+        let searchDebounce;
+        function handleSubjectSearch(input, target) {
+            clearTimeout(searchDebounce);
+            const query = input.value.trim();
+            const resultsBox = document.getElementById(target === 'banner' ? 'bannerSearchResults' : 'notiSearchResults');
+            
+            if (!query) {
+                resultsBox.style.display = 'none';
+                return;
+            }
+
+            searchDebounce = setTimeout(async () => {
+                try {
+                    const res = await fetch(`/api/admin/subjects/search?q=${encodeURIComponent(query)}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+                    
+                    resultsBox.innerHTML = '';
+                    if (!data.list || data.list.length === 0) {
+                        resultsBox.innerHTML = '<div style="padding:12px; font-size:12px; color:var(--text-muted);">No items found in database.</div>';
+                        resultsBox.style.display = 'block';
+                        return;
+                    }
+                    
+                    data.list.forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'search-item';
+                        div.onclick = () => selectSubjectItem(item, target);
+                        div.innerHTML = `
+                            <img src="${item.coverUrl || 'default-cover.png'}" onerror="this.src='default-cover.png'">
+                            <div class="search-item-info">
+                                <div class="search-item-title">${item.title}</div>
+                                <div class="search-item-meta">ID: ${item.subjectId} | ${item.subjectType == 2 ? 'TV Show' : 'Movie'}</div>
+                            </div>
+                        `;
+                        resultsBox.appendChild(div);
+                    });
+                    resultsBox.style.display = 'block';
+                } catch (err) {
+                    console.error(err);
+                }
+            }, 300);
+        }
+
+        function selectSubjectItem(item, target) {
+            if (target === 'banner') {
+                document.getElementById('bannerSearchResults').style.display = 'none';
+                document.getElementById('bannerSearchInput').value = item.title;
+                
+                document.getElementById('bannerSubjectId').value = item.subjectId;
+                document.getElementById('bannerTitle').value = item.title;
+                document.getElementById('bannerCoverUrl').value = item.coverUrl || '';
+                document.getElementById('bannerDetailPath').value = item.detailPath || '';
+                document.getElementById('bannerSubjectType').value = item.subjectType;
+                
+                document.getElementById('bannerFormArea').style.display = 'block';
+            } else {
+                document.getElementById('notiSearchResults').style.display = 'none';
+                document.getElementById('notiSearchInput').value = '';
+                
+                // Show preview
+                document.getElementById('attachedSubjectPreview').style.display = 'flex';
+                document.getElementById('attachedCover').src = item.coverUrl || 'default-cover.png';
+                document.getElementById('attachedTitle').textContent = item.title;
+                document.getElementById('attachedMeta').textContent = `Subject ID: ${item.subjectId} | ${item.subjectType == 2 ? 'TV Show' : 'Movie'}`;
+                document.getElementById('attachedSubjectId').value = item.subjectId;
+            }
+        }
+
+        function removeAttachedSubject() {
+            document.getElementById('attachedSubjectPreview').style.display = 'none';
+            document.getElementById('attachedSubjectId').value = '';
+        }
+
+        async function saveCustomBanner() {
+            const subjectId = document.getElementById('bannerSubjectId').value;
+            const title = document.getElementById('bannerTitle').value;
+            const coverUrl = document.getElementById('bannerCoverUrl').value;
+            const detailPath = document.getElementById('bannerDetailPath').value;
+            const subjectType = document.getElementById('bannerSubjectType').value;
+
+            try {
+                const res = await fetch('/api/admin/banners', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ subjectId, title, coverUrl, detailPath, subjectType })
+                });
+                
+                const data = await res.json();
+                if (res.ok) {
+                    showToast('Banner added successfully!');
+                    document.getElementById('bannerFormArea').style.display = 'none';
+                    document.getElementById('bannerSearchInput').value = '';
+                    fetchActiveBanners();
+                } else {
+                    showToast(data.detail || 'Failed to add banner.', false);
+                }
+            } catch (err) {
+                showToast('Failed to add banner.', false);
+            }
+        }
+
+        async function deleteBanner(subjectId) {
+            if (!confirm('Are you sure you want to remove this banner slide?')) return;
+            try {
+                const res = await fetch(`/api/admin/banners/${subjectId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    showToast('Banner deleted.');
+                    fetchActiveBanners();
+                } else {
+                    showToast('Failed to delete banner.', false);
+                }
+            } catch (_) {
+                showToast('Failed to delete banner.', false);
+            }
+        }
+
+        // --- NOTIFICATIONS TAB LOGIC ---
+        async function handleSendNotification(e) {
+            e.preventDefault();
+            const title = document.getElementById('notiTitle').value;
+            const message = document.getElementById('notiMessage').value;
+            const subjectId = document.getElementById('attachedSubjectId').value || null;
+
+            try {
+                const res = await fetch('/api/admin/notifications', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ title, message, subjectId })
+                });
+                
+                if (res.ok) {
+                    showToast('Notification sent successfully!');
+                    document.getElementById('notificationForm').reset();
+                    removeAttachedSubject();
+                    fetchNotificationHistory();
+                } else {
+                    showToast('Failed to send notification.', false);
+                }
+            } catch (_) {
+                showToast('Failed to send notification.', false);
+            }
+        }
+
+        async function fetchNotificationHistory() {
+            try {
+                const res = await fetch('/api/admin/notifications', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                
+                const container = document.getElementById('notificationHistoryList');
+                container.innerHTML = '';
+                
+                if (!data.list || data.list.length === 0) {
+                    container.innerHTML = `<div class="history-item"><p style="color: var(--text-muted);">No notification logs found.</p></div>`;
+                    return;
+                }
+                
+                data.list.forEach(noti => {
+                    const dateStr = new Date(noti.createdAt).toLocaleString();
+                    container.innerHTML += `
+                        <div class="history-item">
+                            <div class="history-item-header">
+                                <div class="history-item-title">${noti.title}</div>
+                                <div class="history-item-date">${dateStr}</div>
+                            </div>
+                            <div class="history-item-body">${noti.message}</div>
+                            ${noti.subjectId ? `<div class="history-item-badge">Deep link ID: ${noti.subjectId}</div>` : ''}
+                        </div>
+                    `;
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // --- VERSION CONTROL TAB LOGIC ---
+        async function fetchCurrentVersion() {
+            try {
+                const res = await fetch('/api/app/version');
+                const data = await res.json();
+                
+                const card = document.getElementById('currentVersionCard');
+                
+                if (!data.version) {
+                    card.innerHTML = `<p style="color: var(--text-muted);">No version control profiles configured yet.</p>`;
+                    return;
+                }
+                
+                const v = data.version;
+                card.innerHTML = `
+                    <div style="line-height: 1.8;">
+                        <div><strong>Version Code:</strong> ${v.versionCode}</div>
+                        <div><strong>Version Name:</strong> ${v.versionName}</div>
+                        <div><strong>Download URL:</strong> <a href="${v.apkUrl}" target="_blank" style="color:var(--secondary-accent); text-decoration:none;">${v.apkUrl}</a></div>
+                        <div><strong>Force Update:</strong> ${v.mustUpdate ? '<span style="color:#FF3838; font-weight:bold;">Yes (Required)</span>' : '<span style="color:var(--text-muted);">No (Optional)</span>'}</div>
+                        <div style="margin-top: 10px;"><strong>Release Notes:</strong></div>
+                        <div style="background:rgba(255,255,255,0.02); padding:10px; border-radius:8px; border:1px solid var(--border-color); font-size:13px; font-style:italic; white-space:pre-wrap;">${v.releaseNotes || 'None'}</div>
+                    </div>
+                `;
+                
+                // Pre-fill fields for ease of updates
+                document.getElementById('verCode').value = v.versionCode;
+                document.getElementById('verName').value = v.versionName;
+                document.getElementById('verApkUrl').value = v.apkUrl;
+                document.getElementById('verMustUpdate').checked = v.mustUpdate;
+                document.getElementById('verReleaseNotes').value = v.releaseNotes || '';
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Handled chunk-based file upload with progress bar
+        function handleApkFileUpload(input) {
+            const file = input.files[0];
+            if (!file) return;
+            
+            const progressContainer = document.getElementById('uploadProgressContainer');
+            const progressFill = document.getElementById('uploadProgressBarFill');
+            const percentText = document.getElementById('uploadPercent');
+            const statusText = document.getElementById('uploadStatus');
+            
+            progressContainer.style.display = 'block';
+            progressFill.style.width = '0%';
+            percentText.textContent = '0%';
+            statusText.textContent = 'Uploading APK file...';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/admin/version/upload', true);
+            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    progressFill.style.width = `${percent}%`;
+                    percentText.textContent = `${percent}%`;
+                }
+            };
+
+            xhr.onload = () => {
+                if (xhr.status === 200) {
+                    const response = JSON.parse(xhr.responseText);
+                    document.getElementById('verApkUrl').value = response.apkUrl;
+                    statusText.textContent = 'Upload complete!';
+                    showToast('APK file uploaded successfully!');
+                } else {
+                    const response = JSON.parse(xhr.responseText || '{}');
+                    statusText.textContent = 'Upload failed.';
+                    showToast(response.detail || 'Upload failed.', false);
+                }
+            };
+
+            xhr.onerror = () => {
+                statusText.textContent = 'Connection error.';
+                showToast('Upload failed due to connection error.', false);
+            };
+
+            xhr.send(formData);
+        }
+
+        async function handleSaveVersion(e) {
+            e.preventDefault();
+            const versionCode = parseInt(document.getElementById('verCode').value);
+            const versionName = document.getElementById('verName').value;
+            const apkUrl = document.getElementById('verApkUrl').value;
+            const mustUpdate = document.getElementById('verMustUpdate').checked;
+            const releaseNotes = document.getElementById('verReleaseNotes').value;
+
+            try {
+                const res = await fetch('/api/admin/version', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ versionCode, versionName, apkUrl, mustUpdate, releaseNotes })
+                });
+                
+                if (res.ok) {
+                    showToast('Version control updated successfully!');
+                    fetchCurrentVersion();
+                } else {
+                    const errData = await res.json();
+                    showToast(errData.detail || 'Failed to save version control.', false);
+                }
+            } catch (_) {
+                showToast('Failed to save version control.', false);
+            }
+        }
+    </script>
+</body>
+</html>

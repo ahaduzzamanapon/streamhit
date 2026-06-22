@@ -20,3 +20,4 @@ scratch_*.json
 # IDEs
 .vscode/
 .idea/
+streamfit

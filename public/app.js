@@ -127,6 +127,7 @@ function enableDragScroll(el) {
 document.addEventListener("DOMContentLoaded", () => {
     detectRoute();
     bindCommonEvents();
+    initWebNotifications();
 
     // Set userInteracted to true on any user click on the document to capture gesture
     document.addEventListener("click", () => {
@@ -2462,5 +2463,73 @@ function renderContinueWatchingSection() {
                 renderContinueWatchingSection();
             }
         };
+    }
+}
+
+// ==========================================================================
+// PUSH NOTIFICATION PERMISSIONS & POLLING LOGIC
+// ==========================================================================
+function initWebNotifications() {
+    if (!('Notification' in window)) {
+        console.warn("This browser does not support desktop notifications.");
+        return;
+    }
+
+    if (Notification.permission === "default") {
+        // Request permission on startup
+        Notification.requestPermission().then(permission => {
+            if (permission === "granted") {
+                console.log("Notification permission granted.");
+                startNotificationPolling();
+            }
+        });
+    } else if (Notification.permission === "granted") {
+        startNotificationPolling();
+    }
+}
+
+let notificationPollInterval = null;
+function startNotificationPolling() {
+    if (notificationPollInterval) return;
+    
+    // Poll immediately, then every 30 seconds
+    checkLatestNotification();
+    notificationPollInterval = setInterval(checkLatestNotification, 30000);
+}
+
+async function checkLatestNotification() {
+    try {
+        const data = await apiGet("/api/notifications/latest");
+        if (data && data.notification) {
+            const noti = data.notification;
+            const savedId = localStorage.getItem("streamfit_latest_noti_id");
+            
+            // If there's no saved ID, we initialize it without showing the notification
+            if (savedId === null) {
+                localStorage.setItem("streamfit_latest_noti_id", noti.id);
+                return;
+            }
+            
+            // If the notification is newer than what we've seen
+            if (parseInt(noti.id) > parseInt(savedId)) {
+                localStorage.setItem("streamfit_latest_noti_id", noti.id);
+                
+                if (Notification.permission === "granted") {
+                    const notification = new Notification(noti.title, {
+                        body: noti.message,
+                        icon: "/favicon.svg"
+                    });
+                    
+                    notification.onclick = () => {
+                        window.focus();
+                        if (noti.subjectId) {
+                            window.location.href = `/details?id=${noti.subjectId}`;
+                        }
+                    };
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Error polling notifications:", e);
     }
 }
