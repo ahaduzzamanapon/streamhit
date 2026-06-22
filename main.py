@@ -3566,6 +3566,29 @@ async def serve_watch_page(request: Request, id: str = None, tmdb: str = None, t
     return HTMLResponse(content=html_content)
 
 
+@app.get("/download", response_class=HTMLResponse)
+async def serve_download_page(request: Request):
+    # Server-side crawler bot detection and block
+    user_agent = request.headers.get("user-agent", "").lower()
+    bot_keywords = [
+        "googlebot", "bingbot", "yandexbot", "baiduspider", "duckduckbot", "exabot", "sogou", 
+        "facebot", "facebookexternalhit", "ia_archiver", "twitterbot", "discordbot", "telegrambot", 
+        "slackbot", "bot", "crawler", "spider", "crawl", "slurp", "screaming frog", "python", "http-client", "curl", "wget"
+    ]
+    if any(keyword in user_agent for keyword in bot_keywords):
+        print(f"[Bot Blocked on Download] IP: {request.client.host if request.client else 'Unknown'} | User-Agent: {user_agent}")
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    path = os.path.join(base_dir, "public/download.html")
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Page not found")
+        
+    with open(path, "r", encoding="utf-8") as f:
+        html_content = f.read()
+        
+    return HTMLResponse(content=html_content)
+
+
 from admin import router as admin_router
 app.include_router(admin_router)
 

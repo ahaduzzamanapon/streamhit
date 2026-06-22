@@ -2387,6 +2387,10 @@ function bindCommonEvents() {
             loadSearchResults();
         };
     }
+    // Wire all "Download App" buttons to the secure verification page
+    document.querySelectorAll(".download-app-btn").forEach(btn => {
+        btn.onclick = () => { window.location.href = "/download"; };
+    });
 }
 
 function renderContinueWatchingSection() {

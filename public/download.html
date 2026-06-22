@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download App - Streamfit Secure Verification</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Plus+Jakarta+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS Variables and Global resets -->
+    <link rel="stylesheet" href="style.css?v=3.6">
+
+    <style>
+        .verification-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            width: 100%;
+            background-color: var(--bg-primary);
+            padding: 20px;
+        }
+
+        .verification-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: var(--border-radius-lg);
+            padding: 40px 30px;
+            width: 100%;
+            max-width: 440px;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .verification-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 42, 58, 0.05) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .card-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .verify-icon-wrapper {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 42, 58, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px auto;
+            border: 1px solid rgba(255, 42, 58, 0.2);
+            box-shadow: 0 0 20px rgba(255, 42, 58, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .verify-icon-wrapper.success {
+            background: rgba(46, 213, 115, 0.1);
+            border-color: rgba(46, 213, 115, 0.2);
+            box-shadow: 0 0 20px rgba(46, 213, 115, 0.2);
+            color: #2ed573;
+        }
+
+        .verify-icon {
+            font-size: 32px;
+            color: var(--color-accent);
+            transition: all 0.3s ease;
+        }
+
+        .verify-icon-wrapper.success .verify-icon {
+            color: #2ed573;
+        }
+
+        .verify-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 24px;
+            font-weight: 800;
+            margin-bottom: 12px;
+            letter-spacing: -0.5px;
+        }
+
+        .verify-desc {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 35px;
+        }
+
+        /* Slider Styles */
+        .slider-track {
+            width: 100%;
+            height: 56px;
+            background-color: var(--bg-primary);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 28px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            margin-bottom: 20px;
+        }
+
+        .slider-text {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            pointer-events: none;
+            z-index: 2;
+            transition: opacity 0.2s ease;
+        }
+
+        .slider-handle {
+            width: 48px;
+            height: 48px;
+            background: var(--color-accent-gradient);
+            border-radius: 50%;
+            position: absolute;
+            left: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: grab;
+            color: var(--bg-primary);
+            z-index: 3;
+            box-shadow: 0 2px 10px rgba(255, 42, 58, 0.3);
+            transition: transform 0.1s ease;
+        }
+
+        .slider-handle:active {
+            cursor: grabbing;
+        }
+
+        .slider-handle i {
+            font-size: 18px;
+        }
+
+        .slider-progress {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 0;
+            background: rgba(255, 42, 58, 0.1);
+            border-radius: 28px 0 0 28px;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* Status UI */
+        .status-container {
+            display: none;
+            margin-top: 10px;
+        }
+
+        .status-loader {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid rgba(255, 42, 58, 0.1);
+            border-top-color: var(--color-accent);
+            border-radius: 50%;
+            animation: spin 1s infinite linear;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .status-text {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* Success Button */
+        .download-btn-container {
+            display: none;
+            margin-top: 10px;
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .btn-download-now {
+            background: linear-gradient(135deg, #2ed573 0%, #7bed9f 100%);
+            color: var(--bg-primary);
+            font-weight: 800;
+            font-size: 15px;
+            padding: 14px 28px;
+            border-radius: var(--border-radius-md);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 4px 15px rgba(46, 213, 115, 0.3);
+            transition: var(--transition-fast);
+            margin-top: 10px;
+        }
+
+        .btn-download-now:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(46, 213, 115, 0.4);
+        }
+
+        .brand-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+            cursor: pointer;
+        }
+
+        .brand-link span {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 800;
+            font-size: 20px;
+        }
+
+        .brand-link span span {
+            background: var(--color-accent-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .error-message {
+            color: var(--color-danger);
+            font-size: 14px;
+            margin-top: 15px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="verification-container">
+        <div class="verification-card">
+            <div class="card-content">
+                <!-- Brand logo link -->
+                <div class="brand-link" onclick="window.location.href='/'">
+                    <i class="fa-solid fa-play play-logo"></i>
+                    <span>Stream<span>fit</span></span>
+                </div>
+
+                <div class="verify-icon-wrapper" id="iconWrapper">
+                    <i class="fa-solid fa-shield-halved verify-icon" id="statusIcon"></i>
+                </div>
+
+                <h1 class="verify-title" id="verifyTitle">Human Verification</h1>
+                <p class="verify-desc" id="verifyDesc">Complete the slider check below to verify your session and start downloading the Streamfit App.</p>
+
+                <!-- Slider Interface -->
+                <div class="slider-track" id="sliderTrack">
+                    <div class="slider-progress" id="sliderProgress"></div>
+                    <div class="slider-text" id="sliderText">Slide to Verify & Download</div>
+                    <div class="slider-handle" id="sliderHandle">
+                        <i class="fa-solid fa-angle-right"></i>
+                    </div>
+                </div>
+
+                <!-- Fetching Link Loader -->
+                <div class="status-container" id="statusContainer">
+                    <div class="status-loader">
+                        <div class="spinner"></div>
+                        <span class="status-text">Fetching secure download link...</span>
+                    </div>
+                </div>
+
+                <!-- Final download button -->
+                <div class="download-btn-container" id="downloadContainer">
+                    <a href="#" id="downloadLink" class="btn-download-now">
+                        <i class="fa-solid fa-circle-down"></i> Download APK Now
+                    </a>
+                    <p style="font-size: 12px; color: var(--text-secondary); margin-top: 12px;">Your download should begin automatically. If it doesn't start, click the button above.</p>
+                </div>
+
+                <div class="error-message" id="errorMessage">Verification failed. Headless browser detected.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            // Anti-bot Headless check
+            if (navigator.webdriver) {
+                document.getElementById("sliderTrack").style.display = "none";
+                const error = document.getElementById("errorMessage");
+                error.textContent = "Security block: Automated headless browser detected.";
+                error.style.display = "block";
+                return;
+            }
+
+            const track = document.getElementById("sliderTrack");
+            const handle = document.getElementById("sliderHandle");
+            const progress = document.getElementById("sliderProgress");
+            const text = document.getElementById("sliderText");
+
+            const iconWrapper = document.getElementById("iconWrapper");
+            const statusIcon = document.getElementById("statusIcon");
+            const verifyTitle = document.getElementById("verifyTitle");
+            const verifyDesc = document.getElementById("verifyDesc");
+
+            const statusContainer = document.getElementById("statusContainer");
+            const downloadContainer = document.getElementById("downloadContainer");
+            const downloadLink = document.getElementById("downloadLink");
+            const errorMessage = document.getElementById("errorMessage");
+
+            let isDragging = false;
+            let startX = 0;
+            let maxSlide = 0;
+            let currentX = 0;
+
+            const initSlider = () => {
+                maxSlide = track.clientWidth - handle.clientWidth - 8; // Adjust padding margins
+            };
+
+            window.addEventListener("resize", initSlider);
+            initSlider();
+
+            const onStart = (e) => {
+                if (maxSlide <= 0) initSlider();
+                isDragging = true;
+                startX = (e.pageX || (e.touches && e.touches[0].pageX)) - handle.offsetLeft;
+                handle.style.transition = "none";
+                progress.style.transition = "none";
+            };
+
+            const onMove = (e) => {
+                if (!isDragging) return;
+                const pageX = e.pageX || (e.touches && e.touches[0].pageX);
+                currentX = pageX - startX;
+
+                if (currentX < 0) currentX = 0;
+                if (currentX > maxSlide) currentX = maxSlide;
+
+                handle.style.left = (currentX + 4) + "px";
+                progress.style.width = (currentX + handle.clientWidth / 2) + "px";
+
+                // Fade text as handle moves
+                const opacity = 1 - (currentX / maxSlide);
+                text.style.opacity = opacity;
+            };
+
+            const onEnd = () => {
+                if (!isDragging) return;
+                isDragging = false;
+
+                if (currentX >= maxSlide * 0.95) {
+                    // Success!
+                    handle.style.transition = "all 0.3s ease";
+                    progress.style.transition = "all 0.3s ease";
+                    handle.style.left = (maxSlide + 4) + "px";
+                    progress.style.width = "100%";
+                    text.style.opacity = 0;
+                    
+                    onVerifySuccess();
+                } else {
+                    // Reset
+                    handle.style.transition = "all 0.3s ease";
+                    progress.style.transition = "all 0.3s ease";
+                    handle.style.left = "4px";
+                    progress.style.width = "0";
+                    text.style.transition = "opacity 0.3s ease";
+                    text.style.opacity = 1;
+                }
+            };
+
+            // Desktop events
+            handle.addEventListener("mousedown", onStart);
+            window.addEventListener("mousemove", onMove);
+            window.addEventListener("mouseup", onEnd);
+
+            // Mobile/Touch events
+            handle.addEventListener("touchstart", onStart, { passive: true });
+            window.addEventListener("touchmove", onMove, { passive: true });
+            window.addEventListener("touchend", onEnd);
+
+            async function onVerifySuccess() {
+                // Disable slider actions
+                handle.style.cursor = "default";
+                handle.removeEventListener("mousedown", onStart);
+                handle.removeEventListener("touchstart", onStart);
+
+                // Update UI state to Verified
+                iconWrapper.classList.add("success");
+                statusIcon.className = "fa-solid fa-circle-check verify-icon";
+                verifyTitle.textContent = "Verified Human";
+                verifyDesc.textContent = "Security verification completed successfully. Fetching app file now...";
+
+                track.style.display = "none";
+                statusContainer.style.display = "block";
+
+                // Fetch latest APK URL
+                try {
+                    const response = await fetch("/api/app/version");
+                    if (!response.ok) throw new Error("Server error: " + response.status);
+                    const result = await response.json();
+                    
+                    if (result && result.version && result.version.apkUrl) {
+                        const apkUrl = result.version.apkUrl;
+                        statusContainer.style.display = "none";
+                        
+                        // Populate download info
+                        downloadLink.href = apkUrl;
+                        downloadContainer.style.display = "block";
+
+                        // Trigger auto download
+                        const anchor = document.createElement("a");
+                        anchor.href = apkUrl;
+                        anchor.download = "";
+                        document.body.appendChild(anchor);
+                        anchor.click();
+                        document.body.removeChild(anchor);
+                    } else {
+                        throw new Error("Invalid response format / No active release found.");
+                    }
+                } catch (err) {
+                    console.error(err);
+                    statusContainer.style.display = "none";
+                    errorMessage.textContent = "Failed to load APK download link: " + err.message;
+                    errorMessage.style.display = "block";
+                }
+            }
+        });
+    </script>
+</body>
+</html>
