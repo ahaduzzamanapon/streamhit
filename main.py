@@ -38,7 +38,7 @@ DB_PORT = int(os.getenv("DB_PORT", "3306"))
 DB_USER = os.getenv("DB_USER", "root")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_NAME = os.getenv("DB_NAME", "moviebox")
-APP_URL = "https://streamfit.ehealthfinder.com/"
+APP_URL = "https://streamfit.ehealthfinder.com"
 DEPLOY_SECRET = os.getenv("DEPLOY_SECRET", "streamhit_secret_update_2026")
 
 SECRET_KEY_DEFAULT = "76iRl07s0xSN9jqmEWAt79EBJZulIQIsV64FZr2O"
