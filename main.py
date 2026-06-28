@@ -892,7 +892,7 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
     last_status_code = None
     for mode in attempts:
         try:
-            async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+            async with httpx.AsyncClient(trust_env=False, timeout=5.0) as client:
                 if mode == "direct":
                     if method.upper() == "GET":
                         resp = await client.get(url, headers=headers)
@@ -1865,123 +1865,149 @@ async def get_home(page: int = 1, tabId: int = 0):
     if cached:
         return cached
 
-    # Try fetching from remote API
-    try:
-        remote_data = await request_h5_api("GET", f"/wefeed-h5api-bff/tab-operating?page={page}&tabId={tabId}")
-        if remote_data and remote_data.get("code") == 0:
-            operating_list = remote_data.get("data", {}).get("operatingList", [])
-            cleaned_list = []
-            
-            for sec in operating_list:
-                sec_type = sec.get("type")
-                sec_title = sec.get("title", "")
-                
-                # Check for banner list
-                if sec_type == "BANNER":
-                    banner_data = sec.get("banner", {})
-                    items = banner_data.get("items", [])
-                    cleaned_items = []
-                    for item in items:
-                        sub = item.get("subject")
-                        if sub and (is_future_subject(sub) or is_educational_content(sub.get("title", ""))):
-                            continue
-                        cleaned_items.append(item)
-                    
-                    if cleaned_items:
-                        banner_data["items"] = cleaned_items
-                        sec["banner"] = banner_data
-                        sec["name"] = sec_title
-                        cleaned_list.append(sec)
-                        
-                        # Cache banner items asynchronously in database
-                        for item in cleaned_items:
-                            sub = item.get("subject")
-                            sub_id = item.get("subjectId") or (sub.get("subjectId") if sub else None)
-                            if sub_id and str(sub_id) != "0":
-                                img_val = item.get("image")
-                                img_url = img_val.get("url") if isinstance(img_val, dict) else str(img_val or "")
-                                if not img_url and sub:
-                                    img_url = sub.get("cover", {}).get("url") if isinstance(sub.get("cover"), dict) else str(sub.get("cover") or "")
-                                
-                                b_data = {
-                                    "subject_id": str(sub_id),
-                                    "title": item.get("title") or (sub.get("title") if sub else ""),
-                                    "image_url": img_url,
-                                    "detail_path": item.get("detailPath") or (sub.get("detailPath") if sub else ""),
-                                    "subject_type": int(item.get("subjectType") or (sub.get("subjectType") if sub else 1))
-                                }
-                                asyncio.create_task(db_save_banner(b_data))
-                                
-                # Check for regular subjects list
-                elif sec_type == "SUBJECTS_MOVIE" or (sec.get("subjects") and len(sec["subjects"]) > 0):
-                    subjects = sec.get("subjects", [])
-                    cleaned_subjects = []
-                    for sub in subjects:
-                        if is_future_subject(sub) or is_educational_content(sub.get("title", "")):
-                            continue
-                        cleaned_subjects.append(sub)
-                    
-                    if cleaned_subjects:
-                        sec["subjects"] = cleaned_subjects
-                        
-                        # Normalize section names
-                        if "Popular Movie" in sec_title:
-                            sec["title"] = "Trending Now"
-                            sec["name"] = "Trending Now"
-                        elif "Popular Series" in sec_title:
-                            sec["title"] = "Trending Series"
-                            sec["name"] = "Trending Series"
-                        else:
-                            sec["name"] = sec_title
-                            
-                        cleaned_list.append(sec)
-                        
-                        # Asynchronously cache all valid subjects to local database
-                        for sub in cleaned_subjects:
-                            sub_id = sub.get("subjectId")
-                            if sub_id and str(sub_id) != "0":
-                                genres = sub.get("genre", [])
-                                genres_str = ",".join(genres) if isinstance(genres, list) else str(genres)
-                                cover_val = sub.get("cover")
-                                cover_url = cover_val.get("url") if isinstance(cover_val, dict) else str(cover_val)
-                                
-                                s_data = {
-                                    "subject_id": str(sub_id),
-                                    "title": sub.get("title", ""),
-                                    "subject_type": int(sub.get("subjectType", 1)),
-                                    "cover": cover_url,
-                                    "backdrop": cover_url,
-                                    "rating": float(sub.get("imdbRatingValue") or sub.get("score") or 7.5),
-                                    "release_date": sub.get("releaseDate", "2026"),
-                                    "country": sub.get("countryName", ""),
-                                    "genre": genres_str,
-                                    "description": sub.get("description", ""),
-                                    "is_cam": bool(sub.get("isCam", False)),
-                                    "detail_path": sub.get("detailPath")
-                                }
-                                asyncio.create_task(db_save_subject(s_data))
-            
-            result = {
-                "code": 0,
-                "data": {
-                    "items": cleaned_list
-                }
+    # --- Stale-While-Revalidate: serve local data instantly, refresh in background ---
+    local_list = await get_local_operating_list()
+    if local_list:
+        # Return local data immediately so the user sees content fast
+        local_result = {
+            "code": 0,
+            "data": {
+                "items": local_list
             }
-            # Cache for 10 minutes locally
-            set_cached_response(cache_key, result, ttl=600.0)
+        }
+        set_cached_response(cache_key, local_result, ttl=30.0)  # short TTL so next pull gets fresh data
+
+        # Kick off remote refresh in background — won't block the response
+        async def _refresh_home_in_bg():
+            try:
+                await _fetch_and_cache_remote_home(page, tabId, cache_key)
+            except Exception as ex:
+                print(f"[Home BG Refresh Error] {ex}")
+        asyncio.create_task(_refresh_home_in_bg())
+
+        return local_result
+
+    # No local data at all — must wait for remote (first-run scenario)
+    try:
+        result = await _fetch_and_cache_remote_home(page, tabId, cache_key)
+        if result:
             return result
     except Exception as e:
         print(f"[Home API Proxy Error] {e}")
 
-    # Fallback to local database — fast response
-    local_list = await get_local_operating_list()
+    # Final fallback: empty response
+    return {"code": 0, "data": {"items": []}}
+
+
+async def _fetch_and_cache_remote_home(page: int, tabId: int, cache_key: str):
+    """Fetch home data from remote API, process, cache, and return result. Returns None on failure."""
+    remote_data = await request_h5_api("GET", f"/wefeed-h5api-bff/tab-operating?page={page}&tabId={tabId}")
+    if not (remote_data and remote_data.get("code") == 0):
+        return None
+
+    operating_list = remote_data.get("data", {}).get("operatingList", [])
+    cleaned_list = []
+
+    for sec in operating_list:
+        sec_type = sec.get("type")
+        sec_title = sec.get("title", "")
+
+        # Check for banner list
+        if sec_type == "BANNER":
+            banner_data = sec.get("banner", {})
+            items = banner_data.get("items", [])
+            cleaned_items = []
+            for item in items:
+                sub = item.get("subject")
+                if sub and (is_future_subject(sub) or is_educational_content(sub.get("title", ""))):
+                    continue
+                cleaned_items.append(item)
+
+            if cleaned_items:
+                banner_data["items"] = cleaned_items
+                sec["banner"] = banner_data
+                sec["name"] = sec_title
+                cleaned_list.append(sec)
+
+                # Cache banner items asynchronously in database
+                for item in cleaned_items:
+                    sub = item.get("subject")
+                    sub_id = item.get("subjectId") or (sub.get("subjectId") if sub else None)
+                    if sub_id and str(sub_id) != "0":
+                        img_val = item.get("image")
+                        img_url = img_val.get("url") if isinstance(img_val, dict) else str(img_val or "")
+                        if not img_url and sub:
+                            img_url = sub.get("cover", {}).get("url") if isinstance(sub.get("cover"), dict) else str(sub.get("cover") or "")
+
+                        b_data = {
+                            "subject_id": str(sub_id),
+                            "title": item.get("title") or (sub.get("title") if sub else ""),
+                            "image_url": img_url,
+                            "detail_path": item.get("detailPath") or (sub.get("detailPath") if sub else ""),
+                            "subject_type": int(item.get("subjectType") or (sub.get("subjectType") if sub else 1))
+                        }
+                        asyncio.create_task(db_save_banner(b_data))
+
+        # Check for regular subjects list
+        elif sec_type == "SUBJECTS_MOVIE" or (sec.get("subjects") and len(sec["subjects"]) > 0):
+            subjects = sec.get("subjects", [])
+            cleaned_subjects = []
+            for sub in subjects:
+                if is_future_subject(sub) or is_educational_content(sub.get("title", "")):
+                    continue
+                cleaned_subjects.append(sub)
+
+            if cleaned_subjects:
+                sec["subjects"] = cleaned_subjects
+
+                # Normalize section names
+                if "Popular Movie" in sec_title:
+                    sec["title"] = "Trending Now"
+                    sec["name"] = "Trending Now"
+                elif "Popular Series" in sec_title:
+                    sec["title"] = "Trending Series"
+                    sec["name"] = "Trending Series"
+                else:
+                    sec["name"] = sec_title
+
+                cleaned_list.append(sec)
+
+                # Asynchronously cache all valid subjects to local database
+                for sub in cleaned_subjects:
+                    sub_id = sub.get("subjectId")
+                    if sub_id and str(sub_id) != "0":
+                        genres = sub.get("genre", [])
+                        genres_str = ",".join(genres) if isinstance(genres, list) else str(genres)
+                        cover_val = sub.get("cover")
+                        cover_url = cover_val.get("url") if isinstance(cover_val, dict) else str(cover_val)
+
+                        s_data = {
+                            "subject_id": str(sub_id),
+                            "title": sub.get("title", ""),
+                            "subject_type": int(sub.get("subjectType", 1)),
+                            "cover": cover_url,
+                            "backdrop": cover_url,
+                            "rating": float(sub.get("imdbRatingValue") or sub.get("score") or 7.5),
+                            "release_date": sub.get("releaseDate", "2026"),
+                            "country": sub.get("countryName", ""),
+                            "genre": genres_str,
+                            "description": sub.get("description", ""),
+                            "is_cam": bool(sub.get("isCam", False)),
+                            "detail_path": sub.get("detailPath")
+                        }
+                        asyncio.create_task(db_save_subject(s_data))
+
+    if not cleaned_list:
+        return None
+
     result = {
         "code": 0,
         "data": {
-            "items": local_list
+            "items": cleaned_list
         }
     }
-    set_cached_response(cache_key, result, ttl=60.0)  # Short cache for fallback
+    # Cache for 10 minutes
+    set_cached_response(cache_key, result, ttl=600.0)
     return result
 
 @app.get("/api/banners")
