@@ -2013,53 +2013,38 @@ async def search_suggest(q: str = ""):
     if not q:
         return {"code": 0, "data": {"items": []}}
     
-    # Fuzzy subsequence search logic: e.g. "frm" -> "%f%r%m%"
-    subseq = "%" + "%".join(list(q)) + "%"
-    begins = f"{q}%"
-    contains = f"%{q}%"
-    first_char_begins = f"{q[0]}%" if q else "%"
-    
-    pool = await get_db_pool()
-    if not pool:
-        return {"code": 0, "data": {"items": []}}
-        
     try:
-        async with pool.acquire() as conn:
-            async with conn.cursor(aiomysql.DictCursor) as cur:
-                # Query subjects matching the query with prioritization
-                await cur.execute("""
-                    SELECT DISTINCT subject_id, title, detail_path, subject_type, cover, rating, release_date
-                    FROM subjects
-                    WHERE title != 'Placeholder'
-                      AND (title LIKE %s OR title LIKE %s OR title LIKE %s)
-                      AND (release_date IS NULL OR release_date = '' OR release_date < '2027')
-                    ORDER BY 
-                      CASE 
-                        WHEN title LIKE %s THEN 1
-                        WHEN title LIKE %s THEN 2
-                        WHEN title LIKE %s THEN 3
-                        ELSE 4
-                      END,
-                      CHAR_LENGTH(title) ASC,
-                      rating DESC
-                    LIMIT 6
-                """, (begins, contains, subseq, begins, contains, first_char_begins))
-                rows = await cur.fetchall()
-                
-                items = []
-                for row in rows:
-                    items.append({
-                        "subjectId": row["subject_id"],
-                        "title": row["title"],
-                        "detailPath": row["detail_path"],
-                        "subjectType": row["subject_type"],
-                        "cover": {"url": row["cover"]},
-                        "rating": str(row["rating"]),
-                        "releaseDate": row["release_date"]
-                    })
-                return {"code": 0, "data": {"items": items}}
+        api_path = "/wefeed-h5api-bff/subject/search"
+        api_payload = {
+            "keyword": q,
+            "page": 1,
+            "perPage": 6,
+            "subjectType": 0
+        }
+        data = await request_h5_api("POST", api_path, api_payload)
+        items = data.get("data", {}).get("items", [])
+        
+        cleaned_items = []
+        for item in items:
+            sub = item.get("subject") or item
+            if is_future_subject(sub) or is_educational_content(sub.get("title", "")):
+                continue
+            
+            cover_val = sub.get("cover")
+            cover_url = cover_val.get("url") if isinstance(cover_val, dict) else str(cover_val or "")
+            
+            cleaned_items.append({
+                "subjectId": sub.get("subjectId"),
+                "title": sub.get("title"),
+                "detailPath": sub.get("detailPath") or item.get("detailPath") or "",
+                "subjectType": sub.get("subjectType") or 1,
+                "cover": {"url": cover_url},
+                "rating": str(sub.get("imdbRatingValue") or sub.get("score") or "7.5"),
+                "releaseDate": sub.get("releaseDate") or ""
+            })
+        return {"code": 0, "data": {"items": cleaned_items}}
     except Exception as e:
-        print(f"[Suggest Error] {e}")
+        print(f"[Remote Suggest Error] {e}")
         return {"code": 500, "error": str(e)}
 
 
@@ -2159,81 +2144,60 @@ async def search_content(payload: dict):
     if not keyword:
         return {"code": 0, "data": {"items": []}}
 
-    cache_key = f"search:{keyword}:{page}:{per_page}:{subject_type}:{genre}:{country}:{year}:{sort}"
+    cache_key = f"search_v2:{keyword}:{page}:{per_page}:{subject_type}:{genre}:{country}:{year}:{sort}"
     cached = get_cached_response(cache_key)
     if cached:
         return cached
 
-    # Query local database first (instant)
-    offset = (page - 1) * per_page
-    conditions = ["title LIKE %s", "title != 'Placeholder'"]
-    params = [f"%{keyword}%"]
-
-    if genre != "*":
-        conditions.append("genre LIKE %s")
-        params.append(f"%{genre}%")
-    if country != "*":
-        conditions.append("country = %s")
-        params.append(country)
-    if year != "*":
-        conditions.append("release_date LIKE %s")
-        params.append(f"{year}%")
-    if subject_type > 0:
-        conditions.append("subject_type = %s")
-        params.append(subject_type)
-
-    where_clause = " WHERE " + " AND ".join(conditions)
-    order_clause = """
-        ORDER BY (
-            CASE
-                WHEN title = %s THEN 1
-                WHEN title LIKE %s THEN 2
-                ELSE 3
-            END
-        ) ASC, CHAR_LENGTH(title) ASC, rating DESC
-    """
-    params_for_order = [keyword, f"{keyword}%"]
-    query = f"SELECT * FROM subjects{where_clause}{order_clause} LIMIT %s OFFSET %s"
-    all_params = params + params_for_order + [per_page, offset]
-
-    local_results = []
-    pool = await get_db_pool()
-    if pool:
-        try:
-            async with pool.acquire() as conn:
-                async with conn.cursor(aiomysql.DictCursor) as cur:
-                    await cur.execute(query, tuple(all_params))
-                    rows = await cur.fetchall()
-                    for row in rows:
-                        if is_educational_content(row["title"]):
-                            continue
-                        local_results.append({
-                            "subjectId": row["subject_id"],
-                            "title": row["title"],
-                            "subjectType": row["subject_type"],
-                            "cover": {"url": row["cover"]},
-                            "imdbRatingValue": str(row["rating"]),
-                            "releaseDate": row["release_date"],
-                            "countryName": row["country"],
-                            "genre": row["genre"].split(",") if row["genre"] else [],
-                            "isCam": row["is_cam"]
-                        })
-        except Exception as db_err:
-            print(f"[DB Search Error] {db_err}")
-
-    # Trigger background search+cache from upstream API if local results are few
-    if len(local_results) < per_page:
-        asyncio.create_task(background_search_and_cache(keyword, page, per_page, subject_type))
-
-    res = {
-        "code": 0,
-        "data": {
-            "items": local_results,
-            "pager": {"hasMore": len(local_results) == per_page}
+    # Fetch from the remote Search API directly (fresh and complete!)
+    try:
+        api_path = "/wefeed-h5api-bff/subject/search"
+        api_payload = {
+            "keyword": keyword,
+            "page": page,
+            "perPage": per_page,
+            "subjectType": subject_type
         }
-    }
-    set_cached_response(cache_key, res, ttl=60.0)
-    return res
+        data = await request_h5_api("POST", api_path, api_payload)
+        items = data.get("data", {}).get("items", [])
+        
+        cleaned_items = []
+        for item in items:
+            sub = item.get("subject") or item
+            if is_future_subject(sub) or is_educational_content(sub.get("title", "")):
+                continue
+            
+            cover_val = sub.get("cover")
+            cover_url = cover_val.get("url") if isinstance(cover_val, dict) else str(cover_val or "")
+            genres = sub.get("genre") or []
+            if isinstance(genres, str):
+                genres = genres.split(",")
+                
+            cleaned_items.append({
+                "subjectId": sub.get("subjectId"),
+                "title": sub.get("title"),
+                "detailPath": sub.get("detailPath") or item.get("detailPath") or "",
+                "subjectType": sub.get("subjectType") or 1,
+                "cover": {"url": cover_url},
+                "imdbRatingValue": str(sub.get("imdbRatingValue") or sub.get("score") or "7.5"),
+                "releaseDate": sub.get("releaseDate") or "",
+                "countryName": sub.get("countryName") or "",
+                "genre": genres,
+                "isCam": bool(sub.get("isCam", False))
+            })
+            
+        res = {
+            "code": 0,
+            "data": {
+                "items": cleaned_items,
+                "pager": {"hasMore": len(cleaned_items) == per_page}
+            }
+        }
+        set_cached_response(cache_key, res, ttl=300.0) # Cache search results for 5 minutes
+        return res
+    except Exception as e:
+        print(f"[Remote Search Error] {e}")
+        return {"code": 500, "error": str(e)}
 
 async def background_filter_and_cache(genre, country, year, language, sort, subject_type, page, per_page):
     try:
