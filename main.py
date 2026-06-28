@@ -3059,6 +3059,43 @@ async def clear_cache_force():
             return {"status": "error", "message": str(e)}
     return {"status": "error", "message": "Database pool not initialized"}
 
+# ─────────────────────────────────────────
+# Live Active Users Tracking (in-memory)
+# ─────────────────────────────────────────
+import uuid
+_active_sessions: dict[str, dict] = {}  # session_id -> {client, last_seen}
+_SESSION_TIMEOUT = 60  # seconds — session expired if no heartbeat in 60s
+
+def _cleanup_sessions():
+    now = time.time()
+    expired = [sid for sid, s in _active_sessions.items() if now - s["last_seen"] > _SESSION_TIMEOUT]
+    for sid in expired:
+        del _active_sessions[sid]
+
+@app.post("/api/heartbeat")
+async def heartbeat(request: Request):
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    client = body.get("client", "web")  # "app" or "web"
+    session_id = body.get("session_id") or str(uuid.uuid4())
+    _cleanup_sessions()
+    _active_sessions[session_id] = {"client": client, "last_seen": time.time()}
+    return {"session_id": session_id, "status": "ok"}
+
+@app.get("/api/admin/active-users")
+async def get_active_users():
+    _cleanup_sessions()
+    app_count = sum(1 for s in _active_sessions.values() if s["client"] == "app")
+    web_count = sum(1 for s in _active_sessions.values() if s["client"] == "web")
+    return {
+        "total": app_count + web_count,
+        "app": app_count,
+        "web": web_count,
+    }
+
 @app.get("/api/check-db")
 async def check_db_endpoint(subjectId: str = None, se: int = 0, ep: int = 0, secret: str = "", query: str = ""):
     pool = await get_db_pool()

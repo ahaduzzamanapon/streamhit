@@ -154,6 +154,33 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
+// ── Live Active Users Heartbeat ──────────────────────────────────────────────
+(function initHeartbeat() {
+    const HEARTBEAT_INTERVAL = 30000; // 30 seconds
+    let _sessionId = sessionStorage.getItem('sf_session_id') || null;
+
+    async function sendHeartbeat() {
+        try {
+            const resp = await fetch('/api/heartbeat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ client: 'web', session_id: _sessionId }),
+                keepalive: true
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.session_id) {
+                    _sessionId = data.session_id;
+                    sessionStorage.setItem('sf_session_id', _sessionId);
+                }
+            }
+        } catch (_) { /* silent fail — don't disrupt UX */ }
+    }
+
+    sendHeartbeat(); // immediate on load
+    setInterval(sendHeartbeat, HEARTBEAT_INTERVAL);
+})();
+
 // ==========================================================================
 // API REQUEST HELPERS
 // ==========================================================================

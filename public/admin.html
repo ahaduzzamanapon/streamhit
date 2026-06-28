@@ -626,6 +626,91 @@
             color: var(--accent-color);
             font-weight: bold;
         }
+
+        /* ── Live Active Users Widget ── */
+        .live-users-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .live-card {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            background: var(--card-color);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 16px 22px;
+            flex: 1;
+            min-width: 160px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .live-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: var(--card-glow, transparent);
+            opacity: 0.06;
+            pointer-events: none;
+        }
+
+        .live-card-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .live-card-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .live-card-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .live-card-count {
+            font-size: 28px;
+            font-weight: 800;
+            font-family: 'Outfit', sans-serif;
+            line-height: 1.1;
+        }
+
+        .live-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+            box-shadow: 0 0 8px #22c55e;
+            animation: pulse-dot 2s ease-in-out infinite;
+            margin-right: 4px;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
+
+        .live-refresh-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
     </style>
 </head>
 <body>
@@ -666,6 +751,41 @@
             <button onclick="switchTab('banners')" id="btn-banners" class="tab-btn active">Banners Configuration</button>
             <button onclick="switchTab('notifications')" id="btn-notifications" class="tab-btn">Push Notifications</button>
             <button onclick="switchTab('version')" id="btn-version" class="tab-btn">Version Control & APK</button>
+        </div>
+
+        <!-- ── Live Active Users Bar ── -->
+        <div class="live-users-bar">
+            <!-- Total -->
+            <div class="live-card" style="--card-glow: #ffffff; border-color: rgba(255,255,255,0.12);">
+                <div class="live-card-icon" style="background: rgba(255,255,255,0.06);">
+                    🌐
+                </div>
+                <div class="live-card-info">
+                    <span class="live-card-label"><span class="live-dot"></span>Total Active Now</span>
+                    <span class="live-card-count" id="liveTotal">–</span>
+                    <span class="live-refresh-label" id="liveLastRefresh">Fetching...</span>
+                </div>
+            </div>
+            <!-- App Users -->
+            <div class="live-card" style="--card-glow: #FF2A54; border-color: rgba(255,42,84,0.2);">
+                <div class="live-card-icon" style="background: rgba(255,42,84,0.1);">
+                    📱
+                </div>
+                <div class="live-card-info">
+                    <span class="live-card-label">App Users</span>
+                    <span class="live-card-count" id="liveApp" style="color: var(--accent-color);">–</span>
+                </div>
+            </div>
+            <!-- Web Users -->
+            <div class="live-card" style="--card-glow: #00F0FF; border-color: rgba(0,240,255,0.2);">
+                <div class="live-card-icon" style="background: rgba(0,240,255,0.08);">
+                    💻
+                </div>
+                <div class="live-card-info">
+                    <span class="live-card-label">Web Users</span>
+                    <span class="live-card-count" id="liveWeb" style="color: var(--secondary-accent);">–</span>
+                </div>
+            </div>
         </div>
 
         <!-- Banners Tab Panel -->
@@ -1279,6 +1399,47 @@
                 showToast('Failed to save version control.', false);
             }
         }
+
+        // ── Live Active Users Polling ──────────────────────────────────────────
+        async function fetchLiveUsers() {
+            try {
+                const res = await fetch('/api/admin/active-users', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                document.getElementById('liveTotal').textContent = data.total ?? '–';
+                document.getElementById('liveApp').textContent   = data.app   ?? '–';
+                document.getElementById('liveWeb').textContent   = data.web   ?? '–';
+                const now = new Date();
+                document.getElementById('liveLastRefresh').textContent =
+                    'Updated ' + now.toLocaleTimeString();
+            } catch (_) {}
+        }
+
+        // Poll every 10 seconds (only after login)
+        let _liveUsersPollTimer = null;
+        function startLiveUsersPoll() {
+            fetchLiveUsers();
+            if (!_liveUsersPollTimer) {
+                _liveUsersPollTimer = setInterval(fetchLiveUsers, 10000);
+            }
+        }
+
+        // Hook into existing login success flow
+        const _origOnLoad = window.onload;
+        window.addEventListener('DOMContentLoaded', () => {
+            // Watch for login overlay being hidden → start polling
+            const observer = new MutationObserver(() => {
+                const overlay = document.getElementById('loginOverlay');
+                if (overlay && !overlay.classList.contains('active')) {
+                    startLiveUsersPoll();
+                    observer.disconnect();
+                }
+            });
+            const overlay = document.getElementById('loginOverlay');
+            if (overlay) observer.observe(overlay, { attributes: true, attributeFilter: ['class'] });
+        });
     </script>
 </body>
 </html>
