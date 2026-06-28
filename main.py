@@ -1827,7 +1827,7 @@ async def get_local_operating_list() -> list:
                     await cur.execute(f"""
                         SELECT * FROM subjects 
                         WHERE subject_type = %s AND title != 'Placeholder'
-                          AND (release_date IS NULL OR release_date = '' OR release_date < '2027')
+                          AND (release_date IS NULL OR release_date = '' OR release_date <= CURDATE())
                         ORDER BY {order_by} 
                         LIMIT 12
                     """, (sec["type"],))
@@ -2283,7 +2283,13 @@ async def filter_content(payload: dict):
         return cached
 
     # Build MySQL Query — only from local database
-    conditions = ["title != 'Placeholder'", "title != ''", "cover IS NOT NULL", "cover != ''"]
+    conditions = [
+        "title != 'Placeholder'",
+        "title != ''",
+        "cover IS NOT NULL",
+        "cover != ''",
+        "(release_date IS NULL OR release_date = '' OR release_date <= CURDATE())"
+    ]
     params = []
 
     if genre != "*":
