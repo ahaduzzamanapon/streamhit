@@ -2536,7 +2536,8 @@ async def get_detail(subjectId: str, detailPath: str = ""):
                     "genre": row["genre"].split(",") if row["genre"] else [],
                     "description": row["description"],
                     "isCam": row["is_cam"],
-                    "dubs": dubs_data
+                    "dubs": dubs_data,
+                    "detailPath": row["detail_path"] or db_detail_path or ""
                 }
             }
 
@@ -2585,7 +2586,8 @@ async def get_detail(subjectId: str, detailPath: str = ""):
             "description": subject_info.get("description", ""),
             "isCam": bool(subject_info.get("isCam", False)),
             "duration": duration_str,
-            "dubs": subject_info.get("dubs", [])
+            "dubs": subject_info.get("dubs", []),
+            "detailPath": subject_info.get("detailPath") or path_to_use or ""
         }
         return {"code": 0, "data": formatted_detail}
     except Exception as e:
@@ -3014,9 +3016,8 @@ async def proxy_subtitle(url: str):
     if not url:
         raise HTTPException(status_code=400, detail="Missing subtitle url parameter")
     
-    global last_direct_fail_time
     now = time.time()
-    skip_direct = (now - last_direct_fail_time < 3600.0)
+    skip_direct = (now - get_last_direct_fail_time() < 3600.0)
     
     resp_text = None
     
