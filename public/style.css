@@ -3329,3 +3329,97 @@ button, input, select {
     }
 }
 
+/* ==========================================================================
+   SEARCH SUGGESTION DROPDOWN STYLES
+   ========================================================================== */
+.search-box {
+    position: relative; /* Ensure the dropdown positions relative to search-box */
+}
+
+.search-suggest-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    width: 100%;
+    max-height: 380px;
+    overflow-y: auto;
+    background: #181b22;
+    border: 1.5px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--border-radius-md);
+    z-index: 2000;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+    display: none; /* Controlled by JS */
+}
+
+.suggest-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 14px;
+    gap: 14px;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.suggest-item:last-child {
+    border-bottom: none;
+}
+
+.suggest-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.suggest-cover {
+    width: 36px;
+    height: 52px;
+    border-radius: var(--border-radius-sm);
+    object-fit: cover;
+    background: var(--bg-card);
+    flex-shrink: 0;
+}
+
+.suggest-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.suggest-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.suggest-meta {
+    font-size: 12px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.suggest-rating {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    color: #ffb800;
+    font-weight: 700;
+}
+
+.suggest-badge {
+    padding: 2px 6px;
+    background: rgba(255, 42, 58, 0.15);
+    color: var(--color-accent);
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+

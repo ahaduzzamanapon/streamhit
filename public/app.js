@@ -2355,6 +2355,84 @@ function bindCommonEvents() {
         searchInput.addEventListener("keypress", (e) => {
             if (e.key === "Enter") handleSearch();
         });
+
+        // Add auto-suggestion dropdown
+        let dropdown = document.getElementById("searchSuggestDropdown");
+        if (!dropdown) {
+            dropdown = document.createElement("div");
+            dropdown.id = "searchSuggestDropdown";
+            dropdown.className = "search-suggest-dropdown";
+            const searchBox = searchInput.closest(".search-box");
+            if (searchBox) {
+                searchBox.appendChild(dropdown);
+            }
+        }
+
+        let debounceTimeout;
+        searchInput.addEventListener("input", () => {
+            clearTimeout(debounceTimeout);
+            const query = searchInput.value.trim();
+            if (query.length < 1) {
+                dropdown.style.display = "none";
+                return;
+            }
+
+            debounceTimeout = setTimeout(async () => {
+                try {
+                    const res = await fetch(`/api/search/suggest?q=${encodeURIComponent(query)}`);
+                    const data = await res.json();
+                    if (data && data.code === 0 && data.data && data.data.items && data.data.items.length > 0) {
+                        dropdown.innerHTML = "";
+                        data.data.items.forEach(item => {
+                            const itemEl = document.createElement("div");
+                            itemEl.className = "suggest-item";
+                            
+                            const typeText = item.subjectType === 2 ? "TV Series" : (item.subjectType === 1 ? "Movie" : "Anime");
+                            const coverUrl = item.cover && item.cover.url ? item.cover.url : "/default-cover.png";
+                            const year = item.releaseDate ? item.releaseDate.split("-")[0] : "";
+                            const rating = item.rating || "7.5";
+
+                            itemEl.innerHTML = `
+                                <img class="suggest-cover" src="${coverUrl}" onerror="this.onerror=null; this.src='/default-cover.png';" alt="${item.title}">
+                                <div class="suggest-info">
+                                    <div class="suggest-title">${item.title}</div>
+                                    <div class="suggest-meta">
+                                        <span class="suggest-badge">${typeText}</span>
+                                        ${year ? `<span>${year}</span>` : ""}
+                                        <span class="suggest-rating"><i class="fa-solid fa-star"></i> ${rating}</span>
+                                    </div>
+                                </div>
+                            `;
+                            itemEl.onclick = (e) => {
+                                e.stopPropagation();
+                                dropdown.style.display = "none";
+                                window.location.href = `/details?id=${item.subjectId}&path=${encodeURIComponent(item.detailPath)}`;
+                            };
+                            dropdown.appendChild(itemEl);
+                        });
+                        dropdown.style.display = "block";
+                    } else {
+                        dropdown.style.display = "none";
+                    }
+                } catch (e) {
+                    console.error("Error loading suggestions", e);
+                }
+            }, 200);
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener("click", (e) => {
+            if (!e.target.closest(".search-box")) {
+                dropdown.style.display = "none";
+            }
+        });
+
+        // Re-show dropdown if focused and has input
+        searchInput.addEventListener("focus", () => {
+            if (searchInput.value.trim().length >= 1 && dropdown.children.length > 0) {
+                dropdown.style.display = "block";
+            }
+        });
     }
 
     // Toggle filter panel (on Movies / TV pages)

@@ -472,6 +472,8 @@ async def db_get_banners():
             return await cur.fetchall()
 
 async def db_save_subject(s: dict):
+    if is_future_subject(s):
+        return
     pool = await get_db_pool()
     if not pool: return
     dubs_json = json.dumps(s.get("dubs")) if s.get("dubs") is not None else None
@@ -638,6 +640,25 @@ def is_educational_content(title: str, genre: str = "") -> bool:
             return True
 
     return False
+
+
+def is_future_subject(sub: dict) -> bool:
+    if not sub:
+        return False
+    release_date = sub.get("releaseDate") or sub.get("release_date") or ""
+    if not release_date:
+        return False
+    try:
+        import re
+        match = re.search(r'\b(20\d{2})\b', str(release_date))
+        if match:
+            year = int(match.group(1))
+            if year > 2026:
+                return True
+    except Exception:
+        pass
+    return False
+
 
 async def cache_item_metadata_only(item: dict):
     try:
@@ -1806,6 +1827,7 @@ async def get_local_operating_list() -> list:
                     await cur.execute(f"""
                         SELECT * FROM subjects 
                         WHERE subject_type = %s AND title != 'Placeholder'
+                          AND (release_date IS NULL OR release_date = '' OR release_date < '2027')
                         ORDER BY {order_by} 
                         LIMIT 12
                     """, (sec["type"],))
@@ -1822,7 +1844,8 @@ async def get_local_operating_list() -> list:
                             "releaseDate": row["release_date"],
                             "countryName": row["country"],
                             "genre": row["genre"].split(",") if row["genre"] else [],
-                            "isCam": row["is_cam"]
+                            "isCam": row["is_cam"],
+                            "detailPath": row["detail_path"] or ""
                         })
                     
                     if subjects:
@@ -1842,7 +1865,115 @@ async def get_home(page: int = 1, tabId: int = 0):
     if cached:
         return cached
 
-    # Always serve from local database — fast response
+    # Try fetching from remote API
+    try:
+        remote_data = await request_h5_api("GET", f"/wefeed-h5api-bff/tab-operating?page={page}&tabId={tabId}")
+        if remote_data and remote_data.get("code") == 0:
+            operating_list = remote_data.get("data", {}).get("operatingList", [])
+            cleaned_list = []
+            
+            for sec in operating_list:
+                sec_type = sec.get("type")
+                sec_title = sec.get("title", "")
+                
+                # Check for banner list
+                if sec_type == "BANNER":
+                    banner_data = sec.get("banner", {})
+                    items = banner_data.get("items", [])
+                    cleaned_items = []
+                    for item in items:
+                        sub = item.get("subject")
+                        if sub and (is_future_subject(sub) or is_educational_content(sub.get("title", ""))):
+                            continue
+                        cleaned_items.append(item)
+                    
+                    if cleaned_items:
+                        banner_data["items"] = cleaned_items
+                        sec["banner"] = banner_data
+                        sec["name"] = sec_title
+                        cleaned_list.append(sec)
+                        
+                        # Cache banner items asynchronously in database
+                        for item in cleaned_items:
+                            sub = item.get("subject")
+                            sub_id = item.get("subjectId") or (sub.get("subjectId") if sub else None)
+                            if sub_id and str(sub_id) != "0":
+                                img_val = item.get("image")
+                                img_url = img_val.get("url") if isinstance(img_val, dict) else str(img_val or "")
+                                if not img_url and sub:
+                                    img_url = sub.get("cover", {}).get("url") if isinstance(sub.get("cover"), dict) else str(sub.get("cover") or "")
+                                
+                                b_data = {
+                                    "subject_id": str(sub_id),
+                                    "title": item.get("title") or (sub.get("title") if sub else ""),
+                                    "image_url": img_url,
+                                    "detail_path": item.get("detailPath") or (sub.get("detailPath") if sub else ""),
+                                    "subject_type": int(item.get("subjectType") or (sub.get("subjectType") if sub else 1))
+                                }
+                                asyncio.create_task(db_save_banner(b_data))
+                                
+                # Check for regular subjects list
+                elif sec_type == "SUBJECTS_MOVIE" or (sec.get("subjects") and len(sec["subjects"]) > 0):
+                    subjects = sec.get("subjects", [])
+                    cleaned_subjects = []
+                    for sub in subjects:
+                        if is_future_subject(sub) or is_educational_content(sub.get("title", "")):
+                            continue
+                        cleaned_subjects.append(sub)
+                    
+                    if cleaned_subjects:
+                        sec["subjects"] = cleaned_subjects
+                        
+                        # Normalize section names
+                        if "Popular Movie" in sec_title:
+                            sec["title"] = "Trending Now"
+                            sec["name"] = "Trending Now"
+                        elif "Popular Series" in sec_title:
+                            sec["title"] = "Trending Series"
+                            sec["name"] = "Trending Series"
+                        else:
+                            sec["name"] = sec_title
+                            
+                        cleaned_list.append(sec)
+                        
+                        # Asynchronously cache all valid subjects to local database
+                        for sub in cleaned_subjects:
+                            sub_id = sub.get("subjectId")
+                            if sub_id and str(sub_id) != "0":
+                                genres = sub.get("genre", [])
+                                genres_str = ",".join(genres) if isinstance(genres, list) else str(genres)
+                                cover_val = sub.get("cover")
+                                cover_url = cover_val.get("url") if isinstance(cover_val, dict) else str(cover_val)
+                                
+                                s_data = {
+                                    "subject_id": str(sub_id),
+                                    "title": sub.get("title", ""),
+                                    "subject_type": int(sub.get("subjectType", 1)),
+                                    "cover": cover_url,
+                                    "backdrop": cover_url,
+                                    "rating": float(sub.get("imdbRatingValue") or sub.get("score") or 7.5),
+                                    "release_date": sub.get("releaseDate", "2026"),
+                                    "country": sub.get("countryName", ""),
+                                    "genre": genres_str,
+                                    "description": sub.get("description", ""),
+                                    "is_cam": bool(sub.get("isCam", False)),
+                                    "detail_path": sub.get("detailPath")
+                                }
+                                asyncio.create_task(db_save_subject(s_data))
+            
+            result = {
+                "code": 0,
+                "data": {
+                    "items": cleaned_list
+                }
+            }
+            # Cache for 10 minutes locally
+            set_cached_response(cache_key, result, ttl=600.0)
+            return result
+    except Exception as e:
+        print(f"[Home API Proxy Error] {e}")
+
+    # Fallback to local database — fast response
     local_list = await get_local_operating_list()
     result = {
         "code": 0,
@@ -1850,7 +1981,7 @@ async def get_home(page: int = 1, tabId: int = 0):
             "items": local_list
         }
     }
-    set_cached_response(cache_key, result, ttl=120.0)  # Cache for 2 minutes
+    set_cached_response(cache_key, result, ttl=60.0)  # Short cache for fallback
     return result
 
 @app.get("/api/banners")
@@ -1875,6 +2006,62 @@ async def get_banners():
         return {"code": 0, "data": {"list": items}}
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+@app.get("/api/search/suggest")
+async def search_suggest(q: str = ""):
+    q = q.strip()
+    if not q:
+        return {"code": 0, "data": {"items": []}}
+    
+    # Fuzzy subsequence search logic: e.g. "frm" -> "%f%r%m%"
+    subseq = "%" + "%".join(list(q)) + "%"
+    begins = f"{q}%"
+    contains = f"%{q}%"
+    first_char_begins = f"{q[0]}%" if q else "%"
+    
+    pool = await get_db_pool()
+    if not pool:
+        return {"code": 0, "data": {"items": []}}
+        
+    try:
+        async with pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+                # Query subjects matching the query with prioritization
+                await cur.execute("""
+                    SELECT DISTINCT subject_id, title, detail_path, subject_type, cover, rating, release_date
+                    FROM subjects
+                    WHERE title != 'Placeholder'
+                      AND (title LIKE %s OR title LIKE %s OR title LIKE %s)
+                      AND (release_date IS NULL OR release_date = '' OR release_date < '2027')
+                    ORDER BY 
+                      CASE 
+                        WHEN title LIKE %s THEN 1
+                        WHEN title LIKE %s THEN 2
+                        WHEN title LIKE %s THEN 3
+                        ELSE 4
+                      END,
+                      CHAR_LENGTH(title) ASC,
+                      rating DESC
+                    LIMIT 6
+                """, (begins, contains, subseq, begins, contains, first_char_begins))
+                rows = await cur.fetchall()
+                
+                items = []
+                for row in rows:
+                    items.append({
+                        "subjectId": row["subject_id"],
+                        "title": row["title"],
+                        "detailPath": row["detail_path"],
+                        "subjectType": row["subject_type"],
+                        "cover": {"url": row["cover"]},
+                        "rating": str(row["rating"]),
+                        "releaseDate": row["release_date"]
+                    })
+                return {"code": 0, "data": {"items": items}}
+    except Exception as e:
+        print(f"[Suggest Error] {e}")
+        return {"code": 500, "error": str(e)}
+
 
 async def cache_discovered_subjects(home_data: dict):
     operating_list = home_data.get("data", {}).get("operatingList", [])
