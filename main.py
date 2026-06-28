@@ -2841,21 +2841,53 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0, detailPath: str
             
         referer = f"https://123movienow.cc/spa/videoPlayPage/movies/{detail_path}?id={subjectId}&type=/movie/detail"
         origin = "https://123movienow.cc"
-        
-        path = f"/wefeed-h5-bff/web/subject/download?subjectId={subjectId}&se={se}&ep={ep}&_t={int(time.time())}"
-        download_data = await request_h5_api("GET", path, host="https://h5.aoneroom.com", origin=origin, referer=referer)
-        
-        inner_data = download_data.get("data", {})
-        downloads = inner_data.get("downloads", [])
-        captions = inner_data.get("captions", [])
-        
-        if not downloads:
-            # Regex fallback: scan raw JSON response string for any mp4 link
-            raw_text = json.dumps(download_data)
-            mp4_matches = re.findall(r'https?://[^\s"\']+\.mp4[^\s"\']*', raw_text)
-            if mp4_matches:
-                unique_links = list(dict.fromkeys(mp4_matches))
-                downloads = [{"id": f"regex_fallback_{idx}", "resolution": 720 + idx, "size": 0, "url": link} for idx, link in enumerate(unique_links)]
+
+        # Multi-path fallback: try each until we get downloads
+        _fallback_attempts = [
+            # Primary: h5.aoneroom.com web download endpoint
+            {"host": "https://h5.aoneroom.com", "path": f"/wefeed-h5-bff/web/subject/download?subjectId={subjectId}&se={se}&ep={ep}&_t={int(time.time())}"},
+            # Fallback 1: h5-api.aoneroom.com (different host)
+            {"host": "https://h5-api.aoneroom.com", "path": f"/wefeed-h5api-bff/web/subject/download?subjectId={subjectId}&se={se}&ep={ep}&_t={int(time.time())}"},
+            # Fallback 2: alternate path format
+            {"host": "https://h5.aoneroom.com", "path": f"/wefeed-h5-bff/web/subject/download?subjectId={subjectId}&se={se}&ep={ep}&detail={urllib.parse.quote(detail_path)}&_t={int(time.time())}"},
+            # Fallback 3: h5api-bff path variant
+            {"host": "https://h5-api.aoneroom.com", "path": f"/wefeed-h5api-bff/subject/download?subjectId={subjectId}&se={se}&ep={ep}&_t={int(time.time())}"},
+        ]
+
+        download_data = {}
+        downloads = []
+        captions = []
+
+        for attempt in _fallback_attempts:
+            try:
+                print(f"[api/resource] Trying {attempt['host']}{attempt['path']}")
+                download_data = await request_h5_api(
+                    "GET", attempt["path"],
+                    host=attempt["host"],
+                    origin=origin,
+                    referer=referer
+                )
+                inner_data = download_data.get("data", {})
+                downloads = inner_data.get("downloads", [])
+                captions = inner_data.get("captions", [])
+
+                if not downloads:
+                    # Regex fallback: scan raw JSON for any mp4 link
+                    raw_text = json.dumps(download_data)
+                    mp4_matches = re.findall(r'https?://[^\s"\']+\.mp4[^\s"\']*', raw_text)
+                    if mp4_matches:
+                        unique_links = list(dict.fromkeys(mp4_matches))
+                        downloads = [{"id": f"regex_{idx}", "resolution": 720 + idx * 80, "size": 0, "url": link} for idx, link in enumerate(unique_links)]
+
+                if downloads:
+                    print(f"[api/resource] Got {len(downloads)} links from {attempt['host']}")
+                    break  # Success — stop trying more fallbacks
+                else:
+                    print(f"[api/resource] Empty downloads from {attempt['host']}, trying next...")
+
+            except Exception as attempt_err:
+                print(f"[api/resource] Fallback attempt failed ({attempt['host']}): {attempt_err}")
+                continue
 
         items = []
         for r in downloads:
