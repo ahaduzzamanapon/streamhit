@@ -3411,10 +3411,14 @@ async def proxy_sports_stream(
         
     try:
         # Determine client and proxy usage
+        # Only use proxy if BD_PROXY env var is actually configured
         if bd_proxy and use_bd_proxy:
             client = get_proxy_client(bd_proxy)
+            print(f"[Sports Proxy] Using BD proxy for: {url[:80]}")
         else:
             client = get_http_client()
+            if use_bd_proxy and not bd_proxy:
+                print(f"[Sports Proxy] BD_PROXY not configured, using direct connection for: {url[:80]}")
             
         parsed_url = urllib.parse.urlparse(url)
         is_manifest = parsed_url.path.endswith(".m3u8") or ".m3u8" in parsed_url.query
