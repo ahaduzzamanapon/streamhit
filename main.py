@@ -3437,18 +3437,24 @@ async def proxy_sports_stream(
             if resp.status_code != 200:
                 headers = {
                     "Access-Control-Allow-Origin": "*",
-                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
                     "Pragma": "no-cache",
-                    "Expires": "0"
+                    "Expires": "0",
+                    "Surrogate-Control": "no-store",
+                    "CDN-Cache-Control": "no-store",
+                    "Cloudflare-CDN-Cache-Control": "no-store"
                 }
                 return Response(content=resp.content, status_code=resp.status_code, media_type=resp.headers.get("Content-Type"), headers=headers)
             
             rewritten = rewrite_m3u8_manifest(resp.text, url, referer, origin, userAgent, use_bd_proxy)
             headers = {
                 "Access-Control-Allow-Origin": "*",
-                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
                 "Pragma": "no-cache",
-                "Expires": "0"
+                "Expires": "0",
+                "Surrogate-Control": "no-store",
+                "CDN-Cache-Control": "no-store",
+                "Cloudflare-CDN-Cache-Control": "no-store"
             }
             return Response(content=rewritten, media_type="application/vnd.apple.mpegurl", headers=headers)
         else:

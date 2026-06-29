@@ -2332,7 +2332,20 @@ async function playResources() {
 
     if (streamUrl.includes(".m3u8")) {
         if (Hls.isSupported()) {
-            hlsInstance = new Hls();
+            hlsInstance = new Hls({
+                enableWorker: true,
+                lowLatencyMode: true,
+                liveSyncDurationCount: 3,
+                liveMaxLatencyDurationCount: 6,
+                maxBufferLength: 8,
+                maxMaxBufferLength: 15,
+                manifestLoadingMaxRetry: 10,
+                manifestLoadingRetryDelay: 500,
+                levelLoadingMaxRetry: 10,
+                levelLoadingRetryDelay: 500,
+                fragLoadingMaxRetry: 10,
+                fragLoadingRetryDelay: 500
+            });
             const antiCacheUrl = streamUrl + (streamUrl.includes("?") ? "&" : "?") + "_t=" + Date.now();
             hlsInstance.loadSource(antiCacheUrl);
             hlsInstance.attachMedia(videoElement);
