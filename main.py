@@ -3963,38 +3963,42 @@ async def serve_movies(request: Request):
 
 @app.get("/tv", response_class=HTMLResponse)
 async def serve_tv_shows(request: Request):
-    path = os.path.join(base_dir, "public/tv.html")
-    with open(path, "r", encoding="utf-8") as f:
-        html_content = f.read()
+    try:
+        path = os.path.join(base_dir, "public/tv.html")
+        with open(path, "r", encoding="utf-8") as f:
+            html_content = f.read()
+            
+        meta = {
+            "title": "Explore TV Series - Streamfit",
+            "description": "Watch trending television shows and web series online for free. Enjoy full seasons with multiple subtitle and language tracks.",
+            "cover": "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=1200&q=80"
+        }
         
-    meta = {
-        "title": "Explore TV Series - Streamfit",
-        "description": "Watch trending television shows and web series online for free. Enjoy full seasons with multiple subtitle and language tracks.",
-        "cover": "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=1200&q=80"
-    }
-    
-    html_content = html_content.replace("<title>Explore TV Series - Streamfit</title>", f"<title>{meta['title']}</title>")
-    
-    og_tags = f"""
-    <meta name="description" content="{meta['description']}">
-    <meta name="keywords" content="movies, tv shows, streaming, streamfit, watch free, hd movies, hindi dub, bengali dub, watch online">
-    
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="{str(request.url)}">
-    <meta property="og:title" content="{meta['title']}">
-    <meta property="og:description" content="{meta['description']}">
-    <meta property="og:image" content="{meta['cover']}">
+        html_content = html_content.replace("<title>Explore TV Series - Streamfit</title>", f"<title>{meta['title']}</title>")
+        
+        og_tags = f"""
+        <meta name="description" content="{meta['description']}">
+        <meta name="keywords" content="movies, tv shows, streaming, streamfit, watch free, hd movies, hindi dub, bengali dub, watch online">
+        
+        <!-- Open Graph / Facebook -->
+        <meta property="og:type" content="website">
+        <meta property="og:url" content="{str(request.url)}">
+        <meta property="og:title" content="{meta['title']}">
+        <meta property="og:description" content="{meta['description']}">
+        <meta property="og:image" content="{meta['cover']}">
 
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="{str(request.url)}">
-    <meta property="twitter:title" content="{meta['title']}">
-    <meta property="twitter:description" content="{meta['description']}">
-    <meta property="twitter:image" content="{meta['cover']}">
-    """
-    html_content = html_content.replace("</head>", f"{og_tags}\n</head>")
-    return HTMLResponse(content=html_content)
+        <!-- Twitter -->
+        <meta property="twitter:card" content="summary_large_image">
+        <meta property="twitter:url" content="{str(request.url)}">
+        <meta property="twitter:title" content="{meta['title']}">
+        <meta property="twitter:description" content="{meta['description']}">
+        <meta property="twitter:image" content="{meta['cover']}">
+        """
+        html_content = html_content.replace("</head>", f"{og_tags}\n</head>")
+        return HTMLResponse(content=html_content)
+    except Exception as e:
+        import traceback
+        return HTMLResponse(content=f"<pre>Error: {str(e)}\n{traceback.format_exc()}</pre>", status_code=500)
 
 
 @app.get("/live-tv", response_class=HTMLResponse)
