@@ -3898,6 +3898,18 @@ async def serve_home(request: Request):
     return HTMLResponse(content=html_content)
 
 
+@app.get("/debug-routes")
+async def debug_routes():
+    routes = []
+    for route in app.routes:
+        routes.append({
+            "path": route.path,
+            "name": route.name,
+            "methods": list(route.methods) if hasattr(route, "methods") else None
+        })
+    return {"routes": routes}
+
+
 @app.get("/movies", response_class=HTMLResponse)
 async def serve_movies(request: Request):
     path = os.path.join(base_dir, "public/movies.html")
