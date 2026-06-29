@@ -3422,22 +3422,32 @@ async def proxy_sports_stream(
         if is_manifest:
             resp = await client.get(url, headers=headers_to_send, timeout=15.0)
             if resp.status_code != 200:
-                headers = {"Access-Control-Allow-Origin": "*"}
+                headers = {
+                    "Access-Control-Allow-Origin": "*",
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0"
+                }
                 return Response(content=resp.content, status_code=resp.status_code, media_type=resp.headers.get("Content-Type"), headers=headers)
             
             rewritten = rewrite_m3u8_manifest(resp.text, url, referer, origin, userAgent, use_bd_proxy)
             headers = {
                 "Access-Control-Allow-Origin": "*",
-                "Cache-Control": "no-cache"
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
             }
             return Response(content=rewritten, media_type="application/vnd.apple.mpegurl", headers=headers)
         else:
             resp = await client.get(url, headers=headers_to_send, timeout=30.0)
             headers = {}
             for k, v in resp.headers.items():
-                if k.lower() not in ["content-encoding", "transfer-encoding", "access-control-allow-origin", "connection"]:
+                if k.lower() not in ["content-encoding", "transfer-encoding", "access-control-allow-origin", "connection", "cache-control", "pragma", "expires"]:
                     headers[k] = v
             headers["Access-Control-Allow-Origin"] = "*"
+            headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            headers["Pragma"] = "no-cache"
+            headers["Expires"] = "0"
             return Response(content=resp.content, status_code=resp.status_code, headers=headers, media_type=resp.headers.get("Content-Type"))
             
     except Exception as e:
