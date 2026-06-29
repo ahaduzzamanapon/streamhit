@@ -3455,8 +3455,15 @@ async def proxy_sports_stream(
             return Response(content=resp.content, status_code=resp.status_code, headers=headers, media_type=resp.headers.get("Content-Type"))
             
     except Exception as e:
-        print(f"[Sports Proxy Error] URL: {url} | Error: {e}")
-        raise HTTPException(status_code=502, detail=str(e))
+        print(f"[Sports Proxy] Server cannot reach URL directly, redirecting browser: {url[:80]} | Error: {e}")
+        # If server cannot reach the target (e.g. outbound port blocked on shared hosting),
+        # redirect the browser to try the URL directly. The browser often can reach it even
+        # if the server cannot (different network/firewall rules).
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url=url, status_code=302, headers={
+            "Access-Control-Allow-Origin": "*",
+            "Cache-Control": "no-cache"
+        })
 
 # Public Live Sports Listing Endpoint
 @app.get("/api/sports/live")
