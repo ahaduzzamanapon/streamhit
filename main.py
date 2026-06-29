@@ -3410,6 +3410,18 @@ async def proxy_sports_stream(
         headers_to_send["Range"] = range_header
         
     try:
+        parsed_url = urllib.parse.urlparse(url)
+        is_manifest = parsed_url.path.endswith(".m3u8") or ".m3u8" in parsed_url.query
+        is_segment = parsed_url.path.endswith((".ts", ".mp4", ".m4s", ".aac")) or ".ts" in parsed_url.path or "segment" in parsed_url.path
+        
+        if is_segment:
+            # Direct client redirect for heavy video segments to prevent server bandwidth choking
+            from fastapi.responses import RedirectResponse
+            return RedirectResponse(url=url, status_code=302, headers={
+                "Access-Control-Allow-Origin": "*",
+                "Cache-Control": "max-age=3600"
+            })
+            
         # Determine client and proxy usage
         # Only use proxy if BD_PROXY env var is actually configured
         if bd_proxy and use_bd_proxy:
@@ -3419,9 +3431,6 @@ async def proxy_sports_stream(
             client = get_http_client()
             if use_bd_proxy and not bd_proxy:
                 print(f"[Sports Proxy] BD_PROXY not configured, using direct connection for: {url[:80]}")
-            
-        parsed_url = urllib.parse.urlparse(url)
-        is_manifest = parsed_url.path.endswith(".m3u8") or ".m3u8" in parsed_url.query
         
         if is_manifest:
             resp = await client.get(url, headers=headers_to_send, timeout=15.0)

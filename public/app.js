@@ -1854,7 +1854,13 @@ async function initWatchPage() {
         
         // If stream is HTTP but page is HTTPS, redirect to HTTP version of this page.
         // HTTP page can load HTTP streams without mixed content restriction.
-        if (sportUrl.startsWith('http://') && window.location.protocol === 'https:') {
+        let rawUrl = sportUrl;
+        if (sportUrl.includes('/api/sports/proxy?url=')) {
+            try {
+                rawUrl = decodeURIComponent(sportUrl.split('url=')[1].split('&')[0]);
+            } catch(e) {}
+        }
+        if (rawUrl.startsWith('http://') && window.location.protocol === 'https:') {
             window.location.replace(window.location.href.replace('https://', 'http://'));
             return;
         }
