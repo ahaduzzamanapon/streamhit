@@ -3361,8 +3361,13 @@ def rewrite_m3u8_manifest(content: str, base_url: str, referer: str, origin: str
         else:
             # Segment or sub-playlist URL
             absolute_url = urllib.parse.urljoin(base_url, line_strip)
-            proxied_url = f"/api/sports/proxy?url={urllib.parse.quote(absolute_url)}&referer={urllib.parse.quote(referer)}&origin={urllib.parse.quote(origin)}&userAgent={urllib.parse.quote(userAgent)}&use_bd_proxy={'true' if use_bd_proxy else 'false'}"
-            new_lines.append(proxied_url)
+            parsed_line = urllib.parse.urlparse(absolute_url)
+            is_sub_manifest = parsed_line.path.endswith(".m3u8") or ".m3u8" in parsed_line.query
+            if is_sub_manifest:
+                proxied_url = f"/api/sports/proxy?url={urllib.parse.quote(absolute_url)}&referer={urllib.parse.quote(referer)}&origin={urllib.parse.quote(origin)}&userAgent={urllib.parse.quote(userAgent)}&use_bd_proxy={'true' if use_bd_proxy else 'false'}"
+                new_lines.append(proxied_url)
+            else:
+                new_lines.append(absolute_url)
     return "\n".join(new_lines)
 
 # Sports Streaming Proxy Endpoint with Region Lock Bypass
