@@ -876,6 +876,23 @@ async function initWatchPage() {
     const reqSeason = urlParams.get("season") ? parseInt(urlParams.get("season")) : 1;
     const reqEpisode = urlParams.get("episode") ? parseInt(urlParams.get("episode")) : 1;
     
+    const oldStyle = document.getElementById('plyr-live-custom-css');
+    if (oldStyle) oldStyle.remove();
+    if (type === "sports" || type === "tv") {
+        const style = document.createElement('style');
+        style.id = 'plyr-live-custom-css';
+        style.innerHTML = `
+            .plyr__progress, 
+            .plyr__controls [data-plyr="rewind"], 
+            .plyr__controls [data-plyr="fast-forward"],
+            .plyr__time--current,
+            .plyr__time--duration {
+                display: none !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
     if (type !== "sports" && type !== "tv" && !subjectId && !tmdbId) {
         window.location.href = "/";
         return;
@@ -1298,6 +1315,23 @@ async function initWatchPage() {
     const type = urlParams.get("type") || "movie";
     const reqSeason = urlParams.get("season") ? parseInt(urlParams.get("season")) : 1;
     const reqEpisode = urlParams.get("episode") ? parseInt(urlParams.get("episode")) : 1;
+    
+    const oldStyle = document.getElementById('plyr-live-custom-css');
+    if (oldStyle) oldStyle.remove();
+    if (type === "sports" || type === "tv") {
+        const style = document.createElement('style');
+        style.id = 'plyr-live-custom-css';
+        style.innerHTML = `
+            .plyr__progress, 
+            .plyr__controls [data-plyr="rewind"], 
+            .plyr__controls [data-plyr="fast-forward"],
+            .plyr__time--current,
+            .plyr__time--duration {
+                display: none !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
     
     if (type !== "sports" && type !== "tv" && !subjectId && !tmdbId) {
         window.location.href = "/";
@@ -2263,7 +2297,8 @@ async function playResources() {
     if (streamUrl.includes(".m3u8")) {
         if (Hls.isSupported()) {
             hlsInstance = new Hls();
-            hlsInstance.loadSource(streamUrl);
+            const antiCacheUrl = streamUrl + (streamUrl.includes("?") ? "&" : "?") + "_t=" + Date.now();
+            hlsInstance.loadSource(antiCacheUrl);
             hlsInstance.attachMedia(videoElement);
             hlsInstance.on(Hls.Events.MANIFEST_PARSED, function() {
                 triggerAutoplay(playerInstance);
