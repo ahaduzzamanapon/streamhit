@@ -3432,23 +3432,13 @@ async def proxy_sports_stream(
             }
             return Response(content=rewritten, media_type="application/vnd.apple.mpegurl", headers=headers)
         else:
-            req_builder = client.build_request("GET", url, headers=headers_to_send)
-            resp = await client.send(req_builder, stream=True)
-            
+            resp = await client.get(url, headers=headers_to_send, timeout=30.0)
             headers = {}
             for k, v in resp.headers.items():
                 if k.lower() not in ["content-encoding", "transfer-encoding", "access-control-allow-origin", "connection"]:
                     headers[k] = v
             headers["Access-Control-Allow-Origin"] = "*"
-            
-            async def chunk_generator():
-                try:
-                    async for chunk in resp.aiter_bytes(chunk_size=64*1024):
-                        yield chunk
-                finally:
-                    await resp.aclose()
-                        
-            return StreamingResponse(chunk_generator(), status_code=resp.status_code, headers=headers, media_type=resp.headers.get("Content-Type"))
+            return Response(content=resp.content, status_code=resp.status_code, headers=headers, media_type=resp.headers.get("Content-Type"))
             
     except Exception as e:
         print(f"[Sports Proxy Error] URL: {url} | Error: {e}")
