@@ -1,4 +1,7 @@
 import os
+import re
+import json
+import httpx
 import time
 import secrets
 import hashlib
@@ -333,3 +336,310 @@ async def public_download_latest():
                 raise HTTPException(status_code=404, detail="No releases found")
             
             return RedirectResponse(url=row["apk_url"])
+
+import json
+
+@router.get("/api/admin/sports")
+async def admin_get_sports(request: Request):
+    check_admin_auth(request)
+    from main import get_db_pool
+    pool = await get_db_pool()
+    if not pool: return {"list": []}
+    
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute("SELECT * FROM live_sports ORDER BY created_at DESC")
+            rows = await cur.fetchall()
+            
+            items = []
+            for r in rows:
+                try:
+                    links = json.loads(r["stream_links"])
+                except Exception:
+                    links = []
+                items.append({
+                    "id": r["id"],
+                    "title": r["title"],
+                    "logo": r["logo"] or "",
+                    "team1Name": r["team1_name"] or "",
+                    "team1Logo": r["team1_logo"] or "",
+                    "team2Name": r["team2_name"] or "",
+                    "team2Logo": r["team2_logo"] or "",
+                    "streamLinks": links,
+                    "referer": r["referer"] or "",
+                    "origin": r["origin"] or "",
+                    "useBdProxy": bool(r["use_bd_proxy"])
+                })
+            return {"list": items}
+
+@router.post("/api/admin/sports")
+async def admin_save_sport(data: dict, request: Request):
+    check_admin_auth(request)
+    sport_id = data.get("id")
+    title = data.get("title")
+    logo = data.get("logo")
+    team1_name = data.get("team1Name")
+    team1_logo = data.get("team1Logo")
+    team2_name = data.get("team2Name")
+    team2_logo = data.get("team2Logo")
+    stream_links = data.get("streamLinks")
+    referer = data.get("referer")
+    origin = data.get("origin")
+    use_bd_proxy = bool(data.get("useBdProxy", True))
+    
+    if not title or not stream_links:
+        raise HTTPException(status_code=400, detail="Title and stream links are required")
+        
+    if isinstance(stream_links, (list, dict)):
+        stream_links_str = json.dumps(stream_links)
+    else:
+        stream_links_str = str(stream_links)
+        
+    from main import get_db_pool
+    pool = await get_db_pool()
+    if not pool: raise HTTPException(status_code=500, detail="DB Pool not ready")
+    
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            if sport_id:
+                await cur.execute("""
+                    UPDATE live_sports 
+                    SET title=%s, logo=%s, team1_name=%s, team1_logo=%s, team2_name=%s, team2_logo=%s, 
+                        stream_links=%s, referer=%s, origin=%s, use_bd_proxy=%s
+                    WHERE id=%s
+                """, (title, logo, team1_name, team1_logo, team2_name, team2_logo, 
+                      stream_links_str, referer, origin, use_bd_proxy, int(sport_id)))
+            else:
+                await cur.execute("""
+                    INSERT INTO live_sports (title, logo, team1_name, team1_logo, team2_name, team2_logo, stream_links, referer, origin, use_bd_proxy)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (title, logo, team1_name, team1_logo, team2_name, team2_logo, 
+                      stream_links_str, referer, origin, use_bd_proxy))
+                      
+    return {"code": 0, "message": "Live sport saved successfully"}
+
+@router.delete("/api/admin/sports/{sport_id}")
+async def admin_delete_sport(sport_id: int, request: Request):
+    check_admin_auth(request)
+    from main import get_db_pool
+    pool = await get_db_pool()
+    if not pool: raise HTTPException(status_code=500, detail="DB Pool not ready")
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute("DELETE FROM live_sports WHERE id = %s", (sport_id,))
+    return {"code": 0, "message": "Live sport deleted successfully"}
+
+@router.get("/api/admin/tv-channels")
+async def admin_get_tv_channels(request: Request):
+    check_admin_auth(request)
+    from main import get_db_pool
+    pool = await get_db_pool()
+    if not pool: return {"list": []}
+    
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute("SELECT * FROM live_tv_channels ORDER BY created_at DESC")
+            rows = await cur.fetchall()
+            
+            items = []
+            for r in rows:
+                try:
+                    links = json.loads(r["stream_links"])
+                except Exception:
+                    links = []
+                items.append({
+                    "id": r["id"],
+                    "name": r["name"],
+                    "logo": r["logo"] or "",
+                    "category": r["category"] or "General",
+                    "streamLinks": links,
+                    "referer": r["referer"] or "",
+                    "origin": r["origin"] or "",
+                    "useBdProxy": bool(r["use_bd_proxy"])
+                })
+            return {"list": items}
+
+@router.post("/api/admin/tv-channels")
+async def admin_save_tv_channel(data: dict, request: Request):
+    check_admin_auth(request)
+    channel_id = data.get("id")
+    name = data.get("name")
+    logo = data.get("logo")
+    category = data.get("category") or "General"
+    stream_links = data.get("streamLinks")
+    referer = data.get("referer")
+    origin = data.get("origin")
+    use_bd_proxy = bool(data.get("useBdProxy", True))
+    
+    if not name or not stream_links:
+        raise HTTPException(status_code=400, detail="Channel name and stream links are required")
+        
+    if isinstance(stream_links, (list, dict)):
+        stream_links_str = json.dumps(stream_links)
+    else:
+        stream_links_str = str(stream_links)
+        
+    from main import get_db_pool
+    pool = await get_db_pool()
+    if not pool: raise HTTPException(status_code=500, detail="DB Pool not ready")
+    
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            if channel_id:
+                await cur.execute("""
+                    UPDATE live_tv_channels 
+                    SET name=%s, logo=%s, category=%s, stream_links=%s, referer=%s, origin=%s, use_bd_proxy=%s
+                    WHERE id=%s
+                """, (name, logo, category, stream_links_str, referer, origin, use_bd_proxy, int(channel_id)))
+            else:
+                await cur.execute("""
+                    INSERT INTO live_tv_channels (name, logo, category, stream_links, referer, origin, use_bd_proxy)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (name, logo, category, stream_links_str, referer, origin, use_bd_proxy))
+                
+    return {"code": 0, "message": "Live TV channel saved successfully"}
+
+@router.delete("/api/admin/tv-channels/{channel_id}")
+async def admin_delete_tv_channel(channel_id: int, request: Request):
+    check_admin_auth(request)
+    from main import get_db_pool
+    pool = await get_db_pool()
+    if not pool: raise HTTPException(status_code=500, detail="DB Pool not ready")
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute("DELETE FROM live_tv_channels WHERE id = %s", (channel_id,))
+    return {"code": 0, "message": "Live TV channel deleted successfully"}
+
+def parse_m3u_text(text: str) -> list:
+    channels = []
+    lines = text.splitlines()
+    
+    current_extinf = None
+    
+    tvg_name_regex = re.compile(r'tvg-name=["\']([^"\']+)["\']', re.IGNORECASE)
+    tvg_logo_regex = re.compile(r'tvg-logo=["\']([^"\']+)["\']', re.IGNORECASE)
+    group_title_regex = re.compile(r'group-title=["\']([^"\']+)["\']', re.IGNORECASE)
+    
+    for line in lines:
+        line_strip = line.strip()
+        if not line_strip:
+            continue
+            
+        if line_strip.startswith("#EXTINF:"):
+            name = ""
+            if "," in line_strip:
+                name = line_strip.rsplit(",", 1)[1].strip()
+                
+            tvg_name_match = tvg_name_regex.search(line_strip)
+            tvg_logo_match = tvg_logo_regex.search(line_strip)
+            group_title_match = group_title_regex.search(line_strip)
+            
+            tvg_name = tvg_name_match.group(1).strip() if tvg_name_match else name
+            logo = tvg_logo_match.group(1).strip() if tvg_logo_match else ""
+            category = group_title_match.group(1).strip() if group_title_match else "General"
+            
+            if not tvg_name and name:
+                tvg_name = name
+            if not tvg_name:
+                tvg_name = "Unknown Channel"
+                
+            current_extinf = {
+                "name": tvg_name,
+                "logo": logo,
+                "category": category
+            }
+        elif line_strip.startswith("#"):
+            continue
+        else:
+            if current_extinf:
+                current_extinf["url"] = line_strip
+                channels.append(current_extinf)
+                current_extinf = None
+                
+    return channels
+
+@router.post("/api/admin/tv-channels/parse-m3u")
+async def admin_parse_m3u_endpoint(data: dict, request: Request):
+    check_admin_auth(request)
+    url = data.get("url", "").strip()
+    content = data.get("content", "").strip()
+    
+    if not url and not content:
+        raise HTTPException(status_code=400, detail="M3U URL or content is required")
+        
+    if url:
+        try:
+            async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
+                resp = await client.get(url)
+                if resp.status_code != 200:
+                    raise HTTPException(status_code=400, detail=f"Failed to fetch M3U: Status {resp.status_code}")
+                content = resp.text
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to fetch M3U URL: {e}")
+            
+    parsed = parse_m3u_text(content)
+    return {"code": 0, "list": parsed}
+
+@router.post("/api/admin/tv-channels/import")
+async def admin_import_tv_channels(data: dict, request: Request):
+    check_admin_auth(request)
+    channels = data.get("channels")
+    if not channels or not isinstance(channels, list):
+        raise HTTPException(status_code=400, detail="Channels list is required")
+        
+    from main import get_db_pool
+    pool = await get_db_pool()
+    if not pool: raise HTTPException(status_code=500, detail="DB Pool not ready")
+    
+    skipped = 0
+    added = 0
+    updated = 0
+    
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            for ch in channels:
+                name = ch.get("name", "").strip()
+                logo = ch.get("logo", "").strip()
+                category = ch.get("category", "").strip() or "General"
+                url = ch.get("url", "").strip()
+                
+                if not name or not url:
+                    continue
+                    
+                await cur.execute("SELECT * FROM live_tv_channels WHERE name = %s", (name,))
+                existing = await cur.fetchone()
+                
+                if existing:
+                    try:
+                        links = json.loads(existing["stream_links"])
+                    except Exception:
+                        links = []
+                        
+                    has_url = any(l.get("url") == url for l in links)
+                    if has_url:
+                        skipped += 1
+                        continue
+                        
+                    label = f"Link {len(links) + 1}"
+                    links.append({"label": label, "url": url})
+                    links_str = json.dumps(links)
+                    
+                    await cur.execute("""
+                        UPDATE live_tv_channels 
+                        SET stream_links = %s
+                        WHERE id = %s
+                    """, (links_str, existing["id"]))
+                    updated += 1
+                else:
+                    links = [{"label": "Link 1", "url": url}]
+                    links_str = json.dumps(links)
+                    await cur.execute("""
+                        INSERT INTO live_tv_channels (name, logo, category, stream_links, referer, origin, use_bd_proxy)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """, (name, logo, category, links_str, "", "", True))
+                    added += 1
+                    
+    return {
+        "code": 0,
+        "message": f"Import completed successfully. Added: {added}, Updated (link added): {updated}, Skipped (duplicate): {skipped}"
+    }

@@ -751,6 +751,8 @@
             <button onclick="switchTab('banners')" id="btn-banners" class="tab-btn active">Banners Configuration</button>
             <button onclick="switchTab('notifications')" id="btn-notifications" class="tab-btn">Push Notifications</button>
             <button onclick="switchTab('version')" id="btn-version" class="tab-btn">Version Control & APK</button>
+            <button onclick="switchTab('sports')" id="btn-sports" class="tab-btn">Live Sports</button>
+            <button onclick="switchTab('tv')" id="btn-tv" class="tab-btn">Live TV Channels</button>
         </div>
 
         <!-- ── Live Active Users Bar ── -->
@@ -955,6 +957,188 @@
                 </div>
             </div>
         </div>
+
+        <!-- Live Sports Tab Panel -->
+        <div id="panel-sports" class="tab-panel">
+            <div class="grid-2">
+                <div>
+                    <h2>Active Live Sports</h2>
+                    <div id="activeSportsList" class="banner-list">
+                        <!-- Filled dynamically -->
+                        <div class="banner-item"><p style="color: var(--text-muted);">Loading active sports...</p></div>
+                    </div>
+                </div>
+
+                <div>
+                    <h2 id="sportFormTitle">Add Live Sport Event</h2>
+                    <div class="card">
+                        <form id="sportsForm" onsubmit="handleSaveSport(event)">
+                            <input type="hidden" id="sportId">
+                            <div class="form-group">
+                                <label for="sportTitle">Event Title *</label>
+                                <input type="text" id="sportTitle" required placeholder="e.g. FIFA World Cup 2026">
+                            </div>
+                            <div class="form-group">
+                                <label for="sportLogo">Event Logo URL</label>
+                                <input type="text" id="sportLogo" placeholder="e.g. https://domain.com/logo.png">
+                            </div>
+                            
+                            <h3 style="font-size: 14px; margin-bottom: 12px; font-family: 'Outfit'; color: var(--secondary-accent); text-transform: uppercase; letter-spacing: 0.5px;">Teams (Optional)</h3>
+                            <div class="grid-2" style="gap: 16px; margin-bottom: 16px;">
+                                <div>
+                                    <div class="form-group">
+                                        <label for="sportTeam1Name">Team 1 Name</label>
+                                        <input type="text" id="sportTeam1Name" placeholder="e.g. Argentina">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="sportTeam1Logo">Team 1 Logo URL</label>
+                                        <input type="text" id="sportTeam1Logo" placeholder="e.g. https://domain.com/arg.png">
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="form-group">
+                                        <label for="sportTeam2Name">Team 2 Name</label>
+                                        <input type="text" id="sportTeam2Name" placeholder="e.g. France">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="sportTeam2Logo">Team 2 Logo URL</label>
+                                        <input type="text" id="sportTeam2Logo" placeholder="e.g. https://domain.com/fra.png">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <h3 style="font-size: 14px; margin-bottom: 12px; font-family: 'Outfit'; color: var(--secondary-accent); text-transform: uppercase; letter-spacing: 0.5px;">Stream Settings</h3>
+                            <div class="form-group">
+                                <label for="sportReferer">Referer (Optional)</label>
+                                <input type="text" id="sportReferer" placeholder="e.g. https://tahmidx.cinemoja2.workers.dev/">
+                            </div>
+                            <div class="form-group">
+                                <label for="sportOrigin">Origin (Optional)</label>
+                                <input type="text" id="sportOrigin" placeholder="e.g. https://tahmidx.cinemoja2.workers.dev">
+                            </div>
+                            
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="sportUseBdProxy" checked>
+                                <label for="sportUseBdProxy">Route through Bangladeshi region-lock bypass proxy</label>
+                            </div>
+                            
+                            <h3 style="font-size: 14px; margin-bottom: 12px; font-family: 'Outfit'; color: var(--secondary-accent); text-transform: uppercase; letter-spacing: 0.5px;">Stream Links *</h3>
+                            <div class="form-group">
+                                <label for="sportStreamLinks">Stream Links (JSON List of Name & URL) *</label>
+                                <textarea id="sportStreamLinks" required rows="4" style="font-family: monospace; font-size: 12px;" placeholder='[\n  {"label": "Link 1", "url": "https://...m3u8"},\n  {"label": "Link 2", "url": "https://...m3u8"}\n]'></textarea>
+                            </div>
+
+                            <button type="submit" class="btn" style="width: 100%;" id="sportSaveBtn">Save Live Sport Event</button>
+                            <button type="button" class="btn btn-secondary" style="width: 100%; margin-top: 8px; display: none;" id="sportCancelEditBtn" onclick="cancelSportEdit()">Cancel Edit</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live TV Tab Panel -->
+        <div id="panel-tv" class="tab-panel">
+            <div class="grid-2">
+                <div>
+                    <h2>Active Live TV Channels</h2>
+                    <div id="activeTvList" class="banner-list">
+                        <!-- Filled dynamically -->
+                        <div class="banner-item"><p style="color: var(--text-muted);">Loading active channels...</p></div>
+                    </div>
+                </div>
+
+                <div>
+                    <h2 id="tvFormTitle">Add Live TV Channel</h2>
+                    <div class="card">
+                        <form id="tvForm" onsubmit="handleSaveTvChannel(event)">
+                            <input type="hidden" id="tvId">
+                            <div class="form-group">
+                                <label for="tvName">Channel Name *</label>
+                                <input type="text" id="tvName" required placeholder="e.g. Sony Ten 1 HD">
+                            </div>
+                            <div class="form-group">
+                                <label for="tvLogo">Channel Logo URL</label>
+                                <input type="text" id="tvLogo" placeholder="e.g. https://domain.com/sony_logo.png">
+                            </div>
+                            <div class="form-group">
+                                <label for="tvCategory">Category (e.g. Sports, News, Entertainment)</label>
+                                <input type="text" id="tvCategory" placeholder="e.g. Sports">
+                            </div>
+                            
+                            <h3 style="font-size: 14px; margin-bottom: 12px; font-family: 'Outfit'; color: var(--secondary-accent); text-transform: uppercase; letter-spacing: 0.5px;">Stream Settings</h3>
+                            <div class="form-group">
+                                <label for="tvReferer">Referer (Optional)</label>
+                                <input type="text" id="tvReferer" placeholder="e.g. https://referer.com/">
+                            </div>
+                            <div class="form-group">
+                                <label for="tvOrigin">Origin (Optional)</label>
+                                <input type="text" id="tvOrigin" placeholder="e.g. https://origin.com">
+                            </div>
+                            
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="tvUseBdProxy" checked>
+                                <label for="tvUseBdProxy">Route through Bangladeshi region-lock bypass proxy</label>
+                            </div>
+                            
+                            <h3 style="font-size: 14px; margin-bottom: 12px; font-family: 'Outfit'; color: var(--secondary-accent); text-transform: uppercase; letter-spacing: 0.5px;">Backup Stream Links *</h3>
+                            <div class="form-group">
+                                <label for="tvStreamLinks">Stream Links (JSON List of Name & URL) *</label>
+                                <textarea id="tvStreamLinks" required rows="4" style="font-family: monospace; font-size: 12px;" placeholder='[\n  {"label": "Link 1", "url": "https://...m3u8"},\n  {"label": "Link 2", "url": "https://...m3u8"}\n]'></textarea>
+                            </div>
+
+                            <button type="submit" class="btn" style="width: 100%;" id="tvSaveBtn">Save Live TV Channel</button>
+                            <button type="button" class="btn btn-secondary" style="width: 100%; margin-top: 8px; display: none;" id="tvCancelEditBtn" onclick="cancelTvEdit()">Cancel Edit</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid var(--border-color); margin: 32px 0;">
+            
+            <h2>Bulk Import TV Channels (M3U Playlist)</h2>
+            <div class="card" style="margin-bottom: 24px;">
+                <div class="form-group">
+                    <label for="m3uUrl">M3U Playlist URL</label>
+                    <input type="text" id="m3uUrl" placeholder="e.g. https://domain.com/channels.m3u">
+                </div>
+                <div style="text-align: center; margin: 12px 0; color: var(--text-muted); font-size: 13px;">— OR —</div>
+                <div class="form-group">
+                    <label for="m3uContent">Paste M3U Content</label>
+                    <textarea id="m3uContent" rows="6" style="font-family: monospace; font-size: 12px;" placeholder="#EXTM3U&#10;#EXTINF:-1 tvg-logo=&quot;...&quot; group-title=&quot;Sports&quot;,Sony Sports TEN 2&#10;https://...m3u8"></textarea>
+                </div>
+                <button type="button" class="btn" style="background: linear-gradient(135deg, #00C8FF, #0078FF);" onclick="handleParseM3U(event)">Parse Playlist</button>
+            </div>
+
+            <div id="m3uParsedSection" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <h3>Parsed M3U Channels (<span id="m3uCount">0</span> found)</h3>
+                    <div>
+                        <button type="button" class="btn btn-secondary" onclick="toggleSelectAllM3U(true)" style="padding: 6px 12px; font-size: 12px;">Select All</button>
+                        <button type="button" class="btn btn-secondary" onclick="toggleSelectAllM3U(false)" style="padding: 6px 12px; font-size: 12px; margin-left: 6px;">Deselect All</button>
+                    </div>
+                </div>
+                <div class="card" style="padding: 0; overflow-x: auto; margin-bottom: 16px;">
+                    <table style="width: 100%; border-collapse: collapse; min-width: 800px;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid var(--border-color); background: var(--bg-hover);">
+                                <th style="padding: 12px; width: 40px; text-align: center;"><input type="checkbox" id="m3uHeaderCheck" onchange="handleHeaderCheckChange(this)" checked></th>
+                                <th style="padding: 12px; text-align: left; width: 180px;">Logo</th>
+                                <th style="padding: 12px; text-align: left;">Channel Name</th>
+                                <th style="padding: 12px; text-align: left; width: 140px;">Category</th>
+                                <th style="padding: 12px; text-align: left;">Stream URL</th>
+                                <th style="padding: 12px; text-align: center; width: 100px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="m3uParsedList">
+                            <!-- Filled dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+                    <button type="button" class="btn" id="m3uImportBtn" onclick="handleImportM3U()" style="background: linear-gradient(135deg, #00FF87, #60EFFF); color: #000; font-weight: bold;">Import Selected Channels</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Toast Notification element -->
@@ -1049,6 +1233,8 @@
             fetchActiveBanners();
             fetchNotificationHistory();
             fetchCurrentVersion();
+            fetchLiveSports();
+            fetchLiveTvChannels();
         }
 
         function switchTab(tab) {
@@ -1440,6 +1626,439 @@
             const overlay = document.getElementById('loginOverlay');
             if (overlay) observer.observe(overlay, { attributes: true, attributeFilter: ['class'] });
         });
+
+        // --- LIVE SPORTS TAB LOGIC ---
+        async function fetchLiveSports() {
+            try {
+                const res = await fetch('/api/admin/sports', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.status === 401) { handleLogout(); return; }
+                const data = await res.json();
+                
+                const container = document.getElementById('activeSportsList');
+                container.innerHTML = '';
+                
+                window.liveSportsList = data.list || [];
+                
+                if (!window.liveSportsList || window.liveSportsList.length === 0) {
+                    container.innerHTML = `<div class="banner-item"><p style="color: var(--text-muted);">No live sports matches configured.</p></div>`;
+                    return;
+                }
+                
+                window.liveSportsList.forEach(s => {
+                    const eventLogo = s.logo || s.team1Logo || 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=120&q=80';
+                    const teamInfo = s.team1Name ? `${s.team1Name} vs ${s.team2Name}` : 'Event Match';
+                    container.innerHTML += `
+                        <div class="banner-item">
+                            <img src="${eventLogo}" onerror="this.src='https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=120&q=80'" alt="logo" style="width:48px; height:48px; object-fit:contain; border-radius:8px; background: rgba(255,255,255,0.05); padding: 4px;">
+                            <div class="banner-item-info">
+                                <div class="banner-item-title">${s.title}</div>
+                                <div class="banner-item-meta">${teamInfo} | Streams: ${s.streamLinks ? s.streamLinks.length : 0}</div>
+                            </div>
+                            <div style="display:flex; gap: 8px;">
+                                <button onclick="editSport(${s.id})" class="logout-btn" style="color:var(--secondary-accent); border-color:rgba(0,240,255,0.15)">Edit</button>
+                                <button onclick="deleteSport(${s.id})" class="logout-btn" style="color:#FF3838; border-color:rgba(255,0,0,0.15)">Delete</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function handleSaveSport(e) {
+            e.preventDefault();
+            const id = document.getElementById('sportId').value || null;
+            const title = document.getElementById('sportTitle').value.trim();
+            const logo = document.getElementById('sportLogo').value.trim();
+            const team1Name = document.getElementById('sportTeam1Name').value.trim();
+            const team1Logo = document.getElementById('sportTeam1Logo').value.trim();
+            const team2Name = document.getElementById('sportTeam2Name').value.trim();
+            const team2Logo = document.getElementById('sportTeam2Logo').value.trim();
+            const referer = document.getElementById('sportReferer').value.trim();
+            const origin = document.getElementById('sportOrigin').value.trim();
+            const useBdProxy = document.getElementById('sportUseBdProxy').checked;
+            const streamLinksRaw = document.getElementById('sportStreamLinks').value.trim();
+
+            let streamLinks;
+            try {
+                streamLinks = JSON.parse(streamLinksRaw);
+                if (!Array.isArray(streamLinks)) throw new Error('Must be a JSON Array');
+            } catch (err) {
+                showToast('Invalid Stream Links JSON. Must be an array, e.g. [{"label":"Link 1", "url":"..."}]', false);
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/admin/sports', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ id, title, logo, team1Name, team1Logo, team2Name, team2Logo, streamLinks, referer, origin, useBdProxy })
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(id ? 'Sport match updated successfully!' : 'Sport match added successfully!');
+                    cancelSportEdit();
+                    fetchLiveSports();
+                } else {
+                    showToast(data.detail || 'Failed to save live sport.', false);
+                }
+            } catch (_) {
+                showToast('Failed to save live sport.', false);
+            }
+        }
+
+        function editSport(id) {
+            const sport = (window.liveSportsList || []).find(s => s.id == id);
+            if (!sport) return;
+
+            document.getElementById('sportId').value = sport.id;
+            document.getElementById('sportTitle').value = sport.title;
+            document.getElementById('sportLogo').value = sport.logo || '';
+            document.getElementById('sportTeam1Name').value = sport.team1Name || '';
+            document.getElementById('sportTeam1Logo').value = sport.team1Logo || '';
+            document.getElementById('sportTeam2Name').value = sport.team2Name || '';
+            document.getElementById('sportTeam2Logo').value = sport.team2Logo || '';
+            document.getElementById('sportReferer').value = sport.referer || '';
+            document.getElementById('sportOrigin').value = sport.origin || '';
+            document.getElementById('sportUseBdProxy').checked = !!sport.useBdProxy;
+            document.getElementById('sportStreamLinks').value = JSON.stringify(sport.streamLinks, null, 2);
+
+            document.getElementById('sportFormTitle').textContent = 'Edit Live Sport Event';
+            document.getElementById('sportSaveBtn').textContent = 'Update Live Sport Event';
+            document.getElementById('sportCancelEditBtn').style.display = 'inline-block';
+            
+            document.getElementById('sportsForm').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function cancelSportEdit() {
+            document.getElementById('sportsForm').reset();
+            document.getElementById('sportId').value = '';
+            document.getElementById('sportFormTitle').textContent = 'Add Live Sport Event';
+            document.getElementById('sportSaveBtn').textContent = 'Save Live Sport Event';
+            document.getElementById('sportCancelEditBtn').style.display = 'none';
+        }
+
+        async function deleteSport(id) {
+            if (!confirm('Are you sure you want to delete this live sport event?')) return;
+            try {
+                const res = await fetch(`/api/admin/sports/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    showToast('Live sport event deleted.');
+                    if (document.getElementById('sportId').value == id) {
+                        cancelSportEdit();
+                    }
+                    fetchLiveSports();
+                } else {
+                    showToast('Failed to delete live sport.', false);
+                }
+            } catch (_) {
+                showToast('Failed to delete live sport.', false);
+            }
+        }
+
+        // --- LIVE TV CHANNELS TAB LOGIC ---
+        async function fetchLiveTvChannels() {
+            try {
+                const res = await fetch('/api/admin/tv-channels', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.status === 401) { handleLogout(); return; }
+                const data = await res.json();
+                
+                const container = document.getElementById('activeTvList');
+                container.innerHTML = '';
+                
+                window.liveTvChannelsList = data.list || [];
+                
+                if (!window.liveTvChannelsList || window.liveTvChannelsList.length === 0) {
+                    container.innerHTML = `<div class="banner-item"><p style="color: var(--text-muted);">No live TV channels configured.</p></div>`;
+                    return;
+                }
+                
+                window.liveTvChannelsList.forEach(c => {
+                    const channelLogo = c.logo || 'https://images.unsplash.com/photo-1598257006458-087169a1f08d?w=120&q=80';
+                    container.innerHTML += `
+                        <div class="banner-item">
+                            <img src="${channelLogo}" onerror="this.src='https://images.unsplash.com/photo-1598257006458-087169a1f08d?w=120&q=80'" alt="logo" style="width:48px; height:48px; object-fit:contain; border-radius:8px; background: rgba(255,255,255,0.05); padding: 4px;">
+                            <div class="banner-item-info">
+                                <div class="banner-item-title">${c.name}</div>
+                                <div class="banner-item-meta">Category: ${c.category} | Streams: ${c.streamLinks ? c.streamLinks.length : 0}</div>
+                            </div>
+                            <div style="display:flex; gap: 8px;">
+                                <button onclick="editTvChannel(${c.id})" class="logout-btn" style="color:var(--secondary-accent); border-color:rgba(0,240,255,0.15)">Edit</button>
+                                <button onclick="deleteTvChannel(${c.id})" class="logout-btn" style="color:#FF3838; border-color:rgba(255,0,0,0.15)">Delete</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function handleSaveTvChannel(e) {
+            e.preventDefault();
+            const id = document.getElementById('tvId').value || null;
+            const name = document.getElementById('tvName').value.trim();
+            const logo = document.getElementById('tvLogo').value.trim();
+            const category = document.getElementById('tvCategory').value.trim() || 'General';
+            const referer = document.getElementById('tvReferer').value.trim();
+            const origin = document.getElementById('tvOrigin').value.trim();
+            const useBdProxy = document.getElementById('tvUseBdProxy').checked;
+            const streamLinksRaw = document.getElementById('tvStreamLinks').value.trim();
+
+            let streamLinks;
+            try {
+                streamLinks = JSON.parse(streamLinksRaw);
+                if (!Array.isArray(streamLinks)) throw new Error('Must be a JSON Array');
+            } catch (err) {
+                showToast('Invalid Stream Links JSON. Must be an array, e.g. [{"label":"Link 1", "url":"..."}]', false);
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/admin/tv-channels', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ id, name, logo, category, streamLinks, referer, origin, useBdProxy })
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(id ? 'TV channel updated successfully!' : 'TV channel added successfully!');
+                    cancelTvEdit();
+                    fetchLiveTvChannels();
+                } else {
+                    showToast(data.detail || 'Failed to save TV channel.', false);
+                }
+            } catch (_) {
+                showToast('Failed to save TV channel.', false);
+            }
+        }
+
+        function editTvChannel(id) {
+            const channel = (window.liveTvChannelsList || []).find(c => c.id == id);
+            if (!channel) return;
+
+            document.getElementById('tvId').value = channel.id;
+            document.getElementById('tvName').value = channel.name;
+            document.getElementById('tvLogo').value = channel.logo || '';
+            document.getElementById('tvCategory').value = channel.category || '';
+            document.getElementById('tvReferer').value = channel.referer || '';
+            document.getElementById('tvOrigin').value = channel.origin || '';
+            document.getElementById('tvUseBdProxy').checked = !!channel.useBdProxy;
+            document.getElementById('tvStreamLinks').value = JSON.stringify(channel.streamLinks, null, 2);
+
+            document.getElementById('tvFormTitle').textContent = 'Edit Live TV Channel';
+            document.getElementById('tvSaveBtn').textContent = 'Update Live TV Channel';
+            document.getElementById('tvCancelEditBtn').style.display = 'inline-block';
+            
+            document.getElementById('tvForm').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function cancelTvEdit() {
+            document.getElementById('tvForm').reset();
+            document.getElementById('tvId').value = '';
+            document.getElementById('tvFormTitle').textContent = 'Add Live TV Channel';
+            document.getElementById('tvSaveBtn').textContent = 'Save Live TV Channel';
+            document.getElementById('tvCancelEditBtn').style.display = 'none';
+        }
+
+        async function deleteTvChannel(id) {
+            if (!confirm('Are you sure you want to delete this live TV channel?')) return;
+            try {
+                const res = await fetch(`/api/admin/tv-channels/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    showToast('Live TV channel deleted.');
+                    if (document.getElementById('tvId').value == id) {
+                        cancelTvEdit();
+                    }
+                    fetchLiveTvChannels();
+                } else {
+                    showToast('Failed to delete TV channel.', false);
+                }
+            } catch (_) {
+                showToast('Failed to delete TV channel.', false);
+            }
+        }
+
+        // --- M3U BULK UPLOADER LOGIC ---
+        let parsedM3UChannels = [];
+
+        async function handleParseM3U(event) {
+            if (event) event.preventDefault();
+            const url = document.getElementById('m3uUrl').value.trim();
+            const content = document.getElementById('m3uContent').value.trim();
+            
+            if (!url && !content) {
+                showToast('Please provide an M3U URL or paste content', false);
+                return;
+            }
+            
+            const btn = document.querySelector('[onclick="handleParseM3U(event)"]');
+            const originalText = btn.innerText;
+            btn.innerText = 'Parsing...';
+            btn.disabled = true;
+            
+            try {
+                const resp = await fetch('/api/admin/tv-channels/parse-m3u', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ url, content })
+                });
+                
+                const res = await resp.json();
+                if (resp.status !== 200) {
+                    throw new Error(res.detail || 'Failed to parse');
+                }
+                
+                parsedM3UChannels = (res.list || []).map((ch, idx) => ({
+                    id: idx,
+                    selected: true,
+                    name: ch.name,
+                    logo: ch.logo,
+                    category: ch.category,
+                    url: ch.url
+                }));
+                
+                renderM3UTable();
+                document.getElementById('m3uParsedSection').style.display = 'block';
+                showToast(`Successfully parsed ${parsedM3UChannels.length} channels`);
+            } catch (e) {
+                showToast(e.message, false);
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        function renderM3UTable() {
+            const tbody = document.getElementById('m3uParsedList');
+            document.getElementById('m3uCount').innerText = parsedM3UChannels.length;
+            
+            if (parsedM3UChannels.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="padding: 24px; text-align: center; color: var(--text-muted);">No parsed channels available.</td></tr>';
+                document.getElementById('m3uImportBtn').disabled = true;
+                return;
+            }
+            
+            document.getElementById('m3uImportBtn').disabled = false;
+            
+            tbody.innerHTML = parsedM3UChannels.map(ch => `
+                <tr style="border-bottom: 1px solid var(--border-color); vertical-align: middle;">
+                    <td style="padding: 12px; text-align: center;">
+                        <input type="checkbox" ${ch.selected ? 'checked' : ''} onchange="handleM3USelectRow(${ch.id}, this.checked)">
+                    </td>
+                    <td style="padding: 12px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <img src="${ch.logo || 'https://images.unsplash.com/photo-1598257006458-087169a1f08d?w=120&q=80'}" style="width: 32px; height: 32px; object-fit: contain; background: #000; border-radius: 4px; border: 1px solid var(--border-color);" onerror="this.src='https://images.unsplash.com/photo-1598257006458-087169a1f08d?w=120&q=80'">
+                            <input type="text" value="${ch.logo}" onchange="handleM3UEditField(${ch.id}, 'logo', this.value)" style="font-size: 11px; padding: 4px; width: 120px;" placeholder="Logo URL">
+                        </div>
+                    </td>
+                    <td style="padding: 12px;">
+                        <input type="text" value="${ch.name}" onchange="handleM3UEditField(${ch.id}, 'name', this.value)" style="font-size: 12px; padding: 4px; font-weight: bold; width: 100%;">
+                    </td>
+                    <td style="padding: 12px;">
+                        <input type="text" value="${ch.category}" onchange="handleM3UEditField(${ch.id}, 'category', this.value)" style="font-size: 12px; padding: 4px; width: 100px;">
+                    </td>
+                    <td style="padding: 12px;">
+                        <input type="text" value="${ch.url}" onchange="handleM3UEditField(${ch.id}, 'url', this.value)" style="font-size: 11px; padding: 4px; width: 100%; font-family: monospace;">
+                    </td>
+                    <td style="padding: 12px; text-align: center;">
+                        <button type="button" class="logout-btn" onclick="handleM3URemoveRow(${ch.id})" style="padding: 4px 8px; font-size: 11px; color: #FF3838; border-color: rgba(255,0,0,0.15)">Remove</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function handleM3USelectRow(id, isChecked) {
+            const ch = parsedM3UChannels.find(c => c.id === id);
+            if (ch) ch.selected = isChecked;
+            
+            const allSelected = parsedM3UChannels.every(c => c.selected);
+            document.getElementById('m3uHeaderCheck').checked = allSelected;
+        }
+
+        function handleM3UEditField(id, field, value) {
+            const ch = parsedM3UChannels.find(c => c.id === id);
+            if (ch) ch[field] = value.trim();
+            if (field === 'logo') {
+                renderM3UTable();
+            }
+        }
+
+        function handleM3URemoveRow(id) {
+            parsedM3UChannels = parsedM3UChannels.filter(c => c.id !== id);
+            renderM3UTable();
+        }
+
+        function toggleSelectAllM3U(select) {
+            parsedM3UChannels.forEach(c => c.selected = select);
+            document.getElementById('m3uHeaderCheck').checked = select;
+            renderM3UTable();
+        }
+
+        function handleHeaderCheckChange(el) {
+            toggleSelectAllM3U(el.checked);
+        }
+
+        async function handleImportM3U() {
+            const selected = parsedM3UChannels.filter(c => c.selected);
+            if (selected.length === 0) {
+                showToast('Please select at least one channel to import', false);
+                return;
+            }
+            
+            const btn = document.getElementById('m3uImportBtn');
+            const originalText = btn.innerText;
+            btn.innerText = 'Importing...';
+            btn.disabled = true;
+            
+            try {
+                const resp = await fetch('/api/admin/tv-channels/import', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ channels: selected })
+                });
+                
+                const res = await resp.json();
+                if (resp.status !== 200) {
+                    throw new Error(res.detail || 'Import failed');
+                }
+                
+                showToast(res.message || 'Import successful');
+                parsedM3UChannels = parsedM3UChannels.filter(c => !c.selected);
+                renderM3UTable();
+                fetchLiveTvChannels();
+            } catch (e) {
+                showToast(e.message, false);
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
     </script>
 </body>
 </html>

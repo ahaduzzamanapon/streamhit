@@ -429,6 +429,39 @@ async def init_db():
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
 
+                # 11. Live Sports table
+                await cur.execute("""
+                    CREATE TABLE IF NOT EXISTS live_sports (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        title VARCHAR(255) NOT NULL,
+                        logo TEXT,
+                        team1_name VARCHAR(100),
+                        team1_logo TEXT,
+                        team2_name VARCHAR(100),
+                        team2_logo TEXT,
+                        stream_links TEXT NOT NULL,
+                        referer VARCHAR(255),
+                        origin VARCHAR(255),
+                        use_bd_proxy BOOLEAN DEFAULT TRUE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+
+                # 12. Live TV Channels table
+                await cur.execute("""
+                    CREATE TABLE IF NOT EXISTS live_tv_channels (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        name VARCHAR(255) NOT NULL,
+                        logo TEXT,
+                        category VARCHAR(100) DEFAULT 'General',
+                        stream_links TEXT NOT NULL,
+                        referer VARCHAR(255),
+                        origin VARCHAR(255),
+                        use_bd_proxy BOOLEAN DEFAULT TRUE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+
                 db_migrated = True
                 print("[Database] MySQL Tables check/creation complete.")
     except Exception as e:
@@ -2434,6 +2467,7 @@ async def resolve_details_via_tmdb(subject_id: str, path_to_use: str, db_row: di
                         duration_str = f"{duration} min" if duration else "-- min"
                         
                         # Save to database
+                        se_num = 0
                         pool = await get_db_pool()
                         if pool:
                             try:
@@ -2462,10 +2496,11 @@ async def resolve_details_via_tmdb(subject_id: str, path_to_use: str, db_row: di
                                         # Also resolve and save seasons if it is TV series
                                         if is_tv:
                                             seasons_list = td.get("seasons", [])
+                                            se_num = len(seasons_list)
                                             for se in seasons_list:
-                                                se_num = se.get("season_number")
+                                                se_num_val = se.get("season_number")
                                                 # Skip season 0 (specials) unless it's the only one
-                                                if se_num == 0 and len(seasons_list) > 1:
+                                                if se_num_val == 0 and len(seasons_list) > 1:
                                                     continue
                                                 max_ep = se.get("episode_count", 0)
                                                 if max_ep > 0:
@@ -2477,7 +2512,7 @@ async def resolve_details_via_tmdb(subject_id: str, path_to_use: str, db_row: di
                                                         ON DUPLICATE KEY UPDATE
                                                             episode_count=VALUES(episode_count),
                                                             episodes_list=VALUES(episodes_list)
-                                                    """, (str(subject_id), int(se_num), int(max_ep), episodes_str))
+                                                    """, (str(subject_id), int(se_num_val), int(max_ep), episodes_str))
                                                     
                                 print(f"[TMDB Details Fallback] Successfully resolved and cached '{title}' to database.")
                             except Exception as db_err:
@@ -2495,7 +2530,8 @@ async def resolve_details_via_tmdb(subject_id: str, path_to_use: str, db_row: di
                             "description": description,
                             "isCam": False,
                             "duration": duration_str,
-                            "dubs": []
+                            "dubs": [],
+                            "seNum": se_num
                         }
     except Exception as e:
         print(f"[TMDB Details Fallback Error] {e}")
@@ -2506,6 +2542,7 @@ async def resolve_details_via_tmdb(subject_id: str, path_to_use: str, db_row: di
 async def get_detail(subjectId: str, detailPath: str = ""):
     db_detail_path = ""
     row = None
+    se_num = 0
     # Try MySQL
     pool = await get_db_pool()
     if pool:
@@ -2516,6 +2553,11 @@ async def get_detail(subjectId: str, detailPath: str = ""):
                     row = await cur.fetchone()
                     if row:
                         db_detail_path = row.get("detail_path") or ""
+                        # Fetch season count from seasons table
+                        await cur.execute("SELECT COUNT(*) as count FROM seasons WHERE subject_id = %s", (subjectId,))
+                        se_row = await cur.fetchone()
+                        if se_row:
+                            se_num = se_row["count"]
         except Exception as db_err:
             print(f"[DB Details Lookup Error] {db_err}")
             row = None
@@ -2543,7 +2585,8 @@ async def get_detail(subjectId: str, detailPath: str = ""):
                     "description": row["description"],
                     "isCam": row["is_cam"],
                     "dubs": dubs_data,
-                    "detailPath": row["detail_path"] or db_detail_path or ""
+                    "detailPath": row["detail_path"] or db_detail_path or "",
+                    "seNum": se_num
                 }
             }
 
@@ -2562,6 +2605,10 @@ async def get_detail(subjectId: str, detailPath: str = ""):
         subject_info = api_data.get("data", {}).get("subject", {})
         if not subject_info:
             raise Exception("Subject not found in H5 API")
+            
+        resource_obj = api_data.get("data", {}).get("resource", {})
+        seasons_list = resource_obj.get("seasons", [])
+        api_se_num = len(seasons_list)
             
         # Check if educational or blocked
         genres = subject_info.get("genre", "")
@@ -2593,7 +2640,8 @@ async def get_detail(subjectId: str, detailPath: str = ""):
             "isCam": bool(subject_info.get("isCam", False)),
             "duration": duration_str,
             "dubs": subject_info.get("dubs", []),
-            "detailPath": subject_info.get("detailPath") or path_to_use or ""
+            "detailPath": subject_info.get("detailPath") or path_to_use or "",
+            "seNum": api_se_num
         }
         return {"code": 0, "data": formatted_detail}
     except Exception as e:
@@ -2624,7 +2672,8 @@ async def get_detail(subjectId: str, detailPath: str = ""):
                     "genre": row["genre"].split(",") if row["genre"] else [],
                     "description": "Description temporarily unavailable.",
                     "isCam": row["is_cam"],
-                    "dubs": dubs_data
+                    "dubs": dubs_data,
+                    "seNum": se_num
                 }
             }
         return {
@@ -2639,7 +2688,8 @@ async def get_detail(subjectId: str, detailPath: str = ""):
                 "countryName": "",
                 "genre": [],
                 "description": "Stream details resolved. Please use controls below to play.",
-                "isCam": False
+                "isCam": False,
+                "seNum": 0
             }
         }
 
@@ -3015,6 +3065,186 @@ async def get_captions(subjectId: str, resourceId: str):
         return {"code": 0, "data": {"extCaptions": captions}}
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
+
+# Helper to rewrite M3U8 Manifests for Proxying
+def rewrite_m3u8_manifest(content: str, base_url: str, referer: str, origin: str, userAgent: str = "", use_bd_proxy: bool = True) -> str:
+    lines = content.splitlines()
+    new_lines = []
+    for line in lines:
+        line_strip = line.strip()
+        if not line_strip:
+            new_lines.append(line)
+            continue
+        if line_strip.startswith("#"):
+            # Check for tags containing URIs
+            if 'URI="' in line:
+                try:
+                    parts = line.split('URI="', 1)
+                    sub_parts = parts[1].split('"', 1)
+                    uri = sub_parts[0]
+                    absolute_uri = urllib.parse.urljoin(base_url, uri)
+                    proxied_uri = f"/api/sports/proxy?url={urllib.parse.quote(absolute_uri)}&referer={urllib.parse.quote(referer)}&origin={urllib.parse.quote(origin)}&userAgent={urllib.parse.quote(userAgent)}&use_bd_proxy={'true' if use_bd_proxy else 'false'}"
+                    line = f'{parts[0]}URI="{proxied_uri}"{sub_parts[1]}'
+                except Exception:
+                    pass
+            new_lines.append(line)
+        else:
+            # Segment or sub-playlist URL
+            absolute_url = urllib.parse.urljoin(base_url, line_strip)
+            proxied_url = f"/api/sports/proxy?url={urllib.parse.quote(absolute_url)}&referer={urllib.parse.quote(referer)}&origin={urllib.parse.quote(origin)}&userAgent={urllib.parse.quote(userAgent)}&use_bd_proxy={'true' if use_bd_proxy else 'false'}"
+            new_lines.append(proxied_url)
+    return "\n".join(new_lines)
+
+# Sports Streaming Proxy Endpoint with Region Lock Bypass
+@app.get("/api/sports/proxy")
+async def proxy_sports_stream(
+    url: str, 
+    request: Request, 
+    referer: str = "", 
+    origin: str = "", 
+    userAgent: str = "", 
+    use_bd_proxy: bool = True
+):
+    if not url:
+        raise HTTPException(status_code=400, detail="Missing url parameter")
+        
+    bd_proxy = os.getenv("BD_PROXY", "")
+    
+    headers_to_send = {
+        "User-Agent": userAgent or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "*/*"
+    }
+    if origin:
+        headers_to_send["Origin"] = origin
+    if referer:
+        headers_to_send["Referer"] = referer
+        
+    range_header = request.headers.get("Range")
+    if range_header:
+        headers_to_send["Range"] = range_header
+        
+    client_created = False
+    client = None
+    try:
+        # Determine client and proxy usage
+        if bd_proxy and use_bd_proxy:
+            client = httpx.AsyncClient(proxy=bd_proxy, trust_env=False, timeout=15.0)
+            client_created = True
+        else:
+            client = get_http_client()
+            
+        parsed_url = urllib.parse.urlparse(url)
+        is_manifest = parsed_url.path.endswith(".m3u8") or ".m3u8" in parsed_url.query
+        
+        if is_manifest:
+            resp = await client.get(url, headers=headers_to_send, timeout=10.0)
+            if resp.status_code != 200:
+                headers = {"Access-Control-Allow-Origin": "*"}
+                return Response(content=resp.content, status_code=resp.status_code, media_type=resp.headers.get("Content-Type"), headers=headers)
+            
+            rewritten = rewrite_m3u8_manifest(resp.text, url, referer, origin, userAgent, use_bd_proxy)
+            headers = {
+                "Access-Control-Allow-Origin": "*",
+                "Cache-Control": "no-cache"
+            }
+            return Response(content=rewritten, media_type="application/vnd.apple.mpegurl", headers=headers)
+        else:
+            req_builder = client.build_request("GET", url, headers=headers_to_send)
+            resp = await client.send(req_builder, stream=True)
+            
+            headers = {}
+            for k, v in resp.headers.items():
+                if k.lower() not in ["content-encoding", "transfer-encoding", "access-control-allow-origin", "connection"]:
+                    headers[k] = v
+            headers["Access-Control-Allow-Origin"] = "*"
+            
+            async def chunk_generator():
+                try:
+                    async for chunk in resp.aiter_bytes(chunk_size=64*1024):
+                        yield chunk
+                finally:
+                    await resp.aclose()
+                    if client_created and client:
+                        await client.aclose()
+                        
+            return StreamingResponse(chunk_generator(), status_code=resp.status_code, headers=headers, media_type=resp.headers.get("Content-Type"))
+            
+    except Exception as e:
+        if client_created and client:
+            await client.aclose()
+        print(f"[Sports Proxy Error] URL: {url} | Error: {e}")
+        raise HTTPException(status_code=502, detail=str(e))
+
+# Public Live Sports Listing Endpoint
+@app.get("/api/sports/live")
+async def public_get_live_sports():
+    pool = await get_db_pool()
+    if not pool:
+        return {"code": 0, "list": []}
+        
+    try:
+        async with pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+                await cur.execute("SELECT * FROM live_sports ORDER BY created_at DESC")
+                rows = await cur.fetchall()
+                
+                items = []
+                for r in rows:
+                    try:
+                        links = json.loads(r["stream_links"])
+                    except Exception:
+                        links = []
+                    items.append({
+                        "id": r["id"],
+                        "title": r["title"],
+                        "logo": r["logo"] or "",
+                        "team1Name": r["team1_name"] or "",
+                        "team1Logo": r["team1_logo"] or "",
+                        "team2Name": r["team2_name"] or "",
+                        "team2Logo": r["team2_logo"] or "",
+                        "streamLinks": links,
+                        "referer": r["referer"] or "",
+                        "origin": r["origin"] or "",
+                        "useBdProxy": bool(r["use_bd_proxy"])
+                    })
+                return {"code": 0, "list": items}
+    except Exception as e:
+        print(f"[DB Get Live Sports Error] {e}")
+        return {"code": 500, "list": [], "error": str(e)}
+
+# Public Live TV Channels Listing Endpoint
+@app.get("/api/tv/channels")
+async def public_get_tv_channels():
+    pool = await get_db_pool()
+    if not pool:
+        return {"code": 0, "list": []}
+        
+    try:
+        async with pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+                await cur.execute("SELECT * FROM live_tv_channels ORDER BY category ASC, name ASC")
+                rows = await cur.fetchall()
+                
+                items = []
+                for r in rows:
+                    try:
+                        links = json.loads(r["stream_links"])
+                    except Exception:
+                        links = []
+                    items.append({
+                        "id": r["id"],
+                        "name": r["name"],
+                        "logo": r["logo"] or "",
+                        "category": r["category"] or "General",
+                        "streamLinks": links,
+                        "referer": r["referer"] or "",
+                        "origin": r["origin"] or "",
+                        "useBdProxy": bool(r["use_bd_proxy"])
+                    })
+                return {"code": 0, "list": items}
+    except Exception as e:
+        print(f"[DB Get Live TV Channels Error] {e}")
+        return {"code": 500, "list": [], "error": str(e)}
 
 # Proxy Subtitle tracks to bypass CORS blocks
 @app.get("/api/proxy-subtitle")
@@ -3721,6 +3951,42 @@ async def serve_tv_shows(request: Request):
     og_tags = f"""
     <meta name="description" content="{meta['description']}">
     <meta name="keywords" content="movies, tv shows, streaming, streamfit, watch free, hd movies, hindi dub, bengali dub, watch online">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{str(request.url)}">
+    <meta property="og:title" content="{meta['title']}">
+    <meta property="og:description" content="{meta['description']}">
+    <meta property="og:image" content="{meta['cover']}">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="{str(request.url)}">
+    <meta property="twitter:title" content="{meta['title']}">
+    <meta property="twitter:description" content="{meta['description']}">
+    <meta property="twitter:image" content="{meta['cover']}">
+    """
+    html_content = html_content.replace("</head>", f"{og_tags}\n</head>")
+    return HTMLResponse(content=html_content)
+
+
+@app.get("/live-tv", response_class=HTMLResponse)
+async def serve_live_tv(request: Request):
+    path = os.path.join(base_dir, "public/live-tv.html")
+    with open(path, "r", encoding="utf-8") as f:
+        html_content = f.read()
+        
+    meta = {
+        "title": "Live TV Channels - Streamfit",
+        "description": "Watch your favorite live TV channels online for free in high quality. Enjoy sports, news, and entertainment streams on Streamfit.",
+        "cover": "https://images.unsplash.com/photo-1598257006458-087169a1f08d?w=1200&q=80"
+    }
+    
+    html_content = html_content.replace("<title>Live TV Channels - Streamfit</title>", f"<title>{meta['title']}</title>")
+    
+    og_tags = f"""
+    <meta name="description" content="{meta['description']}">
+    <meta name="keywords" content="live tv, channels, sports live, news live, streaming, streamfit, watch free, tv online">
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">

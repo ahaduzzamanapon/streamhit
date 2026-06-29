@@ -34,6 +34,7 @@
                     <li class="active"><a href="/"><i class="fa-solid fa-house"></i> Home</a></li>
                     <li><a href="/movies"><i class="fa-solid fa-film"></i> Movies</a></li>
                     <li><a href="/tv"><i class="fa-solid fa-tv"></i> TV Series</a></li>
+                    <li><a href="/live-tv"><i class="fa-solid fa-satellite-dish"></i> Live TV</a></li>
                 </ul>
 
                 <div class="menu-label">Categories</div>
@@ -99,6 +100,35 @@
                 </div>
             </section>
 
+            <!-- Live Sports Section -->
+            <section class="content-section live-sports-section" id="liveSportsSection" style="display: none;">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-satellite-dish icon-trending" style="color: var(--color-accent); animation: pulse 2s infinite;"></i> Live Sports Match</h2>
+                </div>
+                <div class="slider-wrapper">
+                    <button class="slider-nav-btn prev-btn" id="sportsPrevBtn"><i class="fa-solid fa-chevron-left"></i></button>
+                    <div class="content-slider scroll-x" id="liveSportsGrid">
+                        <!-- Dynamic Live Sports Cards -->
+                    </div>
+                    <button class="slider-nav-btn next-btn" id="sportsNextBtn"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+            </section>
+
+            <!-- All Live TV Section -->
+            <section class="content-section live-tv-section" id="liveTvSection" style="display: none;">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-tv icon-bangla" style="color: var(--secondary-accent); animation: pulse 2.5s infinite;"></i> All Live TV</h2>
+                    <a href="/live-tv" class="see-more-btn">See More <i class="fa-solid fa-arrow-right"></i></a>
+                </div>
+                <div class="slider-wrapper">
+                    <button class="slider-nav-btn prev-btn" id="tvPrevBtn"><i class="fa-solid fa-chevron-left"></i></button>
+                    <div class="content-slider scroll-x" id="liveTvGrid">
+                        <!-- Dynamic Live TV Channel Cards -->
+                    </div>
+                    <button class="slider-nav-btn next-btn" id="tvNextBtn"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+            </section>
+
             <!-- Trending Now Grid -->
             <section class="content-section" id="trendingSection">
                 <div class="section-header">
@@ -149,10 +179,26 @@
             <i class="fa-solid fa-tv"></i>
             <span>TV Series</span>
         </a>
+        <a href="/live-tv" class="nav-item" id="mobileNavLiveTv">
+            <i class="fa-solid fa-satellite-dish"></i>
+            <span>Live TV</span>
+        </a>
         <a href="/download" class="nav-item download-app-btn" id="mobileNavDownload">
             <i class="fa-solid fa-arrow-down-to-bracket"></i>
             <span>Get App</span>
         </a>
+    </div>
+
+    <!-- Live Sports Stream Selector Modal -->
+    <div class="sports-modal-overlay" id="sportsModalOverlay">
+        <div class="sports-modal">
+            <span class="sports-modal-close" id="sportsModalClose">&times;</span>
+            <div class="sports-modal-title" id="sportsModalTitle">Select Stream Source</div>
+            <div class="sports-modal-subtitle" id="sportsModalSubtitle">Choose a stream option to watch live match</div>
+            <div class="sports-links-list" id="sportsLinksList">
+                <!-- Links filled dynamically -->
+            </div>
+        </div>
     </div>
 
     <!-- Application Script -->

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live TV Channels - Streamfit</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="style.css?v=3.6">
+</head>
+<body>
+ 
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand" onclick="window.location.href='/'" style="cursor: pointer;">
+                <i class="fa-solid fa-play play-logo"></i>
+                <span class="logo-text">Stream<span>fit</span></span>
+            </div>
+            
+            <nav class="nav-menu">
+                <div class="menu-label">Navigation</div>
+                <ul>
+                    <li><a href="/"><i class="fa-solid fa-house"></i> Home</a></li>
+                    <li><a href="/movies"><i class="fa-solid fa-film"></i> Movies</a></li>
+                    <li><a href="/tv"><i class="fa-solid fa-tv"></i> TV Series</a></li>
+                    <li class="active"><a href="/live-tv"><i class="fa-solid fa-satellite-dish"></i> Live TV</a></li>
+                </ul>
+
+                <div class="menu-label">Categories</div>
+                <ul>
+                    <li><a href="/movies?genre=Action"><i class="fa-solid fa-gun"></i> Action</a></li>
+                    <li><a href="/movies?genre=Comedy"><i class="fa-solid fa-face-laugh-beam"></i> Comedy</a></li>
+                    <li><a href="/tv?genre=Animation"><i class="fa-solid fa-face-smile"></i> Animation</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content Panel -->
+        <main class="main-content">
+            <!-- Header section -->
+            <header class="header">
+                <!-- Mobile Brand Logo -->
+                <div class="mobile-brand" onclick="window.location.href='/'" style="cursor: pointer;">
+                    <i class="fa-solid fa-play play-logo"></i>
+                    <span class="logo-text">Stream<span>fit</span></span>
+                </div>
+                <!-- Search bar -->
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" id="tvSearchInput" placeholder="Search live TV channels..." autocomplete="off">
+                </div>
+                
+                <!-- Right Controls -->
+                <div class="header-controls">
+                    <button class="download-app-btn"><i class="fa-solid fa-arrow-down-to-bracket"></i> Download App</button>
+                </div>
+            </header>
+
+            <!-- Navigation Tabs & Category Filters -->
+            <section class="navigation-filters" style="margin-top: 20px;">
+                <div class="categories-tabs" id="tvCategoryTabs">
+                    <button class="cat-tab active" data-category="*">All Channels</button>
+                    <!-- Filled dynamically -->
+                </div>
+            </section>
+
+            <!-- Dynamic Channels Layout -->
+            <div id="tvContainer">
+                <div class="tv-category-section">
+                    <div class="tv-grid" id="tvChannelsGrid">
+                        <!-- Loaded channel cards -->
+                        <div class="card-shimmer"></div>
+                        <div class="card-shimmer"></div>
+                        <div class="card-shimmer"></div>
+                        <div class="card-shimmer"></div>
+                        <div class="card-shimmer"></div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Mobile Sticky Bottom Navigation Bar -->
+    <div class="mobile-navigation-bar">
+        <a href="/" class="nav-item" id="mobileNavHome">
+            <i class="fa-solid fa-house"></i>
+            <span>Home</span>
+        </a>
+        <a href="/movies" class="nav-item" id="mobileNavMovies">
+            <i class="fa-solid fa-film"></i>
+            <span>Movies</span>
+        </a>
+        <a href="/tv" class="nav-item" id="mobileNavTv">
+            <i class="fa-solid fa-tv"></i>
+            <span>TV Series</span>
+        </a>
+        <a href="/live-tv" class="nav-item active" id="mobileNavLiveTv">
+            <i class="fa-solid fa-satellite-dish"></i>
+            <span>Live TV</span>
+        </a>
+        <a href="/download" class="nav-item download-app-btn" id="mobileNavDownload">
+            <i class="fa-solid fa-arrow-down-to-bracket"></i>
+            <span>Get App</span>
+        </a>
+    </div>
+
+    <!-- Application Script -->
+    <script src="app.js?v=3.6"></script>
+</body>
+</html>

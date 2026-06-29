@@ -38,6 +38,7 @@ const routes = {
     isHome: false,
     isMovies: false,
     isTv: false,
+    isLiveTv: false,
     isDetails: false,
     isWatch: false
 };
@@ -50,6 +51,8 @@ function detectRoute() {
     } else if (path.includes("/tv")) {
         routes.isTv = true;
         state.subjectType = 2;
+    } else if (path.includes("/live-tv")) {
+        routes.isLiveTv = true;
     } else if (path.includes("/details")) {
         routes.isDetails = true;
     } else if (path.includes("/watch")) {
@@ -65,15 +68,19 @@ function highlightActiveMobileNav() {
     const homeNav = document.getElementById("mobileNavHome");
     const moviesNav = document.getElementById("mobileNavMovies");
     const tvNav = document.getElementById("mobileNavTv");
+    const liveTvNav = document.getElementById("mobileNavLiveTv");
 
     if (homeNav) homeNav.classList.remove("active");
     if (moviesNav) moviesNav.classList.remove("active");
     if (tvNav) tvNav.classList.remove("active");
+    if (liveTvNav) liveTvNav.classList.remove("active");
 
     if (routes.isMovies && moviesNav) {
         moviesNav.classList.add("active");
     } else if (routes.isTv && tvNav) {
         tvNav.classList.add("active");
+    } else if (routes.isLiveTv && liveTvNav) {
+        liveTvNav.classList.add("active");
     } else if (routes.isHome && homeNav) {
         homeNav.classList.add("active");
     }
@@ -147,6 +154,8 @@ document.addEventListener("DOMContentLoaded", () => {
         initHomePage();
     } else if (routes.isMovies || routes.isTv) {
         initFilterPage();
+    } else if (routes.isLiveTv) {
+        initLiveTvPage();
     } else if (routes.isDetails) {
         initDetailsPage();
     } else if (routes.isWatch) {
@@ -292,6 +301,7 @@ async function initHomePage() {
     }
     showShimmers(false);
     initCustomCategorySliders();
+    initHomePageSportsAndTv();
 }
 
 let heroSliderInterval = null;
@@ -1717,6 +1727,82 @@ async function initWatchPage() {
     const loading = document.getElementById("watchPageLoading");
     const content = document.getElementById("watchWrapper");
 
+    if (type === "sports" || type === "tv") {
+        const sportTitle = urlParams.get("title") || "Live Stream";
+        const sportUrl = urlParams.get("url") || "";
+        const fallbackLinksRaw = urlParams.get("links") || "";
+        const startIndex = parseInt(urlParams.get("index") || "0");
+        
+        state.fallbackLinks = [];
+        state.currentFallbackIndex = startIndex;
+        
+        if (fallbackLinksRaw) {
+            try {
+                state.fallbackLinks = JSON.parse(decodeURIComponent(fallbackLinksRaw));
+            } catch(e) {
+                console.error("Failed to parse fallback links:", e);
+            }
+        }
+        
+        state.selectedSubject = {
+            subjectId: "sports",
+            title: sportTitle,
+            cover: "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=120&q=80",
+            seNum: 0,
+            subjectType: 1
+        };
+        
+        const tvSelector = document.getElementById("watchTvSelector");
+        if (tvSelector) tvSelector.style.display = "none";
+        const dubSelectorGroup = document.getElementById("watchDubSelectorGroup");
+        if (dubSelectorGroup) dubSelectorGroup.style.display = "none";
+        
+        const recSection = document.querySelector(".watch-sidebar");
+        if (recSection) recSection.style.display = "none";
+        
+        const mainWatchArea = document.querySelector(".watch-main-content");
+        if (mainWatchArea) {
+            mainWatchArea.style.width = "100%";
+            mainWatchArea.style.maxWidth = "100%";
+            mainWatchArea.style.flex = "1";
+        }
+        
+        const categoryEl = document.getElementById("playerMediaCategory");
+        const titleEl = document.getElementById("playerMediaTitle");
+        if (categoryEl) categoryEl.textContent = type === "sports" ? "Live Sports" : "Live TV";
+        if (titleEl) titleEl.textContent = sportTitle;
+        
+        const metaTitle = document.getElementById("watchMetaTitle");
+        const metaRating = document.getElementById("watchMetaRating");
+        const metaYear = document.getElementById("watchMetaYear");
+        const metaCountry = document.getElementById("watchMetaCountry");
+        const metaDuration = document.getElementById("watchMetaDuration");
+        if (metaTitle) metaTitle.textContent = sportTitle;
+        if (metaRating) metaRating.innerHTML = `<i class="fa-solid fa-satellite-dish"></i> LIVE`;
+        if (metaYear) metaYear.innerHTML = `<i class="fa-regular fa-clock"></i> Stream`;
+        if (metaCountry) metaCountry.innerHTML = `<i class="fa-solid fa-earth-americas"></i> World`;
+        if (metaDuration) metaDuration.innerHTML = `<i class="fa-solid fa-globe"></i> Global`;
+        
+        const descEl = document.getElementById("watchDescription");
+        if (descEl) descEl.textContent = "Enjoy the high quality live broadcast on Streamfit. Free online streaming with BD region-lock bypass.";
+        
+        const dlBtn = document.getElementById("downloadBtn");
+        if (dlBtn) dlBtn.style.display = "none";
+        
+        state.availableResources = [{
+            resourceId: "sports_stream",
+            resolution: 0,
+            size: 0,
+            resourceLink: sportUrl
+        }];
+        
+        playResources();
+        
+        if (loading) loading.style.display = "none";
+        if (content) content.style.display = "block";
+        return;
+    }
+
     if (tmdbId) {
         if (loading) loading.innerHTML = `<div class="loading-spinner"></div><p style="margin-top: 15px;">Resolving TMDB ID ${tmdbId} via Streamfit...</p>`;
         const resolution = await apiGet(`/api/resolve-tmdb?tmdbId=${tmdbId}&type=${type}&season=${reqSeason}&episode=${reqEpisode}`);
@@ -2166,6 +2252,14 @@ async function playResources() {
             default: !!track.default
         }));
 
+    if (playerInstance) {
+        playerInstance.off('error');
+        playerInstance.on('error', (e) => {
+            console.log("[Plyr Error] Media error detected:", e);
+            handlePlaybackError();
+        });
+    }
+
     if (streamUrl.includes(".m3u8")) {
         if (Hls.isSupported()) {
             hlsInstance = new Hls();
@@ -2173,6 +2267,12 @@ async function playResources() {
             hlsInstance.attachMedia(videoElement);
             hlsInstance.on(Hls.Events.MANIFEST_PARSED, function() {
                 triggerAutoplay(playerInstance);
+            });
+            hlsInstance.on(Hls.Events.ERROR, function(event, data) {
+                if (data.fatal) {
+                    console.log("[Hls Error] Fatal error:", data);
+                    handlePlaybackError();
+                }
             });
         } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
             videoElement.src = streamUrl;
@@ -2640,5 +2740,324 @@ async function checkLatestNotification() {
         }
     } catch (e) {
         console.error("Error polling notifications:", e);
+    }
+}
+
+// ==========================================================================
+// TOAST NOTIFICATIONS
+// ==========================================================================
+function showToastNotification(message) {
+    let container = document.getElementById("toast-notification-container");
+    if (!container) {
+        container = document.createElement("div");
+        container.id = "toast-notification-container";
+        container.style.position = "fixed";
+        container.style.bottom = "80px";
+        container.style.right = "20px";
+        container.style.zIndex = "3000";
+        container.style.display = "flex";
+        container.style.flexDirection = "column";
+        container.style.gap = "10px";
+        document.body.appendChild(container);
+    }
+    
+    const toast = document.createElement("div");
+    toast.style.background = "rgba(16, 17, 20, 0.95)";
+    toast.style.color = "#ffffff";
+    toast.style.border = "1px solid var(--color-accent, #1dd171)";
+    toast.style.padding = "12px 24px";
+    toast.style.borderRadius = "8px";
+    toast.style.boxShadow = "0 8px 30px rgba(0,0,0,0.5)";
+    toast.style.fontSize = "13px";
+    toast.style.fontWeight = "700";
+    toast.style.fontFamily = "sans-serif";
+    toast.style.animation = "slideIn 0.3s ease-out";
+    toast.textContent = message;
+    
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transition = "opacity 0.5s ease-out";
+        setTimeout(() => toast.remove(), 500);
+    }, 4000);
+}
+
+// ==========================================================================
+// LIVE SPORTS & LIVE TV METHODS
+// ==========================================================================
+async function initHomePageSportsAndTv() {
+    // 1. Init Sports
+    const sportsGrid = document.getElementById("liveSportsGrid");
+    const sportsSection = document.getElementById("liveSportsSection");
+    if (sportsGrid && sportsSection) {
+        const result = await apiGet("/api/sports/live");
+        if (result && result.code === 0 && result.list && result.list.length > 0) {
+            sportsGrid.innerHTML = "";
+            result.list.forEach(sport => {
+                const card = createSportsCard(sport);
+                sportsGrid.appendChild(card);
+            });
+            sportsSection.style.display = "block";
+            setupSliderNavigation(sportsGrid);
+        } else {
+            sportsSection.style.display = "none";
+        }
+    }
+
+    // 2. Init Live TV
+    const tvGrid = document.getElementById("liveTvGrid");
+    const tvSection = document.getElementById("liveTvSection");
+    if (tvGrid && tvSection) {
+        const result = await apiGet("/api/tv/channels");
+        if (result && result.code === 0 && result.list && result.list.length > 0) {
+            tvGrid.innerHTML = "";
+            result.list.slice(0, 12).forEach(chan => {
+                const card = createTvCard(chan);
+                tvGrid.appendChild(card);
+            });
+            tvSection.style.display = "block";
+            setupSliderNavigation(tvGrid);
+        } else {
+            tvSection.style.display = "none";
+        }
+    }
+}
+
+function createSportsCard(sport) {
+    const card = document.createElement("div");
+    card.className = "sports-card";
+    
+    // Check if teams are configured
+    const hasTeams = sport.team1Name && sport.team2Name;
+    const eventLogo = sport.logo || "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=120&q=80";
+    
+    let innerHTML = `<span class="sports-live-badge">LIVE</span>`;
+    
+    if (hasTeams) {
+        innerHTML += `
+            <div class="sports-card-teams">
+                <div class="sports-card-team">
+                    <img src="${sport.team1Logo || 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=120&q=80'}" onerror="this.src='https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=120&q=80'">
+                    <span>${sport.team1Name}</span>
+                </div>
+                <div class="sports-card-vs">VS</div>
+                <div class="sports-card-team">
+                    <img src="${sport.team2Logo || 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=120&q=80'}" onerror="this.src='https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=120&q=80'">
+                    <span>${sport.team2Name}</span>
+                </div>
+            </div>
+        `;
+    } else {
+        innerHTML += `
+            <div class="sports-card-event">
+                <img src="${eventLogo}" onerror="this.src='https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=120&q=80'">
+                <div class="sports-card-event-info">
+                    <span class="event-name">${sport.title}</span>
+                    <span class="event-subtitle">Live Broadcast</span>
+                </div>
+            </div>
+        `;
+    }
+    
+    innerHTML += `<div class="sports-card-title">${sport.title}</div>`;
+    card.innerHTML = innerHTML;
+    
+    card.onclick = () => playLiveStreamSelector(sport, 'sports');
+    return card;
+}
+
+function createTvCard(channel) {
+    const card = document.createElement("div");
+    card.className = "tv-card";
+    
+    const logoUrl = channel.logo || 'https://images.unsplash.com/photo-1598257006458-087169a1f08d?w=120&q=80';
+    
+    card.innerHTML = `
+        <div class="tv-card-logo-container">
+            <span class="tv-card-category-badge">${channel.category || 'General'}</span>
+            <img src="${logoUrl}" onerror="this.src='https://images.unsplash.com/photo-1598257006458-087169a1f08d?w=120&q=80'">
+        </div>
+        <div class="tv-card-title">${channel.name}</div>
+    `;
+    
+    card.onclick = () => playLiveStreamSelector(channel, 'tv');
+    return card;
+}
+
+function playLiveStreamSelector(item, mediaType) {
+    const streamLinks = item.streamLinks || [];
+    if (streamLinks.length === 0) {
+        showToastNotification("No active stream links found for this channel.");
+        return;
+    }
+    
+    const title = item.title || item.name;
+    
+    if (streamLinks.length === 1) {
+        // Play directly
+        playLiveStream(title, streamLinks[0].url, streamLinks, 0, item.referer, item.origin, item.useBdProxy);
+    } else {
+        // Show selection modal
+        const modalOverlay = document.getElementById("sportsModalOverlay");
+        const modalTitle = document.getElementById("sportsModalTitle");
+        const linksList = document.getElementById("sportsLinksList");
+        const modalClose = document.getElementById("sportsModalClose");
+        
+        if (!modalOverlay || !linksList) return;
+        
+        modalTitle.textContent = title;
+        linksList.innerHTML = "";
+        
+        streamLinks.forEach((link, idx) => {
+            const btn = document.createElement("button");
+            btn.className = "sports-link-btn";
+            btn.innerHTML = `
+                <span>${link.label || 'Stream Link ' + (idx + 1)}</span>
+                <i class="fa-solid fa-play"></i>
+            `;
+            btn.onclick = () => {
+                modalOverlay.classList.remove("show");
+                // Individual link overrides
+                const linkReferer = link.referer || item.referer || "";
+                const linkOrigin = link.origin || item.origin || "";
+                const linkUserAgent = link.userAgent || "";
+                const linkUseBd = link.useBdProxy !== undefined ? link.useBdProxy : item.useBdProxy;
+                
+                playLiveStream(title, link.url, streamLinks, idx, linkReferer, linkOrigin, linkUseBd, linkUserAgent);
+            };
+            linksList.appendChild(btn);
+        });
+        
+        modalOverlay.classList.add("show");
+        
+        modalClose.onclick = () => modalOverlay.classList.remove("show");
+        modalOverlay.onclick = (e) => {
+            if (e.target === modalOverlay) modalOverlay.classList.remove("show");
+        };
+    }
+}
+
+function playLiveStream(title, url, streamLinks, index, referer, origin, useBdProxy, userAgent = "") {
+    // Encode full stream links fallback config in query params
+    const linksConfig = streamLinks.map(l => ({
+        url: l.url,
+        label: l.label,
+        referer: l.referer || referer || "",
+        origin: l.origin || origin || "",
+        userAgent: l.userAgent || userAgent || "",
+        useBdProxy: l.useBdProxy !== undefined ? l.useBdProxy : useBdProxy
+    }));
+    
+    // Proxy URL
+    const proxiedUrl = `/api/sports/proxy?url=${encodeURIComponent(url)}&referer=${encodeURIComponent(referer || '')}&origin=${encodeURIComponent(origin || '')}&userAgent=${encodeURIComponent(userAgent || '')}&use_bd_proxy=${useBdProxy ? 'true' : 'false'}`;
+    
+    // Navigate to watch page
+    window.location.href = `/watch?type=sports&title=${encodeURIComponent(title)}&url=${encodeURIComponent(proxiedUrl)}&links=${encodeURIComponent(JSON.stringify(linksConfig))}&index=${index}`;
+}
+
+async function initLiveTvPage() {
+    const tvChannelsGrid = document.getElementById("tvChannelsGrid");
+    const tvCategoryTabs = document.getElementById("tvCategoryTabs");
+    if (!tvChannelsGrid) return;
+    
+    tvChannelsGrid.innerHTML = '<div class="card-shimmer"></div><div class="card-shimmer"></div><div class="card-shimmer"></div>';
+    
+    const result = await apiGet("/api/tv/channels");
+    tvChannelsGrid.innerHTML = "";
+    
+    if (result && result.code === 0 && result.list && result.list.length > 0) {
+        window.tvPageChannels = result.list;
+        
+        // Extract unique categories
+        const categories = new Set();
+        result.list.forEach(c => {
+            if (c.category) categories.add(c.category);
+        });
+        
+        // Render tabs
+        if (tvCategoryTabs) {
+            tvCategoryTabs.innerHTML = '<button class="cat-tab active" data-category="*">All Channels</button>';
+            categories.forEach(cat => {
+                const btn = document.createElement("button");
+                btn.className = "cat-tab";
+                btn.dataset.category = cat;
+                btn.textContent = cat;
+                tvCategoryTabs.appendChild(btn);
+            });
+            
+            // Connect tabs click
+            tvCategoryTabs.querySelectorAll(".cat-tab").forEach(tab => {
+                tab.onclick = () => {
+                    tvCategoryTabs.querySelectorAll(".cat-tab").forEach(b => b.classList.remove("active"));
+                    tab.classList.add("active");
+                    renderFilteredTvChannels(tab.dataset.category);
+                };
+            });
+        }
+        
+        renderFilteredTvChannels("*");
+    } else {
+        tvChannelsGrid.innerHTML = '<div style="color:var(--text-muted);padding:20px;">No Live TV channels available at the moment.</div>';
+    }
+    
+    // Connect search
+    const searchInput = document.getElementById("tvSearchInput");
+    if (searchInput) {
+        searchInput.oninput = () => {
+            const query = searchInput.value.trim().toLowerCase();
+            renderFilteredTvChannels(null, query);
+        };
+    }
+}
+
+function renderFilteredTvChannels(category, searchQuery = "") {
+    const grid = document.getElementById("tvChannelsGrid");
+    if (!grid || !window.tvPageChannels) return;
+    grid.innerHTML = "";
+    
+    const activeTab = document.querySelector("#tvCategoryTabs .cat-tab.active");
+    const activeCat = category !== null ? category : (activeTab ? activeTab.dataset.category : "*");
+    
+    const filtered = window.tvPageChannels.filter(c => {
+        const matchesCategory = activeCat === "*" || c.category === activeCat;
+        const matchesSearch = !searchQuery || c.name.toLowerCase().includes(searchQuery);
+        return matchesCategory && matchesSearch;
+    });
+    
+    if (filtered.length > 0) {
+        filtered.forEach(chan => {
+            grid.appendChild(createTvCard(chan));
+        });
+    } else {
+        grid.innerHTML = '<div style="color:var(--text-muted);padding:20px;grid-column:1/-1;text-align:center;">No channels found.</div>';
+    }
+}
+
+function handlePlaybackError() {
+    if (state.fallbackLinks && state.fallbackLinks.length > 0 && state.currentFallbackIndex < state.fallbackLinks.length - 1) {
+        state.currentFallbackIndex++;
+        const nextLink = state.fallbackLinks[state.currentFallbackIndex];
+        console.log(`[Auto-Fallback] Stream failed. Trying backup Link ${state.currentFallbackIndex + 1}: ${nextLink.label || nextLink.name}`);
+        
+        // Notify the user via toast
+        showToastNotification(`Stream offline. Trying backup link: ${nextLink.label || nextLink.name || 'Backup'}`);
+        
+        // Re-route URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set("url", nextLink.url);
+        history.replaceState({}, "", `${window.location.pathname}?${urlParams.toString()}`);
+        
+        // Proxy URL
+        const proxiedUrl = `/api/sports/proxy?url=${encodeURIComponent(nextLink.url)}&referer=${encodeURIComponent(nextLink.referer || '')}&origin=${encodeURIComponent(nextLink.origin || '')}&userAgent=${encodeURIComponent(nextLink.userAgent || '')}&use_bd_proxy=${nextLink.useBdProxy ? 'true' : 'false'}`;
+        
+        state.availableResources = [{
+            resourceId: "sports_stream",
+            resolution: 0,
+            size: 0,
+            resourceLink: proxiedUrl
+        }];
+        
+        // Play resources
+        playResources();
     }
 }

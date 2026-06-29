@@ -3422,4 +3422,384 @@ button, input, select {
     letter-spacing: 0.5px;
 }
 
+/* ==========================================================================
+   LIVE SPORTS CARDS & MATCHES
+   ========================================================================== */
+.sports-card {
+    min-width: 280px;
+    width: 280px;
+    height: 160px;
+    flex-shrink: 0;
+    cursor: pointer;
+    position: relative;
+    border-radius: var(--border-radius-md);
+    overflow: hidden;
+    background: linear-gradient(135deg, #161926 0%, #0d0f17 100%);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 16px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.sports-card:hover {
+    transform: translateY(-5px) scale(1.02);
+    border-color: rgba(255, 42, 84, 0.4);
+    box-shadow: 0 8px 25px rgba(255, 42, 84, 0.15);
+}
+
+.sports-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at top right, rgba(0, 240, 255, 0.06), transparent 70%);
+    pointer-events: none;
+}
+
+.sports-card-teams {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin-top: 10px;
+    flex-grow: 1;
+}
+
+.sports-card-team {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 42%;
+    text-align: center;
+}
+
+.sports-card-team img {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+    margin-bottom: 8px;
+    transition: transform 0.3s ease;
+}
+
+.sports-card:hover .sports-card-team img {
+    transform: scale(1.1);
+}
+
+.sports-card-team span {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.sports-card-vs {
+    font-family: 'Outfit', sans-serif;
+    font-size: 16px;
+    font-weight: 900;
+    color: var(--color-accent);
+    text-shadow: 0 0 10px rgba(255, 42, 84, 0.3);
+    font-style: italic;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 4px 8px;
+    border-radius: 8px;
+}
+
+.sports-card-event {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    flex-grow: 1;
+    margin-top: 10px;
+}
+
+.sports-card-event img {
+    width: 60px;
+    height: 60px;
+    object-fit: contain;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 6px;
+}
+
+.sports-card-event-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.sports-card-event-info .event-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.sports-card-event-info .event-subtitle {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.sports-card-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+    border-top: 1px solid rgba(255, 255, 255, 0.03);
+    padding-top: 8px;
+    margin-top: auto;
+}
+
+.sports-live-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(255, 42, 84, 0.12);
+    border: 1px solid rgba(255, 42, 84, 0.3);
+    color: var(--color-accent);
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sports-live-badge::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--color-accent);
+    box-shadow: 0 0 8px var(--color-accent);
+    animation: sportsPulse 1.5s infinite;
+}
+
+@keyframes sportsPulse {
+    0% { transform: scale(0.8); opacity: 0.5; }
+    50% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(0.8); opacity: 0.5; }
+}
+
+/* Stream Choice Overlay Modal */
+.sports-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(15px);
+    z-index: 2000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.sports-modal-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.sports-modal {
+    background: #101115;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--border-radius-lg);
+    width: 90%;
+    max-width: 440px;
+    padding: 30px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    transform: translateY(20px);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    text-align: center;
+    position: relative;
+}
+
+.sports-modal-overlay.show .sports-modal {
+    transform: translateY(0);
+}
+
+.sports-modal-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    color: var(--text-muted);
+    font-size: 20px;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.sports-modal-close:hover {
+    color: var(--text-primary);
+}
+
+.sports-modal-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 20px;
+    font-weight: 800;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+}
+
+.sports-modal-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+}
+
+.sports-links-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.sports-link-btn {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--border-radius-md);
+    padding: 14px 20px;
+    color: var(--text-primary);
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.2s ease;
+}
+
+.sports-link-btn:hover {
+    background: var(--color-accent-gradient);
+    color: var(--bg-primary);
+    border-color: transparent;
+    box-shadow: 0 4px 15px rgba(29, 209, 113, 0.3);
+    transform: translateY(-2px);
+}
+
+.sports-link-btn i {
+    font-size: 16px;
+    opacity: 0.8;
+}
+
+/* ==========================================================================
+   LIVE TV CHANNELS
+   ========================================================================== */
+.tv-card {
+    min-width: 140px;
+    width: 140px;
+    height: 180px;
+    flex-shrink: 0;
+    cursor: pointer;
+    position: relative;
+    border-radius: var(--border-radius-md);
+    overflow: hidden;
+    background-color: var(--bg-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 12px;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-sm);
+}
+
+.tv-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(255, 255, 255, 0.2);
+    background-color: rgba(255, 255, 255, 0.02);
+    box-shadow: var(--shadow-md);
+}
+
+.tv-card-logo-container {
+    width: 100%;
+    height: 110px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: var(--border-radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    overflow: hidden;
+    position: relative;
+}
+
+.tv-card-logo-container img {
+    max-width: 80%;
+    max-height: 80%;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.25));
+    transition: transform 0.3s ease;
+}
+
+.tv-card:hover .tv-card-logo-container img {
+    transform: scale(1.08);
+}
+
+.tv-card-category-badge {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    background: rgba(0, 240, 255, 0.1);
+    border: 1px solid rgba(0, 240, 255, 0.2);
+    color: var(--secondary-accent);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 8px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.tv-card-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+    margin-top: 8px;
+}
+
+/* Category Sections on Live TV Page */
+.tv-category-section {
+    margin-bottom: 35px;
+}
+
+.tv-category-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 15px;
+    border-left: 3px solid var(--secondary-accent);
+    padding-left: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tv-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 20px;
+}
+
 
