@@ -1830,36 +1830,14 @@ async function initWatchPage() {
             resourceLink: sportUrl
         }];
         
-        // Detect mixed content: HTTP stream on HTTPS page
-        const isHttpStream = sportUrl.startsWith('http://');
-        const isHttpsPage = window.location.protocol === 'https:';
-        if (isHttpStream && isHttpsPage) {
-            // Show friendly overlay instead of broken player
-            const playerWrap = document.querySelector('.plyr__video-wrapper') || document.getElementById('playerWrapper') || document.querySelector('.watch-player-container');
-            if (playerWrap) {
-                playerWrap.style.position = 'relative';
-                const overlay = document.createElement('div');
-                overlay.id = 'mixedContentOverlay';
-                overlay.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,0.92);z-index:99;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#fff;text-align:center;padding:24px;border-radius:12px;';
-                const rawUrl = new URLSearchParams(window.location.search).get('rawUrl') || sportUrl.replace('/api/sports/proxy', '');
-                // decode the original URL from proxy url if needed
-                let directUrl = sportUrl;
-                if (sportUrl.includes('/api/sports/proxy?url=')) {
-                    try { directUrl = decodeURIComponent(sportUrl.split('url=')[1].split('&')[0]); } catch(e) {}
-                }
-                overlay.innerHTML = `
-                    <div style="font-size:40px;">📡</div>
-                    <div style="font-size:18px;font-weight:700;">HTTP Stream detected</div>
-                    <div style="font-size:13px;opacity:0.7;max-width:380px;">This stream uses an HTTP link. HTTPS sites cannot load HTTP streams directly due to browser security (Mixed Content). Please use one of the options below:</div>
-                    <a href="${directUrl}" target="_blank" style="display:inline-block;padding:10px 24px;background:#e50914;color:#fff;border-radius:8px;font-weight:700;text-decoration:none;font-size:14px;">▶ Open Stream Directly</a>
-                    <a href="vlc://${directUrl.replace('http://','').replace('https://','')}" style="display:inline-block;padding:10px 24px;background:#333;color:#fff;border-radius:8px;font-weight:700;text-decoration:none;font-size:14px;">🎬 Open in VLC</a>
-                    <div style="font-size:11px;opacity:0.5;">Or switch to HTTP: <a href="${window.location.href.replace('https://','http://')}" style="color:#aaa;">watch via HTTP</a></div>
-                `;
-                playerWrap.appendChild(overlay);
-            }
-        } else {
-            playResources();
+        // If stream is HTTP but page is HTTPS, redirect to HTTP version of this page.
+        // HTTP page can load HTTP streams without mixed content restriction.
+        if (sportUrl.startsWith('http://') && window.location.protocol === 'https:') {
+            window.location.replace(window.location.href.replace('https://', 'http://'));
+            return;
         }
+        
+        playResources();
         
         if (loading) loading.style.display = "none";
         if (content) content.style.display = "block";
