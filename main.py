@@ -4054,6 +4054,9 @@ async def serve_details_page(request: Request, id: str = None, tmdb: str = None,
     meta = await get_subject_meta(subject_id=id, tmdb_id=tmdb, subject_type=sub_type)
     
     html_content = html_content.replace("<title>Details - Streamfit</title>", f"<title>{meta['title']}</title>")
+    html_content = html_content.replace('id="detailsTitle">Title', f'id="detailsTitle">{meta["title"]}')
+    html_content = html_content.replace('id="watchDescription">Description loading...', f'id="watchDescription">{meta["description"]}')
+    html_content = html_content.replace('src="/default-cover.png"', f'src="{meta["cover"]}"')
     
     og_tags = f"""
     <meta name="description" content="{meta['description']}">
