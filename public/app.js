@@ -876,7 +876,7 @@ async function initWatchPage() {
     const reqSeason = urlParams.get("season") ? parseInt(urlParams.get("season")) : 1;
     const reqEpisode = urlParams.get("episode") ? parseInt(urlParams.get("episode")) : 1;
     
-    if (!subjectId && !tmdbId) {
+    if (type !== "sports" && type !== "tv" && !subjectId && !tmdbId) {
         window.location.href = "/";
         return;
     }
@@ -1299,7 +1299,7 @@ async function initWatchPage() {
     const reqSeason = urlParams.get("season") ? parseInt(urlParams.get("season")) : 1;
     const reqEpisode = urlParams.get("episode") ? parseInt(urlParams.get("episode")) : 1;
     
-    if (!subjectId && !tmdbId) {
+    if (type !== "sports" && type !== "tv" && !subjectId && !tmdbId) {
         window.location.href = "/";
         return;
     }
