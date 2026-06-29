@@ -3902,10 +3902,13 @@ async def serve_home(request: Request):
 async def debug_routes():
     routes = []
     for route in app.routes:
+        methods = None
+        if hasattr(route, "methods") and route.methods is not None:
+            methods = list(route.methods)
         routes.append({
-            "path": route.path,
-            "name": route.name,
-            "methods": list(route.methods) if hasattr(route, "methods") else None
+            "path": getattr(route, "path", str(route)),
+            "name": getattr(route, "name", str(route)),
+            "methods": methods
         })
     return {"routes": routes}
 
