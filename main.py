@@ -3913,6 +3913,18 @@ async def debug_routes():
     return {"routes": routes}
 
 
+@app.get("/debug-file")
+async def debug_file(filename: str = "public/tv.html"):
+    path = os.path.join(base_dir, filename)
+    exists = os.path.exists(path)
+    return {
+        "filename": filename,
+        "absolute_path": path,
+        "exists": exists,
+        "base_dir": base_dir
+    }
+
+
 @app.get("/movies", response_class=HTMLResponse)
 async def serve_movies(request: Request):
     path = os.path.join(base_dir, "public/movies.html")
