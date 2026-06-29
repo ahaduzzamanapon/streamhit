@@ -205,6 +205,7 @@ async def serve_movies(request: Request):
 
 
 @app.get("/tv", response_class=HTMLResponse)
+@app.get("/tv-shows", response_class=HTMLResponse)
 async def serve_tv_shows(request: Request):
     try:
         path = os.path.join(base_dir, "public/tv.html")
