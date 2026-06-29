@@ -138,6 +138,276 @@ app.add_middleware(
     expose_headers=["Content-Length", "Content-Range"]
 )
 
+
+# --- Page Routing (Registered early to prevent path parameter conflicts) ---
+
+@app.get("/debug-routes")
+async def debug_routes():
+    routes = []
+    for route in app.routes:
+        methods = None
+        if hasattr(route, "methods") and route.methods is not None:
+            methods = list(route.methods)
+        routes.append({
+            "path": getattr(route, "path", str(route)),
+            "name": getattr(route, "name", str(route)),
+            "methods": methods
+        })
+    return {"routes": routes}
+
+
+@app.get("/debug-file")
+async def debug_file(filename: str = "public/tv.html"):
+    path = os.path.join(base_dir, filename)
+    exists = os.path.exists(path)
+    return {
+        "filename": filename,
+        "absolute_path": path,
+        "exists": exists,
+        "base_dir": base_dir
+    }
+
+
+@app.get("/movies", response_class=HTMLResponse)
+async def serve_movies(request: Request):
+    path = os.path.join(base_dir, "public/movies.html")
+    with open(path, "r", encoding="utf-8") as f:
+        html_content = f.read()
+        
+    meta = {
+        "title": "Explore Movies - Streamfit",
+        "description": "Browse the latest Hollywood, Bollywood, and international movies on Streamfit. High quality free streaming with multilingual dubs.",
+        "cover": "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=1200&q=80"
+    }
+    
+    html_content = html_content.replace("<title>Explore Movies - Streamfit</title>", f"<title>{meta['title']}</title>")
+    
+    og_tags = f"""
+    <meta name="description" content="{meta['description']}">
+    <meta name="keywords" content="movies, tv shows, streaming, streamfit, watch free, hd movies, hindi dub, bengali dub, watch online">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{str(request.url)}">
+    <meta property="og:title" content="{meta['title']}">
+    <meta property="og:description" content="{meta['description']}">
+    <meta property="og:image" content="{meta['cover']}">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="{str(request.url)}">
+    <meta property="twitter:title" content="{meta['title']}">
+    <meta property="twitter:description" content="{meta['description']}">
+    <meta property="twitter:image" content="{meta['cover']}">
+    """
+    html_content = html_content.replace("</head>", f"{og_tags}\n</head>")
+    return HTMLResponse(content=html_content)
+
+
+@app.get("/tv", response_class=HTMLResponse)
+async def serve_tv_shows(request: Request):
+    try:
+        path = os.path.join(base_dir, "public/tv.html")
+        with open(path, "r", encoding="utf-8") as f:
+            html_content = f.read()
+            
+        meta = {
+            "title": "Explore TV Series - Streamfit",
+            "description": "Watch trending television shows and web series online for free. Enjoy full seasons with multiple subtitle and language tracks.",
+            "cover": "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=1200&q=80"
+        }
+        
+        html_content = html_content.replace("<title>Explore TV Series - Streamfit</title>", f"<title>{meta['title']}</title>")
+        
+        og_tags = f"""
+        <meta name="description" content="{meta['description']}">
+        <meta name="keywords" content="movies, tv shows, streaming, streamfit, watch free, hd movies, hindi dub, bengali dub, watch online">
+        
+        <!-- Open Graph / Facebook -->
+        <meta property="og:type" content="website">
+        <meta property="og:url" content="{str(request.url)}">
+        <meta property="og:title" content="{meta['title']}">
+        <meta property="og:description" content="{meta['description']}">
+        <meta property="og:image" content="{meta['cover']}">
+
+        <!-- Twitter -->
+        <meta property="twitter:card" content="summary_large_image">
+        <meta property="twitter:url" content="{str(request.url)}">
+        <meta property="twitter:title" content="{meta['title']}">
+        <meta property="twitter:description" content="{meta['description']}">
+        <meta property="twitter:image" content="{meta['cover']}">
+        """
+        html_content = html_content.replace("</head>", f"{og_tags}\n</head>")
+        return HTMLResponse(content=html_content)
+    except Exception as e:
+        import traceback
+        return HTMLResponse(content=f"<pre>Error: {str(e)}\n{traceback.format_exc()}</pre>", status_code=500)
+
+
+@app.get("/live-tv", response_class=HTMLResponse)
+async def serve_live_tv(request: Request):
+    path = os.path.join(base_dir, "public/live-tv.html")
+    with open(path, "r", encoding="utf-8") as f:
+        html_content = f.read()
+        
+    meta = {
+        "title": "Live TV Channels - Streamfit",
+        "description": "Watch your favorite live TV channels online for free in high quality. Enjoy sports, news, and entertainment streams on Streamfit.",
+        "cover": "https://images.unsplash.com/photo-1598257006458-087169a1f08d?w=1200&q=80"
+    }
+    
+    html_content = html_content.replace("<title>Live TV Channels - Streamfit</title>", f"<title>{meta['title']}</title>")
+    
+    og_tags = f"""
+    <meta name="description" content="{meta['description']}">
+    <meta name="keywords" content="live tv, channels, sports live, news live, streaming, streamfit, watch free, tv online">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{str(request.url)}">
+    <meta property="og:title" content="{meta['title']}">
+    <meta property="og:description" content="{meta['description']}">
+    <meta property="og:image" content="{meta['cover']}">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="{str(request.url)}">
+    <meta property="twitter:title" content="{meta['title']}">
+    <meta property="twitter:description" content="{meta['description']}">
+    <meta property="twitter:image" content="{meta['cover']}">
+    """
+    html_content = html_content.replace("</head>", f"{og_tags}\n</head>")
+    return HTMLResponse(content=html_content)
+
+
+@app.get("/details", response_class=HTMLResponse)
+async def serve_details_page(request: Request, id: str = None, tmdb: str = None, type: str = "movie"):
+    path = os.path.join(base_dir, "public/details.html")
+    with open(path, "r", encoding="utf-8") as f:
+        html_content = f.read()
+        
+    sub_type = 2 if type == "tv" else 1
+    meta = await get_subject_meta(subject_id=id, tmdb_id=tmdb, subject_type=sub_type)
+    
+    html_content = html_content.replace("<title>Details - Streamfit</title>", f"<title>{meta['title']}</title>")
+    html_content = html_content.replace('id="detailsTitle">Title', f'id="detailsTitle">{meta["title"]}')
+    html_content = html_content.replace('id="watchDescription">Description loading...', f'id="watchDescription">{meta["description"]}')
+    html_content = html_content.replace('src="/default-cover.png"', f'src="{meta["cover"]}"')
+    
+    og_tags = f"""
+    <meta name="description" content="{meta['description']}">
+    <meta name="keywords" content="movies, tv shows, streaming, streamfit, watch free, hd movies, hindi dub, bengali dub, watch online">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="video.other">
+    <meta property="og:url" content="{str(request.url)}">
+    <meta property="og:title" content="{meta['title']}">
+    <meta property="og:description" content="{meta['description']}">
+    <meta property="og:image" content="{meta['cover']}">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="{str(request.url)}">
+    <meta property="twitter:title" content="{meta['title']}">
+    <meta property="twitter:description" content="{meta['description']}">
+    <meta property="twitter:image" content="{meta['cover']}">
+    """
+    html_content = html_content.replace("</head>", f"{og_tags}\n</head>")
+    return HTMLResponse(content=html_content)
+
+
+@app.get("/watch", response_class=HTMLResponse)
+async def serve_watch_page(request: Request, id: str = None, tmdb: str = None, type: str = "movie"):
+    # Server-side crawler bot detection and block
+    user_agent = request.headers.get("user-agent", "").lower()
+    bot_keywords = [
+        "googlebot", "bingbot", "yandexbot", "baiduspider", "duckduckbot", "exabot", "sogou", 
+        "facebot", "facebookexternalhit", "ia_archiver", "twitterbot", "discordbot", "telegrambot", 
+        "slackbot", "bot", "crawler", "spider", "crawl", "slurp", "screaming frog"
+    ]
+    if any(keyword in user_agent for keyword in bot_keywords):
+        print(f"[Bot Blocked] IP: {request.client.host if request.client else 'Unknown'} | User-Agent: {user_agent}")
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    path = os.path.join(base_dir, "public/watch.html")
+    with open(path, "r", encoding="utf-8") as f:
+        html_content = f.read()
+        
+    sub_type = 2 if type == "tv" else 1
+    meta = await get_subject_meta(subject_id=id, tmdb_id=tmdb, subject_type=sub_type)
+    
+    html_content = html_content.replace("<title>Watch Online - Streamfit</title>", f"<title>{meta['title']}</title>")
+    
+    og_tags = f"""
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+    <meta name="description" content="{meta['description']}">
+    <meta name="keywords" content="movies, tv shows, streaming, streamfit, watch free, hd movies, hindi dub, bengali dub, watch online">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="video.other">
+    <meta property="og:url" content="{str(request.url)}">
+    <meta property="og:title" content="{meta['title']}">
+    <meta property="og:description" content="{meta['description']}">
+    <meta property="og:image" content="{meta['cover']}">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="{str(request.url)}">
+    <meta property="twitter:title" content="{meta['title']}">
+    <meta property="twitter:description" content="{meta['description']}">
+    <meta property="twitter:image" content="{meta['cover']}">
+    """
+    html_content = html_content.replace("</head>", f"{og_tags}\n</head>")
+    html_content = html_content.replace("</head>", f"{og_tags}\n</head>")
+    return HTMLResponse(content=html_content)
+
+
+@app.get("/download", response_class=HTMLResponse)
+async def serve_download_page(request: Request):
+    # Server-side crawler bot detection and block
+    user_agent = request.headers.get("user-agent", "").lower()
+    bot_keywords = [
+        "googlebot", "bingbot", "yandexbot", "baiduspider", "duckduckbot", "exabot", "sogou", 
+        "facebot", "facebookexternalhit", "ia_archiver", "twitterbot", "discordbot", "telegrambot", 
+        "slackbot", "bot", "crawler", "spider", "crawl", "slurp", "screaming frog", "python", "http-client", "curl", "wget"
+    ]
+    if any(keyword in user_agent for keyword in bot_keywords):
+        print(f"[Bot Blocked on Download] IP: {request.client.host if request.client else 'Unknown'} | User-Agent: {user_agent}")
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    path = os.path.join(base_dir, "public/download.html")
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Page not found")
+        
+    with open(path, "r", encoding="utf-8") as f:
+        html_content = f.read()
+        
+    return HTMLResponse(content=html_content)
+
+
+@app.get("/admin", response_class=HTMLResponse)
+async def serve_admin(request: Request):
+    path = os.path.join(base_dir, "public/admin.html")
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Admin page not found")
+    with open(path, "r", encoding="utf-8") as f:
+        html_content = f.read()
+    return HTMLResponse(content=html_content)
+
+
+@app.get("/logs", response_class=HTMLResponse)
+async def serve_logs(request: Request):
+    path = os.path.join(base_dir, "public/logs.html")
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Logs page not found")
+    with open(path, "r", encoding="utf-8") as f:
+        html_content = f.read()
+    return HTMLResponse(content=html_content)
+
+
+# ---------------------------------------------------------------------------
+
+
 async def get_db_pool():
     global db_pool
     current_loop = asyncio.get_running_loop()
@@ -3898,268 +4168,7 @@ async def serve_home(request: Request):
     return HTMLResponse(content=html_content)
 
 
-@app.get("/debug-routes")
-async def debug_routes():
-    routes = []
-    for route in app.routes:
-        methods = None
-        if hasattr(route, "methods") and route.methods is not None:
-            methods = list(route.methods)
-        routes.append({
-            "path": getattr(route, "path", str(route)),
-            "name": getattr(route, "name", str(route)),
-            "methods": methods
-        })
-    return {"routes": routes}
 
-
-@app.get("/debug-file")
-async def debug_file(filename: str = "public/tv.html"):
-    path = os.path.join(base_dir, filename)
-    exists = os.path.exists(path)
-    return {
-        "filename": filename,
-        "absolute_path": path,
-        "exists": exists,
-        "base_dir": base_dir
-    }
-
-
-@app.get("/movies", response_class=HTMLResponse)
-async def serve_movies(request: Request):
-    path = os.path.join(base_dir, "public/movies.html")
-    with open(path, "r", encoding="utf-8") as f:
-        html_content = f.read()
-        
-    meta = {
-        "title": "Explore Movies - Streamfit",
-        "description": "Browse the latest Hollywood, Bollywood, and international movies on Streamfit. High quality free streaming with multilingual dubs.",
-        "cover": "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=1200&q=80"
-    }
-    
-    html_content = html_content.replace("<title>Explore Movies - Streamfit</title>", f"<title>{meta['title']}</title>")
-    
-    og_tags = f"""
-    <meta name="description" content="{meta['description']}">
-    <meta name="keywords" content="movies, tv shows, streaming, streamfit, watch free, hd movies, hindi dub, bengali dub, watch online">
-    
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="{str(request.url)}">
-    <meta property="og:title" content="{meta['title']}">
-    <meta property="og:description" content="{meta['description']}">
-    <meta property="og:image" content="{meta['cover']}">
-
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="{str(request.url)}">
-    <meta property="twitter:title" content="{meta['title']}">
-    <meta property="twitter:description" content="{meta['description']}">
-    <meta property="twitter:image" content="{meta['cover']}">
-    """
-    html_content = html_content.replace("</head>", f"{og_tags}\n</head>")
-    return HTMLResponse(content=html_content)
-
-
-@app.get("/tv", response_class=HTMLResponse)
-async def serve_tv_shows(request: Request):
-    try:
-        path = os.path.join(base_dir, "public/tv.html")
-        with open(path, "r", encoding="utf-8") as f:
-            html_content = f.read()
-            
-        meta = {
-            "title": "Explore TV Series - Streamfit",
-            "description": "Watch trending television shows and web series online for free. Enjoy full seasons with multiple subtitle and language tracks.",
-            "cover": "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=1200&q=80"
-        }
-        
-        html_content = html_content.replace("<title>Explore TV Series - Streamfit</title>", f"<title>{meta['title']}</title>")
-        
-        og_tags = f"""
-        <meta name="description" content="{meta['description']}">
-        <meta name="keywords" content="movies, tv shows, streaming, streamfit, watch free, hd movies, hindi dub, bengali dub, watch online">
-        
-        <!-- Open Graph / Facebook -->
-        <meta property="og:type" content="website">
-        <meta property="og:url" content="{str(request.url)}">
-        <meta property="og:title" content="{meta['title']}">
-        <meta property="og:description" content="{meta['description']}">
-        <meta property="og:image" content="{meta['cover']}">
-
-        <!-- Twitter -->
-        <meta property="twitter:card" content="summary_large_image">
-        <meta property="twitter:url" content="{str(request.url)}">
-        <meta property="twitter:title" content="{meta['title']}">
-        <meta property="twitter:description" content="{meta['description']}">
-        <meta property="twitter:image" content="{meta['cover']}">
-        """
-        html_content = html_content.replace("</head>", f"{og_tags}\n</head>")
-        return HTMLResponse(content=html_content)
-    except Exception as e:
-        import traceback
-        return HTMLResponse(content=f"<pre>Error: {str(e)}\n{traceback.format_exc()}</pre>", status_code=500)
-
-
-@app.get("/live-tv", response_class=HTMLResponse)
-async def serve_live_tv(request: Request):
-    path = os.path.join(base_dir, "public/live-tv.html")
-    with open(path, "r", encoding="utf-8") as f:
-        html_content = f.read()
-        
-    meta = {
-        "title": "Live TV Channels - Streamfit",
-        "description": "Watch your favorite live TV channels online for free in high quality. Enjoy sports, news, and entertainment streams on Streamfit.",
-        "cover": "https://images.unsplash.com/photo-1598257006458-087169a1f08d?w=1200&q=80"
-    }
-    
-    html_content = html_content.replace("<title>Live TV Channels - Streamfit</title>", f"<title>{meta['title']}</title>")
-    
-    og_tags = f"""
-    <meta name="description" content="{meta['description']}">
-    <meta name="keywords" content="live tv, channels, sports live, news live, streaming, streamfit, watch free, tv online">
-    
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="{str(request.url)}">
-    <meta property="og:title" content="{meta['title']}">
-    <meta property="og:description" content="{meta['description']}">
-    <meta property="og:image" content="{meta['cover']}">
-
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="{str(request.url)}">
-    <meta property="twitter:title" content="{meta['title']}">
-    <meta property="twitter:description" content="{meta['description']}">
-    <meta property="twitter:image" content="{meta['cover']}">
-    """
-    html_content = html_content.replace("</head>", f"{og_tags}\n</head>")
-    return HTMLResponse(content=html_content)
-
-
-@app.get("/details", response_class=HTMLResponse)
-async def serve_details_page(request: Request, id: str = None, tmdb: str = None, type: str = "movie"):
-    path = os.path.join(base_dir, "public/details.html")
-    with open(path, "r", encoding="utf-8") as f:
-        html_content = f.read()
-        
-    sub_type = 2 if type == "tv" else 1
-    meta = await get_subject_meta(subject_id=id, tmdb_id=tmdb, subject_type=sub_type)
-    
-    html_content = html_content.replace("<title>Details - Streamfit</title>", f"<title>{meta['title']}</title>")
-    html_content = html_content.replace('id="detailsTitle">Title', f'id="detailsTitle">{meta["title"]}')
-    html_content = html_content.replace('id="watchDescription">Description loading...', f'id="watchDescription">{meta["description"]}')
-    html_content = html_content.replace('src="/default-cover.png"', f'src="{meta["cover"]}"')
-    
-    og_tags = f"""
-    <meta name="description" content="{meta['description']}">
-    <meta name="keywords" content="movies, tv shows, streaming, streamfit, watch free, hd movies, hindi dub, bengali dub, watch online">
-    
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="video.other">
-    <meta property="og:url" content="{str(request.url)}">
-    <meta property="og:title" content="{meta['title']}">
-    <meta property="og:description" content="{meta['description']}">
-    <meta property="og:image" content="{meta['cover']}">
-
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="{str(request.url)}">
-    <meta property="twitter:title" content="{meta['title']}">
-    <meta property="twitter:description" content="{meta['description']}">
-    <meta property="twitter:image" content="{meta['cover']}">
-    """
-    html_content = html_content.replace("</head>", f"{og_tags}\n</head>")
-    return HTMLResponse(content=html_content)
-
-
-@app.get("/watch", response_class=HTMLResponse)
-async def serve_watch_page(request: Request, id: str = None, tmdb: str = None, type: str = "movie"):
-    # Server-side crawler bot detection and block
-    user_agent = request.headers.get("user-agent", "").lower()
-    bot_keywords = [
-        "googlebot", "bingbot", "yandexbot", "baiduspider", "duckduckbot", "exabot", "sogou", 
-        "facebot", "facebookexternalhit", "ia_archiver", "twitterbot", "discordbot", "telegrambot", 
-        "slackbot", "bot", "crawler", "spider", "crawl", "slurp", "screaming frog"
-    ]
-    if any(keyword in user_agent for keyword in bot_keywords):
-        print(f"[Bot Blocked] IP: {request.client.host if request.client else 'Unknown'} | User-Agent: {user_agent}")
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    path = os.path.join(base_dir, "public/watch.html")
-    with open(path, "r", encoding="utf-8") as f:
-        html_content = f.read()
-        
-    sub_type = 2 if type == "tv" else 1
-    meta = await get_subject_meta(subject_id=id, tmdb_id=tmdb, subject_type=sub_type)
-    
-    html_content = html_content.replace("<title>Watch Online - Streamfit</title>", f"<title>{meta['title']}</title>")
-    
-    og_tags = f"""
-    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
-    <meta name="description" content="{meta['description']}">
-    <meta name="keywords" content="movies, tv shows, streaming, streamfit, watch free, hd movies, hindi dub, bengali dub, watch online">
-    
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="video.other">
-    <meta property="og:url" content="{str(request.url)}">
-    <meta property="og:title" content="{meta['title']}">
-    <meta property="og:description" content="{meta['description']}">
-    <meta property="og:image" content="{meta['cover']}">
-
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="{str(request.url)}">
-    <meta property="twitter:title" content="{meta['title']}">
-    <meta property="twitter:description" content="{meta['description']}">
-    <meta property="twitter:image" content="{meta['cover']}">
-    """
-    html_content = html_content.replace("</head>", f"{og_tags}\n</head>")
-    html_content = html_content.replace("</head>", f"{og_tags}\n</head>")
-    return HTMLResponse(content=html_content)
-
-
-@app.get("/download", response_class=HTMLResponse)
-async def serve_download_page(request: Request):
-    # Server-side crawler bot detection and block
-    user_agent = request.headers.get("user-agent", "").lower()
-    bot_keywords = [
-        "googlebot", "bingbot", "yandexbot", "baiduspider", "duckduckbot", "exabot", "sogou", 
-        "facebot", "facebookexternalhit", "ia_archiver", "twitterbot", "discordbot", "telegrambot", 
-        "slackbot", "bot", "crawler", "spider", "crawl", "slurp", "screaming frog", "python", "http-client", "curl", "wget"
-    ]
-    if any(keyword in user_agent for keyword in bot_keywords):
-        print(f"[Bot Blocked on Download] IP: {request.client.host if request.client else 'Unknown'} | User-Agent: {user_agent}")
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    path = os.path.join(base_dir, "public/download.html")
-    if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="Page not found")
-        
-    with open(path, "r", encoding="utf-8") as f:
-        html_content = f.read()
-        
-    return HTMLResponse(content=html_content)
-
-
-@app.get("/admin", response_class=HTMLResponse)
-async def serve_admin(request: Request):
-    path = os.path.join(base_dir, "public/admin.html")
-    if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="Admin page not found")
-    with open(path, "r", encoding="utf-8") as f:
-        html_content = f.read()
-    return HTMLResponse(content=html_content)
-
-
-@app.get("/logs", response_class=HTMLResponse)
-async def serve_logs(request: Request):
-    path = os.path.join(base_dir, "public/logs.html")
-    if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="Logs page not found")
-    with open(path, "r", encoding="utf-8") as f:
-        html_content = f.read()
-    return HTMLResponse(content=html_content)
 
 
 from admin import router as admin_router
