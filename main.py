@@ -102,6 +102,18 @@ def get_http_client() -> httpx.AsyncClient:
         loop_clients[current_loop] = httpx.AsyncClient(trust_env=False, timeout=120.0)
     return loop_clients[current_loop]
 
+loop_proxy_clients = {}
+
+def get_proxy_client(proxy_url: str) -> httpx.AsyncClient:
+    current_loop = asyncio.get_running_loop()
+    for lp in list(loop_proxy_clients.keys()):
+        if lp.is_closed():
+            loop_proxy_clients.pop(lp, None)
+    key = (current_loop, proxy_url)
+    if key not in loop_proxy_clients:
+        loop_proxy_clients[key] = httpx.AsyncClient(proxy=proxy_url, trust_env=False, timeout=30.0)
+    return loop_proxy_clients[key]
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # ---- startup ----
@@ -3361,13 +3373,8 @@ def rewrite_m3u8_manifest(content: str, base_url: str, referer: str, origin: str
         else:
             # Segment or sub-playlist URL
             absolute_url = urllib.parse.urljoin(base_url, line_strip)
-            parsed_line = urllib.parse.urlparse(absolute_url)
-            is_sub_manifest = parsed_line.path.endswith(".m3u8") or ".m3u8" in parsed_line.query
-            if is_sub_manifest:
-                proxied_url = f"/api/sports/proxy?url={urllib.parse.quote(absolute_url)}&referer={urllib.parse.quote(referer)}&origin={urllib.parse.quote(origin)}&userAgent={urllib.parse.quote(userAgent)}&use_bd_proxy={'true' if use_bd_proxy else 'false'}"
-                new_lines.append(proxied_url)
-            else:
-                new_lines.append(absolute_url)
+            proxied_url = f"/api/sports/proxy?url={urllib.parse.quote(absolute_url)}&referer={urllib.parse.quote(referer)}&origin={urllib.parse.quote(origin)}&userAgent={urllib.parse.quote(userAgent)}&use_bd_proxy={'true' if use_bd_proxy else 'false'}"
+            new_lines.append(proxied_url)
     return "\n".join(new_lines)
 
 # Sports Streaming Proxy Endpoint with Region Lock Bypass
@@ -3394,17 +3401,18 @@ async def proxy_sports_stream(
     if referer:
         headers_to_send["Referer"] = referer
         
-    range_header = request.headers.get("Range")
+    cookie_header = request.headers.get("cookie") or request.headers.get("Cookie")
+    if cookie_header:
+        headers_to_send["Cookie"] = cookie_header
+        
+    range_header = request.headers.get("Range") or request.headers.get("range")
     if range_header:
         headers_to_send["Range"] = range_header
         
-    client_created = False
-    client = None
     try:
         # Determine client and proxy usage
         if bd_proxy and use_bd_proxy:
-            client = httpx.AsyncClient(proxy=bd_proxy, trust_env=False, timeout=15.0)
-            client_created = True
+            client = get_proxy_client(bd_proxy)
         else:
             client = get_http_client()
             
@@ -3412,7 +3420,7 @@ async def proxy_sports_stream(
         is_manifest = parsed_url.path.endswith(".m3u8") or ".m3u8" in parsed_url.query
         
         if is_manifest:
-            resp = await client.get(url, headers=headers_to_send, timeout=10.0)
+            resp = await client.get(url, headers=headers_to_send, timeout=15.0)
             if resp.status_code != 200:
                 headers = {"Access-Control-Allow-Origin": "*"}
                 return Response(content=resp.content, status_code=resp.status_code, media_type=resp.headers.get("Content-Type"), headers=headers)
@@ -3439,14 +3447,10 @@ async def proxy_sports_stream(
                         yield chunk
                 finally:
                     await resp.aclose()
-                    if client_created and client:
-                        await client.aclose()
                         
             return StreamingResponse(chunk_generator(), status_code=resp.status_code, headers=headers, media_type=resp.headers.get("Content-Type"))
             
     except Exception as e:
-        if client_created and client:
-            await client.aclose()
         print(f"[Sports Proxy Error] URL: {url} | Error: {e}")
         raise HTTPException(status_code=502, detail=str(e))
 
