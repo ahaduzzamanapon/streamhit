@@ -1016,17 +1016,19 @@
                                 <label for="sportOrigin">Origin (Optional)</label>
                                 <input type="text" id="sportOrigin" placeholder="e.g. https://tahmidx.cinemoja2.workers.dev">
                             </div>
-                            
                             <div class="checkbox-group">
                                 <input type="checkbox" id="sportUseBdProxy" checked>
                                 <label for="sportUseBdProxy">Route through Bangladeshi region-lock bypass proxy</label>
                             </div>
                             
                             <h3 style="font-size: 14px; margin-bottom: 12px; font-family: 'Outfit'; color: var(--secondary-accent); text-transform: uppercase; letter-spacing: 0.5px;">Stream Links *</h3>
-                            <div class="form-group">
-                                <label for="sportStreamLinks">Stream Links (JSON List of Name & URL) *</label>
-                                <textarea id="sportStreamLinks" required rows="4" style="font-family: monospace; font-size: 12px;" placeholder='[\n  {"label": "Link 1", "url": "https://...m3u8"},\n  {"label": "Link 2", "url": "https://...m3u8"}\n]'></textarea>
+                            <div id="sportStreamLinksContainer" style="margin-bottom: 16px;">
+                                <div id="sportStreamLinksList" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;">
+                                    <!-- dynamic rows -->
+                                </div>
+                                <button type="button" class="btn btn-secondary" onclick="addSportStreamLinkRow('', '')" style="padding: 6px 12px; font-size: 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-color); width: fit-content;"><i class="fa-solid fa-plus" style="margin-right: 4px;"></i> Add Stream Link</button>
                             </div>
+                            <textarea id="sportStreamLinks" style="display: none;"></textarea>
 
                             <button type="submit" class="btn" style="width: 100%;" id="sportSaveBtn">Save Live Sport Event</button>
                             <button type="button" class="btn btn-secondary" style="width: 100%; margin-top: 8px; display: none;" id="sportCancelEditBtn" onclick="cancelSportEdit()">Cancel Edit</button>
@@ -1081,10 +1083,13 @@
                             </div>
                             
                             <h3 style="font-size: 14px; margin-bottom: 12px; font-family: 'Outfit'; color: var(--secondary-accent); text-transform: uppercase; letter-spacing: 0.5px;">Backup Stream Links *</h3>
-                            <div class="form-group">
-                                <label for="tvStreamLinks">Stream Links (JSON List of Name & URL) *</label>
-                                <textarea id="tvStreamLinks" required rows="4" style="font-family: monospace; font-size: 12px;" placeholder='[\n  {"label": "Link 1", "url": "https://...m3u8"},\n  {"label": "Link 2", "url": "https://...m3u8"}\n]'></textarea>
+                            <div id="tvStreamLinksContainer" style="margin-bottom: 16px;">
+                                <div id="tvStreamLinksList" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;">
+                                    <!-- dynamic rows -->
+                                </div>
+                                <button type="button" class="btn btn-secondary" onclick="addTvStreamLinkRow('', '')" style="padding: 6px 12px; font-size: 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-color); width: fit-content;"><i class="fa-solid fa-plus" style="margin-right: 4px;"></i> Add Stream Link</button>
                             </div>
+                            <textarea id="tvStreamLinks" style="display: none;"></textarea>
 
                             <button type="submit" class="btn" style="width: 100%;" id="tvSaveBtn">Save Live TV Channel</button>
                             <button type="button" class="btn btn-secondary" style="width: 100%; margin-top: 8px; display: none;" id="tvCancelEditBtn" onclick="cancelTvEdit()">Cancel Edit</button>
@@ -1100,6 +1105,11 @@
                 <div class="form-group">
                     <label for="m3uUrl">M3U Playlist URL</label>
                     <input type="text" id="m3uUrl" placeholder="e.g. https://domain.com/channels.m3u">
+                </div>
+                <div style="text-align: center; margin: 12px 0; color: var(--text-muted); font-size: 13px;">— OR —</div>
+                <div class="form-group">
+                    <label for="m3uFile">Upload M3U File</label>
+                    <input type="file" id="m3uFile" accept=".m3u,.m3u8" style="background: var(--bg-hover); border: 1px dashed var(--border-color); padding: 12px; cursor: pointer; border-radius: 8px; width: 100%;">
                 </div>
                 <div style="text-align: center; margin: 12px 0; color: var(--text-muted); font-size: 13px;">— OR —</div>
                 <div class="form-group">
@@ -1235,6 +1245,8 @@
             fetchCurrentVersion();
             fetchLiveSports();
             fetchLiveTvChannels();
+            populateSportStreamLinks([]);
+            populateTvStreamLinks([]);
         }
 
         function switchTab(tab) {
@@ -1627,6 +1639,81 @@
             if (overlay) observer.observe(overlay, { attributes: true, attributeFilter: ['class'] });
         });
 
+        // --- STREAM LINKS DYNAMIC MANAGER LOGIC ---
+        function createStreamLinkRowHtml(prefix, label = '', url = '') {
+            return `
+                <div class="${prefix}-stream-row" style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
+                    <input type="text" class="${prefix}-stream-label" placeholder="Server 1" value="${label}" style="width: 150px; margin-bottom: 0; padding: 8px 12px; font-size: 13px;" required>
+                    <input type="text" class="${prefix}-stream-url" placeholder="https://...m3u8" value="${url}" style="flex: 1; margin-bottom: 0; padding: 8px 12px; font-size: 13px;" required>
+                    <button type="button" class="btn btn-danger" onclick="this.parentElement.remove()" style="padding: 8px 12px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgb(239, 68, 68); color: rgb(248, 113, 113); margin-bottom: 0; width: auto; font-size: 12px;"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            `;
+        }
+
+        function addSportStreamLinkRow(label = '', url = '') {
+            const list = document.getElementById('sportStreamLinksList');
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = createStreamLinkRowHtml('sport', label, url).trim();
+            list.appendChild(tempDiv.firstChild);
+        }
+
+        function addTvStreamLinkRow(label = '', url = '') {
+            const list = document.getElementById('tvStreamLinksList');
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = createStreamLinkRowHtml('tv', label, url).trim();
+            list.appendChild(tempDiv.firstChild);
+        }
+
+        function serializeSportStreamLinks() {
+            const list = document.getElementById('sportStreamLinksList');
+            const rows = list.querySelectorAll('.sport-stream-row');
+            const data = [];
+            rows.forEach(row => {
+                const label = row.querySelector('.sport-stream-label').value.trim();
+                const url = row.querySelector('.sport-stream-url').value.trim();
+                if (label || url) {
+                    data.push({ label, url });
+                }
+            });
+            document.getElementById('sportStreamLinks').value = JSON.stringify(data);
+        }
+
+        function serializeTvStreamLinks() {
+            const list = document.getElementById('tvStreamLinksList');
+            const rows = list.querySelectorAll('.tv-stream-row');
+            const data = [];
+            rows.forEach(row => {
+                const label = row.querySelector('.tv-stream-label').value.trim();
+                const url = row.querySelector('.tv-stream-url').value.trim();
+                if (label || url) {
+                    data.push({ label, url });
+                }
+            });
+            document.getElementById('tvStreamLinks').value = JSON.stringify(data);
+        }
+
+        function populateSportStreamLinks(linksArray) {
+            const list = document.getElementById('sportStreamLinksList');
+            list.innerHTML = '';
+            const arr = Array.isArray(linksArray) ? linksArray : [];
+            if (arr.length === 0) {
+                addSportStreamLinkRow('Link 1', '');
+            } else {
+                arr.forEach(item => addSportStreamLinkRow(item.label || item.name || '', item.url || ''));
+            }
+        }
+
+        function populateTvStreamLinks(linksArray) {
+            const list = document.getElementById('tvStreamLinksList');
+            list.innerHTML = '';
+            const arr = Array.isArray(linksArray) ? linksArray : [];
+            if (arr.length === 0) {
+                addTvStreamLinkRow('Link 1', '');
+            } else {
+                arr.forEach(item => addTvStreamLinkRow(item.label || item.name || '', item.url || ''));
+            }
+        }
+
         // --- LIVE SPORTS TAB LOGIC ---
         async function fetchLiveSports() {
             try {
@@ -1670,6 +1757,7 @@
 
         async function handleSaveSport(e) {
             e.preventDefault();
+            serializeSportStreamLinks();
             const id = document.getElementById('sportId').value || null;
             const title = document.getElementById('sportTitle').value.trim();
             const logo = document.getElementById('sportLogo').value.trim();
@@ -1729,6 +1817,7 @@
             document.getElementById('sportOrigin').value = sport.origin || '';
             document.getElementById('sportUseBdProxy').checked = !!sport.useBdProxy;
             document.getElementById('sportStreamLinks').value = JSON.stringify(sport.streamLinks, null, 2);
+            populateSportStreamLinks(sport.streamLinks);
 
             document.getElementById('sportFormTitle').textContent = 'Edit Live Sport Event';
             document.getElementById('sportSaveBtn').textContent = 'Update Live Sport Event';
@@ -1740,6 +1829,7 @@
         function cancelSportEdit() {
             document.getElementById('sportsForm').reset();
             document.getElementById('sportId').value = '';
+            populateSportStreamLinks([]);
             document.getElementById('sportFormTitle').textContent = 'Add Live Sport Event';
             document.getElementById('sportSaveBtn').textContent = 'Save Live Sport Event';
             document.getElementById('sportCancelEditBtn').style.display = 'none';
@@ -1808,6 +1898,7 @@
 
         async function handleSaveTvChannel(e) {
             e.preventDefault();
+            serializeTvStreamLinks();
             const id = document.getElementById('tvId').value || null;
             const name = document.getElementById('tvName').value.trim();
             const logo = document.getElementById('tvLogo').value.trim();
@@ -1861,6 +1952,7 @@
             document.getElementById('tvOrigin').value = channel.origin || '';
             document.getElementById('tvUseBdProxy').checked = !!channel.useBdProxy;
             document.getElementById('tvStreamLinks').value = JSON.stringify(channel.streamLinks, null, 2);
+            populateTvStreamLinks(channel.streamLinks);
 
             document.getElementById('tvFormTitle').textContent = 'Edit Live TV Channel';
             document.getElementById('tvSaveBtn').textContent = 'Update Live TV Channel';
@@ -1872,6 +1964,7 @@
         function cancelTvEdit() {
             document.getElementById('tvForm').reset();
             document.getElementById('tvId').value = '';
+            populateTvStreamLinks([]);
             document.getElementById('tvFormTitle').textContent = 'Add Live TV Channel';
             document.getElementById('tvSaveBtn').textContent = 'Save Live TV Channel';
             document.getElementById('tvCancelEditBtn').style.display = 'none';
@@ -1904,10 +1997,29 @@
         async function handleParseM3U(event) {
             if (event) event.preventDefault();
             const url = document.getElementById('m3uUrl').value.trim();
-            const content = document.getElementById('m3uContent').value.trim();
+            const fileInput = document.getElementById('m3uFile');
+            let content = document.getElementById('m3uContent').value.trim();
             
+            if (fileInput && fileInput.files && fileInput.files[0]) {
+                const file = fileInput.files[0];
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    content = e.target.result;
+                    await parseM3UContent(url, content);
+                };
+                reader.onerror = function() {
+                    showToast('Error reading M3U file.', false);
+                };
+                reader.readAsText(file);
+                return;
+            }
+            
+            await parseM3UContent(url, content);
+        }
+
+        async function parseM3UContent(url, content) {
             if (!url && !content) {
-                showToast('Please provide an M3U URL or paste content', false);
+                showToast('Please provide an M3U URL, upload a file, or paste content', false);
                 return;
             }
             
