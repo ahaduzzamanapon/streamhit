@@ -30,7 +30,8 @@ const state = {
     userInteracted: false,
     hasAutounmuted: false,
     hasMore: false,
-    loadingMore: false
+    loadingMore: false,
+    bufferingTimeout: null
 };
 
 // Determine current page route
@@ -1008,6 +1009,25 @@ async function initWatchPage() {
     // making raw listeners useless after the first source is set.
     const loaderOverlay = document.getElementById("playerLoaderOverlay");
     
+    const startBufferingTimeout = () => {
+        clearBufferingTimeout();
+        if ((type === "sports" || type === "tv") && state.fallbackLinks && state.fallbackLinks.length > 0) {
+            console.log("[Buffering Timeout] Started 10-second loader timeout...");
+            state.bufferingTimeout = setTimeout(() => {
+                console.log("[Buffering Timeout] Loading/buffering took too long, fallback to next link...");
+                handlePlaybackError();
+            }, 10000);
+        }
+    };
+
+    const clearBufferingTimeout = () => {
+        if (state.bufferingTimeout) {
+            console.log("[Buffering Timeout] Cleared timeout.");
+            clearTimeout(state.bufferingTimeout);
+            state.bufferingTimeout = null;
+        }
+    };
+
     const showLoader = () => {
         if (loaderOverlay) {
             const statusTxt = loaderOverlay.querySelector("span");
@@ -1015,9 +1035,11 @@ async function initWatchPage() {
             loaderOverlay.style.background = "rgba(0, 0, 0, 0.8)";
             loaderOverlay.classList.add("visible");
         }
+        startBufferingTimeout();
     };
     
     const hideLoader = () => {
+        clearBufferingTimeout();
         if (loaderOverlay) {
             // If playing but muted and no interaction yet, show translucent unmute prompt
             if (playerInstance && playerInstance.muted && !state.userInteracted) {
@@ -1837,6 +1859,7 @@ async function initWatchPage() {
             return;
         }
         
+        renderLiveStreamLinks();
         playResources();
         
         if (loading) loading.style.display = "none";
@@ -3099,7 +3122,64 @@ function handlePlaybackError() {
             resourceLink: proxiedUrl
         }];
         
+        // Update stream links grid visual active state
+        renderLiveStreamLinks();
+
         // Play resources
         playResources();
+    }
+}
+
+function renderLiveStreamLinks() {
+    const container = document.getElementById("watchLiveStreamSelector");
+    const grid = document.getElementById("watchStreamLinksGrid");
+    if (!container || !grid) return;
+
+    if (state.fallbackLinks && state.fallbackLinks.length > 0) {
+        container.style.display = "block";
+        grid.innerHTML = "";
+        
+        state.fallbackLinks.forEach((link, idx) => {
+            const btn = document.createElement("button");
+            btn.className = "season-tab";
+            if (idx === state.currentFallbackIndex) {
+                btn.className += " active";
+            }
+            btn.textContent = link.label || `Link ${idx + 1}`;
+            btn.onclick = () => {
+                if (idx === state.currentFallbackIndex) return;
+                
+                // Switch to this link
+                state.currentFallbackIndex = idx;
+                
+                // Show loader toast
+                showToastNotification(`Switching to: ${link.label || 'Link ' + (idx + 1)}`);
+                
+                // Re-route URL parameters
+                const urlParams = new URLSearchParams(window.location.search);
+                urlParams.set("url", link.url);
+                urlParams.set("index", idx);
+                history.replaceState({}, "", `${window.location.pathname}?${urlParams.toString()}`);
+                
+                // Proxy URL
+                const proxiedUrl = `/api/sports/proxy?url=${encodeURIComponent(link.url)}&referer=${encodeURIComponent(link.referer || '')}&origin=${encodeURIComponent(link.origin || '')}&userAgent=${encodeURIComponent(link.userAgent || '')}&use_bd_proxy=${link.useBdProxy ? 'true' : 'false'}`;
+                
+                state.availableResources = [{
+                    resourceId: "sports_stream",
+                    resolution: 0,
+                    size: 0,
+                    resourceLink: proxiedUrl
+                }];
+                
+                // Re-render links to update active state
+                renderLiveStreamLinks();
+                
+                // Play
+                playResources();
+            };
+            grid.appendChild(btn);
+        });
+    } else {
+        container.style.display = "none";
     }
 }
