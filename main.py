@@ -3898,44 +3898,6 @@ async def serve_home(request: Request):
     return HTMLResponse(content=html_content)
 
 
-@app.get("/", response_class=HTMLResponse)
-async def serve_home(request: Request):
-    path = os.path.join(base_dir, "public/index.html")
-    if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="Home page not found")
-    with open(path, "r", encoding="utf-8") as f:
-        html_content = f.read()
-        
-    meta = {
-        "title": "Streamfit - Watch Movies & Live TV Online Free",
-        "description": "Stream the latest Hollywood and Bollywood movies, TV shows, and live TV channels online for free. Multi-language dubs and fast buffering.",
-        "cover": "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=1200&q=80"
-    }
-    
-    html_content = html_content.replace("<title>Streamfit - Watch Movies & Live TV Online Free</title>", f"<title>{meta['title']}</title>")
-    
-    og_tags = f"""
-    <meta name="description" content="{meta['description']}">
-    <meta name="keywords" content="movies, tv shows, live tv, streaming, streamfit, watch free, hd movies, hindi dub, bengali dub, watch online">
-    
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="{str(request.url)}">
-    <meta property="og:title" content="{meta['title']}">
-    <meta property="og:description" content="{meta['description']}">
-    <meta property="og:image" content="{meta['cover']}">
-
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="{str(request.url)}">
-    <meta property="twitter:title" content="{meta['title']}">
-    <meta property="twitter:description" content="{meta['description']}">
-    <meta property="twitter:image" content="{meta['cover']}">
-    """
-    html_content = html_content.replace("</head>", f"{og_tags}\n</head>")
-    return HTMLResponse(content=html_content)
-
-
 @app.get("/movies", response_class=HTMLResponse)
 async def serve_movies(request: Request):
     path = os.path.join(base_dir, "public/movies.html")
@@ -4173,7 +4135,7 @@ from admin import router as admin_router
 app.include_router(admin_router)
 
 # Mount general static assets
-app.mount("/", StaticFiles(directory=os.path.join(base_dir, "public")), name="public")
+app.mount("/", StaticFiles(directory=os.path.join(base_dir, "public"), html=True), name="public")
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=3005, reload=False)
