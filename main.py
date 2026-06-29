@@ -3465,6 +3465,38 @@ async def proxy_sports_stream(
             "Cache-Control": "no-cache"
         })
 
+# Diagnostic endpoint — check if server can reach a stream URL
+@app.get("/api/sports/test-connection")
+async def test_stream_connection(url: str):
+    import socket, time
+    result = {"url": url, "tests": {}}
+    parsed = urllib.parse.urlparse(url)
+    host = parsed.hostname
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    
+    # TCP connect test
+    try:
+        start = time.time()
+        sock = socket.create_connection((host, port), timeout=5)
+        sock.close()
+        result["tests"]["tcp_connect"] = {"ok": True, "ms": round((time.time()-start)*1000)}
+    except Exception as e:
+        result["tests"]["tcp_connect"] = {"ok": False, "error": str(e)}
+    
+    # HTTP fetch test
+    try:
+        client = get_http_client()
+        start = time.time()
+        resp = await client.get(url, timeout=10.0)
+        result["tests"]["http_fetch"] = {"ok": True, "status": resp.status_code, "ms": round((time.time()-start)*1000), "content_type": resp.headers.get("content-type", "")}
+    except Exception as e:
+        result["tests"]["http_fetch"] = {"ok": False, "error": str(e)}
+    
+    result["server_ip"] = socket.gethostbyname(socket.gethostname())
+    return result
+
+
+
 # Public Live Sports Listing Endpoint
 @app.get("/api/sports/live")
 async def public_get_live_sports():
