@@ -2134,6 +2134,10 @@ async def get_local_operating_list() -> list:
         {"title": "Top Rated TV Shows", "type": 2, "sort": "rating"}
     ]
     
+    import datetime
+    current_year = datetime.datetime.now().year
+    cutoff_date = f"{current_year}-12-31"
+    
     operating_list = []
     try:
         async with pool.acquire() as conn:
@@ -2143,9 +2147,10 @@ async def get_local_operating_list() -> list:
                     await cur.execute(f"""
                         SELECT * FROM subjects 
                         WHERE subject_type = %s AND title != 'Placeholder'
+                          AND (release_date IS NULL OR release_date = '' OR release_date <= %s)
                         ORDER BY {order_by} 
                         LIMIT 12
-                    """, (sec["type"],))
+                    """, (sec["type"], cutoff_date))
                     rows = await cur.fetchall()
                     
                     subjects = []
