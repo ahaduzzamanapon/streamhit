@@ -781,7 +781,13 @@ async def db_get_banners():
     async with pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cur:
             # Query custom banners explicitly added by admin first
-            await cur.execute("SELECT * FROM banners ORDER BY created_at DESC LIMIT 20")
+            await cur.execute("""
+                SELECT b.* FROM banners b
+                LEFT JOIN subjects s ON b.subject_id = s.subject_id
+                WHERE s.has_resource IS NULL OR s.has_resource = TRUE
+                ORDER BY b.created_at DESC 
+                LIMIT 20
+            """)
             rows = await cur.fetchall()
             if rows:
                 return rows
@@ -791,6 +797,7 @@ async def db_get_banners():
                 SELECT subject_id, title, cover as image_url, detail_path, subject_type 
                 FROM subjects 
                 WHERE cover IS NOT NULL AND cover != '' AND title != 'Placeholder' AND title != ''
+                  AND has_resource = TRUE
                 ORDER BY updated_at DESC, created_at DESC 
                 LIMIT 10
             """)
