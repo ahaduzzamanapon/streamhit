@@ -123,7 +123,10 @@ async def lifespan(app: FastAPI):
     if os.getenv("RUN_SCRAPER", "false").lower() == "true":
         asyncio.create_task(scraper_loop())
         asyncio.create_task(historical_scraper_loop())
-        asyncio.create_task(missing_resources_loop())
+    
+    # Always run the missing resource rechecker so dead movies come back
+    asyncio.create_task(missing_resource_rechecker_loop())
+    
     yield
     # ---- shutdown ----
     global db_pool
@@ -504,6 +507,7 @@ async def init_db():
                         detail_path VARCHAR(255),
                         tmdb_id VARCHAR(50) DEFAULT NULL,
                         dubs TEXT DEFAULT NULL,
+                        has_resource BOOLEAN DEFAULT TRUE,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -522,6 +526,11 @@ async def init_db():
                 try:
                     await cur.execute("ALTER TABLE subjects ADD COLUMN dubs TEXT DEFAULT NULL")
                     print("[Database] Successfully added dubs column to subjects table.")
+                except Exception:
+                    pass
+                try:
+                    await cur.execute("ALTER TABLE subjects ADD COLUMN has_resource BOOLEAN DEFAULT TRUE")
+                    print("[Database] Successfully added has_resource column to subjects table.")
                 except Exception:
                     pass
                 
@@ -1513,6 +1522,41 @@ async def scraper_loop():
         # Run every 20 minutes
         await asyncio.sleep(1200)
 
+async def missing_resource_rechecker_loop():
+    """Periodically checks subjects marked as has_resource = FALSE to see if they've come back online."""
+    # Wait for DB connection
+    await get_db_pool()
+    while True:
+        try:
+            pool = await get_db_pool()
+            if pool:
+                async with pool.acquire() as conn:
+                    async with conn.cursor(aiomysql.DictCursor) as cur:
+                        # Get all subjects that are marked as having no resources
+                        await cur.execute("SELECT subject_id FROM subjects WHERE has_resource = FALSE")
+                        dead_subjects = await cur.fetchall()
+                
+                if dead_subjects:
+                    print(f"[Rechecker] Found {len(dead_subjects)} subjects with no resources. Checking...")
+                    for row in dead_subjects:
+                        sub_id = row["subject_id"]
+                        detail_data = await request_h5_api("GET", f"/wefeed-h5api-bff/detail?subjectId={sub_id}")
+                        if detail_data and detail_data.get("code") == 0:
+                            sub_info = detail_data.get("data", {}).get("subject", {})
+                            if sub_info.get("hasResource") is True:
+                                print(f"[Rechecker] {sub_id} now HAS resources! Updating database.")
+                                async with pool.acquire() as conn:
+                                    async with conn.cursor() as cur:
+                                        await cur.execute("UPDATE subjects SET has_resource = TRUE WHERE subject_id = %s", (sub_id,))
+                        
+                        # Be gentle on the API
+                        await asyncio.sleep(2)
+        except Exception as e:
+            print(f"[Rechecker Loop] Error: {e}")
+        
+        # Run every 12 hours (43200 seconds)
+        await asyncio.sleep(43200)
+
 async def run_historical_scraper():
     progress = await db_read_scraper_progress()
     print(f"[Scraper] Starting historical scraping cycle. Current progress: {progress}")
@@ -2147,6 +2191,7 @@ async def get_local_operating_list() -> list:
                     await cur.execute(f"""
                         SELECT * FROM subjects 
                         WHERE subject_type = %s AND title != 'Placeholder'
+                          AND has_resource = TRUE
                           AND (release_date IS NULL OR release_date = '' OR release_date <= %s)
                         ORDER BY {order_by} 
                         LIMIT 12
@@ -3193,6 +3238,8 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0, detailPath: str
                                 valid_resources.append(r)
                                 
                         if valid_resources:
+                            # If successful, mark as has_resource = TRUE
+                            await cur.execute("UPDATE subjects SET has_resource = TRUE WHERE subject_id = %s", (subjectId,))
                             items = []
                             for r in valid_resources:
                                 items.append({
@@ -3203,6 +3250,9 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0, detailPath: str
                                 })
                             print(f"[api/resource] Successfully returned resources for {subjectId} after inline scraping!")
                             return {"code": 0, "data": {"list": items}}
+                        else:
+                            # Mark as has_resource = FALSE
+                            await cur.execute("UPDATE subjects SET has_resource = FALSE WHERE subject_id = %s", (subjectId,))
             except Exception as db_err:
                 print(f"[DB Resource Re-Lookup Error] {db_err}")
 
