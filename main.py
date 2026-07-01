@@ -3172,8 +3172,41 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0, detailPath: str
             })
         return {"code": 0, "data": {"list": items}}
 
-    # Missing or expired: fetch fresh links from OneRoom
+    # Missing or expired: fetch fresh links from OneRoom via inline scraper first
     try:
+        print(f"[api/resource] No valid resources in DB for {subjectId}. Scraping details & resources...")
+        await scrape_subject_details(subjectId)
+        
+        # Re-query DB for the newly scraped/saved resources
+        if pool:
+            try:
+                async with pool.acquire() as conn:
+                    async with conn.cursor(aiomysql.DictCursor) as cur:
+                        await cur.execute("""
+                            SELECT * FROM play_resources 
+                            WHERE subject_id = %s AND season = %s AND episode = %s
+                        """, (subjectId, se, ep))
+                        cached_rows = await cur.fetchall()
+                        valid_resources = []
+                        for r in cached_rows:
+                            if r["expires_at"] and r["expires_at"] > now + timedelta(minutes=5):
+                                valid_resources.append(r)
+                                
+                        if valid_resources:
+                            items = []
+                            for r in valid_resources:
+                                items.append({
+                                    "resourceId": r["resource_id"],
+                                    "resolution": r["resolution"],
+                                    "size": r["size"],
+                                    "resourceLink": f"/fetch?source_url={urllib.parse.quote(r['resource_link'])}"
+                                })
+                            print(f"[api/resource] Successfully returned resources for {subjectId} after inline scraping!")
+                            return {"code": 0, "data": {"list": items}}
+            except Exception as db_err:
+                print(f"[DB Resource Re-Lookup Error] {db_err}")
+
+        # Fallback to direct OneRoom bff API lookup if re-query is empty
         detail_path = detailPath
         if not detail_path and pool:
             try:
@@ -3183,13 +3216,8 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0, detailPath: str
                         row = await cur.fetchone()
                         if row and row[0]:
                             detail_path = row[0]
-                        else:
-                            print(f"[api/resource] Subject {subjectId} detail_path missing. Scraping details...")
-                            scraped = await scrape_subject_details(subjectId)
-                            if scraped and scraped.get("detail_path"):
-                                detail_path = scraped["detail_path"]
             except Exception as db_err:
-                print(f"[DB detail_path Lookup/Scrape Error in get_resource] {db_err}")
+                print(f"[DB detail_path Lookup Error in get_resource] {db_err}")
                     
         if not detail_path:
             detail_path = "details"
