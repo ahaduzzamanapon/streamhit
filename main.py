@@ -1404,7 +1404,7 @@ async def scrape_episode_resources(subject_id: str, season: int, episode: int):
         referer = f"https://123movienow.cc/spa/videoPlayPage/movies/{detail_path}?id={subject_id}&type=/movie/detail"
         origin = "https://123movienow.cc"
         
-        path = f"/wefeed-h5-bff/web/subject/download?subjectId={subject_id}&se={season}&ep={episode}&_t={int(time.time())}"
+        path = f"/wefeed-h5-bff/web/subject/download?subjectId={subject_id}&se={season}&ep={episode}"
         download_data = await request_h5_api("GET", path, host="https://h5.aoneroom.com", origin=origin, referer=referer)
         
         inner_data = download_data.get("data", {})
@@ -1998,7 +1998,7 @@ async def resolve_tmdb_resource(tmdb_id: str, is_tv: bool, season: int, episode:
     referer = f"https://123movienow.cc/spa/videoPlayPage/movies/{preferred.get('detailPath') or match['detailPath']}?id={subject_id}&type=/movie/detail"
     origin = "https://123movienow.cc"
     
-    path = f"/wefeed-h5-bff/web/subject/download?subjectId={subject_id}&se={season if is_tv else 0}&ep={episode if is_tv else 0}&_t={int(time.time())}"
+    path = f"/wefeed-h5-bff/web/subject/download?subjectId={subject_id}&se={season if is_tv else 0}&ep={episode if is_tv else 0}"
     download_data = await request_h5_api("GET", path, host="https://h5.aoneroom.com", origin=origin, referer=referer)
     
     inner_data = download_data.get("data", {})
@@ -3237,13 +3237,13 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0, detailPath: str
         # Multi-path fallback: try each until we get downloads
         _fallback_attempts = [
             # Primary: h5.aoneroom.com web download endpoint
-            {"host": "https://h5.aoneroom.com", "path": f"/wefeed-h5-bff/web/subject/download?subjectId={subjectId}&se={se}&ep={ep}&_t={int(time.time())}"},
+            {"host": "https://h5.aoneroom.com", "path": f"/wefeed-h5-bff/web/subject/download?subjectId={subjectId}&se={se}&ep={ep}"},
             # Fallback 1: h5-api.aoneroom.com (different host)
-            {"host": "https://h5-api.aoneroom.com", "path": f"/wefeed-h5api-bff/web/subject/download?subjectId={subjectId}&se={se}&ep={ep}&_t={int(time.time())}"},
+            {"host": "https://h5-api.aoneroom.com", "path": f"/wefeed-h5api-bff/web/subject/download?subjectId={subjectId}&se={se}&ep={ep}"},
             # Fallback 2: alternate path format
-            {"host": "https://h5.aoneroom.com", "path": f"/wefeed-h5-bff/web/subject/download?subjectId={subjectId}&se={se}&ep={ep}&detail={urllib.parse.quote(detail_path)}&_t={int(time.time())}"},
+            {"host": "https://h5.aoneroom.com", "path": f"/wefeed-h5-bff/web/subject/download?subjectId={subjectId}&se={se}&ep={ep}&detail={urllib.parse.quote(detail_path)}"},
             # Fallback 3: h5api-bff path variant
-            {"host": "https://h5-api.aoneroom.com", "path": f"/wefeed-h5api-bff/subject/download?subjectId={subjectId}&se={se}&ep={ep}&_t={int(time.time())}"},
+            {"host": "https://h5-api.aoneroom.com", "path": f"/wefeed-h5api-bff/subject/download?subjectId={subjectId}&se={se}&ep={ep}"},
         ]
 
         download_data = {}
