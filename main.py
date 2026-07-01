@@ -1130,7 +1130,7 @@ async def refresh_cookies_if_needed() -> str:
     }
 
     last_direct_fail_time = get_last_direct_fail_time()
-    skip_direct = (now - last_direct_fail_time < 3600.0)
+    skip_direct = (now - last_direct_fail_time < 30.0)
     cookie_url = "https://h5.aoneroom.com/wefeed-h5-bff/app/get-latest-app-pkgs?app_name=moviebox"
 
     # Try Direct -> Workers -> Random Proxy
@@ -1192,7 +1192,7 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
     url = f"{host}{path}"
     now = time.time()
     last_direct_fail_time = get_last_direct_fail_time()
-    skip_direct = (now - last_direct_fail_time < 3600.0)
+    skip_direct = (now - last_direct_fail_time < 30.0)
 
     # Rotation Strategy: Direct -> Worker -> External Proxy
     attempts = ["direct", "worker", "proxy"]
@@ -3642,7 +3642,7 @@ async def proxy_subtitle(url: str):
         raise HTTPException(status_code=400, detail="Missing subtitle url parameter")
     
     now = time.time()
-    skip_direct = (now - get_last_direct_fail_time() < 3600.0)
+    skip_direct = (now - get_last_direct_fail_time() < 30.0)
     
     resp_text = None
     
