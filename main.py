@@ -3712,7 +3712,8 @@ async def clear_cache_force():
             async with pool.acquire() as conn:
                 async with conn.cursor() as cur:
                     await cur.execute("DELETE FROM play_resources")
-            return {"status": "success", "message": "play_resources table cleared successfully"}
+                    await cur.execute("DELETE FROM tmdb_map")
+            return {"status": "success", "message": "play_resources and tmdb_map tables cleared successfully"}
         except Exception as e:
             return {"status": "error", "message": str(e)}
     return {"status": "error", "message": "Database pool not initialized"}
