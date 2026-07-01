@@ -2142,7 +2142,6 @@ async def get_local_operating_list() -> list:
                     await cur.execute(f"""
                         SELECT * FROM subjects 
                         WHERE subject_type = %s AND title != 'Placeholder'
-                          AND (release_date IS NULL OR release_date = '' OR release_date <= CURDATE())
                         ORDER BY {order_by} 
                         LIMIT 12
                     """, (sec["type"],))
@@ -2835,11 +2834,12 @@ async def get_detail(subjectId: str, detailPath: str = ""):
                     row = await cur.fetchone()
                     if row:
                         db_detail_path = row.get("detail_path") or ""
-                        # Fetch season count from seasons table
-                        await cur.execute("SELECT COUNT(*) as count FROM seasons WHERE subject_id = %s", (subjectId,))
-                        se_row = await cur.fetchone()
-                        if se_row:
-                            se_num = se_row["count"]
+                        if int(row.get("subject_type", 1)) != 1:
+                            # Fetch season count from seasons table
+                            await cur.execute("SELECT COUNT(*) as count FROM seasons WHERE subject_id = %s", (subjectId,))
+                            se_row = await cur.fetchone()
+                            if se_row:
+                                se_num = se_row["count"]
         except Exception as db_err:
             print(f"[DB Details Lookup Error] {db_err}")
             row = None
@@ -2852,6 +2852,18 @@ async def get_detail(subjectId: str, detailPath: str = ""):
                 dubs_data = json.loads(row["dubs"])
             except Exception:
                 pass
+                
+        # Self-healing: if details, description, detail_path or dubs are missing, trigger background scrape
+        has_desc = bool(row.get("description") and "temporarily unavailable" not in row["description"])
+        has_detail_path = bool(row.get("detail_path"))
+        has_seasons = True
+        if int(row.get("subject_type", 1)) == 2 and se_num == 0:
+            has_seasons = False
+            
+        if not has_desc or not has_detail_path or not has_seasons:
+            print(f"[Details API] Data incomplete for {subjectId} (desc={has_desc}, path={has_detail_path}, seasons={has_seasons}). Triggering background scrape...")
+            asyncio.create_task(scrape_subject_details(subjectId))
+            
         if row["description"] and row["title"] != "Placeholder" and "temporarily unavailable" not in row["description"]:
             return {
                 "code": 0,
@@ -2878,8 +2890,11 @@ async def get_detail(subjectId: str, detailPath: str = ""):
         path_to_use = f"details?subjectId={subjectId}"
         
     try:
-        if "details" in path_to_use or "subjectId" in path_to_use:
-            api_path = f"/wefeed-h5api-bff/detail?{path_to_use if '=' in path_to_use else f'detailPath={path_to_use}'}"
+        if "subjectId=" in path_to_use:
+            sub_id_val = path_to_use.split("subjectId=")[1].split("&")[0]
+            api_path = f"/wefeed-h5api-bff/detail?subjectId={sub_id_val}"
+        elif "details" in path_to_use:
+            api_path = f"/wefeed-h5api-bff/detail?{path_to_use}"
         else:
             api_path = f"/wefeed-h5api-bff/detail?detailPath={urllib.parse.quote(path_to_use)}"
             
@@ -2890,7 +2905,7 @@ async def get_detail(subjectId: str, detailPath: str = ""):
             
         resource_obj = api_data.get("data", {}).get("resource", {})
         seasons_list = resource_obj.get("seasons", [])
-        api_se_num = len(seasons_list)
+        api_se_num = len(seasons_list) if int(subject_info.get("subjectType", 1)) != 1 else 0
             
         # Check if educational or blocked
         genres = subject_info.get("genre", "")
@@ -3050,8 +3065,11 @@ async def get_season_info(subjectId: str, detailPath: str = ""):
         path_to_use = f"details?subjectId={subjectId}"
         
     try:
-        if "details" in path_to_use or "subjectId" in path_to_use:
-            api_path = f"/wefeed-h5api-bff/detail?{path_to_use if '=' in path_to_use else f'detailPath={path_to_use}'}"
+        if "subjectId=" in path_to_use:
+            sub_id_val = path_to_use.split("subjectId=")[1].split("&")[0]
+            api_path = f"/wefeed-h5api-bff/detail?subjectId={sub_id_val}"
+        elif "details" in path_to_use:
+            api_path = f"/wefeed-h5api-bff/detail?{path_to_use}"
         else:
             api_path = f"/wefeed-h5api-bff/detail?detailPath={urllib.parse.quote(path_to_use)}"
             

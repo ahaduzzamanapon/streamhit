@@ -118,7 +118,7 @@ class _WatchScreenState extends State<WatchScreen> {
   @override
   void initState() {
     super.initState();
-    final isTv = widget.subject.seasonCount > 0 || widget.subject.subjectType == 2;
+    final isTv = widget.subject.subjectType != 1 && (widget.subject.seasonCount > 0 || widget.subject.subjectType == 2);
     _currentSeason = widget.season ?? (isTv ? 1 : null);
     _currentEpisode = widget.episode ?? (isTv ? 1 : null);
 
@@ -253,7 +253,7 @@ class _WatchScreenState extends State<WatchScreen> {
     }
 
     // Otherwise, fetch online stream resources
-    final isTv = widget.subject.seasonCount > 0 || widget.subject.subjectType == 2;
+    final isTv = widget.subject.subjectType != 1 && (widget.subject.seasonCount > 0 || widget.subject.subjectType == 2);
     final resources = await ApiService.fetchPlayResources(
       widget.subject.subjectId,
       detailPath: widget.subject.detailPath,
@@ -520,7 +520,7 @@ class _WatchScreenState extends State<WatchScreen> {
     }
 
     // Netflix Countdown auto-play next episode
-    final isTv = widget.subject.seasonCount > 0 || widget.subject.subjectType == 2;
+    final isTv = widget.subject.subjectType != 1 && (widget.subject.seasonCount > 0 || widget.subject.subjectType == 2);
     if (isTv && _controller!.value.position >= _controller!.value.duration - const Duration(seconds: 10)) {
       if (!_showNextCountdown && _hasNextEpisode()) {
         _triggerNextEpisodeCountdown();
@@ -1584,7 +1584,7 @@ class _WatchScreenState extends State<WatchScreen> {
 
   void _showDownloadBottomSheet() {
     final downloadsProvider = Provider.of<DownloadsProvider>(context, listen: false);
-    final isTv = widget.subject.seasonCount > 0 || widget.subject.subjectType == 2;
+    final isTv = widget.subject.subjectType != 1 && (widget.subject.seasonCount > 0 || widget.subject.subjectType == 2);
     
     // Find unique resolutions from current _resources or fallback to common ones
     final List<int> availableResolutions = _resources.map((r) => r.resolution).toSet().toList();
@@ -1927,7 +1927,7 @@ class _WatchScreenState extends State<WatchScreen> {
 
   Future<void> _startBackgroundDownload(int episode, int resolution) async {
     final downloadsProvider = Provider.of<DownloadsProvider>(context, listen: false);
-    final isTv = widget.subject.seasonCount > 0 || widget.subject.subjectType == 2;
+    final isTv = widget.subject.subjectType != 1 && (widget.subject.seasonCount > 0 || widget.subject.subjectType == 2);
     final seasonNum = isTv ? (_currentSeason ?? 1) : 0;
 
     try {
@@ -2235,7 +2235,7 @@ class _WatchScreenState extends State<WatchScreen> {
     }
 
     final size = MediaQuery.of(context).size;
-    final isTv = widget.subject.seasonCount > 0 || widget.subject.subjectType == 2;
+    final isTv = widget.subject.subjectType != 1 && (widget.subject.seasonCount > 0 || widget.subject.subjectType == 2);
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     final showFullscreen = _isFullscreen || isLandscape;
 
@@ -2925,7 +2925,7 @@ class _WatchScreenState extends State<WatchScreen> {
   }
 
   Future<void> _loadStreamInfoBackground() async {
-    final isTv = widget.subject.seasonCount > 0 || widget.subject.subjectType == 2;
+    final isTv = widget.subject.subjectType != 1 && (widget.subject.seasonCount > 0 || widget.subject.subjectType == 2);
     
     try {
       final resources = await ApiService.fetchPlayResources(

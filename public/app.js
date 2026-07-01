@@ -1941,15 +1941,53 @@ async function initWatchPage() {
                     opt.dataset.path = dub.detailPath || "";
                     dubSelect.appendChild(opt);
                 });
-                dubSelect.onchange = () => {
+                dubSelect.onchange = async () => {
                     const selectedOpt = dubSelect.options[dubSelect.selectedIndex];
                     const targetSubjectId = selectedOpt.value;
                     const targetDetailPath = selectedOpt.dataset.path || "";
-                    let newUrl = `/watch?id=${targetSubjectId}&path=${encodeURIComponent(targetDetailPath)}`;
-                    if (state.selectedSubject && state.selectedSubject.subjectType === 2) {
-                        newUrl += `&season=${state.selectedSeason}&episode=${state.selectedEpisode}`;
+                    
+                    showToastNotification("Switching language track...");
+                    
+                    // Update URL silently
+                    const urlParams = new URLSearchParams(window.location.search);
+                    urlParams.set("id", targetSubjectId);
+                    if (targetDetailPath) {
+                        urlParams.set("path", targetDetailPath);
+                    } else {
+                        urlParams.delete("path");
                     }
-                    window.location.href = newUrl;
+                    history.pushState({}, "", `${window.location.pathname}?${urlParams.toString()}`);
+                    
+                    // Update active subject ID
+                    subjectId = targetSubjectId;
+                    
+                    const result = await apiGet(`/api/detail?subjectId=${targetSubjectId}&detailPath=${encodeURIComponent(targetDetailPath)}`);
+                    if (result && result.data) {
+                        const newDetail = result.data;
+                        state.selectedSubject = newDetail;
+                        
+                        // Update UI texts
+                        const titleEl = document.getElementById("playerMediaTitle");
+                        if (titleEl) titleEl.textContent = newDetail.title;
+                        const watchMetaTitle = document.getElementById("watchMetaTitle");
+                        if (watchMetaTitle) watchMetaTitle.textContent = newDetail.title;
+                        const descEl = document.getElementById("watchDescription");
+                        if (descEl) descEl.textContent = newDetail.description || "No description available.";
+                        
+                        const isTv = newDetail.subjectType !== 1 && (newDetail.seNum > 0 || newDetail.subjectType === 2);
+                        const tvSelector = document.getElementById("watchTvSelector");
+                        if (isTv) {
+                            if (tvSelector) tvSelector.style.display = "block";
+                            await loadSeasonEpisodes(targetSubjectId, targetDetailPath);
+                            await loadPlayResources(targetSubjectId, state.selectedSeason, state.selectedEpisode);
+                        } else {
+                            if (tvSelector) tvSelector.style.display = "none";
+                            await loadPlayResources(targetSubjectId);
+                        }
+                        
+                        // Update recommendations
+                        loadRecommendations(newDetail);
+                    }
                 };
             } else {
                 dubSelectorGroup.style.display = "none";
@@ -1973,7 +2011,7 @@ async function initWatchPage() {
         }
 
         // TV Show episode selector
-        const isTv = detail.seNum > 0 || detail.subjectType === 2;
+        const isTv = detail.subjectType !== 1 && (detail.seNum > 0 || detail.subjectType === 2);
         const tvSelector = document.getElementById("watchTvSelector");
         if (isTv) {
             if (tvSelector) tvSelector.style.display = "block";
