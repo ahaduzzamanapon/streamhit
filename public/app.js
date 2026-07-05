@@ -1235,7 +1235,7 @@ async function initDetailsPage() {
         const dubSelectorGroup = document.getElementById("watchDubSelectorGroup");
         const dubSelect = document.getElementById("dubLanguageSelect");
         if (dubSelectorGroup && dubSelect) {
-            if (detail.dubs && detail.dubs.length > 0) {
+            if (detail.dubs && detail.dubs.length > 1) {
                 dubSelectorGroup.style.display = "block";
                 dubSelect.innerHTML = "";
                 
@@ -1930,7 +1930,7 @@ async function initWatchPage() {
         const dubSelectorGroup = document.getElementById("watchDubSelectorGroup");
         const dubSelect = document.getElementById("dubLanguageSelect");
         if (dubSelectorGroup && dubSelect) {
-            if (detail.dubs && detail.dubs.length > 0) {
+            if (detail.dubs && detail.dubs.length > 1) {
                 dubSelectorGroup.style.display = "block";
                 dubSelect.innerHTML = "";
                 detail.dubs.forEach(dub => {
@@ -2122,6 +2122,17 @@ async function loadSeasonEpisodes(subjectId, detailPath = "") {
 
         const activeSeasonObj = seasons.find(s => s.se === state.selectedSeason) || seasons[0];
         state.selectedSeason = activeSeasonObj.se;
+        
+        // Ensure state.selectedEpisode exists in the selected season
+        if (activeSeasonObj.allEp) {
+            const epsArr = activeSeasonObj.allEp.split(",").map(Number);
+            if (!epsArr.includes(state.selectedEpisode)) {
+                state.selectedEpisode = epsArr[0] || 1;
+            }
+        } else {
+            state.selectedEpisode = 1;
+        }
+
         renderEpisodes(activeSeasonObj);
 
         // Apply drag scroll to season tabs

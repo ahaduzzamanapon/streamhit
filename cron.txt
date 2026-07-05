@@ -1,0 +1,4 @@
+MAILTO=""
+*/5 * * * * wget -q -O /dev/null "https://ehealthfinder.com/cron/resolve-geo?token=5"
+0,30 * * * * wget -q -O /dev/null "http://alltv.lc-synergy.ltd/cron/sync-scrapers?token=alltv_cron_secret_token_2026"
+0 * * * * curl -s "https://streamhit.lc-synergy.ltd/api/clear-cache-force" > /dev/null 2>&1

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import 'package:screen_brightness/screen_brightness.dart';
@@ -48,6 +49,7 @@ class WatchScreen extends StatefulWidget {
 }
 
 class _WatchScreenState extends State<WatchScreen> {
+  late Subject _currentSubject;
   VideoPlayerController? _controller;
   final Floating _floating = Floating();
   StreamSubscription<PiPStatus>? _pipSubscription;
@@ -118,7 +120,9 @@ class _WatchScreenState extends State<WatchScreen> {
   @override
   void initState() {
     super.initState();
-    final isTv = widget.subject.subjectType != 1 && (widget.subject.seasonCount > 0 || widget.subject.subjectType == 2);
+    _currentSubject = widget.subject;
+    _fetchFullSubjectIfNeeded();
+    final isTv = _currentSubject.subjectType != 1 && (_currentSubject.seasonCount > 0 || _currentSubject.subjectType == 2);
     _currentSeason = widget.season ?? (isTv ? 1 : null);
     _currentEpisode = widget.episode ?? (isTv ? 1 : null);
 
@@ -169,11 +173,22 @@ class _WatchScreenState extends State<WatchScreen> {
     });
   }
 
+  Future<void> _fetchFullSubjectIfNeeded() async {
+    if (!widget.isLive && (_currentSubject.dubs.isEmpty || _currentSubject.description.isEmpty)) {
+      final fullSubject = await ApiService.fetchDetail(_currentSubject.subjectId, _currentSubject.detailPath);
+      if (fullSubject != null && mounted) {
+        setState(() {
+          _currentSubject = fullSubject;
+        });
+      }
+    }
+  }
+
   Future<void> _loadRecommendations() async {
-    final firstGenre = widget.subject.genres.isNotEmpty ? widget.subject.genres[0] : '*';
+    final firstGenre = _currentSubject.genres.isNotEmpty ? _currentSubject.genres[0] : '*';
     final recRes = await ApiService.fetchFilteredData(
       genre: firstGenre,
-      subjectType: widget.subject.subjectType,
+      subjectType: _currentSubject.subjectType,
       page: 1,
     );
     if (recRes != null && recRes['items'] != null) {
@@ -182,7 +197,7 @@ class _WatchScreenState extends State<WatchScreen> {
       setState(() {
         _recommendations = list
             .map((x) => Subject.fromJson(x))
-            .where((x) => x.subjectId != widget.subject.subjectId)
+            .where((x) => x.subjectId != _currentSubject.subjectId)
             .take(6)
             .toList();
       });
@@ -236,13 +251,13 @@ class _WatchScreenState extends State<WatchScreen> {
     // Check if item is offline (downloaded)
     final dlProvider = Provider.of<DownloadsProvider>(context, listen: false);
     final downloadedItem = dlProvider.getDownload(
-      widget.subject.subjectId,
+      _currentSubject.subjectId,
       season: _currentSeason ?? 0,
       episode: _currentEpisode ?? 0,
     );
 
     if (downloadedItem != null && downloadedItem.status == 'completed') {
-      print('Playing local downloaded file: ${downloadedItem.localPath}');
+      debugPrint('Playing local downloaded file: ${downloadedItem.localPath}');
       _initializePlayer(Uri.parse(downloadedItem.localPath).toString(), isLocal: true);
       
       setState(() {
@@ -253,10 +268,10 @@ class _WatchScreenState extends State<WatchScreen> {
     }
 
     // Otherwise, fetch online stream resources
-    final isTv = widget.subject.subjectType != 1 && (widget.subject.seasonCount > 0 || widget.subject.subjectType == 2);
+    final isTv = _currentSubject.subjectType != 1 && (_currentSubject.seasonCount > 0 || _currentSubject.subjectType == 2);
     final resources = await ApiService.fetchPlayResources(
-      widget.subject.subjectId,
-      detailPath: widget.subject.detailPath,
+      _currentSubject.subjectId,
+      detailPath: _currentSubject.detailPath,
       se: isTv ? _currentSeason : null,
       ep: isTv ? _currentEpisode : null,
     );
@@ -275,7 +290,7 @@ class _WatchScreenState extends State<WatchScreen> {
     PlayResource bestResource = resources.reduce((a, b) => a.resolution > b.resolution ? a : b);
     
     // Fetch captions/subtitles in background
-    final captions = await ApiService.fetchCaptions(widget.subject.subjectId, bestResource.resourceId);
+    final captions = await ApiService.fetchCaptions(_currentSubject.subjectId, bestResource.resourceId);
 
     setState(() {
       _resources = resources;
@@ -290,7 +305,7 @@ class _WatchScreenState extends State<WatchScreen> {
 
     // Fetch TV season episodes list for TV shows next-episode autoplay logic
     if (isTv && _seasons.isEmpty) {
-      final seasons = await ApiService.fetchSeasonInfo(widget.subject.subjectId, widget.subject.detailPath);
+      final seasons = await ApiService.fetchSeasonInfo(_currentSubject.subjectId, _currentSubject.detailPath);
       if (!mounted) return;
       setState(() {
         _seasons = seasons;
@@ -332,7 +347,7 @@ class _WatchScreenState extends State<WatchScreen> {
       try {
         await oldController.dispose();
       } catch (e) {
-        print('Error disposing old controller: $e');
+        debugPrint('Error disposing old controller: $e');
       }
     }
 
@@ -364,7 +379,7 @@ class _WatchScreenState extends State<WatchScreen> {
         // Check for saved progress (Resume toast)
         final historyProvider = Provider.of<ContinueWatchingProvider>(context, listen: false);
         final savedProgress = await historyProvider.getSavedProgress(
-          widget.subject.subjectId,
+          _currentSubject.subjectId,
           season: _currentSeason ?? 0,
           episode: _currentEpisode ?? 0,
         );
@@ -390,7 +405,7 @@ class _WatchScreenState extends State<WatchScreen> {
       _clearBufferingTimeout();
       _startControlsAutoHide();
     } catch (e) {
-      print('Video player initialization error: $e');
+      debugPrint('Video player initialization error: $e');
       if (initId != _currentInitId) return;
       
       if (!mounted) return;
@@ -407,7 +422,7 @@ class _WatchScreenState extends State<WatchScreen> {
           _isLoading = true;
           _errorMessage = null; // Keep it null to show retry description under spinner
         });
-        print('Retrying player initialization ($_retryCount/$_maxRetries) in 2 seconds...');
+        debugPrint('Retrying player initialization ($_retryCount/$_maxRetries) in 2 seconds...');
         await Future.delayed(const Duration(seconds: 2));
         if (initId == _currentInitId && mounted) {
           _initializePlayer(url, isLocal: isLocal);
@@ -431,7 +446,7 @@ class _WatchScreenState extends State<WatchScreen> {
 
     if (_controller!.value.hasError) {
       final errorMsg = _controller!.value.errorDescription ?? 'Playback error';
-      print('Controller playback error detected: $errorMsg');
+      debugPrint('Controller playback error detected: $errorMsg');
       
       if (mounted) {
         if (widget.isLive && widget.liveLinks != null && _currentLiveIndex < widget.liveLinks!.length - 1) {
@@ -454,7 +469,7 @@ class _WatchScreenState extends State<WatchScreen> {
           final currentIsLocal = _currentIsLocal;
           final initId = _currentInitId;
           
-          print('Auto-retrying playback from position $lastPosition in 2 seconds...');
+          debugPrint('Auto-retrying playback from position $lastPosition in 2 seconds...');
           Future.delayed(const Duration(seconds: 2), () {
             if (mounted && initId == _currentInitId && currentUrl != null) {
               _initializePlayer(currentUrl, isLocal: currentIsLocal);
@@ -495,7 +510,7 @@ class _WatchScreenState extends State<WatchScreen> {
       if (positionSec != _lastSavedSeconds) {
         _lastSavedSeconds = positionSec;
         Provider.of<ContinueWatchingProvider>(context, listen: false).saveProgress(
-          widget.subject,
+          _currentSubject,
           season: _currentSeason ?? 0,
           episode: _currentEpisode ?? 0,
           position: positionSec.toDouble(),
@@ -520,7 +535,7 @@ class _WatchScreenState extends State<WatchScreen> {
     }
 
     // Netflix Countdown auto-play next episode
-    final isTv = widget.subject.subjectType != 1 && (widget.subject.seasonCount > 0 || widget.subject.subjectType == 2);
+    final isTv = _currentSubject.subjectType != 1 && (_currentSubject.seasonCount > 0 || _currentSubject.subjectType == 2);
     if (isTv && _controller!.value.position >= _controller!.value.duration - const Duration(seconds: 10)) {
       if (!_showNextCountdown && _hasNextEpisode()) {
         _triggerNextEpisodeCountdown();
@@ -538,9 +553,9 @@ class _WatchScreenState extends State<WatchScreen> {
   void _startBufferingTimeout() {
     _clearBufferingTimeout();
     if (widget.isLive && widget.liveLinks != null && widget.liveLinks!.isNotEmpty) {
-      print('[Buffering Timeout] Started 10s timer...');
+      debugPrint('[Buffering Timeout] Started 10s timer...');
       _bufferingTimeoutTimer = Timer(const Duration(seconds: 10), () {
-        print('[Buffering Timeout] 10 seconds reached. Falling back to next stream link...');
+        debugPrint('[Buffering Timeout] 10 seconds reached. Falling back to next stream link...');
         _handleLivePlaybackFallback();
       });
     }
@@ -555,7 +570,7 @@ class _WatchScreenState extends State<WatchScreen> {
     if (widget.isLive && widget.liveLinks != null && _currentLiveIndex < widget.liveLinks!.length - 1) {
       _currentLiveIndex++;
       final nextLinkObj = widget.liveLinks![_currentLiveIndex];
-      print('[Live Fallback] Stream failed. Trying backup Link ${_currentLiveIndex + 1}: ${nextLinkObj.label}');
+      debugPrint('[Live Fallback] Stream failed. Trying backup Link ${_currentLiveIndex + 1}: ${nextLinkObj.label}');
       
       // Clean up controller to prepare for fallback
       _controller?.removeListener(_onControllerUpdate);
@@ -785,7 +800,7 @@ class _WatchScreenState extends State<WatchScreen> {
   }
 
   void _showLanguageSelector() {
-    if (widget.subject.dubs.isEmpty) {
+    if (_currentSubject.dubs.isEmpty) {
       _showToastMessage('Only standard audio available.');
       return;
     }
@@ -817,10 +832,10 @@ class _WatchScreenState extends State<WatchScreen> {
               Flexible(
                 child: ListView.builder(
                   shrinkWrap: true,
-                  itemCount: widget.subject.dubs.length,
+                  itemCount: _currentSubject.dubs.length,
                   itemBuilder: (context, index) {
-                    final dub = widget.subject.dubs[index];
-                    final isCurrent = dub.subjectId == widget.subject.subjectId;
+                    final dub = _currentSubject.dubs[index];
+                    final isCurrent = dub.subjectId == _currentSubject.subjectId;
                     return ListTile(
                       title: Text(
                         dub.languageName,
@@ -848,30 +863,7 @@ class _WatchScreenState extends State<WatchScreen> {
   }
 
   void _switchLanguage(DubInfo dub) {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => WatchScreen(
-          subject: Subject(
-            subjectId: dub.subjectId,
-            title: widget.subject.title,
-            coverUrl: widget.subject.coverUrl,
-            rating: widget.subject.rating,
-            releaseYear: widget.subject.releaseYear,
-            subjectType: widget.subject.subjectType,
-            genres: widget.subject.genres,
-            country: widget.subject.country,
-            duration: widget.subject.duration,
-            description: widget.subject.description,
-            seasonCount: widget.subject.seasonCount,
-            detailPath: dub.detailPath,
-            dubs: widget.subject.dubs,
-          ),
-          season: _currentSeason,
-          episode: _currentEpisode,
-        ),
-      ),
-    );
+    _switchDub(dub);
   }
 
   Widget _buildVideoWidget(double playerAspectRatio) {
@@ -1003,7 +995,7 @@ class _WatchScreenState extends State<WatchScreen> {
     try {
       await _floating.enable(ImmediatePiP());
     } catch (e) {
-      print('PiP failed: $e');
+      debugPrint('PiP failed: $e');
     }
   }
 
@@ -1019,9 +1011,9 @@ class _WatchScreenState extends State<WatchScreen> {
         setState(() {
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
+        if (mounted) { ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to load selected audio track.')),
-        );
+        ); }
       }
       return;
     }
@@ -1033,7 +1025,7 @@ class _WatchScreenState extends State<WatchScreen> {
     final positionSec = curPos.inSeconds;
     if (positionSec > 5) {
       await Provider.of<ContinueWatchingProvider>(context, listen: false).saveProgress(
-        widget.subject,
+        _currentSubject,
         season: _currentSeason ?? 0,
         episode: _currentEpisode ?? 0,
         position: positionSec.toDouble(),
@@ -1041,13 +1033,36 @@ class _WatchScreenState extends State<WatchScreen> {
       );
     }
 
+    int? targetSeason = _currentSeason;
+    int? targetEpisode = _currentEpisode;
+
+    if (newSubject.isTv && newSubject.seasons.isNotEmpty) {
+      bool found = false;
+      for (final s in newSubject.seasons) {
+        if (s.season == targetSeason) {
+          if (s.episodes.any((e) => e.episode == targetEpisode)) {
+            found = true;
+          }
+          break;
+        }
+      }
+      if (!found) {
+        targetSeason = newSubject.seasons.first.season;
+        if (newSubject.seasons.first.episodes.isNotEmpty) {
+          targetEpisode = newSubject.seasons.first.episodes.first.episode;
+        } else {
+          targetEpisode = 1;
+        }
+      }
+    }
+
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
         builder: (context) => WatchScreen(
           subject: newSubject,
-          season: _currentSeason,
-          episode: _currentEpisode,
+          season: targetSeason,
+          episode: targetEpisode,
         ),
       ),
     );
@@ -1110,13 +1125,13 @@ class _WatchScreenState extends State<WatchScreen> {
                             },
                           ),
                     // Audio panel
-                    widget.subject.dubs.isEmpty
+                    _currentSubject.dubs.isEmpty
                         ? const Center(child: Text('Default Audio (No other tracks)', style: TextStyle(color: AppTheme.textMutedColor)))
                         : ListView.builder(
-                            itemCount: widget.subject.dubs.length,
+                            itemCount: _currentSubject.dubs.length,
                             itemBuilder: (context, idx) {
-                              final dub = widget.subject.dubs[idx];
-                              final isSelected = dub.subjectId == widget.subject.subjectId;
+                              final dub = _currentSubject.dubs[idx];
+                              final isSelected = dub.subjectId == _currentSubject.subjectId;
                               return ListTile(
                                 leading: Icon(Icons.check, color: isSelected ? AppTheme.accentColor : Colors.transparent),
                                 title: Text(dub.languageName, style: TextStyle(color: isSelected ? AppTheme.accentColor : Colors.white)),
@@ -1246,7 +1261,7 @@ class _WatchScreenState extends State<WatchScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.6),
+                            color: Colors.black.withValues(alpha: 0.6),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -1402,7 +1417,7 @@ class _WatchScreenState extends State<WatchScreen> {
                               _errorMessage!,
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.7),
+                                color: Colors.white.withValues(alpha: 0.7),
                                 fontSize: 12,
                               ),
                             ),
@@ -1482,18 +1497,18 @@ class _WatchScreenState extends State<WatchScreen> {
               const Icon(Icons.star, color: Colors.amber, size: 12),
               const SizedBox(width: 4),
               Text(
-                widget.subject.rating,
+                _currentSubject.rating,
                 style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
               ),
             ],
           ),
         ),
         const SizedBox(width: 12),
-        Text(widget.subject.releaseYear, style: const TextStyle(fontSize: 12, color: Colors.white)),
+        Text(_currentSubject.releaseYear, style: const TextStyle(fontSize: 12, color: Colors.white)),
         const SizedBox(width: 12),
-        Text(widget.subject.country, style: const TextStyle(fontSize: 12, color: AppTheme.textMutedColor)),
+        Text(_currentSubject.country, style: const TextStyle(fontSize: 12, color: AppTheme.textMutedColor)),
         const SizedBox(width: 12),
-        Text(widget.subject.duration, style: const TextStyle(fontSize: 12, color: AppTheme.textMutedColor)),
+        Text(_currentSubject.duration, style: const TextStyle(fontSize: 12, color: AppTheme.textMutedColor)),
       ],
     );
   }
@@ -1521,7 +1536,7 @@ class _WatchScreenState extends State<WatchScreen> {
             icon: Icons.share,
             label: 'Share',
             onPressed: () {
-              _showToastMessage('Sharing link: ${widget.subject.title}');
+              _showToastMessage('Sharing link: ${_currentSubject.title}');
             },
           ),
           const SizedBox(width: 8),
@@ -1555,7 +1570,7 @@ class _WatchScreenState extends State<WatchScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => DetailsScreen(subjectId: widget.subject.subjectId, detailPath: widget.subject.detailPath),
+                  builder: (context) => DetailsScreen(subjectId: _currentSubject.subjectId, detailPath: _currentSubject.detailPath),
                 ),
               );
             },
@@ -1584,7 +1599,7 @@ class _WatchScreenState extends State<WatchScreen> {
 
   void _showDownloadBottomSheet() {
     final downloadsProvider = Provider.of<DownloadsProvider>(context, listen: false);
-    final isTv = widget.subject.subjectType != 1 && (widget.subject.seasonCount > 0 || widget.subject.subjectType == 2);
+    final isTv = _currentSubject.subjectType != 1 && (_currentSubject.seasonCount > 0 || _currentSubject.subjectType == 2);
     
     // Find unique resolutions from current _resources or fallback to common ones
     final List<int> availableResolutions = _resources.map((r) => r.resolution).toSet().toList();
@@ -1617,14 +1632,14 @@ class _WatchScreenState extends State<WatchScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      barrierColor: Colors.black.withOpacity(0.5),
+      barrierColor: Colors.black.withValues(alpha: 0.5),
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
             // Check completed status for disabled state
             bool isAllChecked() {
               final unDownloaded = episodesList.where((ep) {
-                return !downloadsProvider.isDownloaded(widget.subject.subjectId, season: isTv ? (_currentSeason ?? 1) : 0, episode: ep);
+                return !downloadsProvider.isDownloaded(_currentSubject.subjectId, season: isTv ? (_currentSeason ?? 1) : 0, episode: ep);
               }).toList();
               if (unDownloaded.isEmpty) return false;
               return unDownloaded.every((ep) => checkedEpisodes.contains(ep));
@@ -1634,7 +1649,7 @@ class _WatchScreenState extends State<WatchScreen> {
               setModalState(() {
                 if (checked == true) {
                   checkedEpisodes = episodesList.where((ep) {
-                    return !downloadsProvider.isDownloaded(widget.subject.subjectId, season: isTv ? (_currentSeason ?? 1) : 0, episode: ep);
+                    return !downloadsProvider.isDownloaded(_currentSubject.subjectId, season: isTv ? (_currentSeason ?? 1) : 0, episode: ep);
                   }).toList();
                 } else {
                   checkedEpisodes.clear();
@@ -1647,7 +1662,7 @@ class _WatchScreenState extends State<WatchScreen> {
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                 child: Container(
-                  color: AppTheme.surfaceColor.withOpacity(0.85),
+                  color: AppTheme.surfaceColor.withValues(alpha: 0.85),
                   padding: EdgeInsets.only(
                     bottom: MediaQuery.of(context).viewInsets.bottom,
                   ),
@@ -1682,7 +1697,7 @@ class _WatchScreenState extends State<WatchScreen> {
                             Expanded(
                               child: Text(
                                 'Resources Uploaded by Raeesah Mussá etc.',
-                                style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12),
+                                style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -1770,12 +1785,12 @@ class _WatchScreenState extends State<WatchScreen> {
                             final seasonNum = isTv ? (_currentSeason ?? 1) : 0;
                             
                             final isCompleted = downloadsProvider.isDownloaded(
-                              widget.subject.subjectId,
+                              _currentSubject.subjectId,
                               season: seasonNum,
                               episode: ep,
                             );
                             final existing = downloadsProvider.getDownload(
-                              widget.subject.subjectId,
+                              _currentSubject.subjectId,
                               season: seasonNum,
                               episode: ep,
                             );
@@ -1791,7 +1806,7 @@ class _WatchScreenState extends State<WatchScreen> {
                             final sizeStr = selectedResolution == 1080 
                                 ? '557.3 MB' 
                                 : (selectedResolution == 720 ? '380.0 MB' : '180.5 MB');
-                            final durationStr = isTv ? '23:34' : widget.subject.duration;
+                            final durationStr = isTv ? '23:34' : _currentSubject.duration;
 
                             return ListTile(
                               leading: isCompleted
@@ -1854,7 +1869,7 @@ class _WatchScreenState extends State<WatchScreen> {
                       const Divider(color: AppTheme.borderSubtle, height: 1),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        color: AppTheme.cardColor.withOpacity(0.5),
+                        color: AppTheme.cardColor.withValues(alpha: 0.5),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -1927,19 +1942,19 @@ class _WatchScreenState extends State<WatchScreen> {
 
   Future<void> _startBackgroundDownload(int episode, int resolution) async {
     final downloadsProvider = Provider.of<DownloadsProvider>(context, listen: false);
-    final isTv = widget.subject.subjectType != 1 && (widget.subject.seasonCount > 0 || widget.subject.subjectType == 2);
+    final isTv = _currentSubject.subjectType != 1 && (_currentSubject.seasonCount > 0 || _currentSubject.subjectType == 2);
     final seasonNum = isTv ? (_currentSeason ?? 1) : 0;
 
     try {
       final resources = await ApiService.fetchPlayResources(
-        widget.subject.subjectId,
-        detailPath: widget.subject.detailPath,
+        _currentSubject.subjectId,
+        detailPath: _currentSubject.detailPath,
         se: isTv ? seasonNum : null,
         ep: isTv ? episode : null,
       );
 
       if (resources.isEmpty) {
-        print('No resources found for background download of episode $episode');
+        debugPrint('No resources found for background download of episode $episode');
         return;
       }
 
@@ -1952,13 +1967,13 @@ class _WatchScreenState extends State<WatchScreen> {
       }
 
       await downloadsProvider.startDownload(
-        widget.subject,
+        _currentSubject,
         selectedRes,
         season: seasonNum,
         episode: episode,
       );
     } catch (e) {
-      print('Background download error for episode $episode: $e');
+      debugPrint('Background download error for episode $episode: $e');
     }
   }
 
@@ -2122,7 +2137,7 @@ class _WatchScreenState extends State<WatchScreen> {
           final ep = seasonObj.episodes[idx];
           final isSelected = ep == _currentEpisode;
           final isDownloaded = downloadsProvider.isDownloaded(
-            widget.subject.subjectId,
+            _currentSubject.subjectId,
             season: _currentSeason ?? 1,
             episode: ep,
           );
@@ -2235,7 +2250,7 @@ class _WatchScreenState extends State<WatchScreen> {
     }
 
     final size = MediaQuery.of(context).size;
-    final isTv = widget.subject.subjectType != 1 && (widget.subject.seasonCount > 0 || widget.subject.subjectType == 2);
+    final isTv = _currentSubject.subjectType != 1 && (_currentSubject.seasonCount > 0 || _currentSubject.subjectType == 2);
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     final showFullscreen = _isFullscreen || isLandscape;
 
@@ -2262,7 +2277,7 @@ class _WatchScreenState extends State<WatchScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          widget.subject.title,
+                          _currentSubject.title,
                           style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                         const SizedBox(height: 4),
@@ -2447,8 +2462,8 @@ class _WatchScreenState extends State<WatchScreen> {
   Widget _buildPlayerControlsOverlay(Size size) {
     if (_controller == null) return const SizedBox.shrink();
 
-    final isTv = widget.subject.seasonCount > 0 || widget.subject.subjectType == 2;
-    final title = isTv ? '${widget.subject.title} - S${_currentSeason}E${_currentEpisode.toString().padLeft(2, '0')}' : widget.subject.title;
+    final isTv = _currentSubject.seasonCount > 0 || _currentSubject.subjectType == 2;
+    final title = isTv ? '${_currentSubject.title} - S${_currentSeason}E${_currentEpisode.toString().padLeft(2, '0')}' : _currentSubject.title;
 
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
@@ -2925,12 +2940,12 @@ class _WatchScreenState extends State<WatchScreen> {
   }
 
   Future<void> _loadStreamInfoBackground() async {
-    final isTv = widget.subject.subjectType != 1 && (widget.subject.seasonCount > 0 || widget.subject.subjectType == 2);
+    final isTv = _currentSubject.subjectType != 1 && (_currentSubject.seasonCount > 0 || _currentSubject.subjectType == 2);
     
     try {
       final resources = await ApiService.fetchPlayResources(
-        widget.subject.subjectId,
-        detailPath: widget.subject.detailPath,
+        _currentSubject.subjectId,
+        detailPath: _currentSubject.detailPath,
         se: isTv ? _currentSeason : null,
         ep: isTv ? _currentEpisode : null,
       );
@@ -2939,7 +2954,7 @@ class _WatchScreenState extends State<WatchScreen> {
 
       if (resources.isNotEmpty) {
         PlayResource bestResource = resources.reduce((a, b) => a.resolution > b.resolution ? a : b);
-        final captions = await ApiService.fetchCaptions(widget.subject.subjectId, bestResource.resourceId);
+        final captions = await ApiService.fetchCaptions(_currentSubject.subjectId, bestResource.resourceId);
         
         setState(() {
           _resources = resources;
@@ -2950,14 +2965,14 @@ class _WatchScreenState extends State<WatchScreen> {
       }
 
       if (isTv && _seasons.isEmpty) {
-        final seasons = await ApiService.fetchSeasonInfo(widget.subject.subjectId, widget.subject.detailPath);
+        final seasons = await ApiService.fetchSeasonInfo(_currentSubject.subjectId, _currentSubject.detailPath);
         if (!mounted) return;
         setState(() {
           _seasons = seasons;
         });
       }
     } catch (e) {
-      print('Background stream info fetch error: $e');
+      debugPrint('Background stream info fetch error: $e');
     }
   }
 }
