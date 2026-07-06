@@ -1921,6 +1921,32 @@ function renderEpisodes(season) {
 }
 
 async function loadPlayResources(subjectId, season = null, episode = null) {
+    // ── IMMEDIATELY stop current stream so old episode doesn't keep playing ──
+    if (hlsInstance) {
+        hlsInstance.destroy();
+        hlsInstance = null;
+    }
+    if (playerInstance) {
+        try { playerInstance.pause(); } catch(e) {}
+        const _vid = playerInstance.media;
+        if (_vid) {
+            _vid.pause();
+            _vid.removeAttribute("src");
+            try { _vid.load(); } catch(e) {}
+        }
+    }
+    state.availableResources = [];
+    state.availableCaptions = [];
+
+    // Show loading overlay immediately so user sees feedback right away
+    const loaderOverlay = document.getElementById("playerLoaderOverlay");
+    if (loaderOverlay) {
+        const statusTxt = loaderOverlay.querySelector("span");
+        if (statusTxt) statusTxt.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:8px;"></i>Loading stream...';
+        loaderOverlay.style.background = "rgba(0, 0, 0, 0.85)";
+        loaderOverlay.classList.add("visible");
+    }
+
     // Reset auto-quality options on new stream loading
     userSelectedQuality = false;
     bufferingCount = 0;
@@ -1981,8 +2007,7 @@ async function loadPlayResources(subjectId, season = null, episode = null) {
         }
     }
 
-    // Show player loading overlay immediately while fetching resources
-    const loaderOverlay = document.getElementById("playerLoaderOverlay");
+    // Overlay already shown at function start; ensure visible during fetch
     if (loaderOverlay) loaderOverlay.classList.add("visible");
 
     const result = await apiGet(url);
