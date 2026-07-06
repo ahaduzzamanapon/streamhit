@@ -1106,7 +1106,7 @@ def set_last_direct_fail_time(t: float):
 class ProxyManager:
     def __init__(self):
         self.workers = list(WORKER_PROXIES)
-        self.active_workers = list(WORKER_PROXIES)
+        self.active_workers = []
         self.worker_index = 0
         self.external_proxies = []
         self.proxy_index = 0
@@ -1121,16 +1121,13 @@ class ProxyManager:
                     file_workers = [line.strip() for line in f if line.strip() and not line.startswith("#")]
                 if file_workers:
                     self.workers = file_workers
-                    self.active_workers = list(file_workers)
                     print(f"[ProxyManager] Loaded {len(self.workers)} workers from workers.txt")
                 else:
                     self.workers = list(WORKER_PROXIES)
-                    self.active_workers = list(WORKER_PROXIES)
             except Exception as e:
                 print(f"[ProxyManager] Error loading workers.txt: {e}")
         else:
             self.workers = list(WORKER_PROXIES)
-            self.active_workers = list(WORKER_PROXIES)
 
     def load_external_proxies(self):
         proxy_file = os.path.join(base_dir, "proxies.txt")
