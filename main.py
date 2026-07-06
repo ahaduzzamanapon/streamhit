@@ -1312,7 +1312,7 @@ async def run_config_sync():
     except Exception as e:
         print(f"[Scraper] Failed to fetch moviebox.ph configuration: {e}")
 
-async def scrape_subject_details(subject_id: str) -> dict:
+async def scrape_subject_details(subject_id: str, only_se: int = -1, only_ep: int = -1) -> dict:
     # Retry logic with proxy rotation
     attempts = [
         {"name": "Direct", "use_worker": False, "use_proxy": False},
@@ -1376,10 +1376,16 @@ async def scrape_subject_details(subject_id: str) -> dict:
                     max_ep = int(se.get("maxEp", 0))
                     episodes_list = ",".join(str(i) for i in range(1, max_ep + 1))
                     await db_save_season(subject_id, se_num, max_ep, episodes_list)
-                    if max_ep > 0:
-                        for ep_num in range(1, max_ep + 1):
-                            await scrape_episode_resources(subject_id, se_num, ep_num)
-                            await asyncio.sleep(0.5)
+                    if only_se != -1 and only_ep != -1:
+                        # Only scrape the requested episode inline, and background scrape the rest
+                        if se_num == only_se:
+                            await scrape_episode_resources(subject_id, only_se, only_ep)
+                        asyncio.create_task(scrape_other_episodes_in_background(subject_id, se_num, max_ep, exclude_ep=only_ep if se_num == only_se else -1))
+                    else:
+                        if max_ep > 0:
+                            for ep_num in range(1, max_ep + 1):
+                                await scrape_episode_resources(subject_id, se_num, ep_num)
+                                await asyncio.sleep(0.5)
             else:
                 await scrape_episode_resources(subject_id, 0, 0)
 
@@ -1401,6 +1407,17 @@ async def scrape_all_episodes_for_season(subject_id: str, season: int, max_ep: i
             await asyncio.sleep(0.5)
         except Exception as e:
             print(f"[Season Scraper] Error on S{season}E{ep_num} for {subject_id}: {e}")
+
+async def scrape_other_episodes_in_background(subject_id: str, season: int, max_ep: int, exclude_ep: int = -1):
+    """Background task: scrape all episodes of a season except the excluded one."""
+    for ep_num in range(1, max_ep + 1):
+        if ep_num == exclude_ep:
+            continue
+        try:
+            await scrape_episode_resources(subject_id, season, ep_num)
+            await asyncio.sleep(0.5)
+        except Exception as e:
+            print(f"[Background Scraper] Error on S{season}E{ep_num} for {subject_id}: {e}")
 
 async def scrape_episode_resources(subject_id: str, season: int, episode: int):
     try:
@@ -3227,7 +3244,7 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0, detailPath: str
     # Missing or expired: fetch fresh links from OneRoom via inline scraper first
     try:
         print(f"[api/resource] No valid resources in DB for {subjectId}. Scraping details & resources...")
-        await scrape_subject_details(subjectId)
+        await scrape_subject_details(subjectId, se, ep)
         
         # Re-query DB for the newly scraped/saved resources
         if pool:
