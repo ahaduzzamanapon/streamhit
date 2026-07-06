@@ -3849,6 +3849,17 @@ async def read_log(file: str = "stderr.log"):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+@app.get("/api/git-log")
+async def get_git_log(secret: str = ""):
+    if secret != DEPLOY_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    try:
+        import subprocess
+        out = subprocess.check_output(["git", "log", "-n", "3", "--oneline"], stderr=subprocess.STDOUT)
+        return {"status": "success", "log": out.decode("utf-8")}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @app.get("/api/clear-cache-force")
 async def clear_cache_force():
     pool = await get_db_pool()
