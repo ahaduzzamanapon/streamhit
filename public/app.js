@@ -1418,8 +1418,11 @@ async function initWatchPage() {
     window.addEventListener('beforeunload', saveProgress);
 
     // Auto-Play next episode event listener
+    // Only trigger if video actually played (duration > 0) to avoid firing on failed streams
     playerInstance.on('ended', () => {
         saveProgress();
+        const currentDuration = playerInstance ? playerInstance.duration : 0;
+        if (!currentDuration || currentDuration < 5) return; // not a real playback end
         const isTv = state.selectedSubject && (state.selectedSubject.seNum > 0 || state.selectedSubject.subjectType === 2);
         if (isTv) {
             const nextEp = state.selectedEpisode + 1;
@@ -2053,6 +2056,9 @@ async function loadPlayResources(subjectId, season = null, episode = null) {
     } else {
         console.error("No play resources found for this item");
         if (loaderOverlay) {
+            // Hide spinner so it doesn't keep animating behind error message
+            const spinner = loaderOverlay.querySelector(".player-spinner");
+            if (spinner) spinner.style.display = "none";
             const statusTxt = loaderOverlay.querySelector("span");
             if (statusTxt) statusTxt.innerHTML = `
                 <i class="fa-solid fa-circle-exclamation" style="margin-right:8px;color:#f97316;"></i>
@@ -2061,7 +2067,7 @@ async function loadPlayResources(subjectId, season = null, episode = null) {
                     style="margin-left:12px;background:var(--color-accent,#1dd171);color:#000;border:none;padding:6px 14px;border-radius:6px;font-weight:700;cursor:pointer;font-size:12px;">
                     <i class="fa-solid fa-rotate-right"></i> Retry
                 </button>`;
-            loaderOverlay.style.background = "rgba(0,0,0,0.85)";
+            loaderOverlay.style.background = "rgba(0,0,0,0.92)";
             loaderOverlay.classList.add("visible");
         }
     }
