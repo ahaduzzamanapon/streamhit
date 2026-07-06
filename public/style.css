@@ -1686,7 +1686,18 @@ button, input, select {
 
 @media (max-width: 380px) {
     .sidebar-widget .episode-grid {
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(5, 1fr);
+    }
+}
+
+/* Mobile watch page — episode grid more compact, 6 cols */
+@media (max-width: 1200px) {
+    .resources-container .episode-grid {
+        grid-template-columns: repeat(6, 1fr) !important;
+        gap: 6px !important;
+    }
+    .resources-container .episode-btn {
+        font-size: 13px !important;
     }
 }
 
@@ -1912,6 +1923,24 @@ button, input, select {
     pointer-events: auto;
 }
 
+/* Pulsing glow ring behind spinner when loading */
+.player-loader-overlay.visible .player-spinner::before {
+    content: '';
+    position: absolute;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: transparent;
+    border: 1px solid rgba(255, 42, 58, 0.2);
+    animation: spinnerRingPulse 1.5s ease-out infinite;
+    pointer-events: none;
+}
+
+@keyframes spinnerRingPulse {
+    0% { transform: scale(1); opacity: 0.6; }
+    100% { transform: scale(1.6); opacity: 0; }
+}
+
 .player-loader-overlay.visible ~ .player-header-overlay {
     opacity: 1;
     pointer-events: auto;
@@ -1937,6 +1966,26 @@ button, input, select {
 
 @keyframes player-spin {
     to { transform: rotate(360deg); }
+}
+
+/* Theater Mode — player expands to push sidebar below */
+.theater-mode .watch-cinema-grid {
+    grid-template-columns: 1fr !important;
+}
+.theater-mode .resources-container {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+    position: static !important;
+    max-height: none !important;
+}
+.theater-mode .cinema-meta-section {
+    grid-column: 1 !important;
+}
+.theater-mode .cinema-desc-section {
+    grid-column: 1 !important;
+}
+.theater-mode .player-wrapper {
+    box-shadow: 0 0 60px rgba(255, 42, 58, 0.2) !important;
 }
 
 /* Player Netflix-style Header Overlay */
@@ -2074,23 +2123,30 @@ button, input, select {
     padding: 0 !important;
     background: var(--color-accent-gradient) !important;
     color: var(--bg-primary) !important;
-    width: 80px !important;
-    height: 80px !important;
+    width: 88px !important;
+    height: 88px !important;
     border-radius: 50% !important;
-    box-shadow: 0 8px 32px rgba(255, 42, 58, 0.3) !important;
+    box-shadow: 0 0 0 0 rgba(255, 42, 58, 0.4), 0 8px 32px rgba(255, 42, 58, 0.3) !important;
     border: none !important;
     transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    animation: playBtnPulse 2.5s infinite ease-in-out !important;
+}
+
+@keyframes playBtnPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 42, 58, 0.4), 0 8px 32px rgba(255, 42, 58, 0.3); }
+    50% { box-shadow: 0 0 0 14px rgba(255, 42, 58, 0), 0 8px 32px rgba(255, 42, 58, 0.5); }
 }
 
 .plyr__control--overlaid svg {
-    width: 28px !important;
-    height: 28px !important;
-    transform: translateX(3px) !important;
+    width: 32px !important;
+    height: 32px !important;
+    transform: translateX(4px) !important;
 }
 
 .plyr__control--overlaid:hover {
-    transform: translate(-50%, -50%) scale(1.1) rotate(5deg) !important;
-    box-shadow: 0 12px 40px rgba(29, 209, 113, 0.5) !important;
+    transform: translate(-50%, -50%) scale(1.12) !important;
+    box-shadow: 0 0 0 20px rgba(255, 42, 58, 0), 0 16px 48px rgba(29, 209, 113, 0.5) !important;
+    animation: none !important;
 }
 
 /* Progress bar customization */
@@ -2098,13 +2154,19 @@ button, input, select {
     cursor: pointer !important;
 }
 
-.plyr__progress input[type=range], 
+.plyr__progress input[type=range],
 .plyr__volume input[type=range] {
     color: var(--color-accent) !important;
 }
 
+/* Glowing progress thumb */
+.plyr__progress input[type=range]::-webkit-slider-thumb {
+    box-shadow: 0 0 0 3px rgba(255, 42, 58, 0.25), 0 0 10px rgba(255, 42, 58, 0.5) !important;
+}
+
 .plyr__progress__buffer {
-    color: rgba(255, 255, 255, 0.15) !important;
+    color: rgba(255, 255, 255, 0.12) !important;
+    background: rgba(255, 255, 255, 0.12) !important;
 }
 
 .plyr__time {

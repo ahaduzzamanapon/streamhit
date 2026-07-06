@@ -1054,6 +1054,21 @@ async function initWatchPage() {
     document.body.style.overflow = 'visible';
     document.body.style.overflowX = 'visible';
 
+    // Theater Mode toggle
+    const theaterBtn = document.getElementById("theaterModeBtn");
+    const theaterIcon = document.getElementById("theaterModeIcon");
+    const watchWrapper = document.getElementById("watchWrapper");
+    if (theaterBtn && watchWrapper) {
+        theaterBtn.onclick = () => {
+            watchWrapper.classList.toggle("theater-mode");
+            const isTheater = watchWrapper.classList.contains("theater-mode");
+            if (theaterIcon) {
+                theaterIcon.className = isTheater ? "fa-solid fa-compress" : "fa-solid fa-expand";
+            }
+            theaterBtn.title = isTheater ? "Exit Theater Mode" : "Theater Mode";
+        };
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     let subjectId = urlParams.get("id");
     const tmdbId = urlParams.get("tmdb");
