@@ -534,6 +534,19 @@ async def init_db():
                 except Exception:
                     pass
                 
+                # Auto-heal AUTO_INCREMENT on seasons and play_resources tables if missing
+                try:
+                    await cur.execute("ALTER TABLE seasons MODIFY COLUMN id INT AUTO_INCREMENT")
+                    print("[Database] Verified/Applied AUTO_INCREMENT on seasons table.")
+                except Exception as e:
+                    print(f"[Database Schema Migration Warning] Failed to alter seasons table: {e}")
+                
+                try:
+                    await cur.execute("ALTER TABLE play_resources MODIFY COLUMN id INT AUTO_INCREMENT")
+                    print("[Database] Verified/Applied AUTO_INCREMENT on play_resources table.")
+                except Exception as e:
+                    print(f"[Database Schema Migration Warning] Failed to alter play_resources table: {e}")
+                
                 # Database index migrations for performance optimization
                 try:
                     await cur.execute("ALTER TABLE subjects ADD INDEX idx_subject_type (subject_type)")
