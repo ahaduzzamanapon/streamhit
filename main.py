@@ -4028,7 +4028,6 @@ async def handle_fetch(request: Request, source_url: str):
         connector = "&" if "?" in source_url else "?"
         source_url = f"{source_url}{connector}{extra_qs}"
 
-    worker = get_next_worker()
     headers_to_send = {
         "Origin": "https://fmoviesunblocked.net",
         "Referer": "https://fmoviesunblocked.net/",
@@ -4044,8 +4043,21 @@ async def handle_fetch(request: Request, source_url: str):
     if if_range:
         headers_to_send["If-Range"] = if_range
 
-    proxy_url = f"{worker}/mp4-proxy?url={urllib.parse.quote(source_url)}&headers={urllib.parse.quote(json.dumps(headers_to_send))}"
-    return RedirectResponse(url=proxy_url)
+    try:
+        client = get_http_client()
+        req = client.build_request("GET", source_url, headers=headers_to_send)
+        resp = await client.send(req, stream=True)
+        return build_streaming_response(resp, range_header)
+    except Exception as e:
+        print(f"[Fetch Proxy Error] {e}")
+        raise HTTPException(status_code=502, detail=f"Proxy error: {e}")
+
+async def stream_and_close(resp, start=None, end=None):
+    try:
+        async for chunk in stream_chunks(resp, start, end):
+            yield chunk
+    finally:
+        await resp.aclose()
 
 def build_streaming_response(resp, range_header):
     if range_header and resp.status_code == 200:
@@ -4063,7 +4075,7 @@ def build_streaming_response(resp, range_header):
             "Access-Control-Expose-Headers": "Content-Length, Content-Range, Accept-Ranges",
         }
         return StreamingResponse(
-            stream_chunks(resp, start, end),
+            stream_and_close(resp, start, end),
             status_code=206,
             headers=headers,
             media_type="video/mp4"
@@ -4092,7 +4104,7 @@ def build_streaming_response(resp, range_header):
         headers["Content-Length"] = resp.headers["content-length"]
         
     return StreamingResponse(
-        stream_chunks(resp),
+        stream_and_close(resp),
         status_code=resp.status_code,
         headers=headers,
         media_type="video/mp4"
