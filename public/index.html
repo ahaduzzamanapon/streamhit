@@ -1,207 +1,181 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta name="google-site-verification" content="BpJUnDdIY6XZAzAfXkH9vJNQiS72qTEnI2xN9l3-3oc" />
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Streamfit - Premium Movie & TV Series Streaming</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    
-    <!-- FontAwesome for icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Custom Style Sheet -->
-    <link rel="stylesheet" href="style.css?v=3.7">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Streamfit — Free Movies, TV Shows & Anime Streaming</title>
+  <meta name="description" content="Watch free movies, TV shows, anime and live sports online. Hindi dub, Bengali dub, and English available. No subscription needed.">
+  <meta name="google-site-verification" content="BpJUnDdIY6XZAzAfXkH9vJNQiS72qTEnI2xN9l3-3oc">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css?v=4.0">
 </head>
 <body>
- 
-    <div class="app-container">
-        <!-- Sidebar Navigation -->
-        <aside class="sidebar">
-            <div class="brand" onclick="window.location.href='/'" style="cursor: pointer;">
-                <i class="fa-solid fa-play play-logo"></i>
-                <span class="logo-text">Stream<span>fit</span></span>
-            </div>
-            
-            <nav class="nav-menu">
-                <div class="menu-label">Navigation</div>
-                <ul>
-                    <li class="active"><a href="/"><i class="fa-solid fa-house"></i> Home</a></li>
-                    <li><a href="/movies"><i class="fa-solid fa-film"></i> Movies</a></li>
-                    <li><a href="/tv"><i class="fa-solid fa-tv"></i> TV Series</a></li>
-                    <li><a href="/live-tv"><i class="fa-solid fa-satellite-dish"></i> Live TV</a></li>
-                </ul>
-
-                <div class="menu-label">Categories</div>
-                <ul>
-                    <li><a href="/movies?genre=Action"><i class="fa-solid fa-gun"></i> Action</a></li>
-                    <li><a href="/movies?genre=Comedy"><i class="fa-solid fa-face-laugh-beam"></i> Comedy</a></li>
-                    <li><a href="/tv?genre=Animation"><i class="fa-solid fa-face-smile"></i> Animation</a></li>
-                </ul>
-            </nav>
-        </aside>
-
-        <!-- Main Content Panel -->
-        <main class="main-content">
-            <!-- Header section -->
-            <header class="header">
-                <!-- Mobile Brand Logo -->
-                <div class="mobile-brand" onclick="window.location.href='/'" style="cursor: pointer;">
-                    <i class="fa-solid fa-play play-logo"></i>
-                    <span class="logo-text">Stream<span>fit</span></span>
-                </div>
-                <!-- Search bar -->
-                <div class="search-box">
-                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                    <input type="text" id="searchInput" placeholder="Search movies, TV shows, and anime..." autocomplete="off">
-                    <button id="searchBtn">Search</button>
-                </div>
-                
-                <!-- Right Controls -->
-                <div class="header-controls">
-                    <div class="language-selector">
-                        <i class="fa-solid fa-globe"></i>
-                        <span>ENGLISH</span>
-                    </div>
-                    <button class="download-app-btn"><i class="fa-solid fa-arrow-down-to-bracket"></i> Download App</button>
-                </div>
-            </header>
-
-            <!-- Featured Banner Slider -->
-            <section class="hero-slider" id="heroSlider">
-                <div class="hero-slide-placeholder">
-                    <div class="shimmer-line title"></div>
-                    <div class="shimmer-line desc"></div>
-                </div>
-            </section>
-
-            <!-- Navigation Tabs & Category Filters -->
-            <section class="navigation-filters">
-                <div class="categories-tabs">
-                    <button class="cat-tab active" onclick="window.location.href='/'">All Releases</button>
-                    <button class="cat-tab" onclick="window.location.href='/movies'">Movies</button>
-                    <button class="cat-tab" onclick="window.location.href='/tv'">TV Shows</button>
-                </div>
-            </section>
-
-            <!-- Continue Watching Section -->
-            <section class="content-section continue-watching-section" id="continueWatchingSection" style="display: none;">
-                <div class="section-header">
-                    <h2><i class="fa-solid fa-clock-rotate-left icon-trending" style="color: var(--color-accent);"></i> Continue Watching</h2>
-                    <button id="clearContinueWatchingBtn" style="background: none; border: none; font-size: 12px; font-weight: 700; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 4px;"><i class="fa-solid fa-trash"></i> Clear</button>
-                </div>
-                <div class="continue-watching-grid" id="continueWatchingGrid">
-                    <!-- Dynamic Continue Watching Cards -->
-                </div>
-            </section>
-
-            <!-- Live Sports Section -->
-            <section class="content-section live-sports-section" id="liveSportsSection" style="display: none;">
-                <div class="section-header">
-                    <h2><i class="fa-solid fa-satellite-dish icon-trending" style="color: var(--color-accent); animation: pulse 2s infinite;"></i> Live Sports Match</h2>
-                </div>
-                <div class="slider-wrapper">
-                    <button class="slider-nav-btn prev-btn" id="sportsPrevBtn"><i class="fa-solid fa-chevron-left"></i></button>
-                    <div class="content-slider scroll-x" id="liveSportsGrid">
-                        <!-- Dynamic Live Sports Cards -->
-                    </div>
-                    <button class="slider-nav-btn next-btn" id="sportsNextBtn"><i class="fa-solid fa-chevron-right"></i></button>
-                </div>
-            </section>
-
-            <!-- All Live TV Section -->
-            <section class="content-section live-tv-section" id="liveTvSection" style="display: none;">
-                <div class="section-header">
-                    <h2><i class="fa-solid fa-tv icon-bangla" style="color: var(--secondary-accent); animation: pulse 2.5s infinite;"></i> All Live TV</h2>
-                    <a href="/live-tv" class="see-more-btn">See More <i class="fa-solid fa-arrow-right"></i></a>
-                </div>
-                <div class="slider-wrapper">
-                    <button class="slider-nav-btn prev-btn" id="tvPrevBtn"><i class="fa-solid fa-chevron-left"></i></button>
-                    <div class="content-slider scroll-x" id="liveTvGrid">
-                        <!-- Dynamic Live TV Channel Cards -->
-                    </div>
-                    <button class="slider-nav-btn next-btn" id="tvNextBtn"><i class="fa-solid fa-chevron-right"></i></button>
-                </div>
-            </section>
-
-            <!-- Trending Now Grid -->
-            <section class="content-section" id="trendingSection">
-                <div class="section-header">
-                    <h2><i class="fa-solid fa-bolt icon-trending"></i> Trending Now</h2>
-                </div>
-                
-                <div class="content-slider scroll-x" id="trendingGrid">
-                    <!-- Shimmer Loaders -->
-                    <div class="card-shimmer"></div>
-                    <div class="card-shimmer"></div>
-                    <div class="card-shimmer"></div>
-                    <div class="card-shimmer"></div>
-                    <div class="card-shimmer"></div>
-                </div>
-            </section>
-
-            <!-- Main Dynamic Grid (Movies/Series) -->
-            <section class="content-section" id="dynamicSection">
-                <div class="section-header">
-                    <h2 id="dynamicTitle">Latest Releases</h2>
-                </div>
-                
-                <div class="content-grid" id="dynamicGrid">
-                    <!-- Loaded movies/TV shows -->
-                </div>
-
-                <div class="pagination-controls" id="paginationControls">
-                    <button class="page-btn prev" id="prevPageBtn" disabled><i class="fa-solid fa-arrow-left"></i> Previous</button>
-                    <span class="page-indicator" id="pageIndicator">Page 1</span>
-                    <button class="page-btn next" id="nextPageBtn">Next <i class="fa-solid fa-arrow-right"></i></button>
-                </div>
-            </section>
-
-        </main>
+<div class="app-container">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand" onclick="window.location.href='/'">
+      <div class="play-logo"><i class="fa-solid fa-play"></i></div>
+      <span class="logo-text">Stream<span>fit</span></span>
     </div>
+    <nav class="nav-menu">
+      <div class="menu-label">Navigation</div>
+      <ul>
+        <li class="active"><a href="/"><i class="fa-solid fa-house"></i> Home</a></li>
+        <li><a href="/movies"><i class="fa-solid fa-film"></i> Movies</a></li>
+        <li><a href="/tv"><i class="fa-solid fa-tv"></i> TV Series</a></li>
+        <li><a href="/live-tv"><i class="fa-solid fa-satellite-dish"></i> Live TV</a></li>
+      </ul>
+      <div class="menu-label">Categories</div>
+      <ul>
+        <li><a href="/movies?genre=Action"><i class="fa-solid fa-gun"></i> Action</a></li>
+        <li><a href="/movies?genre=Comedy"><i class="fa-solid fa-face-laugh-beam"></i> Comedy</a></li>
+        <li><a href="/movies?genre=Horror"><i class="fa-solid fa-ghost"></i> Horror</a></li>
+        <li><a href="/tv?genre=Animation"><i class="fa-solid fa-wand-magic-sparkles"></i> Animation</a></li>
+        <li><a href="/movies?genre=Thriller"><i class="fa-solid fa-masks-theater"></i> Thriller</a></li>
+        <li><a href="/movies?genre=Romance"><i class="fa-solid fa-heart"></i> Romance</a></li>
+      </ul>
+    </nav>
+  </aside>
 
-    <!-- Mobile Sticky Bottom Navigation Bar -->
-    <div class="mobile-navigation-bar">
-        <a href="/" class="nav-item active" id="mobileNavHome">
-            <i class="fa-solid fa-house"></i>
-            <span>Home</span>
-        </a>
-        <a href="/movies" class="nav-item" id="mobileNavMovies">
-            <i class="fa-solid fa-film"></i>
-            <span>Movies</span>
-        </a>
-        <a href="/tv" class="nav-item" id="mobileNavTv">
-            <i class="fa-solid fa-tv"></i>
-            <span>TV Series</span>
-        </a>
-        <a href="/live-tv" class="nav-item" id="mobileNavLiveTv">
-            <i class="fa-solid fa-satellite-dish"></i>
-            <span>Live TV</span>
-        </a>
-        <a href="/download" class="nav-item download-app-btn" id="mobileNavDownload">
-            <i class="fa-solid fa-arrow-down-to-bracket"></i>
-            <span>Get App</span>
-        </a>
-    </div>
-
-    <!-- Live Sports Stream Selector Modal -->
-    <div class="sports-modal-overlay" id="sportsModalOverlay">
-        <div class="sports-modal">
-            <span class="sports-modal-close" id="sportsModalClose">&times;</span>
-            <div class="sports-modal-title" id="sportsModalTitle">Select Stream Source</div>
-            <div class="sports-modal-subtitle" id="sportsModalSubtitle">Choose a stream option to watch live match</div>
-            <div class="sports-links-list" id="sportsLinksList">
-                <!-- Links filled dynamically -->
-            </div>
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Header -->
+    <header class="header">
+      <div class="mobile-brand" onclick="window.location.href='/'">
+        <div class="play-logo" style="width:28px;height:28px;font-size:11px;"><i class="fa-solid fa-play"></i></div>
+        <span class="logo-text" style="font-size:17px;">Stream<span>fit</span></span>
+      </div>
+      <div class="search-box">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input type="text" id="searchInput" placeholder="Search movies, shows, anime..." autocomplete="off">
+        <button id="searchBtn">Search</button>
+        <div class="search-dropdown" id="searchDropdown" style="display:none;"></div>
+      </div>
+      <div class="header-controls">
+        <div class="notification-bell" id="notificationBell" title="Notifications">
+          <i class="fa-solid fa-bell"></i>
         </div>
-    </div>
+        <div class="language-selector">
+          <i class="fa-solid fa-globe"></i>
+          <span>ENGLISH</span>
+        </div>
+        <button class="download-app-btn" onclick="window.location.href='/download'">
+          <i class="fa-solid fa-arrow-down-to-bracket"></i> Get App
+        </button>
+      </div>
+    </header>
 
-    <!-- Application Script -->
-    <script src="app.js?v=3.7"></script>
+    <!-- Hero Banner Slider -->
+    <section class="hero-slider" id="heroSlider">
+      <div class="hero-slide-placeholder">
+        <div class="shimmer-line title"></div>
+        <div class="shimmer-line desc"></div>
+      </div>
+    </section>
+
+    <!-- Category Tabs -->
+    <section class="navigation-filters">
+      <div class="categories-tabs">
+        <button class="cat-tab active" onclick="window.location.href='/'">All</button>
+        <button class="cat-tab" onclick="window.location.href='/movies'">Movies</button>
+        <button class="cat-tab" onclick="window.location.href='/tv'">TV Shows</button>
+        <button class="cat-tab" onclick="window.location.href='/live-tv'">Live TV</button>
+      </div>
+    </section>
+
+    <!-- Continue Watching -->
+    <section class="content-section continue-watching-section" id="continueWatchingSection" style="display:none;">
+      <div class="section-header">
+        <h2><i class="fa-solid fa-clock-rotate-left icon-trending"></i> Continue Watching</h2>
+        <button id="clearContinueWatchingBtn" style="background:none;border:none;font-size:12px;font-weight:700;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;gap:5px;">
+          <i class="fa-solid fa-trash"></i> Clear
+        </button>
+      </div>
+      <div class="continue-watching-grid" id="continueWatchingGrid"></div>
+    </section>
+
+    <!-- Live Sports -->
+    <section class="content-section live-sports-section" id="liveSportsSection" style="display:none;">
+      <div class="section-header">
+        <h2><i class="fa-solid fa-satellite-dish icon-trending" style="animation:pulse 2s infinite;"></i> Live Sports Match</h2>
+      </div>
+      <div class="slider-wrapper">
+        <button class="slider-nav-btn prev-btn" id="sportsPrevBtn"><i class="fa-solid fa-chevron-left"></i></button>
+        <div class="content-slider scroll-x" id="liveSportsGrid"></div>
+        <button class="slider-nav-btn next-btn" id="sportsNextBtn"><i class="fa-solid fa-chevron-right"></i></button>
+      </div>
+    </section>
+
+    <!-- Live TV -->
+    <section class="content-section live-tv-section" id="liveTvSection" style="display:none;">
+      <div class="section-header">
+        <h2><i class="fa-solid fa-tv icon-bangla"></i> Live TV</h2>
+        <a href="/live-tv" class="see-more-btn">See More <i class="fa-solid fa-arrow-right"></i></a>
+      </div>
+      <div class="slider-wrapper">
+        <button class="slider-nav-btn prev-btn" id="tvPrevBtn"><i class="fa-solid fa-chevron-left"></i></button>
+        <div class="content-slider scroll-x" id="liveTvGrid"></div>
+        <button class="slider-nav-btn next-btn" id="tvNextBtn"><i class="fa-solid fa-chevron-right"></i></button>
+      </div>
+    </section>
+
+    <!-- Trending Now -->
+    <section class="content-section" id="trendingSection">
+      <div class="section-header">
+        <h2><i class="fa-solid fa-bolt icon-trending"></i> Trending Now</h2>
+      </div>
+      <div class="slider-wrapper">
+        <div class="content-slider" id="trendingGrid">
+          <div class="card-shimmer"></div>
+          <div class="card-shimmer"></div>
+          <div class="card-shimmer"></div>
+          <div class="card-shimmer"></div>
+          <div class="card-shimmer"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Dynamic Category Sections (Bollywood, Hollywood, etc.) injected here -->
+
+    <!-- Latest Releases Grid -->
+    <section class="content-section" id="dynamicSection">
+      <div class="section-header">
+        <h2 id="dynamicTitle">Latest Releases</h2>
+      </div>
+      <div class="content-grid" id="dynamicGrid"></div>
+      <div class="pagination-controls" id="paginationControls">
+        <button class="page-btn prev" id="prevPageBtn" disabled><i class="fa-solid fa-arrow-left"></i> Previous</button>
+        <span class="page-indicator" id="pageIndicator">Page 1</span>
+        <button class="page-btn next" id="nextPageBtn">Next <i class="fa-solid fa-arrow-right"></i></button>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Mobile Bottom Nav -->
+<div class="mobile-navigation-bar">
+  <a href="/" class="nav-item active" id="mobileNavHome"><i class="fa-solid fa-house"></i><span>Home</span></a>
+  <a href="/movies" class="nav-item" id="mobileNavMovies"><i class="fa-solid fa-film"></i><span>Movies</span></a>
+  <a href="/tv" class="nav-item" id="mobileNavTv"><i class="fa-solid fa-tv"></i><span>TV</span></a>
+  <a href="/live-tv" class="nav-item" id="mobileNavLiveTv"><i class="fa-solid fa-satellite-dish"></i><span>Live</span></a>
+  <a href="/download" class="nav-item download-app-btn" id="mobileNavDownload"><i class="fa-solid fa-arrow-down-to-bracket"></i><span>Get App</span></a>
+</div>
+
+<!-- Live Sports Modal -->
+<div class="sports-modal-overlay" id="sportsModalOverlay">
+  <div class="sports-modal">
+    <span class="sports-modal-close" id="sportsModalClose">&times;</span>
+    <div class="sports-modal-title" id="sportsModalTitle">Select Stream Source</div>
+    <div class="sports-modal-subtitle" id="sportsModalSubtitle">Choose a stream to watch the match</div>
+    <div class="sports-links-list" id="sportsLinksList"></div>
+  </div>
+</div>
+
+<script src="app.js?v=4.0"></script>
 </body>
 </html>

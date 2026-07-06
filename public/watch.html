@@ -1,374 +1,224 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Watch Online - Streamfit</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Watch — Streamfit</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Plyr CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css">
+  <link rel="stylesheet" href="style.css?v=4.0">
+</head>
+<body class="watch-page-body">
+<div class="app-container">
+  <aside class="sidebar">
+    <div class="brand" onclick="window.location.href='/'">
+      <div class="play-logo"><i class="fa-solid fa-play"></i></div>
+      <span class="logo-text">Stream<span>fit</span></span>
+    </div>
+    <nav class="nav-menu">
+      <div class="menu-label">Navigation</div>
+      <ul>
+        <li><a href="/"><i class="fa-solid fa-house"></i> Home</a></li>
+        <li><a href="/movies"><i class="fa-solid fa-film"></i> Movies</a></li>
+        <li><a href="/tv"><i class="fa-solid fa-tv"></i> TV Series</a></li>
+        <li><a href="/live-tv"><i class="fa-solid fa-satellite-dish"></i> Live TV</a></li>
+      </ul>
+    </nav>
+  </aside>
 
-    <!-- Meta tag to block crawler indexing -->
-    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
-
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
-
-    <!-- FontAwesome for icons -->
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-    />
-
-    <!-- Plyr CSS for premium video player -->
-    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
-
-    <!-- Custom Style Sheet -->
-    <link rel="stylesheet" href="style.css?v=3.7" />
-  </head>
-  <body class="watch-page-body">
-    <div class="app-container">
-      <!-- Sidebar Navigation -->
-      <aside class="sidebar">
-        <div
-          class="brand"
-          onclick="window.location.href = '/'"
-          style="cursor: pointer"
-        >
-          <i class="fa-solid fa-play play-logo"></i>
-          <span class="logo-text">Stream<span>fit</span></span>
+  <main class="main-content">
+    <header class="header">
+      <div class="mobile-brand" onclick="window.location.href='/'">
+        <div class="play-logo" style="width:28px;height:28px;font-size:11px;"><i class="fa-solid fa-play"></i></div>
+        <span class="logo-text" style="font-size:17px;">Stream<span>fit</span></span>
+      </div>
+      <div class="search-box">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input type="text" id="searchInput" placeholder="Search..." autocomplete="off">
+        <button id="searchBtn">Search</button>
+        <div class="search-dropdown" id="searchDropdown" style="display:none;"></div>
+      </div>
+      <div class="header-controls">
+        <div class="language-selector" onclick="window.history.back()" style="cursor:pointer;">
+          <i class="fa-solid fa-arrow-left"></i>
+          <span>Back</span>
         </div>
+      </div>
+    </header>
 
-        <nav class="nav-menu">
-          <div class="menu-label">Navigation</div>
-          <ul>
-            <li>
-              <a href="/"><i class="fa-solid fa-house"></i> Home</a>
-            </li>
-            <li>
-              <a href="/movies"><i class="fa-solid fa-film"></i> Movies</a>
-            </li>
-            <li>
-              <a href="/tv"><i class="fa-solid fa-tv"></i> TV Series</a>
-            </li>
-          </ul>
-
-          <div class="menu-label">Categories</div>
-          <ul>
-            <li>
-              <a href="/movies?genre=Action"
-                ><i class="fa-solid fa-gun"></i> Action</a
-              >
-            </li>
-            <li>
-              <a href="/movies?genre=Comedy"
-                ><i class="fa-solid fa-face-laugh-beam"></i> Comedy</a
-              >
-            </li>
-            <li>
-              <a href="/tv?genre=Animation"
-                ><i class="fa-solid fa-face-smile"></i> Animation</a
-              >
-            </li>
-          </ul>
-        </nav>
-
-       
-      </aside>
-
-      <!-- Main Content Panel -->
-      <main class="main-content">
-        <!-- Header section -->
-        <header class="header">
-          <!-- Mobile Brand Logo -->
-          <div class="mobile-brand" onclick="window.location.href = '/'">
-            <i class="fa-solid fa-play play-logo"></i>
-            <span class="logo-text">Stream<span>fit</span></span>
-          </div>
-          <!-- Search bar -->
-          <div class="search-box">
-            <i class="fa-solid fa-magnifying-glass search-icon"></i>
-            <input
-              type="text"
-              id="searchInput"
-              placeholder="Search movies/shows..."
-              autocomplete="off"
-            />
-            <button id="searchBtn">Search</button>
-          </div>
-
-          <!-- Right Controls -->
-          <div class="header-controls">
-            <div
-              class="language-selector"
-              onclick="window.history.back()"
-              style="cursor: pointer"
-            >
-              <i class="fa-solid fa-arrow-left"></i>
-              <span>Back</span>
-            </div>
-          </div>
-        </header>
-
-        <!-- Loading Shimmer / Spinner -->
-        <div id="watchPageLoading" class="watch-loading-container">
-          <div class="loading-spinner"></div>
-          <p>Loading player, please wait...</p>
-        </div>
-
-        <!-- Main Watch Content Wrapper (Hidden until loaded) -->
-        <div class="watch-wrapper" id="watchWrapper" style="display: none">
-          <div class="watch-cinema-grid">
-            <!-- Sticky Player Section -->
-            <div class="cinema-player-section">
-              <!-- Main Video Player Wrapper -->
-              <div class="player-wrapper">
-                <!-- Player Loading Overlay -->
-                <div class="player-loader-overlay" id="playerLoaderOverlay">
-                  <div class="player-spinner"></div>
-                  <span>Loading stream...</span>
-                </div>
-
-                <!-- Premium Video Player -->
-                <video id="player" playsinline controls autoplay></video>
-
-                <!-- Netflix-style top control bar overlay -->
-                <div class="player-header-overlay" id="playerHeaderOverlay">
-                  <button
-                    class="player-back-btn"
-                    onclick="window.history.back()"
-                  >
-                    <i class="fa-solid fa-arrow-left"></i>
-                  </button>
-                  <div class="player-title-info">
-                    <span id="playerMediaCategory">Streaming</span>
-                    <h2 id="playerMediaTitle">Title</h2>
-                  </div>
-                  <!-- Theater Mode Toggle -->
-                  <button class="player-back-btn" id="theaterModeBtn" title="Theater Mode" style="margin-left:auto;">
-                    <i class="fa-solid fa-expand" id="theaterModeIcon"></i>
-                  </button>
-                </div>
-
-                <!-- Next Episode Overlay -->
-                <div class="next-episode-overlay" id="nextEpisodeOverlay">
-                  <div class="next-overlay-content">
-                    <div class="next-title-label">Up Next</div>
-                    <div class="next-episode-title" id="nextEpisodeTitle">Loading next episode...</div>
-                    <div class="next-countdown-container">
-                      <svg class="next-countdown-circle" viewBox="0 0 80 80">
-                        <circle class="bg-circle" cx="40" cy="40" r="36"></circle>
-                        <circle class="progress-circle" id="nextCountdownCircleProgress" cx="40" cy="40" r="36"></circle>
-                      </svg>
-                      <div class="next-countdown-text" id="nextCountdownText">10</div>
-                    </div>
-                    <div class="next-btn-group">
-                      <button class="next-btn-play" id="nextEpisodePlayBtn">Play Now</button>
-                      <button class="next-btn-cancel" id="nextEpisodeCancelBtn">Cancel</button>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Resume Watching Toast -->
-                <div class="resume-toast" id="resumeToast">
-                  <span id="resumeToastText">Resumed from 00:00</span>
-                  <button class="resume-toast-btn" id="resumeToastStartOverBtn">Start Over</button>
-                  <button class="resume-toast-btn secondary" id="resumeToastDismissBtn">Dismiss</button>
-                </div>
-
-                <!-- Seek Gesture Feedback Overlays -->
-                <div
-                  class="seek-feedback seek-feedback-left"
-                  id="seekFeedbackLeft"
-                >
-                  <div class="seek-icon-circle">
-                    <i class="fa-solid fa-backward"></i>
-                    <span>10-</span>
-                  </div>
-                </div>
-                <div
-                  class="seek-feedback seek-feedback-right"
-                  id="seekFeedbackRight"
-                >
-                  <div class="seek-icon-circle">
-                    <i class="fa-solid fa-forward"></i>
-                    <span>10+</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Media Title & Metadata Section -->
-            <div class="cinema-meta-section">
-              <h1 id="watchMetaTitle">Title</h1>
-              <div class="meta-row">
-                <span class="rating" id="watchMetaRating"
-                  ><i class="fa-solid fa-star"></i> --</span
-                >
-                <span class="year" id="watchMetaYear"
-                  ><i class="fa-regular fa-calendar"></i> ----</span
-                >
-                <span class="country" id="watchMetaCountry"
-                  ><i class="fa-solid fa-earth-americas"></i> USA</span
-                >
-                <span class="duration" id="watchMetaDuration"
-                  ><i class="fa-regular fa-clock"></i> -- min</span
-                >
-              </div>
-            </div>
-
-            <!-- Description & Comments Card -->
-            <div class="cinema-desc-section">
-              <div
-                class="tag-container"
-                id="watchGenres"
-                style="display: none"
-              ></div>
-
-              <div class="description-box">
-                <h3>Description</h3>
-                <p id="watchDescription">Description loading...</p>
-              </div>
-
-              <!-- Tabs Section (For you & Comments) -->
-              <div class="watch-tabs-section">
-                <div class="watch-tabs-header">
-                  <button class="tab-header-btn active" id="tabBtnForYou">
-                    For you
-                  </button>
-                  <button class="tab-header-btn" id="tabBtnComments">
-                    Comments (99+)
-                  </button>
-                </div>
-                <div class="watch-tabs-content">
-                  <div class="tab-pane active" id="tabPaneForYou">
-                    <div class="content-grid" id="watchRecommendationsGrid">
-                      <!-- Dynamically populated recommendations -->
-                    </div>
-                  </div>
-                  <div class="tab-pane" id="tabPaneComments">
-                    <div class="comments-list">
-                      <div class="comment-item">
-                        <div class="comment-avatar">
-                          <i class="fa-solid fa-user"></i>
-                        </div>
-                        <div class="comment-details">
-                          <div class="comment-meta">
-                            <span class="comment-author">apon_streamhit</span>
-                            <span class="comment-time">2 hours ago</span>
-                          </div>
-                          <p class="comment-text">
-                            Finally found a site that plays Hindi dub smooth and
-                            fast. Kudos!
-                          </p>
-                        </div>
-                      </div>
-                      <div class="comment-item">
-                        <div class="comment-avatar">
-                          <i class="fa-solid fa-user"></i>
-                        </div>
-                        <div class="comment-details">
-                          <div class="comment-meta">
-                            <span class="comment-author">john_doe</span>
-                            <span class="comment-time">1 day ago</span>
-                          </div>
-                          <p class="comment-text">
-                            Quality is 1080p stream as advertised. Thanks for
-                            the fix on TV episodes!
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Resources & Episodes Selector (Right sidebar on desktop) -->
-            <div class="resources-container">
-              <div class="resources-header">
-                <span
-                  >Resources
-                  <span class="upload-by"
-                    >Uploaded by Streamfit team</span
-                  ></span
-                >
-                <i class="fa-solid fa-circle-question info-icon"></i>
-              </div>
-
-              <!-- Dub / Language selector (visible when multiple dubs exist) -->
-              <div
-                class="dub-selector-wrapper"
-                id="watchDubSelectorGroup"
-                style="display: none"
-              >
-                <select id="dubLanguageSelect" class="custom-select">
-                  <!-- Options loaded dynamically -->
-                </select>
-              </div>
-
-              <!-- TV Show Season & Episode grid (hidden for movies) -->
-              <div
-                class="tv-episode-selector"
-                id="watchTvSelector"
-                style="display: none"
-              >
-                <div class="season-tabs" id="watchSeasonTabs">
-                  <!-- Season buttons loaded dynamically -->
-                </div>
-                <div class="episode-grid scroll-y" id="watchEpisodeGrid">
-                  <!-- Episode grid populated dynamically -->
-                </div>
-              </div>
-
-              <!-- Live Stream Links Selector -->
-              <div
-                class="live-stream-selector"
-                id="watchLiveStreamSelector"
-                style="display: none; margin-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 20px;"
-              >
-                <div class="resources-header" style="margin-bottom: 12px;">
-                  <span>Stream Links</span>
-                </div>
-                <div class="season-tabs" id="watchStreamLinksGrid" style="flex-wrap: wrap;">
-                  <!-- Stream links buttons loaded dynamically -->
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
+    <!-- Loading -->
+    <div id="watchPageLoading" class="watch-loading-container">
+      <div class="loading-spinner"></div>
+      <p>Loading stream...</p>
     </div>
 
-    <!-- Mobile Sticky Bottom Navigation Bar -->
-    <div class="mobile-navigation-bar">
-      <a href="/" class="nav-item" id="mobileNavHome">
-        <i class="fa-solid fa-house"></i>
-        <span>Home</span>
-      </a>
-      <a href="/movies" class="nav-item" id="mobileNavMovies">
-        <i class="fa-solid fa-film"></i>
-        <span>Movies</span>
-      </a>
-      <a href="/tv" class="nav-item" id="mobileNavTv">
-        <i class="fa-solid fa-tv"></i>
-        <span>TV Series</span>
-      </a>
-      <a href="/download" class="nav-item download-app-btn" id="mobileNavDownload">
-        <i class="fa-solid fa-arrow-down-to-bracket"></i>
-        <span>Get App</span>
-      </a>
+    <!-- Watch Content -->
+    <div class="watch-wrapper" id="watchWrapper" style="display:none;">
+      <div class="watch-cinema-grid">
+
+        <!-- ── PLAYER COLUMN ─────────────────────────────────────── -->
+        <div class="cinema-player-section">
+          <div class="player-wrapper" id="playerWrapperEl">
+            <!-- Plyr Video -->
+            <video id="player" playsinline></video>
+
+            <!-- Loading Overlay -->
+            <div class="player-loader-overlay" id="playerLoaderOverlay">
+              <div class="player-spinner"></div>
+              <span><i class="fa-solid fa-spinner fa-spin" style="margin-right:8px;"></i>Loading stream...</span>
+            </div>
+
+            <!-- Player Header Overlay (title + back + theater) -->
+            <div class="player-header-overlay" id="playerHeaderOverlay">
+              <button class="player-back-btn" onclick="window.history.back()">
+                <i class="fa-solid fa-arrow-left"></i>
+              </button>
+              <div class="player-title-info">
+                <span id="playerMediaCategory">Streaming</span>
+                <h2 id="playerMediaTitle">Loading...</h2>
+              </div>
+              <!-- Theater Mode Toggle -->
+              <button class="player-back-btn" id="theaterModeBtn" title="Theater Mode" style="margin-left:auto;">
+                <i class="fa-solid fa-expand" id="theaterModeIcon"></i>
+              </button>
+            </div>
+
+            <!-- Seek Feedback Overlays -->
+            <div class="seek-feedback seek-feedback-left" id="seekFeedbackLeft">
+              <div class="seek-icon-circle">
+                <i class="fa-solid fa-backward-fast"></i>
+                <span>-10s</span>
+              </div>
+            </div>
+            <div class="seek-feedback seek-feedback-right" id="seekFeedbackRight">
+              <div class="seek-icon-circle">
+                <i class="fa-solid fa-forward-fast"></i>
+                <span>+10s</span>
+              </div>
+            </div>
+
+            <!-- Next Episode Overlay -->
+            <div class="next-episode-overlay" id="nextEpisodeOverlay">
+              <div class="next-overlay-content">
+                <div>
+                  <div class="next-title-label">Up Next</div>
+                  <div class="next-episode-title" id="nextEpisodeTitle">Next Episode</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:14px;">
+                  <div class="next-countdown-container">
+                    <svg class="next-countdown-circle" viewBox="0 0 76 76">
+                      <circle class="bg-circle" cx="38" cy="38" r="36"/>
+                      <circle class="progress-circle" id="nextCountdownCircleProgress" cx="38" cy="38" r="36"/>
+                    </svg>
+                    <div class="next-countdown-text" id="nextCountdownText">10</div>
+                  </div>
+                  <div class="next-btn-group" style="flex-direction:column;">
+                    <button class="next-btn-play" id="nextEpisodePlayBtn">
+                      <i class="fa-solid fa-play"></i> Play Now
+                    </button>
+                    <button class="next-btn-cancel" id="nextEpisodeCancelBtn">Cancel</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Resume Toast -->
+            <div class="resume-toast" id="resumeToast">
+              <i class="fa-solid fa-clock-rotate-left" style="color:var(--accent);font-size:16px;"></i>
+              <span id="resumeToastText">Resumed from 12:34</span>
+              <button class="resume-toast-btn secondary" id="resumeToastStartOverBtn">Start Over</button>
+              <button class="resume-toast-btn" id="resumeToastDismissBtn">OK</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── META BELOW PLAYER ─────────────────────────────────── -->
+        <div class="cinema-meta-section">
+          <h1 id="watchMetaTitle" style="font-family:'Outfit',sans-serif;font-size:22px;font-weight:900;color:#fff;margin-bottom:8px;"></h1>
+          <div class="meta-row">
+            <span class="rating" id="watchMetaRating"></span>
+            <span id="watchMetaYear"></span>
+            <span id="watchMetaCountry"></span>
+            <span id="watchMetaDuration"></span>
+          </div>
+        </div>
+
+        <!-- ── DESCRIPTION ───────────────────────────────────────── -->
+        <div class="cinema-desc-section" style="margin:0 24px 24px;">
+          <div class="watch-tabs-section">
+            <div class="watch-tabs-header">
+              <button class="tab-header-btn active" id="tabBtnForYou">For You</button>
+              <button class="tab-header-btn" id="tabBtnComments">Comments (99+)</button>
+            </div>
+            <div class="watch-tabs-content">
+              <div class="tab-pane active" id="tabPaneForYou">
+                <div id="watchRecommendationsGrid"></div>
+              </div>
+              <div class="tab-pane" id="tabPaneComments">
+                <div class="comments-list">
+                  <div class="comment-item">
+                    <div class="comment-avatar"><i class="fa-solid fa-user"></i></div>
+                    <div class="comment-details">
+                      <div class="comment-meta">
+                        <span class="comment-author">apon_streamhit</span>
+                        <span class="comment-time">2 hours ago</span>
+                      </div>
+                      <p class="comment-text">Finally found a site that plays Hindi dub smooth and fast. Kudos!</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── RESOURCES SIDEBAR ─────────────────────────────────── -->
+        <div class="resources-container" id="resourcesContainer">
+          <div class="resources-header">
+            <span>Resources <span class="upload-by">By Streamfit</span></span>
+            <i class="fa-solid fa-circle-question info-icon"></i>
+          </div>
+
+          <!-- Dub Selector -->
+          <div class="dub-selector-wrapper" id="watchDubSelectorGroup" style="display:none;">
+            <select id="dubLanguageSelect" class="custom-select"></select>
+          </div>
+
+          <!-- TV Season + Episode Selector -->
+          <div class="tv-episode-selector" id="watchTvSelector" style="display:none;">
+            <div class="season-tabs" id="watchSeasonTabs"></div>
+            <div class="episode-grid scroll-y" id="watchEpisodeGrid"></div>
+          </div>
+
+          <!-- Live Stream Links (sports/tv) -->
+          <div class="live-stream-selector" id="watchLiveStreamSelector" style="display:none;"></div>
+        </div>
+
+      </div>
     </div>
+  </main>
+</div>
 
-    <!-- Plyr Library JS -->
-    <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
-    <!-- Hls.js library for m3u8 playback support -->
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<!-- Mobile Bottom Nav -->
+<div class="mobile-navigation-bar">
+  <a href="/" class="nav-item" id="mobileNavHome"><i class="fa-solid fa-house"></i><span>Home</span></a>
+  <a href="/movies" class="nav-item" id="mobileNavMovies"><i class="fa-solid fa-film"></i><span>Movies</span></a>
+  <a href="/tv" class="nav-item" id="mobileNavTv"><i class="fa-solid fa-tv"></i><span>TV</span></a>
+  <a href="/live-tv" class="nav-item" id="mobileNavLiveTv"><i class="fa-solid fa-satellite-dish"></i><span>Live</span></a>
+  <a href="/download" class="nav-item download-app-btn" id="mobileNavDownload"><i class="fa-solid fa-arrow-down-to-bracket"></i><span>Get App</span></a>
+</div>
 
-    <!-- App Logic Script -->
-    <script src="app.js?v=3.7"></script>
-  </body>
+<!-- HLS.js -->
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest/dist/hls.min.js"></script>
+<!-- Plyr JS -->
+<script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.min.js"></script>
+<!-- App Logic -->
+<script src="app.js?v=4.0"></script>
+</body>
 </html>

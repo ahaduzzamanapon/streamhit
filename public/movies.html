@@ -1,180 +1,144 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Explore Movies - Streamfit</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    
-    <!-- FontAwesome for icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Custom Style Sheet -->
-    <link rel="stylesheet" href="style.css?v=3.7">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movies — Streamfit</title>
+  <meta name="description" content="Browse and watch the latest movies online for free. Action, Comedy, Horror, Thriller and more.">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css?v=4.0">
 </head>
 <body>
- 
-    <div class="app-container">
-        <!-- Sidebar Navigation -->
-        <aside class="sidebar">
-            <div class="brand" onclick="window.location.href='/'" style="cursor: pointer;">
-                <i class="fa-solid fa-play play-logo"></i>
-                <span class="logo-text">Stream<span>fit</span></span>
-            </div>
-            
-            <nav class="nav-menu">
-                <div class="menu-label">Navigation</div>
-                <ul>
-                    <li><a href="/"><i class="fa-solid fa-house"></i> Home</a></li>
-                    <li class="active"><a href="/movies"><i class="fa-solid fa-film"></i> Movies</a></li>
-                    <li><a href="/tv"><i class="fa-solid fa-tv"></i> TV Series</a></li>
-                </ul>
+<div class="app-container">
+  <aside class="sidebar">
+    <div class="brand" onclick="window.location.href='/'">
+      <div class="play-logo"><i class="fa-solid fa-play"></i></div>
+      <span class="logo-text">Stream<span>fit</span></span>
+    </div>
+    <nav class="nav-menu">
+      <div class="menu-label">Navigation</div>
+      <ul>
+        <li><a href="/"><i class="fa-solid fa-house"></i> Home</a></li>
+        <li class="active"><a href="/movies"><i class="fa-solid fa-film"></i> Movies</a></li>
+        <li><a href="/tv"><i class="fa-solid fa-tv"></i> TV Series</a></li>
+        <li><a href="/live-tv"><i class="fa-solid fa-satellite-dish"></i> Live TV</a></li>
+      </ul>
+      <div class="menu-label">Genres</div>
+      <ul>
+        <li><a href="/movies?genre=Action"><i class="fa-solid fa-gun"></i> Action</a></li>
+        <li><a href="/movies?genre=Comedy"><i class="fa-solid fa-face-laugh-beam"></i> Comedy</a></li>
+        <li><a href="/movies?genre=Horror"><i class="fa-solid fa-ghost"></i> Horror</a></li>
+        <li><a href="/movies?genre=Thriller"><i class="fa-solid fa-masks-theater"></i> Thriller</a></li>
+        <li><a href="/movies?genre=Romance"><i class="fa-solid fa-heart"></i> Romance</a></li>
+        <li><a href="/movies?genre=Drama"><i class="fa-solid fa-star"></i> Drama</a></li>
+      </ul>
+    </nav>
+  </aside>
+  <main class="main-content">
+    <header class="header">
+      <div class="mobile-brand" onclick="window.location.href='/'">
+        <div class="play-logo" style="width:28px;height:28px;font-size:11px;"><i class="fa-solid fa-play"></i></div>
+        <span class="logo-text" style="font-size:17px;">Stream<span>fit</span></span>
+      </div>
+      <div class="search-box">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input type="text" id="searchInput" placeholder="Search movies..." autocomplete="off">
+        <button id="searchBtn">Search</button>
+        <div class="search-dropdown" id="searchDropdown" style="display:none;"></div>
+      </div>
+      <div class="header-controls">
+        <div class="language-selector" onclick="window.location.href='/'">
+          <i class="fa-solid fa-arrow-left"></i>
+          <span>Home</span>
+        </div>
+      </div>
+    </header>
 
-                <div class="menu-label">Categories</div>
-                <ul>
-                    <li><a href="/movies?genre=Action"><i class="fa-solid fa-gun"></i> Action</a></li>
-                    <li><a href="/movies?genre=Comedy"><i class="fa-solid fa-face-laugh-beam"></i> Comedy</a></li>
-                    <li><a href="/tv?genre=Animation"><i class="fa-solid fa-face-smile"></i> Animation</a></li>
-                </ul>
-            </nav>
-        </aside>
-
-        <!-- Main Content Panel -->
-        <main class="main-content">
-            <!-- Header section -->
-            <header class="header">
-                <!-- Mobile Brand Logo -->
-                <div class="mobile-brand" onclick="window.location.href='/'" style="cursor: pointer;">
-                    <i class="fa-solid fa-play play-logo"></i>
-                    <span class="logo-text">Stream<span>fit</span></span>
-                </div>
-                <!-- Search bar -->
-                <div class="search-box">
-                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                    <input type="text" id="searchInput" placeholder="Search movies..." autocomplete="off">
-                    <button id="searchBtn">Search</button>
-                </div>
-                
-                <!-- Right Controls -->
-                <div class="header-controls">
-                    <div class="language-selector">
-                        <i class="fa-solid fa-globe"></i>
-                        <span>ENGLISH</span>
-                    </div>
-                    <button class="download-app-btn"><i class="fa-solid fa-arrow-down-to-bracket"></i> Download App</button>
-                </div>
-            </header>
-
-            <!-- Advanced Filter Panel (Always visible or toggled) -->
-            <section class="navigation-filters">
-                <div class="categories-tabs">
-                    <button class="cat-tab active">Explore Movies</button>
-                </div>
-                <button class="filter-toggle-btn active" id="filterToggleBtn">
-                    <i class="fa-solid fa-filter"></i> Filters
-                </button>
-            </section>
-
-            <!-- Filter Options Panel -->
-            <section class="filter-panel open" id="filterPanel">
-                <div class="filter-row" data-type="genre">
-                    <span class="filter-label">Genre</span>
-                    <div class="filter-options" id="filterGenreOpts">
-                        <span class="filter-opt active" data-value="*">All</span>
-                        <span class="filter-opt" data-value="Action">Action</span>
-                        <span class="filter-opt" data-value="Adventure">Adventure</span>
-                        <span class="filter-opt" data-value="Animation">Animation</span>
-                        <span class="filter-opt" data-value="Comedy">Comedy</span>
-                        <span class="filter-opt" data-value="Crime">Crime</span>
-                        <span class="filter-opt" data-value="Documentary">Documentary</span>
-                        <span class="filter-opt" data-value="Drama">Drama</span>
-                        <span class="filter-opt" data-value="Family">Family</span>
-                        <span class="filter-opt" data-value="Fantasy">Fantasy</span>
-                        <span class="filter-opt" data-value="History">History</span>
-                        <span class="filter-opt" data-value="Horror">Horror</span>
-                        <span class="filter-opt" data-value="Mystery">Mystery</span>
-                        <span class="filter-opt" data-value="Romance">Romance</span>
-                        <span class="filter-opt" data-value="Sci-Fi">Sci-Fi</span>
-                        <span class="filter-opt" data-value="Thriller">Thriller</span>
-                    </div>
-                </div>
-
-                <div class="filter-row" data-type="country">
-                    <span class="filter-label">Country</span>
-                    <div class="filter-options" id="filterCountryOpts">
-                        <span class="filter-opt active" data-value="*">All</span>
-                        <span class="filter-opt" data-value="United States">United States</span>
-                        <span class="filter-opt" data-value="United Kingdom">United Kingdom</span>
-                        <span class="filter-opt" data-value="India">India</span>
-                        <span class="filter-opt" data-value="Bangladesh">Bangladesh</span>
-                        <span class="filter-opt" data-value="Japan">Japan</span>
-                        <span class="filter-opt" data-value="Korea">Korea</span>
-                        <span class="filter-opt" data-value="China">China</span>
-                        <span class="filter-opt" data-value="France">France</span>
-                        <span class="filter-opt" data-value="Germany">Germany</span>
-                    </div>
-                </div>
-
-                <div class="filter-row" data-type="year">
-                    <span class="filter-label">Year</span>
-                    <div class="filter-options" id="filterYearOpts">
-                        <span class="filter-opt active" data-value="*">All</span>
-                        <span class="filter-opt" data-value="2026">2026</span>
-                        <span class="filter-opt" data-value="2025">2025</span>
-                        <span class="filter-opt" data-value="2024">2024</span>
-                        <span class="filter-opt" data-value="2023">2023</span>
-                        <span class="filter-opt" data-value="2022">2022</span>
-                        <span class="filter-opt" data-value="2021">2021</span>
-                        <span class="filter-opt" data-value="2020">2020</span>
-                    </div>
-                </div>
-
-
-            </section>
-
-            <!-- Movies Grid Section -->
-            <section class="content-section">
-                <div class="section-header">
-                    <h2 id="dynamicTitle">All Movies</h2>
-                </div>
-                
-                <div class="content-grid" id="dynamicGrid">
-                    <!-- Loaded movies -->
-                </div>
-                <div id="infiniteLoader" class="infinite-loader" style="display: none; text-align: center; padding: 20px; font-size: 14px; color: var(--text-secondary); width: 100%;">
-                    <i class="fa-solid fa-spinner fa-spin" style="margin-right: 8px; color: var(--color-accent);"></i> Loading more content...
-                </div>
-            </section>
-
-        </main>
+    <!-- Filter Toggle Bar -->
+    <div class="filter-toggle-bar">
+      <button id="filterToggleBtn"><i class="fa-solid fa-sliders"></i> Filters</button>
+      <span class="cat-tab active" style="border-bottom:none;padding:8px 14px;font-size:13px;color:var(--text-muted);" id="moviesPageTitle">Movies</span>
     </div>
 
-    <!-- Mobile Sticky Bottom Navigation Bar -->
-    <div class="mobile-navigation-bar">
-        <a href="/" class="nav-item" id="mobileNavHome">
-            <i class="fa-solid fa-house"></i>
-            <span>Home</span>
-        </a>
-        <a href="/movies" class="nav-item active" id="mobileNavMovies">
-            <i class="fa-solid fa-film"></i>
-            <span>Movies</span>
-        </a>
-        <a href="/tv" class="nav-item" id="mobileNavTv">
-            <i class="fa-solid fa-tv"></i>
-            <span>TV Series</span>
-        </a>
-        <a href="/download" class="nav-item download-app-btn" id="mobileNavDownload">
-            <i class="fa-solid fa-arrow-down-to-bracket"></i>
-            <span>Get App</span>
-        </a>
+    <!-- Filter Panel -->
+    <div class="filter-panel" id="filterPanel">
+      <div class="filter-panel-inner">
+        <div class="filter-row">
+          <span class="filter-label">Genre</span>
+          <div id="filterGenreOpts" style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="filter-opt active" data-value="*">All</button>
+            <button class="filter-opt" data-value="Action">Action</button>
+            <button class="filter-opt" data-value="Comedy">Comedy</button>
+            <button class="filter-opt" data-value="Horror">Horror</button>
+            <button class="filter-opt" data-value="Thriller">Thriller</button>
+            <button class="filter-opt" data-value="Drama">Drama</button>
+            <button class="filter-opt" data-value="Romance">Romance</button>
+            <button class="filter-opt" data-value="Animation">Animation</button>
+            <button class="filter-opt" data-value="Adventure">Adventure</button>
+            <button class="filter-opt" data-value="Sci-Fi">Sci-Fi</button>
+            <button class="filter-opt" data-value="Fantasy">Fantasy</button>
+            <button class="filter-opt" data-value="Crime">Crime</button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">Country</span>
+          <div id="filterCountryOpts" style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="filter-opt active" data-value="*">All</button>
+            <button class="filter-opt" data-value="United States">USA</button>
+            <button class="filter-opt" data-value="India">India</button>
+            <button class="filter-opt" data-value="United Kingdom">UK</button>
+            <button class="filter-opt" data-value="Korea">Korea</button>
+            <button class="filter-opt" data-value="Japan">Japan</button>
+            <button class="filter-opt" data-value="China">China</button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">Year</span>
+          <div id="filterYearOpts" style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="filter-opt active" data-value="*">All</button>
+            <button class="filter-opt" data-value="2026">2026</button>
+            <button class="filter-opt" data-value="2025">2025</button>
+            <button class="filter-opt" data-value="2024">2024</button>
+            <button class="filter-opt" data-value="2023">2023</button>
+            <button class="filter-opt" data-value="2022">2022</button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">Sort</span>
+          <div id="filterSortOpts" style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="filter-opt" data-value="ForYou">For You</button>
+            <button class="filter-opt active" data-value="Hottest">Hottest</button>
+            <button class="filter-opt" data-value="Rating">Top Rated</button>
+            <button class="filter-opt" data-value="Newest">Newest</button>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Application Script -->
-    <script src="app.js?v=3.7"></script>
+    <div style="padding:28px 28px 0;">
+      <div class="content-grid" id="dynamicGrid"></div>
+      <div id="infiniteLoader"><i class="fa-solid fa-spinner fa-spin"></i> Loading more...</div>
+      <div class="pagination-controls" id="paginationControls">
+        <button class="page-btn prev" id="prevPageBtn" disabled><i class="fa-solid fa-arrow-left"></i> Previous</button>
+        <span class="page-indicator" id="pageIndicator">Page 1</span>
+        <button class="page-btn next" id="nextPageBtn">Next <i class="fa-solid fa-arrow-right"></i></button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="mobile-navigation-bar">
+  <a href="/" class="nav-item" id="mobileNavHome"><i class="fa-solid fa-house"></i><span>Home</span></a>
+  <a href="/movies" class="nav-item active" id="mobileNavMovies"><i class="fa-solid fa-film"></i><span>Movies</span></a>
+  <a href="/tv" class="nav-item" id="mobileNavTv"><i class="fa-solid fa-tv"></i><span>TV</span></a>
+  <a href="/live-tv" class="nav-item" id="mobileNavLiveTv"><i class="fa-solid fa-satellite-dish"></i><span>Live</span></a>
+  <a href="/download" class="nav-item download-app-btn" id="mobileNavDownload"><i class="fa-solid fa-arrow-down-to-bracket"></i><span>Get App</span></a>
+</div>
+
+<script src="app.js?v=4.0"></script>
 </body>
 </html>
