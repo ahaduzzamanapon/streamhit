@@ -3445,6 +3445,34 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0, detailPath: str
             except Exception:
                 pass
 
+        # If still no detailPath, fetch from upstream API using subjectId
+        if not _fast_detail_path:
+            try:
+                print(f"[api/resource] detailPath missing for {subjectId}, fetching from upstream API...")
+                _detail_resp = await request_h5_api(
+                    "GET",
+                    f"/wefeed-h5-bff/web/subject/detail?subjectId={subjectId}",
+                    host="https://h5.aoneroom.com",
+                    origin="https://123movienow.cc",
+                    referer=f"https://123movienow.cc/spa/videoPlayPage/movies/?id={subjectId}"
+                )
+                _detail_data = _detail_resp.get("data", {})
+                _fast_detail_path = _detail_data.get("detailPath", "")
+                if _fast_detail_path and pool:
+                    # Cache it in DB for future requests
+                    try:
+                        async with pool.acquire() as conn:
+                            async with conn.cursor() as cur:
+                                await cur.execute(
+                                    "INSERT INTO subjects (subject_id, detail_path) VALUES (%s, %s) ON DUPLICATE KEY UPDATE detail_path = IF(detail_path IS NULL OR detail_path = '', VALUES(detail_path), detail_path)",
+                                    (subjectId, _fast_detail_path)
+                                )
+                    except Exception:
+                        pass
+                print(f"[api/resource] Resolved detailPath from API: {_fast_detail_path}")
+            except Exception as _dp_err:
+                print(f"[api/resource] Failed to resolve detailPath from upstream: {_dp_err}")
+
         if _fast_detail_path:
             try:
                 _token = await get_guest_bearer_token()
