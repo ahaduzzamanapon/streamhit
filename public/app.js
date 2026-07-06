@@ -774,7 +774,7 @@ function createContentCard(item) {
     card.dataset.id = item.subjectId;
     card.onclick = () => window.location.href = `/details?id=${item.subjectId}&path=${encodeURIComponent(item.detailPath || '')}`;
 
-    const title = item.title;
+    const title = item.title || 'Unknown Title';
     const coverUrl = item.cover ? (item.cover.url || item.cover) : "/default-cover.png";
     const rating = item.imdbRatingValue || '7.5';
     const releaseDate = item.releaseDate || '2026';
@@ -841,12 +841,8 @@ function showShimmers(show) {
 // ==========================================================================
 function triggerAutoplay(player) {
     if (!player) return;
-    
-    // Ensure volume is set to 1.0 (full) initially
     player.volume = 1.0;
     player.muted = false;
-    
-    // Attempt unmuted play first
     player.play().then(() => {
         console.log("[Autoplay] Played successfully unmuted");
     }).catch(e => {
@@ -860,285 +856,12 @@ function triggerAutoplay(player) {
             const loaderEl = document.getElementById("playerLoaderOverlay");
             if (loaderEl) {
                 const statusTxt = loaderEl.querySelector("span");
-                if (statusTxt) {
-                    statusTxt.innerHTML = '<i class="fa-solid fa-circle-play" style="margin-right: 8px; font-size: 1.2em;"></i> Click to Play';
-                }
+                if (statusTxt) statusTxt.innerHTML = '<i class="fa-solid fa-circle-play" style="margin-right: 8px; font-size: 1.2em;"></i> Click to Play';
                 loaderEl.classList.add("visible");
             }
         });
     });
 }
-
-async function initWatchPage() {
-    const urlParams = new URLSearchParams(window.location.search);
-    let subjectId = urlParams.get("id");
-    const tmdbId = urlParams.get("tmdb");
-    const type = urlParams.get("type") || "movie";
-    const reqSeason = urlParams.get("season") ? parseInt(urlParams.get("season")) : 1;
-    const reqEpisode = urlParams.get("episode") ? parseInt(urlParams.get("episode")) : 1;
-    
-    const oldStyle = document.getElementById('plyr-live-custom-css');
-    if (oldStyle) oldStyle.remove();
-    if (type === "sports" || type === "tv") {
-        const style = document.createElement('style');
-        style.id = 'plyr-live-custom-css';
-        style.innerHTML = `
-            .plyr__progress, 
-            .plyr__controls [data-plyr="rewind"], 
-            .plyr__controls [data-plyr="fast-forward"],
-            .plyr__time--current,
-            .plyr__time--duration {
-                display: none !important;
-            }
-        `;
-        document.head.appendChild(style);
-    }
-    
-    if (type !== "sports" && type !== "tv" && !subjectId && !tmdbId) {
-        window.location.href = "/";
-        return;
-    }
-
-    // Initialize Plyr player with simple controls on mobile and full controls on desktop
-    const isMobile = window.innerWidth <= 768;
-    const mobileControls = ['play', 'progress', 'current-time', 'duration', 'mute', 'pip', 'fullscreen'];
-    const desktopControls = ['play-large', 'play', 'rewind', 'fast-forward', 'progress', 'current-time', 'mute', 'volume', 'captions', 'settings', 'pip', 'fullscreen'];
-
-    playerInstance = new Plyr('#player', {
-        controls: isMobile ? mobileControls : desktopControls,
-        settings: ['quality', 'speed'],
-        quality: { default: 0, options: [0, 4320, 2880, 2160, 1440, 1080, 720, 576, 480, 360, 240] },
-        keyboard: { global: true, focused: true },
-        captions: { active: true, update: true },
-        volume: 1,
-        muted: false
-    });
-
-    // Double-tap/click seek handlers
-    setTimeout(() => {
-        const wrapper = document.querySelector('.player-wrapper');
-        const fbLeft = document.getElementById('seekFeedbackLeft');
-        const fbRight = document.getElementById('seekFeedbackRight');
-        let seekTimerLeft = null;
-        let seekTimerRight = null;
-
-        const triggerSeek = (direction) => {
-            if (!playerInstance) return;
-            if (direction === 'left') {
-                playerInstance.currentTime = Math.max(0, playerInstance.currentTime - 10);
-                if (fbLeft) {
-                    fbLeft.classList.add('active');
-                    clearTimeout(seekTimerLeft);
-                    seekTimerLeft = setTimeout(() => fbLeft.classList.remove('active'), 500);
-                }
-            } else {
-                playerInstance.currentTime = Math.min(playerInstance.duration || 0, playerInstance.currentTime + 10);
-                if (fbRight) {
-                    fbRight.classList.add('active');
-                    clearTimeout(seekTimerRight);
-                    seekTimerRight = setTimeout(() => fbRight.classList.remove('active'), 500);
-                }
-            }
-        };
-
-        let lastTapTime = 0;
-        if (wrapper) {
-            // Touch screen double tap
-            wrapper.addEventListener('touchstart', (e) => {
-                if (e.touches.length !== 1) return;
-                // Ignore if clicked controls or header overlays
-                if (e.target.closest('.plyr__controls') || e.target.closest('.player-header-overlay')) return;
-                
-                const now = Date.now();
-                const delay = now - lastTapTime;
-                if (delay < 300 && delay > 0) {
-                    const rect = wrapper.getBoundingClientRect();
-                    const touchX = e.touches[0].clientX - rect.left;
-                    if (touchX < rect.width / 2) {
-                        triggerSeek('left');
-                    } else {
-                        triggerSeek('right');
-                    }
-                    e.preventDefault();
-                }
-                lastTapTime = now;
-            }, { passive: false });
-
-            // Desktop double click
-            wrapper.addEventListener('dblclick', (e) => {
-                if (e.target.closest('.plyr__controls') || e.target.closest('.player-header-overlay')) return;
-                
-                const rect = wrapper.getBoundingClientRect();
-                const clickX = e.clientX - rect.left;
-                if (clickX < rect.width / 2) {
-                    triggerSeek('left');
-                } else {
-                    triggerSeek('right');
-                }
-            });
-        }
-    }, 100);
-
-    // Start background poller to rewrite "0p" label to "Auto" in settings menu and buttons
-    setInterval(() => {
-        // Quality menu options list
-        const menuItems = document.querySelectorAll('.plyr__menu__container button[value="0"] span, .plyr__menu__container span.plyr__menu__value');
-        menuItems.forEach(el => {
-            if (el.textContent.trim() === '0p') {
-                el.textContent = 'Auto';
-            }
-        });
-        
-        // General fallback check for any elements inside Plyr displaying "0p"
-        const plyrEls = document.querySelectorAll('.plyr [data-plyr="quality"], .plyr .plyr__menu__value, .plyr button');
-        plyrEls.forEach(el => {
-            if (el.textContent.trim() === '0p') {
-                const span = el.querySelector('span');
-                if (span) {
-                    span.textContent = 'Auto';
-                } else {
-                    el.textContent = 'Auto';
-                }
-            }
-        });
-    }, 250);
-
-    // Custom Player Loading Overlay event bindings
-    // NOTE: We use playerInstance.on() (Plyr events) instead of raw video.addEventListener()
-    // because Plyr destroys and recreates the <video> element on every source change,
-    // making raw listeners useless after the first source is set.
-    const loaderOverlay = document.getElementById("playerLoaderOverlay");
-    
-    const startBufferingTimeout = () => {
-        clearBufferingTimeout();
-        if ((type === "sports" || type === "tv") && state.fallbackLinks && state.fallbackLinks.length > 0) {
-            console.log("[Buffering Timeout] Started 10-second loader timeout...");
-            state.bufferingTimeout = setTimeout(() => {
-                console.log("[Buffering Timeout] Loading/buffering took too long, fallback to next link...");
-                handlePlaybackError();
-            }, 10000);
-        }
-    };
-
-    const clearBufferingTimeout = () => {
-        if (state.bufferingTimeout) {
-            console.log("[Buffering Timeout] Cleared timeout.");
-            clearTimeout(state.bufferingTimeout);
-            state.bufferingTimeout = null;
-        }
-    };
-
-    const showLoader = () => {
-        if (loaderOverlay) {
-            const statusTxt = loaderOverlay.querySelector("span");
-            if (statusTxt) statusTxt.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:8px;"></i>Loading stream...';
-            loaderOverlay.style.background = "rgba(0, 0, 0, 0.8)";
-            loaderOverlay.classList.add("visible");
-        }
-        startBufferingTimeout();
-    };
-    
-    const hideLoader = () => {
-        clearBufferingTimeout();
-        if (loaderOverlay) {
-            // If playing but muted and no interaction yet, show translucent unmute prompt
-            if (playerInstance && playerInstance.muted && !state.userInteracted) {
-                const statusTxt = loaderOverlay.querySelector("span");
-                if (statusTxt) statusTxt.innerHTML = '<i class="fa-solid fa-volume-high" style="margin-right:8px; font-size: 1.2em;"></i> Click to Unmute';
-                loaderOverlay.style.background = "rgba(0, 0, 0, 0.4)";
-                loaderOverlay.classList.add("visible");
-            } else {
-                loaderOverlay.classList.remove("visible");
-            }
-        }
-    };
-    
-    if (loaderOverlay) {
-        loaderOverlay.style.cursor = "pointer";
-        loaderOverlay.onclick = () => {
-            state.userInteracted = true;
-            if (playerInstance) {
-                if (playerInstance.muted) {
-                    playerInstance.muted = false;
-                    playerInstance.volume = 1.0;
-                }
-                playerInstance.play().catch(e => console.log("[Player] Overlay play failed:", e));
-                hideLoader();
-            }
-        };
-    }
-
-    // Plyr events survive source changes — attach once here, they stay alive
-    playerInstance.on('waiting', () => {
-        showLoader();
-        
-        // Auto-quality selection logic: if network is slow/buffering, switch resolution
-        if (userSelectedQuality || isSwitchingQuality) return;
-        
-        const now = Date.now();
-        if (now - lastBufferingTime < 15000) {
-            bufferingCount++;
-        } else {
-            bufferingCount = 1;
-        }
-        lastBufferingTime = now;
-        
-        console.log(`[Player Control] Buffering detected. Count: ${bufferingCount}`);
-        
-        if (bufferingCount >= 3) {
-            bufferingCount = 0;
-            autoDowngradeQuality();
-        }
-    });
-    
-    playerInstance.on('qualitychange', (event) => {
-        if (!isProgrammaticQualityChange) {
-            const selectedQ = event.detail.quality;
-            if (selectedQ === 0) {
-                console.log(`[Player Control] User selected Auto quality.`);
-                userSelectedQuality = false;
-            } else {
-                console.log(`[Player Control] User manually selected quality: ${selectedQ}p. Disabling auto-quality down.`);
-                userSelectedQuality = true;
-            }
-        }
-    });
-
-    playerInstance.on('seeking', showLoader);
-    playerInstance.on('playing', hideLoader);
-    playerInstance.on('play', hideLoader);
-    // Mark user interaction on any manual play gesture
-    playerInstance.on('play', () => { 
-        state.userInteracted = true; 
-        if (playerInstance && playerInstance.muted && !state.hasAutounmuted) {
-            playerInstance.muted = false;
-            playerInstance.volume = 1.0;
-            state.hasAutounmuted = true;
-        }
-    });
-    playerInstance.on('volumechange', () => {
-        if (playerInstance && !playerInstance.muted) {
-            state.userInteracted = true;
-            hideLoader();
-        }
-    });
-
-    // Automatically lock to landscape mode on mobile entering fullscreen
-    playerInstance.on('enterfullscreen', () => {
-        if (window.screen && window.screen.orientation && window.screen.orientation.lock) {
-            window.screen.orientation.lock('landscape').catch(err => {
-                console.warn('Failed to lock orientation:', err);
-            });
-        }
-    });
-
-    // Unlock screen orientation on exiting fullscreen
-    playerInstance.on('exitfullscreen', () => {
-        if (window.screen && window.screen.orientation && window.screen.orientation.unlock) {
-            window.screen.orientation.unlock();
-        }
-    });
-} // end of initWatchPage
 
 async function initDetailsPage() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -2289,7 +2012,18 @@ async function loadPlayResources(subjectId, season = null, episode = null) {
         }, 10000);
     } else {
         console.error("No play resources found for this item");
-        if (loaderOverlay) loaderOverlay.classList.remove("visible");
+        if (loaderOverlay) {
+            const statusTxt = loaderOverlay.querySelector("span");
+            if (statusTxt) statusTxt.innerHTML = `
+                <i class="fa-solid fa-circle-exclamation" style="margin-right:8px;color:#f97316;"></i>
+                Stream currently unavailable.
+                <button onclick="loadPlayResources('${subjectId}',${season !== null ? season : 'null'},${episode !== null ? episode : 'null'})" 
+                    style="margin-left:12px;background:var(--color-accent,#1dd171);color:#000;border:none;padding:6px 14px;border-radius:6px;font-weight:700;cursor:pointer;font-size:12px;">
+                    <i class="fa-solid fa-rotate-right"></i> Retry
+                </button>`;
+            loaderOverlay.style.background = "rgba(0,0,0,0.85)";
+            loaderOverlay.classList.add("visible");
+        }
     }
 }
 
@@ -2607,6 +2341,9 @@ function bindCommonEvents() {
         const handleSearch = () => {
             const query = searchInput.value.trim();
             if (!query) return;
+            // Hide suggestion dropdown before navigating
+            const dd = document.getElementById("searchSuggestDropdown");
+            if (dd) dd.style.display = "none";
             // Always route search queries globally to /movies with type=0
             window.location.href = `/movies?keyword=${encodeURIComponent(query)}&type=0`;
         };
