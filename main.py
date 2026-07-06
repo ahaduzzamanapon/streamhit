@@ -127,6 +127,9 @@ async def lifespan(app: FastAPI):
     # Always run the missing resource rechecker so dead movies come back
     asyncio.create_task(missing_resource_rechecker_loop())
     
+    # Start the worker proxy health check loop
+    asyncio.create_task(proxy_manager.worker_health_check_loop())
+    
     yield
     # ---- shutdown ----
     global db_pool
@@ -1102,11 +1105,32 @@ def set_last_direct_fail_time(t: float):
 
 class ProxyManager:
     def __init__(self):
-        self.workers = WORKER_PROXIES
+        self.workers = list(WORKER_PROXIES)
+        self.active_workers = list(WORKER_PROXIES)
         self.worker_index = 0
         self.external_proxies = []
         self.proxy_index = 0
+        self.load_external_workers()
         self.load_external_proxies()
+
+    def load_external_workers(self):
+        worker_file = os.path.join(base_dir, "workers.txt")
+        if os.path.exists(worker_file):
+            try:
+                with open(worker_file, "r") as f:
+                    file_workers = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+                if file_workers:
+                    self.workers = file_workers
+                    self.active_workers = list(file_workers)
+                    print(f"[ProxyManager] Loaded {len(self.workers)} workers from workers.txt")
+                else:
+                    self.workers = list(WORKER_PROXIES)
+                    self.active_workers = list(WORKER_PROXIES)
+            except Exception as e:
+                print(f"[ProxyManager] Error loading workers.txt: {e}")
+        else:
+            self.workers = list(WORKER_PROXIES)
+            self.active_workers = list(WORKER_PROXIES)
 
     def load_external_proxies(self):
         proxy_file = os.path.join(base_dir, "proxies.txt")
@@ -1121,8 +1145,18 @@ class ProxyManager:
             # Default fallback list if file doesn't exist yet
             self.external_proxies = ["194.127.178.223"]
 
+    def get_next_active_worker(self):
+        if not self.active_workers:
+            return None
+        worker = self.active_workers[self.worker_index % len(self.active_workers)]
+        self.worker_index += 1
+        return worker
+
     def get_next_worker(self):
-        worker = self.workers[self.worker_index % len(self.workers)]
+        list_to_use = self.active_workers if self.active_workers else self.workers
+        if not list_to_use:
+            return None
+        worker = list_to_use[self.worker_index % len(list_to_use)]
         self.worker_index += 1
         return worker
 
@@ -1132,6 +1166,33 @@ class ProxyManager:
         proxy = self.external_proxies[self.proxy_index % len(self.external_proxies)]
         self.proxy_index += 1
         return proxy
+
+    async def worker_health_check_loop(self):
+        print("[ProxyManager] Starting worker health check loop...")
+        while True:
+            # Load from workers.txt dynamically if updated
+            self.load_external_workers()
+            
+            valid_workers = []
+            for w in self.workers:
+                try:
+                    # Perform simple HTTP GET check on worker endpoint
+                    client = get_http_client()
+                    resp = await client.get(f"{w}/mp4-proxy?url=https%3A//google.com", timeout=5.0)
+                    # 404 indicates the worker script path is not found/deleted.
+                    # 200, 206, or 403 (CF challenge/Forbidden) indicate the worker exists on Cloudflare.
+                    if resp.status_code != 404:
+                        valid_workers.append(w)
+                    else:
+                        print(f"[ProxyManager Health Check] Worker {w} returned 404. Deactivated.")
+                except Exception as e:
+                    print(f"[ProxyManager Health Check] Worker {w} failed check: {e}. Deactivated.")
+            
+            self.active_workers = valid_workers
+            print(f"[ProxyManager Health Check] Active workers updated: {len(self.active_workers)}/{len(self.workers)}")
+            
+            # Run check every 10 minutes
+            await asyncio.sleep(600)
 
 proxy_manager = ProxyManager()
 
@@ -4043,6 +4104,13 @@ async def handle_fetch(request: Request, source_url: str):
     if if_range:
         headers_to_send["If-Range"] = if_range
 
+    # Check for active worker proxies first
+    worker = proxy_manager.get_next_active_worker()
+    if worker:
+        proxy_url = f"{worker}/mp4-proxy?url={urllib.parse.quote(source_url)}&headers={urllib.parse.quote(json.dumps(headers_to_send))}"
+        return RedirectResponse(url=proxy_url)
+
+    # Fallback: proxy locally on the server
     try:
         client = get_http_client()
         req = client.build_request("GET", source_url, headers=headers_to_send)
