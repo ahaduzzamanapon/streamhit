@@ -25,6 +25,8 @@ if [ -f "stderr.log" ]; then
     > stderr.log
 fi
 touch passenger_wsgi.py
+mkdir -p tmp
+touch tmp/restart.txt
 
 # 4. Start the background scraper using the specific virtualenv path
 # echo "[4/4] Starting scraper in background..."
