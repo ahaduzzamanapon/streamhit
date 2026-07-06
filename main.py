@@ -3430,8 +3430,77 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0, detailPath: str
             })
         return {"code": 0, "data": {"list": items}}
 
-    # Missing or expired: fetch fresh links from OneRoom via inline scraper first
+    # Missing or expired: try netfilm.world play endpoint first (fast path), then fall back to full scraper
     try:
+        # Fast path: get detail_path from DB and call netfilm.world /subject/play directly
+        _fast_detail_path = detailPath
+        if not _fast_detail_path and pool:
+            try:
+                async with pool.acquire() as conn:
+                    async with conn.cursor() as cur:
+                        await cur.execute("SELECT detail_path FROM subjects WHERE subject_id = %s", (subjectId,))
+                        _row = await cur.fetchone()
+                        if _row and _row[0]:
+                            _fast_detail_path = _row[0]
+            except Exception:
+                pass
+
+        if _fast_detail_path:
+            try:
+                _token = await get_guest_bearer_token()
+                async with httpx.AsyncClient(follow_redirects=True, timeout=20.0) as _hx:
+                    _dom_resp = await _hx.get(
+                        "https://h5-api.aoneroom.com/wefeed-h5api-bff/media-player/get-domain",
+                        headers={
+                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                            "Referer": "https://moviebox.ph/", "Origin": "https://moviebox.ph",
+                            "X-Client-Info": json.dumps({"timezone": "Asia/Dhaka"}),
+                            "Authorization": f"Bearer {_token}"
+                        }
+                    )
+                    _player_domain = "https://netfilm.world"
+                    if _dom_resp.status_code == 200:
+                        _dom_val = _dom_resp.json().get("data", _player_domain)
+                        if isinstance(_dom_val, str) and _dom_val.startswith("http"):
+                            _player_domain = _dom_val.rstrip("/")
+
+                    _play_referer = f"{_player_domain}/spa/videoPlayPage/movies/{_fast_detail_path}?id={subjectId}&type=/movie/detail&detailSe={se}&detailEp={ep}&lang=en"
+                    _play_url = f"{_player_domain}/wefeed-h5api-bff/subject/play?subjectId={subjectId}&se={se}&ep={ep}&detailPath={_fast_detail_path}"
+                    _play_resp = await _hx.get(_play_url, headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        "Referer": _play_referer, "Accept": "application/json",
+                        "X-Client-Info": json.dumps({"timezone": "Asia/Dhaka"}),
+                    })
+                    _play_data = _play_resp.json().get("data", {})
+                    _streams = _play_data.get("streams", [])
+                    _hls_list = _play_data.get("hls", [])
+
+                    if _streams or _hls_list:
+                        print(f"[api/resource] Fast path: netfilm.world returned {len(_streams)} streams for {subjectId} S{se}E{ep}")
+                        _fast_items = []
+                        _fast_downloads = _streams if _streams else _hls_list
+                        for _s in _fast_downloads:
+                            _url = _s.get("url", "")
+                            if not _url: continue
+                            _res_id = str(_s.get("id", f"play_{_s.get('resolutions', 0)}"))
+                            _resolution = int(_s.get("resolutions", 0) if _streams else 0)
+                            _exp = get_link_expiration(_url)
+                            await db_save_resource({
+                                "resource_id": _res_id, "subject_id": str(subjectId),
+                                "season": se, "episode": ep,
+                                "resolution": _resolution, "size": int(_s.get("size", 0)),
+                                "resource_link": _url,
+                                "expires_at": _exp.strftime('%Y-%m-%d %H:%M:%S')
+                            })
+                            _fast_items.append({
+                                "resourceId": _res_id, "resolution": _resolution, "size": int(_s.get("size", 0)),
+                                "resourceLink": f"/fetch?source_url={urllib.parse.quote(_url)}"
+                            })
+                        if _fast_items:
+                            return {"code": 0, "data": {"list": _fast_items}}
+            except Exception as _fast_err:
+                print(f"[api/resource] Fast path (netfilm.world) failed: {_fast_err}")
+
         print(f"[api/resource] No valid resources in DB for {subjectId}. Scraping details & resources...")
         await scrape_subject_details(subjectId, se, ep)
         
