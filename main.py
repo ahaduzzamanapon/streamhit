@@ -2375,35 +2375,24 @@ async def get_home(page: int = 1, tabId: int = 0):
     if cached:
         return cached
 
-    # --- Stale-While-Revalidate: serve local data instantly, refresh in background ---
-    local_list = await get_local_operating_list()
-    if local_list:
-        # Return local data immediately so the user sees content fast
-        local_result = {
-            "code": 0,
-            "data": {
-                "items": local_list
-            }
-        }
-        set_cached_response(cache_key, local_result, ttl=30.0)  # short TTL so next pull gets fresh data
-
-        # Kick off remote refresh in background — won't block the response
-        async def _refresh_home_in_bg():
-            try:
-                await _fetch_and_cache_remote_home(page, tabId, cache_key)
-            except Exception as ex:
-                print(f"[Home BG Refresh Error] {ex}")
-        asyncio.create_task(_refresh_home_in_bg())
-
-        return local_result
-
-    # No local data at all — must wait for remote (first-run scenario)
+    # Fetch fresh remote home data first (quick load)
     try:
         result = await _fetch_and_cache_remote_home(page, tabId, cache_key)
         if result:
             return result
     except Exception as e:
         print(f"[Home API Proxy Error] {e}")
+
+    # Fallback to local DB categories only if remote API fails
+    local_list = await get_local_operating_list()
+    if local_list:
+        local_result = {
+            "code": 0,
+            "data": {
+                "items": local_list
+            }
+        }
+        return local_result
 
     # Final fallback: empty response
     return {"code": 0, "data": {"items": []}}
