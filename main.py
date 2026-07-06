@@ -1041,17 +1041,16 @@ async def cache_item_metadata_only(item: dict):
 # 3. PROXY & H5 API CLIENT (MULTI-PROXY ROTATION)
 # ==========================================================================
 
+# Spoofed IP ranges for South Asian regional content (Bangladesh and India)
 SINGAPORE_IP_RANGES = [
-    ((1, 21, 224, 0), (1, 21, 255, 255)),
-    ((1, 32, 128, 0), (1, 32, 191, 255)),
-    ((101, 100, 160, 0), (101, 100, 255, 255)),
-    ((101, 127, 0, 0), (101, 127, 255, 255)),
-    ((101, 32, 104, 0), (101, 32, 175, 255)),
-    ((103, 1, 136, 0), (103, 1, 139, 255)),
-    ((103, 10, 100, 0), (103, 10, 103, 255)),
-    ((103, 11, 188, 0), (103, 11, 191, 255)),
-    ((103, 14, 212, 0), (103, 14, 215, 255)),
+    ((103, 108, 140, 0), (103, 108, 143, 255)),
+    ((103, 242, 21, 0), (103, 242, 21, 255)),
+    ((103, 95, 96, 0), (103, 95, 99, 255)),
+    ((45, 127, 244, 0), (45, 127, 247, 255)),
     ((103, 15, 100, 0), (103, 15, 103, 255)),
+    ((103, 20, 100, 0), (103, 20, 103, 255)),
+    ((103, 24, 100, 0), (103, 24, 103, 255)),
+    ((103, 28, 100, 0), (103, 28, 103, 255)),
 ]
 
 def ip_to_long(ip):
@@ -1195,8 +1194,9 @@ proxy_manager = ProxyManager()
 
 global_cookies = ""
 cookies_expiry = 0.0
+guest_bearer_token = ""
+guest_token_expiry = 0.0
 
-# ... (refresh_cookies_if_needed update) ...
 async def refresh_cookies_if_needed() -> str:
     global global_cookies, cookies_expiry
     now = time.time()
@@ -1258,8 +1258,58 @@ async def refresh_cookies_if_needed() -> str:
     if global_cookies: return global_cookies
     raise Exception("Failed to acquire OneRoom H5 cookies after multiple attempts")
 
+async def get_guest_bearer_token() -> str:
+    global guest_bearer_token, guest_token_expiry
+    now = time.time()
+    if guest_bearer_token and now < guest_token_expiry:
+        return guest_bearer_token
+
+    url = "https://h5-api.aoneroom.com/wefeed-h5api-bff/home?host=moviebox.ph"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+        "Referer": "https://moviebox.ph/",
+        "Origin": "https://moviebox.ph",
+        "X-Client-Info": json.dumps({"timezone": "Asia/Dhaka"}),
+        "X-Source": "",
+        "sec-ch-ua": '"Chromium";v="148", "Google Chrome";v="148", "Not/A)Brand";v="99"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+    }
+
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=15.0) as client:
+            resp = await client.get(url, headers=headers)
+            x_user = resp.headers.get("x-user")
+            token = None
+            if x_user:
+                try:
+                    token = json.loads(x_user).get("token")
+                except Exception:
+                    pass
+            if not token:
+                cookie = resp.headers.get("set-cookie", "")
+                import re as _re
+                m = _re.search(r"token=([^;]+)", cookie)
+                if m:
+                    token = m.group(1)
+            
+            if token:
+                guest_bearer_token = token
+                guest_token_expiry = now + 3600.0  # cache for 1 hour
+                print(f"[API Auth] Acquired guest Bearer token successfully.")
+                return guest_bearer_token
+    except Exception as e:
+        print(f"[API Auth] Failed to acquire guest Bearer token: {e}")
+
+    if guest_bearer_token:
+        return guest_bearer_token
+    return ""
+
 async def request_h5_api(method: str, path: str, body_dict: dict = None, host: str = "https://h5-api.aoneroom.com", origin: str = None, referer: str = None) -> dict:
-    cookies = await refresh_cookies_if_needed()
+    token = await get_guest_bearer_token()
     ip = get_random_singapore_ip()
     print(f"[API Network] Using spoofed IP: {ip}")
     
@@ -1267,14 +1317,14 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
         "X-Forwarded-For": ip,
         "CF-Connecting-IP": ip,
         "X-Real-IP": ip,
-        "X-Client-Info": json.dumps({"timezone": "Africa/Nairobi"}),
+        "X-Client-Info": json.dumps({"timezone": "Asia/Dhaka"}),
         "Accept-Language": "en-US,en;q=0.5",
         "Accept": "application/json",
-        "User-Agent": "okhttp/4.12.0",
-        "Referer": referer or "https://h5.aoneroom.com",
-        "Cookie": cookies
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+        "Referer": referer or "https://moviebox.ph/",
+        "Origin": origin or "https://moviebox.ph",
+        "Authorization": f"Bearer {token}" if token else ""
     }
-    if origin: headers["Origin"] = origin
 
     url = f"{host}{path}"
     now = time.time()
@@ -1568,7 +1618,7 @@ async def run_incremental_scraper():
             }
             
             data = await request_h5_api("POST", "/wefeed-h5api-bff/subject/filter", payload)
-            items = data.get("data", {}).get("items", [])
+            items = data.get("data", {}).get("items") or data.get("data", {}).get("list") or []
             
             if not items and data.get("data", {}).get("results"):
                 results = data.get("data", {}).get("results", [])
@@ -1678,7 +1728,7 @@ async def run_historical_scraper():
                 }
                 
                 data = await request_h5_api("POST", "/wefeed-h5api-bff/subject/filter", payload)
-                items = data.get("data", {}).get("items", [])
+                items = data.get("data", {}).get("items") or data.get("data", {}).get("list") or []
                 
                 if not items and data.get("data", {}).get("results"):
                     results = data.get("data", {}).get("results", [])
@@ -1921,7 +1971,7 @@ async def search_moviebox_for_tmdb(title: str, year: str, is_tv: bool, season: i
                 "subjectType": subject_type
             }
             data = await request_h5_api("POST", "/wefeed-h5api-bff/subject/search", payload)
-            items = data.get("data", {}).get("items", [])
+            items = data.get("data", {}).get("items") or data.get("data", {}).get("list") or []
             for item in items:
                 sub_id = item.get("subjectId")
                 item_title = item.get("title", "")
@@ -2361,7 +2411,7 @@ async def get_home(page: int = 1, tabId: int = 0):
 
 async def _fetch_and_cache_remote_home(page: int, tabId: int, cache_key: str):
     """Fetch home data from remote API, process, cache, and return result. Returns None on failure."""
-    remote_data = await request_h5_api("GET", f"/wefeed-h5api-bff/tab-operating?page={page}&tabId={tabId}")
+    remote_data = await request_h5_api("GET", "/wefeed-h5api-bff/home?host=moviebox.ph")
     if not (remote_data and remote_data.get("code") == 0):
         return None
 
@@ -2508,7 +2558,7 @@ async def search_suggest(q: str = ""):
             "subjectType": 0
         }
         data = await request_h5_api("POST", api_path, api_payload)
-        items = data.get("data", {}).get("items", [])
+        items = data.get("data", {}).get("items") or data.get("data", {}).get("list") or []
         
         cleaned_items = []
         for item in items:
@@ -2607,7 +2657,7 @@ async def background_search_and_cache(keyword: str, page: int, per_page: int, su
             "subjectType": subject_type
         }
         data = await request_h5_api("POST", api_path, api_payload)
-        items = data.get("data", {}).get("items", [])
+        items = data.get("data", {}).get("items") or data.get("data", {}).get("list") or []
         for item in items:
             sub_id = item.get("subjectId")
             if sub_id:
@@ -2645,7 +2695,7 @@ async def search_content(payload: dict):
             "subjectType": subject_type
         }
         data = await request_h5_api("POST", api_path, api_payload)
-        items = data.get("data", {}).get("items", [])
+        items = data.get("data", {}).get("items") or data.get("data", {}).get("list") or []
         
         cleaned_items = []
         for item in items:
@@ -2700,7 +2750,7 @@ async def background_filter_and_cache(genre, country, year, language, sort, subj
         }
         
         data = await request_h5_api("POST", "/wefeed-h5api-bff/subject/filter", api_payload)
-        items = data.get("data", {}).get("items", [])
+        items = data.get("data", {}).get("items") or data.get("data", {}).get("list") or []
         
         if not items and data.get("data", {}).get("results"):
             results = data.get("data", {}).get("results", [])
