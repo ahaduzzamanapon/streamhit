@@ -1564,6 +1564,50 @@ async def scrape_episode_resources(subject_id: str, season: int, episode: int):
         inner_data = download_data.get("data", {})
         downloads = inner_data.get("downloads", [])
         captions = inner_data.get("captions", [])
+
+        # Fallback: try netfilm.world /subject/play when /download returns empty
+        if not downloads:
+            try:
+                token = await get_guest_bearer_token()
+                async with httpx.AsyncClient(follow_redirects=True, timeout=20.0) as hx:
+                    dom_resp = await hx.get(
+                        "https://h5-api.aoneroom.com/wefeed-h5api-bff/media-player/get-domain",
+                        headers={
+                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                            "Referer": "https://moviebox.ph/", "Origin": "https://moviebox.ph",
+                            "X-Client-Info": json.dumps({"timezone": "Asia/Dhaka"}),
+                            "Authorization": f"Bearer {token}"
+                        }
+                    )
+                    player_domain = "https://netfilm.world"
+                    if dom_resp.status_code == 200:
+                        dom_val = dom_resp.json().get("data", player_domain)
+                        if isinstance(dom_val, str) and dom_val.startswith("http"):
+                            player_domain = dom_val.rstrip("/")
+
+                    play_referer = f"{player_domain}/spa/videoPlayPage/movies/{detail_path}?id={subject_id}&type=/movie/detail&detailSe={season}&detailEp={episode}&lang=en"
+                    play_url = f"{player_domain}/wefeed-h5api-bff/subject/play?subjectId={subject_id}&se={season}&ep={episode}&detailPath={detail_path}"
+                    play_resp = await hx.get(play_url, headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        "Referer": play_referer, "Accept": "application/json",
+                        "X-Client-Info": json.dumps({"timezone": "Asia/Dhaka"}),
+                    })
+                    play_data = play_resp.json().get("data", {})
+                    streams = play_data.get("streams", [])
+                    if streams:
+                        print(f"[Scraper] netfilm.world returned {len(streams)} streams for {subject_id} S{season}E{episode}")
+                        for s in streams:
+                            url = s.get("url", "")
+                            if url:
+                                downloads.append({
+                                    "id": str(s.get("id", f"play_{s.get('resolutions', 0)}")),
+                                    "resolution": int(s.get("resolutions", 720)),
+                                    "size": int(s.get("size", 0)),
+                                    "url": url
+                                })
+                        captions = play_data.get("captions", captions)
+            except Exception as play_err:
+                print(f"[Scraper] netfilm.world play fallback failed for {subject_id} S{season}E{episode}: {play_err}")
         
         for r in downloads:
             r_id = r.get("id")
@@ -2858,31 +2902,35 @@ async def filter_content(payload: dict):
     return res
 
 async def resolve_details_via_tmdb(subject_id: str, path_to_use: str, db_row: dict = None) -> dict:
-    if not path_to_use or "subjectId" in path_to_use or "details" in path_to_use:
-        return None
-        
-    path_clean = path_to_use.split("?")[0]
-    parts = path_clean.split("-")
-    if len(parts) > 1:
-        last_part = parts[-1]
-        # Check if last part is alphanumeric hash of length >= 8
-        if len(last_part) >= 8 and any(c.isupper() for c in last_part) and any(c.islower() for c in last_part):
-            title_parts = parts[:-1]
-        else:
-            title_parts = parts
-        title_str = " ".join(title_parts).strip()
-    else:
-        title_str = path_to_use
-        
-    title_str = title_str.replace("_", " ").title()
-    if not title_str:
-        return None
-        
+    title_str = ""
     is_tv = True
     if db_row:
         is_tv = (db_row.get("subject_type") == 2)
-    else:
+        if db_row.get("title") and db_row.get("title") != "Placeholder":
+            title_str = db_row.get("title")
+
+    if not title_str:
+        if not path_to_use or "subjectId" in path_to_use or "details" in path_to_use:
+            return None
+            
+        path_clean = path_to_use.split("?")[0]
+        parts = path_clean.split("-")
+        if len(parts) > 1:
+            last_part = parts[-1]
+            # Check if last part is alphanumeric hash of length >= 8
+            if len(last_part) >= 8 and any(c.isupper() for c in last_part) and any(c.islower() for c in last_part):
+                title_parts = parts[:-1]
+            else:
+                title_parts = parts
+            title_str = " ".join(title_parts).strip()
+        else:
+            title_str = path_to_use
+            
+        title_str = title_str.replace("_", " ").title()
         is_tv = any(k in path_to_use.lower() for k in ["season", "series", "episode", "got", "thrones"])
+        
+    if not title_str:
+        return None
         
     print(f"[TMDB Details Fallback] Searching TMDB for '{title_str}' (is_tv={is_tv})")
     
@@ -3282,6 +3330,37 @@ async def get_season_info(subjectId: str, detailPath: str = ""):
                 "allEp": episodes_list
             })
             
+        # Check if TMDB has more seasons to merge
+        try:
+            db_row = None
+            if pool:
+                async with pool.acquire() as conn:
+                    async with conn.cursor(aiomysql.DictCursor) as cur:
+                        await cur.execute("SELECT * FROM subjects WHERE subject_id = %s", (subjectId,))
+                        db_row = await cur.fetchone()
+            
+            if db_row and db_row.get("subject_type") == 2:
+                tmdb_resolved = await resolve_details_via_tmdb(subjectId, path_to_use, db_row)
+                if tmdb_resolved:
+                    merged_seasons = []
+                    async with pool.acquire() as conn:
+                        async with conn.cursor(aiomysql.DictCursor) as cur:
+                            await cur.execute("SELECT * FROM seasons WHERE subject_id = %s ORDER BY season_number", (subjectId,))
+                            rows = await cur.fetchall()
+                            for r in rows:
+                                merged_seasons.append({
+                                    "se": r["season_number"],
+                                    "episodeCount": r["episode_count"],
+                                    "allEp": r["episodes_list"]
+                                })
+                    if merged_seasons:
+                        merged_dict = {s["se"]: s for s in merged_seasons}
+                        for s in formatted_seasons:
+                            merged_dict[s["se"]] = s
+                        return {"code": 0, "data": {"seasons": sorted(merged_dict.values(), key=lambda x: x["se"])}}
+        except Exception as tmdb_err:
+            print(f"[Season Info TMDB Merge Error] {tmdb_err}")
+
         return {"code": 0, "data": {"seasons": formatted_seasons}}
     except Exception as e:
         print(f"[Season Info API Fallback] Failed to fetch seasons for {subjectId} path {path_to_use}: {e}")
@@ -3464,6 +3543,67 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0, detailPath: str
             except Exception as attempt_err:
                 print(f"[api/resource] Fallback attempt failed ({attempt['host']}): {attempt_err}")
                 continue
+
+        # Final fallback: netfilm.world player /subject/play endpoint
+        # This is the actual player domain used by moviebox.ph frontend — works when /download returns empty
+        if not downloads:
+            try:
+                print(f"[api/resource] All download endpoints empty. Trying netfilm.world play endpoint...")
+                async with httpx.AsyncClient(follow_redirects=True, timeout=20.0) as client:
+                    # Get player domain first
+                    dom_resp = await client.get(
+                        "https://h5-api.aoneroom.com/wefeed-h5api-bff/media-player/get-domain",
+                        headers={
+                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                            "Referer": "https://moviebox.ph/",
+                            "Origin": "https://moviebox.ph",
+                            "X-Client-Info": json.dumps({"timezone": "Asia/Dhaka"}),
+                            "Authorization": f"Bearer {await get_guest_bearer_token()}"
+                        }
+                    )
+                    player_domain = "https://netfilm.world"
+                    if dom_resp.status_code == 200:
+                        dom_val = dom_resp.json().get("data", player_domain)
+                        if isinstance(dom_val, str) and dom_val.startswith("http"):
+                            player_domain = dom_val.rstrip("/")
+
+                    player_referer = f"{player_domain}/spa/videoPlayPage/movies/{detail_path}?id={subjectId}&type=/movie/detail&detailSe={se}&detailEp={ep}&lang=en"
+                    play_url = f"{player_domain}/wefeed-h5api-bff/subject/play?subjectId={subjectId}&se={se}&ep={ep}&detailPath={detail_path}"
+
+                    play_resp = await client.get(play_url, headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        "Referer": player_referer,
+                        "Accept": "application/json",
+                        "X-Client-Info": json.dumps({"timezone": "Asia/Dhaka"}),
+                    })
+                    play_data = play_resp.json().get("data", {})
+                    streams = play_data.get("streams", [])
+                    hls_list = play_data.get("hls", [])
+
+                    if streams:
+                        print(f"[api/resource] netfilm.world returned {len(streams)} streams!")
+                        for s in streams:
+                            url = s.get("url", "")
+                            if url:
+                                downloads.append({
+                                    "id": str(s.get("id", f"play_{s.get('resolutions', 0)}")),
+                                    "resolution": int(s.get("resolutions", 720)),
+                                    "size": int(s.get("size", 0)),
+                                    "url": url
+                                })
+                        captions = play_data.get("captions", captions)
+                    elif hls_list:
+                        for h in hls_list:
+                            url = h.get("url", "")
+                            if url:
+                                downloads.append({
+                                    "id": str(h.get("id", "hls_0")),
+                                    "resolution": 0,
+                                    "size": 0,
+                                    "url": url
+                                })
+            except Exception as play_err:
+                print(f"[api/resource] netfilm.world play fallback failed: {play_err}")
 
         items = []
         for r in downloads:
