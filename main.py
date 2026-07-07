@@ -1585,12 +1585,14 @@ async def scrape_episode_resources(subject_id: str, season: int, episode: int):
                         if isinstance(dom_val, str) and dom_val.startswith("http"):
                             player_domain = dom_val.rstrip("/")
 
-                    play_referer = f"{player_domain}/spa/videoPlayPage/movies/{detail_path}?id={subject_id}&type=/movie/detail&detailSe={season}&detailEp={episode}&lang=en"
-                    play_url = f"{player_domain}/wefeed-h5api-bff/subject/play?subjectId={subject_id}&se={season}&ep={episode}&detailPath={detail_path}"
+                    _ctype = "tv" if season > 0 else "movies"
+                    play_referer = f"{player_domain}/spa/videoPlayPage/{_ctype}/{detail_path}?id={subject_id}&type=/{_ctype}/detail&detailSe={season}&detailEp={episode}&lang=en"
+                    play_url = f"{player_domain}/wefeed-h5api-bff/subject/play?subject_id={subject_id}&se={season}&ep={episode}&detailPath={detail_path}"
                     play_resp = await hx.get(play_url, headers={
                         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                         "Referer": play_referer, "Accept": "application/json",
                         "X-Client-Info": json.dumps({"timezone": "Asia/Dhaka"}),
+                        "Authorization": f"Bearer {token}",
                     })
                     play_data = play_resp.json().get("data", {})
                     streams = play_data.get("streams", [])
@@ -1626,7 +1628,10 @@ async def scrape_episode_resources(subject_id: str, season: int, episode: int):
                 "resource_link": r_link,
                 "expires_at": exp.strftime('%Y-%m-%d %H:%M:%S')
             }
-            await db_save_resource(resource_item)
+            try:
+                await db_save_resource(resource_item)
+            except Exception as db_save_err:
+                print(f"[DB Resource Save Error in Scraper] {db_save_err}")
             
         # Cache captions associated with each resource
         for cap in captions:
@@ -3515,13 +3520,16 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0, detailPath: str
                             _res_id = str(_s.get("id", f"play_{_s.get('resolutions', 0)}"))
                             _resolution = int(_s.get("resolutions", 0) if _streams else 0)
                             _exp = get_link_expiration(_url)
-                            await db_save_resource({
-                                "resource_id": _res_id, "subject_id": str(subjectId),
-                                "season": se, "episode": ep,
-                                "resolution": _resolution, "size": int(_s.get("size", 0)),
-                                "resource_link": _url,
-                                "expires_at": _exp.strftime('%Y-%m-%d %H:%M:%S')
-                            })
+                            try:
+                                await db_save_resource({
+                                    "resource_id": _res_id, "subject_id": str(subjectId),
+                                    "season": se, "episode": ep,
+                                    "resolution": _resolution, "size": int(_s.get("size", 0)),
+                                    "resource_link": _url,
+                                    "expires_at": _exp.strftime('%Y-%m-%d %H:%M:%S')
+                                })
+                            except Exception as db_save_err:
+                                print(f"[DB Resource Save Error in Fast Path] {db_save_err}")
                             _fast_items.append({
                                 "resourceId": _res_id, "resolution": _resolution, "size": int(_s.get("size", 0)),
                                 "resourceLink": f"/fetch?source_url={urllib.parse.quote(_url)}"
@@ -3726,7 +3734,10 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0, detailPath: str
                 "resource_link": r_link,
                 "expires_at": exp.strftime('%Y-%m-%d %H:%M:%S')
             }
-            await db_save_resource(resource_item)
+            try:
+                await db_save_resource(resource_item)
+            except Exception as db_save_err:
+                print(f"[DB Resource Save Error in Fallback Path] {db_save_err}")
             
             items.append({
                 "resourceId": str(r_id),
