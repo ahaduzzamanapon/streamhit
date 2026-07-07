@@ -3492,12 +3492,14 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0, detailPath: str
                         if isinstance(_dom_val, str) and _dom_val.startswith("http"):
                             _player_domain = _dom_val.rstrip("/")
 
-                    _play_referer = f"{_player_domain}/spa/videoPlayPage/movies/{_fast_detail_path}?id={subjectId}&type=/movie/detail&detailSe={se}&detailEp={ep}&lang=en"
+                    _content_type = "tv" if se > 0 else "movies"
+                    _play_referer = f"{_player_domain}/spa/videoPlayPage/{_content_type}/{_fast_detail_path}?id={subjectId}&type=/{_content_type}/detail&detailSe={se}&detailEp={ep}&lang=en"
                     _play_url = f"{_player_domain}/wefeed-h5api-bff/subject/play?subjectId={subjectId}&se={se}&ep={ep}&detailPath={_fast_detail_path}"
                     _play_resp = await _hx.get(_play_url, headers={
                         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                         "Referer": _play_referer, "Accept": "application/json",
                         "X-Client-Info": json.dumps({"timezone": "Asia/Dhaka"}),
+                        "Authorization": f"Bearer {_token}",
                     })
                     _play_data = _play_resp.json().get("data", {})
                     _streams = _play_data.get("streams", [])
@@ -3591,7 +3593,8 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0, detailPath: str
                 except Exception as db_err:
                     print(f"[DB detail_path Auto-Repair Error] {db_err}")
             
-        referer = f"https://123movienow.cc/spa/videoPlayPage/movies/{detail_path}?id={subjectId}&type=/movie/detail"
+        _fb_ctype = "tv" if se > 0 else "movies"
+        referer = f"https://123movienow.cc/spa/videoPlayPage/{_fb_ctype}/{detail_path}?id={subjectId}&type=/{_fb_ctype}/detail"
         origin = "https://123movienow.cc"
 
         # Multi-path fallback: try each until we get downloads
@@ -3664,14 +3667,17 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0, detailPath: str
                         if isinstance(dom_val, str) and dom_val.startswith("http"):
                             player_domain = dom_val.rstrip("/")
 
-                    player_referer = f"{player_domain}/spa/videoPlayPage/movies/{detail_path}?id={subjectId}&type=/movie/detail&detailSe={se}&detailEp={ep}&lang=en"
+                    _fb2_ctype = "tv" if se > 0 else "movies"
+                    player_referer = f"{player_domain}/spa/videoPlayPage/{_fb2_ctype}/{detail_path}?id={subjectId}&type=/{_fb2_ctype}/detail&detailSe={se}&detailEp={ep}&lang=en"
                     play_url = f"{player_domain}/wefeed-h5api-bff/subject/play?subjectId={subjectId}&se={se}&ep={ep}&detailPath={detail_path}"
 
+                    _fb2_token = await get_guest_bearer_token()
                     play_resp = await client.get(play_url, headers={
                         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                         "Referer": player_referer,
                         "Accept": "application/json",
                         "X-Client-Info": json.dumps({"timezone": "Asia/Dhaka"}),
+                        "Authorization": f"Bearer {_fb2_token}",
                     })
                     play_data = play_resp.json().get("data", {})
                     streams = play_data.get("streams", [])

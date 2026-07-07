@@ -1362,22 +1362,24 @@ async function initWatchPage() {
 
         videoEl.addEventListener('enterpictureinpicture', () => {
             isInPiP = true;
+            // Override pause() so nothing (including Plyr's visibilitychange handler)
+            // can pause the video while PiP is active
+            const origPause = videoEl.pause.bind(videoEl);
+            videoEl._origPause = origPause;
+            videoEl.pause = () => {
+                if (isInPiP) return; // silently block
+                origPause();
+            };
         });
+
         videoEl.addEventListener('leavepictureinpicture', () => {
             isInPiP = false;
+            // Restore original pause
+            if (videoEl._origPause) {
+                videoEl.pause = videoEl._origPause;
+                delete videoEl._origPause;
+            }
         });
-    });
-
-    // Override Plyr's built-in visibilitychange pause behaviour
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden && isInPiP && playerInstance) {
-            // PiP is active — Plyr will try to pause; we immediately resume
-            setTimeout(() => {
-                if (isInPiP && playerInstance && playerInstance.paused) {
-                    playerInstance.play().catch(() => {});
-                }
-            }, 50);
-        }
     });
 
     // Playback progress event listeners
