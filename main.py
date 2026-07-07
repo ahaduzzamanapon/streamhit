@@ -1568,46 +1568,44 @@ async def scrape_episode_resources(subject_id: str, season: int, episode: int):
         # Fallback: try netfilm.world /subject/play when /download returns empty
         if not downloads:
             try:
-                token = await get_guest_bearer_token()
-                async with httpx.AsyncClient(follow_redirects=True, timeout=20.0) as hx:
-                    dom_resp = await hx.get(
-                        "https://h5-api.aoneroom.com/wefeed-h5api-bff/media-player/get-domain",
-                        headers={
-                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                            "Referer": "https://moviebox.ph/", "Origin": "https://moviebox.ph",
-                            "X-Client-Info": json.dumps({"timezone": "Asia/Dhaka"}),
-                            "Authorization": f"Bearer {token}"
-                        }
-                    )
-                    player_domain = "https://netfilm.world"
-                    if dom_resp.status_code == 200:
-                        dom_val = dom_resp.json().get("data", player_domain)
-                        if isinstance(dom_val, str) and dom_val.startswith("http"):
-                            player_domain = dom_val.rstrip("/")
+                dom_resp = await request_h5_api(
+                    "GET",
+                    "/wefeed-h5api-bff/media-player/get-domain",
+                    host="https://h5-api.aoneroom.com",
+                    origin="https://moviebox.ph",
+                    referer="https://moviebox.ph/"
+                )
+                player_domain = "https://netfilm.world"
+                if dom_resp and "data" in dom_resp:
+                    dom_val = dom_resp.get("data", player_domain)
+                    if isinstance(dom_val, str) and dom_val.startswith("http"):
+                        player_domain = dom_val.rstrip("/")
 
-                    _ctype = "tv" if season > 0 else "movies"
-                    play_referer = f"{player_domain}/spa/videoPlayPage/{_ctype}/{detail_path}?id={subject_id}&type=/{_ctype}/detail&detailSe={season}&detailEp={episode}&lang=en"
-                    play_url = f"{player_domain}/wefeed-h5api-bff/subject/play?subject_id={subject_id}&se={season}&ep={episode}&detailPath={detail_path}"
-                    play_resp = await hx.get(play_url, headers={
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                        "Referer": play_referer, "Accept": "application/json",
-                        "X-Client-Info": json.dumps({"timezone": "Asia/Dhaka"}),
-                        "Authorization": f"Bearer {token}",
-                    })
-                    play_data = play_resp.json().get("data", {})
-                    streams = play_data.get("streams", [])
-                    if streams:
-                        print(f"[Scraper] netfilm.world returned {len(streams)} streams for {subject_id} S{season}E{episode}")
-                        for s in streams:
-                            url = s.get("url", "")
-                            if url:
-                                downloads.append({
-                                    "id": str(s.get("id", f"play_{s.get('resolutions', 0)}")),
-                                    "resolution": int(s.get("resolutions", 720)),
-                                    "size": int(s.get("size", 0)),
-                                    "url": url
-                                })
-                        captions = play_data.get("captions", captions)
+                _ctype = "tv" if season > 0 else "movies"
+                play_referer = f"{player_domain}/spa/videoPlayPage/{_ctype}/{detail_path}?id={subject_id}&type=/{_ctype}/detail&detailSe={season}&detailEp={episode}&lang=en"
+                
+                play_resp = await request_h5_api(
+                    "GET",
+                    f"/wefeed-h5api-bff/subject/play?subjectId={subject_id}&se={season}&ep={episode}&detailPath={detail_path}",
+                    host=player_domain,
+                    origin=player_domain,
+                    referer=play_referer
+                )
+                
+                play_data = play_resp.get("data", {})
+                streams = play_data.get("streams", [])
+                if streams:
+                    print(f"[Scraper] netfilm.world returned {len(streams)} streams for {subject_id} S{season}E{episode}")
+                    for s in streams:
+                        url = s.get("url", "")
+                        if url:
+                            downloads.append({
+                                "id": str(s.get("id", f"play_{s.get('resolutions', 0)}")),
+                                "resolution": int(s.get("resolutions", 720)),
+                                "size": int(s.get("size", 0)),
+                                "url": url
+                            })
+                    captions = play_data.get("captions", captions)
             except Exception as play_err:
                 print(f"[Scraper] netfilm.world play fallback failed for {subject_id} S{season}E{episode}: {play_err}")
         
@@ -3480,62 +3478,60 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0, detailPath: str
 
         if _fast_detail_path:
             try:
-                _token = await get_guest_bearer_token()
-                async with httpx.AsyncClient(follow_redirects=True, timeout=20.0) as _hx:
-                    _dom_resp = await _hx.get(
-                        "https://h5-api.aoneroom.com/wefeed-h5api-bff/media-player/get-domain",
-                        headers={
-                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                            "Referer": "https://moviebox.ph/", "Origin": "https://moviebox.ph",
-                            "X-Client-Info": json.dumps({"timezone": "Asia/Dhaka"}),
-                            "Authorization": f"Bearer {_token}"
-                        }
-                    )
-                    _player_domain = "https://netfilm.world"
-                    if _dom_resp.status_code == 200:
-                        _dom_val = _dom_resp.json().get("data", _player_domain)
-                        if isinstance(_dom_val, str) and _dom_val.startswith("http"):
-                            _player_domain = _dom_val.rstrip("/")
+                _dom_resp = await request_h5_api(
+                    "GET",
+                    "/wefeed-h5api-bff/media-player/get-domain",
+                    host="https://h5-api.aoneroom.com",
+                    origin="https://moviebox.ph",
+                    referer="https://moviebox.ph/"
+                )
+                _player_domain = "https://netfilm.world"
+                if _dom_resp and "data" in _dom_resp:
+                    _dom_val = _dom_resp.get("data", _player_domain)
+                    if isinstance(_dom_val, str) and _dom_val.startswith("http"):
+                        _player_domain = _dom_val.rstrip("/")
 
-                    _content_type = "tv" if se > 0 else "movies"
-                    _play_referer = f"{_player_domain}/spa/videoPlayPage/{_content_type}/{_fast_detail_path}?id={subjectId}&type=/{_content_type}/detail&detailSe={se}&detailEp={ep}&lang=en"
-                    _play_url = f"{_player_domain}/wefeed-h5api-bff/subject/play?subjectId={subjectId}&se={se}&ep={ep}&detailPath={_fast_detail_path}"
-                    _play_resp = await _hx.get(_play_url, headers={
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                        "Referer": _play_referer, "Accept": "application/json",
-                        "X-Client-Info": json.dumps({"timezone": "Asia/Dhaka"}),
-                        "Authorization": f"Bearer {_token}",
-                    })
-                    _play_data = _play_resp.json().get("data", {})
-                    _streams = _play_data.get("streams", [])
-                    _hls_list = _play_data.get("hls", [])
+                _content_type = "tv" if se > 0 else "movies"
+                _play_referer = f"{_player_domain}/spa/videoPlayPage/{_content_type}/{_fast_detail_path}?id={subjectId}&type=/{_content_type}/detail&detailSe={se}&detailEp={ep}&lang=en"
+                
+                _play_resp = await request_h5_api(
+                    "GET",
+                    f"/wefeed-h5api-bff/subject/play?subjectId={subjectId}&se={se}&ep={ep}&detailPath={_fast_detail_path}",
+                    host=_player_domain,
+                    origin=_player_domain,
+                    referer=_play_referer
+                )
+                
+                _play_data = _play_resp.get("data", {}) if _play_resp else {}
+                _streams = _play_data.get("streams", [])
+                _hls_list = _play_data.get("hls", [])
 
-                    if _streams or _hls_list:
-                        print(f"[api/resource] Fast path: netfilm.world returned {len(_streams)} streams for {subjectId} S{se}E{ep}")
-                        _fast_items = []
-                        _fast_downloads = _streams if _streams else _hls_list
-                        for _s in _fast_downloads:
-                            _url = _s.get("url", "")
-                            if not _url: continue
-                            _res_id = str(_s.get("id", f"play_{_s.get('resolutions', 0)}"))
-                            _resolution = int(_s.get("resolutions", 0) if _streams else 0)
-                            _exp = get_link_expiration(_url)
-                            try:
-                                await db_save_resource({
-                                    "resource_id": _res_id, "subject_id": str(subjectId),
-                                    "season": se, "episode": ep,
-                                    "resolution": _resolution, "size": int(_s.get("size", 0)),
-                                    "resource_link": _url,
-                                    "expires_at": _exp.strftime('%Y-%m-%d %H:%M:%S')
-                                })
-                            except Exception as db_save_err:
-                                print(f"[DB Resource Save Error in Fast Path] {db_save_err}")
-                            _fast_items.append({
-                                "resourceId": _res_id, "resolution": _resolution, "size": int(_s.get("size", 0)),
-                                "resourceLink": f"/fetch?source_url={urllib.parse.quote(_url)}"
+                if _streams or _hls_list:
+                    print(f"[api/resource] Fast path: netfilm.world returned {len(_streams)} streams for {subjectId} S{se}E{ep}")
+                    _fast_items = []
+                    _fast_downloads = _streams if _streams else _hls_list
+                    for _s in _fast_downloads:
+                        _url = _s.get("url", "")
+                        if not _url: continue
+                        _res_id = str(_s.get("id", f"play_{_s.get('resolutions', 0)}"))
+                        _resolution = int(_s.get("resolutions", 0) if _streams else 0)
+                        _exp = get_link_expiration(_url)
+                        try:
+                            await db_save_resource({
+                                "resource_id": _res_id, "subject_id": str(subjectId),
+                                "season": se, "episode": ep,
+                                "resolution": _resolution, "size": int(_s.get("size", 0)),
+                                "resource_link": _url,
+                                "expires_at": _exp.strftime('%Y-%m-%d %H:%M:%S')
                             })
-                        if _fast_items:
-                            return {"code": 0, "data": {"list": _fast_items}}
+                        except Exception as db_save_err:
+                            print(f"[DB Resource Save Error in Fast Path] {db_save_err}")
+                        _fast_items.append({
+                            "resourceId": _res_id, "resolution": _resolution, "size": int(_s.get("size", 0)),
+                            "resourceLink": f"/fetch?source_url={urllib.parse.quote(_url)}"
+                        })
+                    if _fast_items:
+                        return {"code": 0, "data": {"list": _fast_items}}
             except Exception as _fast_err:
                 print(f"[api/resource] Fast path (netfilm.world) failed: {_fast_err}")
 
