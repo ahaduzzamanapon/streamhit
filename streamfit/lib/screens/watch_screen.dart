@@ -1216,16 +1216,6 @@ class _WatchScreenState extends State<WatchScreen> {
     ),
   );
 
-  Widget _buildSeekBubble(bool forward) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.55), borderRadius: BorderRadius.circular(50)),
-    child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Icon(forward ? Icons.fast_forward_rounded : Icons.fast_rewind_rounded, color: Colors.white, size: 26),
-      const SizedBox(height: 2),
-      Text(forward ? '+10s' : '-10s', style: GoogleFonts.outfit(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
-    ]),
-  );
-
   String _fmt(Duration d) {
     final h = d.inHours;
     final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
