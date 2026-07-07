@@ -1354,6 +1354,32 @@ async function initWatchPage() {
         }
     });
 
+    // PiP mode — prevent video from pausing when tab becomes hidden
+    let isInPiP = false;
+    playerInstance.on('ready', () => {
+        const videoEl = playerInstance.media;
+        if (!videoEl) return;
+
+        videoEl.addEventListener('enterpictureinpicture', () => {
+            isInPiP = true;
+        });
+        videoEl.addEventListener('leavepictureinpicture', () => {
+            isInPiP = false;
+        });
+    });
+
+    // Override Plyr's built-in visibilitychange pause behaviour
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden && isInPiP && playerInstance) {
+            // PiP is active — Plyr will try to pause; we immediately resume
+            setTimeout(() => {
+                if (isInPiP && playerInstance && playerInstance.paused) {
+                    playerInstance.play().catch(() => {});
+                }
+            }, 50);
+        }
+    });
+
     // Playback progress event listeners
     let progressSaveTimeout = null;
     
@@ -1798,14 +1824,21 @@ async function loadRecommendations(detail) {
 
     const result = await apiPost('/api/filter', payload);
     grid.innerHTML = "";
-    if (result && result.data && result.data.items) {
-        const raw = result.data.items || [];
+    if (result && result.data) {
+        // filter API returns data.list or data.items depending on endpoint
+        const raw = result.data.list || result.data.items || [];
         const subjects = (raw.length > 0 && raw[0].subjects !== undefined)
             ? raw.flatMap(sec => sec.subjects || [])
             : raw;
         
-        // Filter out current subject
-        const filtered = subjects.filter(item => String(item.subjectId) !== String(detail.subjectId)).slice(0, 6);
+        // Filter out current subject and deduplicate
+        const seen = new Set();
+        const filtered = subjects.filter(item => {
+            const id = String(item.subjectId);
+            if (id === String(detail.subjectId) || seen.has(id)) return false;
+            seen.add(id);
+            return true;
+        }).slice(0, 6);
         if (filtered.length > 0) {
             filtered.forEach(item => {
                 grid.appendChild(createContentCard(item));
@@ -2533,7 +2566,16 @@ function renderContinueWatchingSection() {
     section.style.display = "block";
     grid.innerHTML = "";
     
-    history.forEach(item => {
+    // Deduplicate by subjectId (keep most recent = first occurrence)
+    const seen = new Set();
+    const dedupedHistory = history.filter(item => {
+        const key = String(item.subjectId);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+    
+    dedupedHistory.forEach(item => {
         const card = document.createElement("div");
         card.className = "continue-card";
         
@@ -2787,13 +2829,14 @@ function createTvCard(channel) {
     card.className = "tv-card";
     
     const logoUrl = channel.logo || 'https://images.unsplash.com/photo-1598257006458-087169a1f08d?w=120&q=80';
+    // Strip leading order prefix like "0. ", "1. ", "12. " from channel names
+    const cleanName = (channel.name || '').replace(/^\d+\.\s*/, '').trim();
     
     card.innerHTML = `
         <div class="tv-card-logo-container">
-            <span class="tv-card-category-badge">${channel.category || 'General'}</span>
             <img src="${logoUrl}" onerror="this.src='https://images.unsplash.com/photo-1598257006458-087169a1f08d?w=120&q=80'">
         </div>
-        <div class="tv-card-title">${channel.name}</div>
+        <div class="tv-card-title">${cleanName}</div>
     `;
     
     card.onclick = () => playLiveStreamSelector(channel, 'tv');
