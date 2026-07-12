@@ -1250,8 +1250,11 @@ async def refresh_cookies_if_needed() -> str:
                     return global_cookies
         except Exception as e:
             if mode == "direct":
-                print(f"[API Auth] Direct cookie refresh failed. Marking direct API as failed.")
-                set_last_direct_fail_time(time.time())
+                if isinstance(e, httpx.RequestError):
+                    print(f"[API Auth] Direct cookie refresh network error. Marking direct API as failed: {e}")
+                    set_last_direct_fail_time(time.time())
+                else:
+                    print(f"[API Auth] Direct cookie refresh failed with API error: {e}")
             else:
                 print(f"[API Auth] Cookie refresh failed via {mode}: {e}")
 
@@ -1326,6 +1329,13 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
         "Authorization": f"Bearer {token}" if token else ""
     }
 
+    try:
+        cookies = await refresh_cookies_if_needed()
+        if cookies:
+            headers["Cookie"] = cookies
+    except Exception as cookie_err:
+        print(f"[API Auth Warning] Failed to refresh/get cookies: {cookie_err}")
+
     url = f"{host}{path}"
     now = time.time()
     last_direct_fail_time = get_last_direct_fail_time()
@@ -1382,7 +1392,8 @@ async def request_h5_api(method: str, path: str, body_dict: dict = None, host: s
 
         except Exception as e:
             print(f"[API Warning] Request via {mode} failed for {path}: {e}")
-            if mode == "direct": set_last_direct_fail_time(time.time())
+            if mode == "direct" and isinstance(e, httpx.RequestError):
+                set_last_direct_fail_time(time.time())
 
     # Include last HTTP status in exception so callers can detect 400 (out-of-bounds), 403 etc.
     status_hint = f" [HTTP {last_status_code}]" if last_status_code else ""
@@ -3394,6 +3405,68 @@ async def get_season_info(subjectId: str, detailPath: str = ""):
                 
         return {"code": 0, "data": {"seasons": [{"se": 1, "episodeCount": 1, "allEp": "1"}]}}
 
+async def find_fallback_dub_resource(subject_id: str, se: int, ep: int):
+    pool = await get_db_pool()
+    if not pool:
+        return None
+    try:
+        dubs_json = None
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("SELECT dubs FROM subjects WHERE subject_id = %s", (subject_id,))
+                row = await cur.fetchone()
+                if row:
+                    dubs_json = row[0]
+                    
+        if not dubs_json:
+            # If dubs is not in DB, try fetching from details API
+            detail_data = await request_h5_api("GET", f"/wefeed-h5api-bff/detail?subjectId={subject_id}")
+            if detail_data and detail_data.get("code") == 0:
+                subject_info = detail_data.get("data", {}).get("subject", {})
+                dubs = subject_info.get("dubs", [])
+                dubs_json = json.dumps(dubs)
+                # Cache it in DB
+                async with pool.acquire() as conn:
+                    async with conn.cursor() as cur:
+                        await cur.execute("UPDATE subjects SET dubs = %s WHERE subject_id = %s", (dubs_json, subject_id))
+                        
+        if dubs_json:
+            dubs_list = json.loads(dubs_json)
+            # Find fallback subject
+            fallback_subject_id = None
+            
+            # 1. Try Original/Subbed first
+            for dub in dubs_list:
+                lan_name = str(dub.get("lanName", "")).lower()
+                if "original" in lan_name or "sub" in lan_name:
+                    fallback_subject_id = str(dub.get("subjectId"))
+                    break
+                    
+            # 2. Try English dub second
+            if not fallback_subject_id:
+                for dub in dubs_list:
+                    lan_name = str(dub.get("lanName", "")).lower()
+                    if "english" in lan_name or "en " in lan_name or lan_name == "en":
+                        fallback_subject_id = str(dub.get("subjectId"))
+                        break
+                        
+            # 3. Try any other dub as final resort
+            if not fallback_subject_id and dubs_list:
+                fallback_subject_id = str(dubs_list[0].get("subjectId"))
+                
+            if fallback_subject_id and fallback_subject_id != subject_id:
+                print(f"[Fallback Dub] Dub version of subject {subject_id} has no resources for S{se}E{ep}. Falling back to {fallback_subject_id}...")
+                # We fetch detail_path for the fallback subject if possible to speed it up
+                fallback_path = ""
+                for dub in dubs_list:
+                    if str(dub.get("subjectId")) == fallback_subject_id:
+                        fallback_path = dub.get("detailPath", "")
+                        break
+                return await get_resource(fallback_subject_id, se, ep, fallback_path)
+    except Exception as e:
+        print(f"[Fallback Dub Error] Failed to find fallback dub: {e}")
+    return None
+
 # Play Resource link (resolves and auto-renews CDN links)
 @app.get("/api/resource")
 async def get_resource(subjectId: str, se: int = 0, ep: int = 0, detailPath: str = ""):
@@ -3757,8 +3830,17 @@ async def get_resource(subjectId: str, se: int = 0, ep: int = 0, detailPath: str
                 }
                 await db_save_caption(cap_item)
                 
+        if not items:
+            fallback_res = await find_fallback_dub_resource(subjectId, se, ep)
+            if fallback_res:
+                return fallback_res
+
         return {"code": 0, "data": {"list": items}}
     except Exception as e:
+        print(f"[api/resource] Error fetching resource for {subjectId} S{se}E{ep}: {e}")
+        fallback_res = await find_fallback_dub_resource(subjectId, se, ep)
+        if fallback_res:
+            return fallback_res
         raise HTTPException(status_code=502, detail=str(e))
 
 # Captions (Subtitles)
@@ -3773,8 +3855,8 @@ async def get_captions(subjectId: str, resourceId: str):
                 async with conn.cursor(aiomysql.DictCursor) as cur:
                     await cur.execute("""
                         SELECT * FROM captions 
-                        WHERE subject_id = %s AND resource_id = %s
-                    """, (subjectId, resourceId))
+                        WHERE resource_id = %s
+                    """, (resourceId,))
                     rows = await cur.fetchall()
                     for r in rows:
                         captions.append({
@@ -3798,13 +3880,14 @@ async def get_captions(subjectId: str, resourceId: str):
                 async with pool.acquire() as conn:
                     async with conn.cursor() as cur:
                         await cur.execute("""
-                            SELECT season, episode FROM play_resources 
-                            WHERE subject_id = %s AND resource_id = %s
-                        """, (subjectId, resourceId))
+                            SELECT season, episode, subject_id FROM play_resources 
+                            WHERE resource_id = %s
+                        """, (resourceId,))
                         row = await cur.fetchone()
                         if row:
                             se = row[0]
                             ep = row[1]
+                            subjectId = row[2]
             except Exception as db_err:
                 print(f"[DB play_resources Lookup Error in get_captions] {db_err}")
                     
@@ -3818,8 +3901,8 @@ async def get_captions(subjectId: str, resourceId: str):
                     async with conn.cursor(aiomysql.DictCursor) as cur:
                         await cur.execute("""
                             SELECT * FROM captions 
-                            WHERE subject_id = %s AND resource_id = %s
-                        """, (subjectId, resourceId))
+                            WHERE resource_id = %s
+                        """, (resourceId,))
                         rows = await cur.fetchall()
                         for r in rows:
                             captions.append({
