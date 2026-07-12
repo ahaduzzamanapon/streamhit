@@ -1381,7 +1381,7 @@ async function initWatchPage() {
             }
         });
     });
-
+ 
     // Playback progress event listeners
     let progressSaveTimeout = null;
     

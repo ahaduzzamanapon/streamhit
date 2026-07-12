@@ -117,6 +117,8 @@ class _WatchScreenState extends State<WatchScreen> {
   String _hudText = '';
 
   // Temporary drag variables
+  double? _dragStartX;
+  double? _dragStartY;
   double? _dragStartVolume;
   double? _dragStartBrightness;
   Duration? _dragStartSeekTime;
@@ -135,8 +137,9 @@ class _WatchScreenState extends State<WatchScreen> {
     _initSystemValues();
     _loadResources();
 
-    // Auto-enter fullscreen landscape
+    // Enable all orientations automatically to adapt to user posture
     SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
@@ -319,6 +322,7 @@ class _WatchScreenState extends State<WatchScreen> {
     final localX = d.localPosition.dx;
     final isLeft = localX < (size.width / 2);
 
+    _dragStartY = d.localPosition.dy;
     _dragStartVolume = null;
     _dragStartBrightness = null;
 
@@ -330,14 +334,15 @@ class _WatchScreenState extends State<WatchScreen> {
   }
 
   void _handleVerticalDragUpdate(DragUpdateDetails d) {
-    if (!_gesturesEnabled || _isLocked || _controller == null || !_controller!.value.isInitialized) return;
-    final size = MediaQuery.of(context).size;
-    final sensitivity = 2.0;
+    if (!_gesturesEnabled || _isLocked || _controller == null || !_controller!.value.isInitialized || _dragStartY == null) return;
+    
+    // Cumulative displacement (dragging UP is positive)
+    final displacementY = _dragStartY! - d.localPosition.dy;
+    final changeFraction = displacementY / 180.0;
 
     if (_dragStartVolume != null) {
-      final delta = -d.delta.dy / size.height * sensitivity;
       final totalMaxVolume = _maxSystemVolume + 15;
-      final targetVolume = (_dragStartVolume! + (delta * totalMaxVolume)).clamp(0.0, totalMaxVolume.toDouble());
+      final targetVolume = (_dragStartVolume! + (changeFraction * totalMaxVolume)).clamp(0.0, totalMaxVolume.toDouble());
       
       final roundedVol = targetVolume.round();
       if (roundedVol <= _maxSystemVolume) {
@@ -362,8 +367,7 @@ class _WatchScreenState extends State<WatchScreen> {
             : 'Volume: $percentage%';
       });
     } else if (_dragStartBrightness != null) {
-      final delta = -d.delta.dy / size.height * sensitivity;
-      final targetBrightness = (_dragStartBrightness! + delta).clamp(0.0, 1.0);
+      final targetBrightness = (_dragStartBrightness! + changeFraction).clamp(0.0, 1.0);
       _brightnessValue = targetBrightness;
       SystemService.setBrightness(targetBrightness);
       setState(() {
@@ -377,6 +381,7 @@ class _WatchScreenState extends State<WatchScreen> {
   void _handleVerticalDragEnd(DragEndDetails d) {
     setState(() {
       _hudType = null;
+      _dragStartY = null;
       _dragStartVolume = null;
       _dragStartBrightness = null;
     });
@@ -384,17 +389,20 @@ class _WatchScreenState extends State<WatchScreen> {
 
   void _handleHorizontalDragStart(DragStartDetails d) {
     if (!_gesturesEnabled || _isLocked || _controller == null || !_controller!.value.isInitialized) return;
+    _dragStartX = d.localPosition.dx;
     _dragStartSeekTime = _controller!.value.position;
     _dragCurrentSeekTarget = _dragStartSeekTime;
   }
 
   void _handleHorizontalDragUpdate(DragUpdateDetails d) {
-    if (!_gesturesEnabled || _isLocked || _controller == null || !_controller!.value.isInitialized || _dragStartSeekTime == null) return;
-    final size = MediaQuery.of(context).size;
-    final duration = _controller!.value.duration;
+    if (!_gesturesEnabled || _isLocked || _controller == null || !_controller!.value.isInitialized || _dragStartSeekTime == null || _dragStartX == null) return;
     
-    final deltaSecs = (d.delta.dx / size.width) * duration.inSeconds * 0.8;
-    final targetSecs = (_dragCurrentSeekTarget!.inSeconds + deltaSecs.round()).clamp(0, duration.inSeconds);
+    final duration = _controller!.value.duration;
+    final displacementX = d.localPosition.dx - _dragStartX!;
+    
+    // A 250 logical pixel drag represents 90 seconds seek
+    final seekChangeSecs = (displacementX / 250.0) * 90.0;
+    final targetSecs = (_dragStartSeekTime!.inSeconds + seekChangeSecs.round()).clamp(0, duration.inSeconds);
     
     _dragCurrentSeekTarget = Duration(seconds: targetSecs);
     final diff = _dragCurrentSeekTarget!.inSeconds - _dragStartSeekTime!.inSeconds;
@@ -412,6 +420,7 @@ class _WatchScreenState extends State<WatchScreen> {
     }
     setState(() {
       _hudType = null;
+      _dragStartX = null;
       _dragStartSeekTime = null;
       _dragCurrentSeekTarget = null;
     });
@@ -782,6 +791,22 @@ class _WatchScreenState extends State<WatchScreen> {
                           _buildTextBtn(qualityLabel, _showQualitySheet),
                           const SizedBox(width: 8),
                         ],
+                        IconButton(
+                          onPressed: () {
+                            final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+                            if (isLandscape) {
+                              SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+                            } else {
+                              SystemChrome.setPreferredOrientations([
+                                DeviceOrientation.landscapeLeft,
+                                DeviceOrientation.landscapeRight,
+                              ]);
+                            }
+                          },
+                          padding: EdgeInsets.zero, constraints: const BoxConstraints(),
+                          icon: const Icon(Icons.screen_rotation_rounded, color: Colors.white, size: 19),
+                        ),
+                        const SizedBox(width: 12),
                         IconButton(
                           onPressed: () => setState(() => _gesturesEnabled = !_gesturesEnabled),
                           padding: EdgeInsets.zero, constraints: const BoxConstraints(),
