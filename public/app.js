@@ -46,18 +46,18 @@ const routes = {
 
 function detectRoute() {
     const path = window.location.pathname.toLowerCase();
-    if (path.includes("/movies")) {
+    if (path.startsWith("/watch/")) {
+        routes.isWatch = true;
+    } else if (path.startsWith("/movie/") || path.match(/^\/tv\//)) {
+        routes.isDetails = true;
+    } else if (path.startsWith("/movies")) {
         routes.isMovies = true;
         state.subjectType = 1;
-    } else if (path.includes("/tv")) {
+    } else if (path.startsWith("/tv") && !path.match(/^\/tv\//)) {
         routes.isTv = true;
         state.subjectType = 2;
-    } else if (path.includes("/live-tv")) {
+    } else if (path.startsWith("/live-tv")) {
         routes.isLiveTv = true;
-    } else if (path.includes("/details")) {
-        routes.isDetails = true;
-    } else if (path.includes("/watch")) {
-        routes.isWatch = true;
     } else {
         routes.isHome = true;
         state.subjectType = 0;
@@ -866,14 +866,14 @@ function triggerAutoplay(player) {
 }
 
 async function initDetailsPage() {
+    // Extract slug from /movie/<slug> or /tv/<slug>
+    const pathParts = window.location.pathname.split("/");
+    const detailPath = decodeURIComponent(pathParts[pathParts.length - 1] || "");
     const urlParams = new URLSearchParams(window.location.search);
-    let subjectId = urlParams.get("id");
-    const tmdbId = urlParams.get("tmdb");
-    const type = urlParams.get("type") || "movie";
     const reqSeason = urlParams.get("season") ? parseInt(urlParams.get("season")) : 1;
     const reqEpisode = urlParams.get("episode") ? parseInt(urlParams.get("episode")) : 1;
-    
-    if (!subjectId && !tmdbId) {
+
+    if (!detailPath) {
         window.location.href = "/";
         return;
     }
@@ -881,23 +881,9 @@ async function initDetailsPage() {
     const loading = document.getElementById("watchPageLoading");
     const content = document.getElementById("watchWrapper");
 
-    if (tmdbId) {
-        if (loading) loading.innerHTML = `<div class="loading-spinner"></div><p style="margin-top: 15px;">Resolving TMDB ID ${tmdbId} via Streamfit...</p>`;
-        const resolution = await apiGet(`/api/resolve-tmdb?tmdbId=${tmdbId}&type=${type}&season=${reqSeason}&episode=${reqEpisode}`);
-        if (resolution && resolution.code === 0 && resolution.data && resolution.data.subjectId) {
-            subjectId = resolution.data.subjectId;
-            state.selectedSeason = resolution.data.season;
-            state.selectedEpisode = resolution.data.episode;
-        } else {
-            if (loading) loading.innerHTML = "<p><i class='fa-solid fa-triangle-exclamation'></i> Failed to resolve TMDB ID. Go back home.</p>";
-            return;
-        }
-    } else {
-        state.selectedSeason = reqSeason;
-        state.selectedEpisode = reqEpisode;
-    }
+    state.selectedSeason = reqSeason;
+    state.selectedEpisode = reqEpisode;
 
-    const detailPath = urlParams.get("path") || "";
     // Fetch Details
     const result = await apiGet(`/api/detail?detailPath=${encodeURIComponent(detailPath)}`);
     if (result && result.data) {
@@ -937,9 +923,10 @@ async function initDetailsPage() {
         const btnDetailsPlay = document.getElementById("btnDetailsPlay");
         if (btnDetailsPlay) {
             btnDetailsPlay.onclick = () => {
-                let url = `/watch?id=${subjectId}&path=${encodeURIComponent(detailPath)}`;
+                const typeSegment = detail.subjectType === 2 ? 'tv' : 'movie';
+                let url = `/watch/${typeSegment}/${encodeURIComponent(detailPath)}`;
                 if (detail.subjectType === 2) {
-                    url += `&season=${state.selectedSeason}&episode=${state.selectedEpisode}`;
+                    url += `?season=${state.selectedSeason}&episode=${state.selectedEpisode}`;
                 }
                 window.location.href = url;
             };
@@ -1071,10 +1058,15 @@ async function initWatchPage() {
         };
     }
 
+    // Extract slug from /watch/movie/<slug> or /watch/tv/<slug>
+    const watchPathParts = window.location.pathname.split("/");
+    // [0]="", [1]="watch", [2]="movie"|"tv", [3]=slug
+    const watchSlug = decodeURIComponent(watchPathParts[3] || "");
+    const watchTypeSegment = watchPathParts[2] || "movie";
     const urlParams = new URLSearchParams(window.location.search);
-    let subjectId = urlParams.get("id");
+    const subjectId = "";
     const tmdbId = urlParams.get("tmdb");
-    const type = urlParams.get("type") || "movie";
+    const type = urlParams.get("type") || watchTypeSegment;
     const reqSeason = urlParams.get("season") ? parseInt(urlParams.get("season")) : 1;
     const reqEpisode = urlParams.get("episode") ? parseInt(urlParams.get("episode")) : 1;
     
@@ -1095,7 +1087,7 @@ async function initWatchPage() {
         document.head.appendChild(style);
     }
     
-    if (type !== "sports" && type !== "tv" && !subjectId && !tmdbId) {
+    if (type !== "sports" && type !== "tv" && !watchSlug && !tmdbId) {
         window.location.href = "/";
         return;
     }
@@ -1660,7 +1652,7 @@ async function initWatchPage() {
         state.selectedEpisode = reqEpisode;
     }
 
-    const detailPath = urlParams.get("path") || "";
+    const detailPath = watchSlug;
     const result = await apiGet(`/api/detail?detailPath=${encodeURIComponent(detailPath)}`);
     if (result && result.data) {
         const detail = result.data;
@@ -2025,8 +2017,8 @@ async function loadPlayResources(subjectId, season = null, episode = null) {
         resumeToast.classList.remove("visible");
     }
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const detailPath = urlParams.get("path") || "";
+    const _pathSegments = window.location.pathname.split("/");
+    const detailPath = decodeURIComponent(_pathSegments[_pathSegments.length - 1] || "");
 
     // Check for saved playback progress for this resource
     const isTv = state.selectedSubject && (state.selectedSubject.seNum > 0 || state.selectedSubject.subjectType === 2);
