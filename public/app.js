@@ -917,7 +917,8 @@ async function initDetailsPage() {
 
         // Render genres
         if (detailsGenresList && detail.genre) {
-            detailsGenresList.innerHTML = detail.genre.map(g => `<span>${g}</span>`).join('');
+            const genres = Array.isArray(detail.genre) ? detail.genre : detail.genre.split(',');
+            detailsGenresList.innerHTML = genres.map(g => `<span>${g.trim()}</span>`).join('');
         }
 
         // Watch Online button click handler
@@ -1001,8 +1002,8 @@ async function initDetailsPage() {
         }
         const actionViewDoc = document.getElementById("actionViewDoc");
         if (actionViewDoc) {
-            actionViewDoc.onclick = () => {
-                alert("Title: " + detail.title + "\nYear: " + (detail.releaseDate ? detail.releaseDate.split('-')[0] : '----') + "\nRating: " + (detail.imdbRatingValue || '--') + "\nCountry: " + (detail.countryName || 'USA') + "\nGenre: " + (detail.genre ? detail.genre.join(', ') : ''));
+                const genresStr = detail.genre ? (Array.isArray(detail.genre) ? detail.genre.join(', ') : detail.genre) : '';
+                alert("Title: " + detail.title + "\nYear: " + (detail.releaseDate ? detail.releaseDate.split('-')[0] : '----') + "\nRating: " + (detail.imdbRatingValue || '--') + "\nCountry: " + (detail.countryName || 'USA') + "\nGenre: " + genresStr);
             };
         }
 
@@ -1686,8 +1687,9 @@ async function initWatchPage() {
 
         // Populate genre tags
         const genreEl = document.getElementById("watchGenres");
-        if (genreEl && detail.genre && detail.genre.length > 0) {
-            genreEl.innerHTML = detail.genre.map(g => `<span class="tag">${g}</span>`).join('');
+        if (genreEl && detail.genre) {
+            const genres = Array.isArray(detail.genre) ? detail.genre : detail.genre.split(',');
+            genreEl.innerHTML = genres.map(g => `<span class="tag">${g.trim()}</span>`).join('');
             genreEl.style.display = "flex";
         }
 
@@ -1808,7 +1810,13 @@ async function loadRecommendations(detail) {
     grid.innerHTML = '<div class="card-shimmer"></div><div class="card-shimmer"></div><div class="card-shimmer"></div>';
 
     // Query filter API with the same genre/subject type
-    const firstGenre = detail.genre && detail.genre.length > 0 ? detail.genre[0] : "*";
+    let firstGenre = "*";
+    if (detail.genre) {
+        const genres = Array.isArray(detail.genre) ? detail.genre : detail.genre.split(',');
+        if (genres.length > 0) {
+            firstGenre = genres[0].trim();
+        }
+    }
     const payload = {
         genre: firstGenre,
         country: "*",
