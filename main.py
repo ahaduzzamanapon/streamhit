@@ -238,16 +238,29 @@ async def api_sports():
 async def search_suggest(q: str = ""):
     url = f"{API_BASE}/wefeed-h5api-bff/subject/search-suggest"
     data = await _make_request(url, method="POST", payload={"keyword": q, "perPage": 10})
-    if "data" in data and "list" in data["data"]:
+    if "data" in data and "items" in data["data"]:
+        raw_items = data["data"]["items"]
         items = []
-        for d in data["data"]["list"]:
-            sub = d.get("subject", {})
+        for d in raw_items:
+            sub = d.get("subject") or {}
             if sub:
                 d["title"] = sub.get("title", "")
                 d["subjectType"] = sub.get("subjectType", 1)
                 d["cover"] = sub.get("cover", {})
                 d["rating"] = sub.get("imdbRatingValue", "")
-            items.append(d)
+                d["detailPath"] = sub.get("detailPath", "")
+                d["releaseDate"] = sub.get("releaseDate", "")
+                d["isKeyword"] = False
+            else:
+                d["title"] = d.get("word", "")
+                d["subjectType"] = 0
+                d["cover"] = {}
+                d["rating"] = ""
+                d["detailPath"] = ""
+                d["releaseDate"] = ""
+                d["isKeyword"] = True
+            if d["title"]:
+                items.append(d)
         data["data"]["items"] = items
     return data
 

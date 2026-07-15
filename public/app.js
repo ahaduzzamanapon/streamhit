@@ -2466,28 +2466,43 @@ function bindCommonEvents() {
                         data.data.items.forEach(item => {
                             const itemEl = document.createElement("div");
                             itemEl.className = "suggest-item";
-                            
-                            const typeText = item.subjectType === 2 ? "TV Series" : (item.subjectType === 1 ? "Movie" : "Anime");
-                            const coverUrl = item.cover && item.cover.url ? item.cover.url : "/default-cover.png";
-                            const year = item.releaseDate ? item.releaseDate.split("-")[0] : "";
-                            const rating = item.rating || "7.5";
 
-                            itemEl.innerHTML = `
-                                <img class="suggest-cover" src="${coverUrl}" onerror="this.onerror=null; this.src='/default-cover.png';" alt="${item.title}">
-                                <div class="suggest-info">
-                                    <div class="suggest-title">${item.title}</div>
-                                    <div class="suggest-meta">
-                                        <span class="suggest-badge">${typeText}</span>
-                                        ${year ? `<span>${year}</span>` : ""}
-                                        <span class="suggest-rating"><i class="fa-solid fa-star"></i> ${rating}</span>
+                            if (item.isKeyword) {
+                                // Keyword suggestion — show search icon + word
+                                itemEl.innerHTML = `
+                                    <div class="suggest-icon"><i class="fa-solid fa-magnifying-glass"></i></div>
+                                    <div class="suggest-info">
+                                        <div class="suggest-title">${item.title}</div>
                                     </div>
-                                </div>
-                            `;
-                            itemEl.onclick = (e) => {
-                                e.stopPropagation();
-                                dropdown.style.display = "none";
-                                window.location.href = '/' + (item.subjectType === 2 ? 'tv' : 'movie') + '/' + encodeURIComponent(item.detailPath || '');
-                            };
+                                `;
+                                itemEl.onclick = (e) => {
+                                    e.stopPropagation();
+                                    dropdown.style.display = "none";
+                                    window.location.href = `/movies?keyword=${encodeURIComponent(item.title)}&type=0`;
+                                };
+                            } else {
+                                // Subject suggestion — show cover, type, year, rating
+                                const typeText = item.subjectType === 2 ? "TV Series" : (item.subjectType === 1 ? "Movie" : "Anime");
+                                const coverUrl = item.cover && item.cover.url ? item.cover.url : "/default-cover.png";
+                                const year = item.releaseDate ? item.releaseDate.split("-")[0] : "";
+                                const rating = item.rating || "7.5";
+                                itemEl.innerHTML = `
+                                    <img class="suggest-cover" src="${coverUrl}" onerror="this.onerror=null; this.src='/default-cover.png';" alt="${item.title}">
+                                    <div class="suggest-info">
+                                        <div class="suggest-title">${item.title}</div>
+                                        <div class="suggest-meta">
+                                            <span class="suggest-badge">${typeText}</span>
+                                            ${year ? `<span>${year}</span>` : ""}
+                                            <span class="suggest-rating"><i class="fa-solid fa-star"></i> ${rating}</span>
+                                        </div>
+                                    </div>
+                                `;
+                                itemEl.onclick = (e) => {
+                                    e.stopPropagation();
+                                    dropdown.style.display = "none";
+                                    window.location.href = `/${item.subjectType === 2 ? 'tv' : 'movie'}/${encodeURIComponent(item.detailPath || '')}`;
+                                };
+                            }
                             dropdown.appendChild(itemEl);
                         });
                         dropdown.style.display = "block";
