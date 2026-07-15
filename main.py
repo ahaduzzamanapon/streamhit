@@ -215,8 +215,12 @@ async def api_filter(request: Request):
     if "data" in data and "subjects" in data["data"]: data["data"]["items"] = data["data"]["subjects"]
     return data
 
-@app.get("/api/search")
-async def api_search(keyword: str, page: int = 1, perPage: int = 24):
+@app.post("/api/search")
+async def api_search(request: Request):
+    payload = await request.json()
+    keyword = payload.get("keyword", "")
+    page = payload.get("page", 1)
+    perPage = payload.get("perPage", 24)
     url = f"{API_BASE}/wefeed-h5api-bff/subject/search"
     data = await _make_request(url, method="POST", payload={"keyword": keyword, "page": page, "perPage": perPage})
     if "data" in data and "list" in data["data"]: data["data"]["items"] = data["data"]["list"]

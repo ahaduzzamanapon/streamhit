@@ -888,6 +888,7 @@ async function initDetailsPage() {
     const result = await apiGet(`/api/detail?detailPath=${encodeURIComponent(detailPath)}`);
     if (result && result.data) {
         const detail = result.data;
+        const subjectId = detail.subjectId;
         state.selectedSubject = detail;
 
         // Set Details UI
@@ -1064,7 +1065,7 @@ async function initWatchPage() {
     const watchSlug = decodeURIComponent(watchPathParts[3] || "");
     const watchTypeSegment = watchPathParts[2] || "movie";
     const urlParams = new URLSearchParams(window.location.search);
-    const subjectId = "";
+    let subjectId = "";
     const tmdbId = urlParams.get("tmdb");
     const type = urlParams.get("type") || watchTypeSegment;
     const reqSeason = urlParams.get("season") ? parseInt(urlParams.get("season")) : 1;
@@ -1657,6 +1658,7 @@ async function initWatchPage() {
     if (result && result.data) {
         const detail = result.data;
         state.selectedSubject = detail;
+        subjectId = detail.subjectId;
 
         // Set player header overlay details
         const mediaTypeLabel = detail.seNum > 0 || detail.subjectType === 2 ? "TV Show" : "Movie";
