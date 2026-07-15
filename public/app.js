@@ -367,7 +367,7 @@ function renderHeroBanner(banners) {
                     <span>${country}</span>
                 </div>
                 <div class="hero-buttons">
-                    <button class="btn-primary" onclick="window.location.href='/details?id=${item.subjectId}&path=${encodeURIComponent(item.detailPath || sub.detailPath || '')}'">
+                    <button class="btn-primary" onclick="window.location.href=\'/\' + (item.subjectType === 2 ? \'tv\' : \'movie\') + \'/\' + encodeURIComponent(item.detailPath || sub.detailPath || \'\')">
                         <i class="fa-solid fa-play"></i> Watch Now
                     </button>
                 </div>
@@ -769,10 +769,12 @@ function renderExploreGrid(items, isAppend = false) {
 }
 
 function createContentCard(item) {
-    const card = document.createElement("div");
+    const card = document.createElement("a");
     card.className = "content-card";
     card.dataset.id = item.subjectId;
-    card.onclick = () => window.location.href = `/details?id=${item.subjectId}&path=${encodeURIComponent(item.detailPath || '')}`;
+    const pathValue = item.detailPath || '';
+    card.href = (item.subjectType === 2 ? '/tv/' : '/movie/') + encodeURIComponent(pathValue);
+    card.style.textDecoration = 'none';
 
     const title = item.title || 'Unknown Title';
     const coverUrl = item.cover ? (item.cover.url || item.cover) : "/default-cover.png";
@@ -897,7 +899,7 @@ async function initDetailsPage() {
 
     const detailPath = urlParams.get("path") || "";
     // Fetch Details
-    const result = await apiGet(`/api/detail?subjectId=${subjectId}&detailPath=${encodeURIComponent(detailPath)}`);
+    const result = await apiGet(`/api/detail?detailPath=${encodeURIComponent(detailPath)}`);
     if (result && result.data) {
         const detail = result.data;
         state.selectedSubject = detail;
@@ -1420,7 +1422,7 @@ async function initWatchPage() {
                 currentTime: currentTime,
                 duration: duration,
                 progressPercent: progressPercent,
-                detailPath: new URLSearchParams(window.location.search).get("path") || "",
+                detailPath: window.location.pathname.split("/").pop() || "",
                 lastWatched: Date.now()
             };
             history.unshift(newItem);
@@ -1659,7 +1661,7 @@ async function initWatchPage() {
     }
 
     const detailPath = urlParams.get("path") || "";
-    const result = await apiGet(`/api/detail?subjectId=${subjectId}&detailPath=${encodeURIComponent(detailPath)}`);
+    const result = await apiGet(`/api/detail?detailPath=${encodeURIComponent(detailPath)}`);
     if (result && result.data) {
         const detail = result.data;
         state.selectedSubject = detail;
@@ -1876,7 +1878,7 @@ async function loadSeasonEpisodes(subjectId, detailPath = "") {
     seasonTabs.innerHTML = "<span>Loading seasons...</span>";
     episodeGrid.innerHTML = "";
 
-    const result = await apiGet(`/api/season-info?subjectId=${subjectId}&detailPath=${encodeURIComponent(detailPath)}`);
+    const result = await apiGet(`/api/season-info?detailPath=${encodeURIComponent(detailPath)}`);
     if (result && result.data && result.data.seasons && result.data.seasons.length > 0) {
         const seasons = result.data.seasons;
         seasonTabs.innerHTML = "";
@@ -2484,7 +2486,7 @@ function bindCommonEvents() {
                             itemEl.onclick = (e) => {
                                 e.stopPropagation();
                                 dropdown.style.display = "none";
-                                window.location.href = `/details?id=${item.subjectId}&path=${encodeURIComponent(item.detailPath)}`;
+                                window.location.href = '/' + (item.subjectType === 2 ? 'tv' : 'movie') + '/' + encodeURIComponent(item.detailPath || '');
                             };
                             dropdown.appendChild(itemEl);
                         });
@@ -2692,7 +2694,7 @@ async function checkLatestNotification() {
                     notification.onclick = () => {
                         window.focus();
                         if (noti.subjectId) {
-                            window.location.href = `/details?id=${noti.subjectId}`;
+                            window.location.href = '/movie/' + (noti.detailPath || 'unknown');
                         }
                     };
                 }
