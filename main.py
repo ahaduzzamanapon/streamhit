@@ -172,7 +172,9 @@ async def old_details(id: str = None, path: str = None):
     return RedirectResponse(url="/", status_code=301)
 
 @app.get("/watch")
-async def old_watch(id: str = None, path: str = None):
+async def old_watch(request: Request, id: str = None, path: str = None, type: str = None):
+    if type in ["sports", "tv"]:
+        return serve_html("public/watch.html")
     if path: return RedirectResponse(url=f"/watch/movie/{path}", status_code=301)
     return RedirectResponse(url="/", status_code=301)
 
@@ -291,15 +293,11 @@ async def api_season(detailPath: str = ""):
 
 @app.get("/api/resource")
 async def api_resource(se: int = 1, ep: int = 1, detailPath: str = ""):
-    dom_data = await _make_request(f"{API_BASE}/wefeed-h5api-bff/media-player/get-domain")
-    domain = (dom_data.get("data") or "https://netfilm.world").rstrip("/")
     if not detailPath: detailPath = "details"
-    player_referer = f"{domain}/"
-    play_url = f"{domain}/wefeed-h5api-bff/subject/play?se={se}&ep={ep}&detailPath={detailPath}"
-
-    resp = await http_client.get(play_url, headers={**PLAYER_HEADERS, "Referer": player_referer})
-    data = resp.json().get("data", {})
-
+    play_url = f"{API_BASE}/wefeed-h5api-bff/subject/play?se={se}&ep={ep}&detailPath={detailPath}"
+    res_data = await _make_request(play_url, custom_headers={"Referer": "https://netfilm.world/"})
+    data = res_data.get("data") or {}
+ 
     streams = data.get("streams", [])
     items = []
     for s in streams:
@@ -312,16 +310,13 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = ""):
                 "resourceLink": f"/fetch?source_url={urllib.parse.quote(url_val)}"
             })
     return {"code": 0, "data": {"list": items}}
-
+ 
 @app.get("/api/captions")
 async def api_captions(se: int = 1, ep: int = 1, detailPath: str = ""):
-    dom_data = await _make_request(f"{API_BASE}/wefeed-h5api-bff/media-player/get-domain")
-    domain = (dom_data.get("data") or "https://netfilm.world").rstrip("/")
     if not detailPath: detailPath = "details"
-    player_referer = f"{domain}/"
-    play_url = f"{domain}/wefeed-h5api-bff/subject/play?se={se}&ep={ep}&detailPath={detailPath}"
-    play_resp = await http_client.get(play_url, headers={**PLAYER_HEADERS, "Referer": player_referer})
-    play_data = play_resp.json().get("data", {})
+    play_url = f"{API_BASE}/wefeed-h5api-bff/subject/play?se={se}&ep={ep}&detailPath={detailPath}"
+    play_resp = await _make_request(play_url, custom_headers={"Referer": "https://netfilm.world/"})
+    play_data = play_resp.get("data") or {}
     
     streams = play_data.get("streams", [])
     dash = play_data.get("dash", [])

@@ -1002,6 +1002,7 @@ async function initDetailsPage() {
         }
         const actionViewDoc = document.getElementById("actionViewDoc");
         if (actionViewDoc) {
+            actionViewDoc.onclick = () => {
                 const genresStr = detail.genre ? (Array.isArray(detail.genre) ? detail.genre.join(', ') : detail.genre) : '';
                 alert("Title: " + detail.title + "\nYear: " + (detail.releaseDate ? detail.releaseDate.split('-')[0] : '----') + "\nRating: " + (detail.imdbRatingValue || '--') + "\nCountry: " + (detail.countryName || 'USA') + "\nGenre: " + genresStr);
             };
@@ -1068,13 +1069,14 @@ async function initWatchPage() {
     const urlParams = new URLSearchParams(window.location.search);
     let subjectId = "";
     const tmdbId = urlParams.get("tmdb");
-    const type = urlParams.get("type") || watchTypeSegment;
+    const isLiveStream = (window.location.pathname.toLowerCase() === "/watch") && (urlParams.get("type") === "sports" || urlParams.get("type") === "tv");
+    const type = isLiveStream ? urlParams.get("type") : watchTypeSegment;
     const reqSeason = urlParams.get("season") ? parseInt(urlParams.get("season")) : 1;
     const reqEpisode = urlParams.get("episode") ? parseInt(urlParams.get("episode")) : 1;
     
     const oldStyle = document.getElementById('plyr-live-custom-css');
     if (oldStyle) oldStyle.remove();
-    if (type === "sports" || type === "tv") {
+    if (isLiveStream) {
         const style = document.createElement('style');
         style.id = 'plyr-live-custom-css';
         style.innerHTML = `
@@ -1089,7 +1091,7 @@ async function initWatchPage() {
         document.head.appendChild(style);
     }
     
-    if (type !== "sports" && type !== "tv" && !watchSlug && !tmdbId) {
+    if (!isLiveStream && !watchSlug && !tmdbId) {
         window.location.href = "/";
         return;
     }
@@ -1548,7 +1550,7 @@ async function initWatchPage() {
     const loading = document.getElementById("watchPageLoading");
     const content = document.getElementById("watchWrapper");
 
-    if (type === "sports" || type === "tv") {
+    if (isLiveStream) {
         const sportTitle = urlParams.get("title") || "Live Stream";
         const sportUrl = urlParams.get("url") || "";
         const fallbackLinksRaw = urlParams.get("links") || "";
@@ -1904,8 +1906,14 @@ async function loadSeasonEpisodes(subjectId, detailPath = "") {
         state.selectedSeason = activeSeasonObj.se;
         
         // Ensure state.selectedEpisode exists in the selected season
+        let epsArr = [];
         if (activeSeasonObj.allEp) {
-            const epsArr = activeSeasonObj.allEp.split(",").map(Number);
+            epsArr = activeSeasonObj.allEp.split(",").map(Number);
+        } else if (activeSeasonObj.maxEp) {
+            for (let i = 1; i <= activeSeasonObj.maxEp; i++) epsArr.push(i);
+        }
+        
+        if (epsArr.length > 0) {
             if (!epsArr.includes(state.selectedEpisode)) {
                 state.selectedEpisode = epsArr[0] || 1;
             }
@@ -1927,8 +1935,14 @@ function renderEpisodes(season) {
     if (!grid) return;
     grid.innerHTML = "";
 
+    let eps = [];
     if (season.allEp) {
-        const eps = season.allEp.split(",");
+        eps = season.allEp.split(",");
+    } else if (season.maxEp) {
+        for (let i = 1; i <= season.maxEp; i++) eps.push(String(i));
+    }
+
+    if (eps.length > 0) {
         eps.forEach((epNum) => {
             const btn = document.createElement("button");
             const isActive = Number(epNum) === state.selectedEpisode;
@@ -1943,14 +1957,21 @@ function renderEpisodes(season) {
             }
 
             btn.onclick = async () => {
+                state.selectedEpisode = Number(epNum);
+                const _epPathParts = window.location.pathname.split("/");
+                const _epSlug = _epPathParts[_epPathParts.length - 1] || "";
+                const _epType = _epPathParts[2] || "movie";
+
+                // If on details page, redirect to watch page
+                if (!routes.isWatch) {
+                    const typeSegment = (state.selectedSubject && state.selectedSubject.subjectType === 2) ? 'tv' : 'movie';
+                    window.location.href = `/watch/${typeSegment}/${encodeURIComponent(_epSlug)}?season=${state.selectedSeason}&episode=${state.selectedEpisode}`;
+                    return;
+                }
+
                 if (state.playingSeason === state.selectedSeason && Number(epNum) === state.playingEpisode) return; // already playing
 
-                state.selectedEpisode = Number(epNum);
-
-                // Update URL silently (no page reload)
-                const urlParams = new URLSearchParams(window.location.search);
-                const detailPath = urlParams.get("path") || "";
-                const newUrl = `/watch?id=${state.selectedSubject.subjectId}&path=${encodeURIComponent(detailPath)}&season=${state.selectedSeason}&episode=${state.selectedEpisode}`;
+                const newUrl = `/watch/${_epType}/${_epSlug}?season=${state.selectedSeason}&episode=${state.selectedEpisode}`;
                 history.pushState({}, "", newUrl);
 
                 // Highlight active episode button

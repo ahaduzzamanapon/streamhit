@@ -2230,16 +2230,51 @@ input, select { font-family: inherit; }
   .main-content { margin-left: 0; }
   .mobile-navigation-bar { display: flex; }
 
+  /* Hide the brand text on mobile so only the red square icon is visible */
+  .mobile-brand .logo-text {
+    display: none !important;
+  }
+
+  /* Make header layout clean and aligned on mobile */
+  .header {
+    padding: 0 12px;
+    gap: 8px;
+  }
+  .search-box {
+    flex: 1;
+    max-width: 100%;
+    margin: 0;
+    padding: 0 4px 0 12px;
+  }
+  .search-box input {
+    padding: 6px 0;
+    font-size: 13px;
+  }
+  #searchBtn {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+  .header-controls {
+    gap: 8px;
+  }
+  .header-controls .language-selector {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+  .header-controls .language-selector span { display: none; }
+  .header-controls .download-app-btn { display: none; }
+
+  /* On details/watch VOD pages, hide the search box entirely on mobile to prevent squishing */
+  .details-page-body .header .search-box,
+  .watch-page-body .header .search-box {
+    display: none !important;
+  }
+
   /* Add bottom padding so content isn't hidden behind bottom nav */
   .main-content { padding-bottom: 64px; }
   .watch-wrapper { padding-bottom: 64px; }
 
   .mobile-brand { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-
-  .header { padding: 0 14px; gap: 10px; }
-  .search-box { max-width: 100%; }
-  .header-controls .language-selector span { display: none; }
-  .header-controls .download-app-btn { display: none; }
 
   .hero-slider { aspect-ratio: 16/9; min-height: 220px; max-height: 320px; }
   .hero-content { padding: 20px 18px 32px; }
