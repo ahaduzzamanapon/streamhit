@@ -203,11 +203,15 @@ async def get_banners():
         })
     return {"code": 0, "data": {"list": formatted}}
 
-@app.get("/api/filter")
-async def api_filter(tabId: int = 1, sort: str = "RECOMMEND", page: int = 1, perPage: int = 24):
+@app.post("/api/filter")
+async def api_filter(request: Request):
+    payload = await request.json()
+    tabId = payload.get("tabId", 1)
+    filter_data = payload.get("filter", {"sort": "RECOMMEND", "genre": "ALL", "country": "ALL", "year": "ALL", "language": "ALL"})
+    page = payload.get("page", 1)
+    perPage = payload.get("perPage", 24)
     url = f"{API_BASE}/wefeed-h5api-bff/subject/filter"
-    payload = {"tabId": tabId, "filter": {"sort": sort, "genre": "ALL", "country": "ALL", "year": "ALL", "language": "ALL"}, "page": page, "perPage": perPage}
-    data = await _make_request(url, method="POST", payload=payload)
+    data = await _make_request(url, method="POST", payload={"tabId": tabId, "filter": filter_data, "page": page, "perPage": perPage})
     if "data" in data and "subjects" in data["data"]: data["data"]["items"] = data["data"]["subjects"]
     return data
 
@@ -217,6 +221,18 @@ async def api_search(keyword: str, page: int = 1, perPage: int = 24):
     data = await _make_request(url, method="POST", payload={"keyword": keyword, "page": page, "perPage": perPage})
     if "data" in data and "list" in data["data"]: data["data"]["items"] = data["data"]["list"]
     return data
+
+@app.post("/api/heartbeat")
+async def api_heartbeat():
+    return {"code": 0, "message": "success"}
+
+@app.get("/api/notifications/latest")
+async def api_notifications():
+    return {"code": 0, "data": []}
+
+@app.get("/api/sports/live")
+async def api_sports():
+    return {"code": 0, "data": []}
 
 @app.get("/api/search/suggest")
 async def search_suggest(q: str = ""):
