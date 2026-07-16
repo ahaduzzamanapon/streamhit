@@ -163,8 +163,18 @@ async def _make_request(url: str, method: str = "GET", payload: dict = None, cus
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Request failed: {str(e)}")
 
+async def run_sitemap_generator_background():
+    try:
+        import sys
+        import subprocess
+        print("Starting background sitemap generator subprocess...")
+        subprocess.Popen([sys.executable, "sitemap_generator.py"])
+    except Exception as e:
+        print(f"Failed to start background sitemap generator: {e}")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    asyncio.create_task(run_sitemap_generator_background())
     yield
     await http_client.aclose()
 
@@ -234,103 +244,7 @@ async def tv(): return serve_html("public/tv.html", {"<title>Explore TV Series -
 @app.get("/live-tv", response_class=HTMLResponse)
 async def livetv(): return serve_html("public/live-tv.html")
 
-# ==========================================================================
-# SITEMAPS
-# ==========================================================================
-@app.get("/sitemap.xml")
-async def sitemap_index():
-    base_url = "https://streamfit.ehealthfinder.com"
-    xml_lines = [
-        '<?xml version="1.0" encoding="UTF-8"?>',
-        '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-        f'  <sitemap><loc>{base_url}/sitemap_static.xml</loc></sitemap>'
-    ]
-    for i in range(1, 501):
-        xml_lines.append(f'  <sitemap><loc>{base_url}/sitemap_movies_{i}.xml</loc></sitemap>')
-    for i in range(1, 501):
-        xml_lines.append(f'  <sitemap><loc>{base_url}/sitemap_tv_{i}.xml</loc></sitemap>')
-    xml_lines.append('</sitemapindex>')
-    return Response(content="\n".join(xml_lines), media_type="application/xml")
 
-@app.get("/sitemap_static.xml")
-async def sitemap_static():
-    base_url = "https://streamfit.ehealthfinder.com"
-    urls = [
-        {"loc": f"{base_url}/", "changefreq": "daily", "priority": "1.0"},
-        {"loc": f"{base_url}/movies", "changefreq": "daily", "priority": "0.9"},
-        {"loc": f"{base_url}/tv", "changefreq": "daily", "priority": "0.9"},
-        {"loc": f"{base_url}/live-tv", "changefreq": "daily", "priority": "0.8"},
-        {"loc": f"{base_url}/download", "changefreq": "weekly", "priority": "0.6"},
-    ]
-    return build_sitemap_xml(urls)
-
-@app.get("/sitemap_movies_{page_num}.xml")
-async def sitemap_movies(page_num: int):
-    base_url = "https://streamfit.ehealthfinder.com"
-    start_page = (page_num - 1) * 400 + 1
-    
-    urls = []
-    for p in range(start_page, start_page + 400):
-        try:
-            url = f"{API_BASE}/wefeed-h5api-bff/subject/filter"
-            payload = {
-                "tabId": 1,
-                "filter": {"sort": "RECOMMEND", "genre": "ALL", "country": "ALL", "year": "ALL", "language": "ALL"},
-                "page": p,
-                "perPage": 24
-            }
-            res = await _make_request(url, method="POST", payload=payload)
-            subjects = res.get("data", {}).get("items", []) or []
-            for sub in subjects:
-                slug = sub.get("detailPath")
-                if slug:
-                    urls.append({"loc": f"{base_url}/movie/{slug}", "changefreq": "weekly", "priority": "0.8"})
-                    urls.append({"loc": f"{base_url}/watch/movie/{slug}", "changefreq": "weekly", "priority": "0.7"})
-        except Exception as e:
-            print(f"Error fetching sitemap movies page {p}: {e}")
-            
-    return build_sitemap_xml(urls)
-
-@app.get("/sitemap_tv_{page_num}.xml")
-async def sitemap_tv(page_num: int):
-    base_url = "https://streamfit.ehealthfinder.com"
-    start_page = (page_num - 1) * 400 + 1
-    
-    urls = []
-    for p in range(start_page, start_page + 400):
-        try:
-            url = f"{API_BASE}/wefeed-h5api-bff/subject/filter"
-            payload = {
-                "tabId": 2,
-                "filter": {"sort": "RECOMMEND", "genre": "ALL", "country": "ALL", "year": "ALL", "language": "ALL"},
-                "page": p,
-                "perPage": 24
-            }
-            res = await _make_request(url, method="POST", payload=payload)
-            subjects = res.get("data", {}).get("items", []) or []
-            for sub in subjects:
-                slug = sub.get("detailPath")
-                if slug:
-                    urls.append({"loc": f"{base_url}/tv/{slug}", "changefreq": "weekly", "priority": "0.8"})
-                    urls.append({"loc": f"{base_url}/watch/tv/{slug}", "changefreq": "weekly", "priority": "0.7"})
-        except Exception as e:
-            print(f"Error fetching sitemap tv page {p}: {e}")
-            
-    return build_sitemap_xml(urls)
-
-def build_sitemap_xml(urls):
-    xml_lines = [
-        '<?xml version="1.0" encoding="UTF-8"?>',
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
-    ]
-    for u in urls:
-        xml_lines.append("  <url>")
-        xml_lines.append(f"    <loc>{u['loc']}</loc>")
-        xml_lines.append(f"    <changefreq>{u['changefreq']}</changefreq>")
-        xml_lines.append(f"    <priority>{u['priority']}</priority>")
-        xml_lines.append("  </url>")
-    xml_lines.append("</urlset>")
-    return Response(content="\n".join(xml_lines), media_type="application/xml")
 
 @app.get("/movie/{slug}", response_class=HTMLResponse)
 @app.get("/tv/{slug}", response_class=HTMLResponse)
