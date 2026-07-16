@@ -5,7 +5,7 @@ import httpx
 import urllib.parse
 import asyncio
 import random
-from fastapi import FastAPI, Request, HTTPException, Query
+from fastapi import FastAPI, Request, HTTPException, Query, Response
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -126,12 +126,27 @@ async def _fetch_download_resources(subject_id: str, se: int = 1, ep: int = 1, d
 async def _get_bearer_token() -> str:
     global _bearer_token
     if _bearer_token: return _bearer_token
-    try:
-        resp = await http_client.get(f"{API_BASE}/wefeed-h5api-bff/home?host=moviebox.ph", headers=DEFAULT_HEADERS)
-        x_user = resp.headers.get("x-user")
-        if x_user: _bearer_token = json.loads(x_user).get("token")
-    except: pass
-    return _bearer_token or ""
+    for attempt in range(3):
+        ip = get_random_singapore_ip()
+        headers = {
+            **DEFAULT_HEADERS,
+            "X-Forwarded-For": ip,
+            "CF-Connecting-IP": ip,
+            "X-Real-IP": ip,
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+        try:
+            resp = await http_client.get(f"{API_BASE}/wefeed-h5api-bff/home?host=moviebox.ph", headers=headers)
+            x_user = resp.headers.get("x-user")
+            if x_user:
+                token = json.loads(x_user).get("token")
+                if token:
+                    _bearer_token = token
+                    return _bearer_token
+        except Exception as e:
+            print(f"Error fetching bearer token (attempt {attempt+1}): {e}")
+        await asyncio.sleep(0.5)
+    return ""
 
 async def _make_request(url: str, method: str = "GET", payload: dict = None, custom_headers: dict = None) -> dict:
     global _bearer_token
@@ -219,12 +234,112 @@ async def tv(): return serve_html("public/tv.html", {"<title>Explore TV Series -
 @app.get("/live-tv", response_class=HTMLResponse)
 async def livetv(): return serve_html("public/live-tv.html")
 
+# ==========================================================================
+# SITEMAPS
+# ==========================================================================
+@app.get("/sitemap.xml")
+async def sitemap_index():
+    base_url = "https://streamfit.ehealthfinder.com"
+    xml_lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+        f'  <sitemap><loc>{base_url}/sitemap_static.xml</loc></sitemap>',
+        f'  <sitemap><loc>{base_url}/sitemap_movies_1.xml</loc></sitemap>',
+        f'  <sitemap><loc>{base_url}/sitemap_movies_2.xml</loc></sitemap>',
+        f'  <sitemap><loc>{base_url}/sitemap_movies_3.xml</loc></sitemap>',
+        f'  <sitemap><loc>{base_url}/sitemap_tv_1.xml</loc></sitemap>',
+        f'  <sitemap><loc>{base_url}/sitemap_tv_2.xml</loc></sitemap>',
+        f'  <sitemap><loc>{base_url}/sitemap_tv_3.xml</loc></sitemap>',
+        '</sitemapindex>'
+    ]
+    return Response(content="\n".join(xml_lines), media_type="application/xml")
+
+@app.get("/sitemap_static.xml")
+async def sitemap_static():
+    base_url = "https://streamfit.ehealthfinder.com"
+    urls = [
+        {"loc": f"{base_url}/", "changefreq": "daily", "priority": "1.0"},
+        {"loc": f"{base_url}/movies", "changefreq": "daily", "priority": "0.9"},
+        {"loc": f"{base_url}/tv", "changefreq": "daily", "priority": "0.9"},
+        {"loc": f"{base_url}/live-tv", "changefreq": "daily", "priority": "0.8"},
+        {"loc": f"{base_url}/download", "changefreq": "weekly", "priority": "0.6"},
+    ]
+    return build_sitemap_xml(urls)
+
+@app.get("/sitemap_movies_{page_num}.xml")
+async def sitemap_movies(page_num: int):
+    base_url = "https://streamfit.ehealthfinder.com"
+    start_page = (page_num - 1) * 4 + 1
+    
+    urls = []
+    for p in range(start_page, start_page + 4):
+        try:
+            url = f"{API_BASE}/wefeed-h5api-bff/subject/filter"
+            payload = {
+                "tabId": 1,
+                "filter": {"sort": "RECOMMEND", "genre": "ALL", "country": "ALL", "year": "ALL", "language": "ALL"},
+                "page": p,
+                "perPage": 24
+            }
+            res = await _make_request(url, method="POST", payload=payload)
+            subjects = res.get("data", {}).get("items", []) or []
+            for sub in subjects:
+                slug = sub.get("detailPath")
+                if slug:
+                    urls.append({"loc": f"{base_url}/movie/{slug}", "changefreq": "weekly", "priority": "0.8"})
+                    urls.append({"loc": f"{base_url}/watch/movie/{slug}", "changefreq": "weekly", "priority": "0.7"})
+        except Exception as e:
+            print(f"Error fetching sitemap movies page {p}: {e}")
+            
+    return build_sitemap_xml(urls)
+
+@app.get("/sitemap_tv_{page_num}.xml")
+async def sitemap_tv(page_num: int):
+    base_url = "https://streamfit.ehealthfinder.com"
+    start_page = (page_num - 1) * 4 + 1
+    
+    urls = []
+    for p in range(start_page, start_page + 4):
+        try:
+            url = f"{API_BASE}/wefeed-h5api-bff/subject/filter"
+            payload = {
+                "tabId": 2,
+                "filter": {"sort": "RECOMMEND", "genre": "ALL", "country": "ALL", "year": "ALL", "language": "ALL"},
+                "page": p,
+                "perPage": 24
+            }
+            res = await _make_request(url, method="POST", payload=payload)
+            subjects = res.get("data", {}).get("items", []) or []
+            for sub in subjects:
+                slug = sub.get("detailPath")
+                if slug:
+                    urls.append({"loc": f"{base_url}/tv/{slug}", "changefreq": "weekly", "priority": "0.8"})
+                    urls.append({"loc": f"{base_url}/watch/tv/{slug}", "changefreq": "weekly", "priority": "0.7"})
+        except Exception as e:
+            print(f"Error fetching sitemap tv page {p}: {e}")
+            
+    return build_sitemap_xml(urls)
+
+def build_sitemap_xml(urls):
+    xml_lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+    ]
+    for u in urls:
+        xml_lines.append("  <url>")
+        xml_lines.append(f"    <loc>{u['loc']}</loc>")
+        xml_lines.append(f"    <changefreq>{u['changefreq']}</changefreq>")
+        xml_lines.append(f"    <priority>{u['priority']}</priority>")
+        xml_lines.append("  </url>")
+    xml_lines.append("</urlset>")
+    return Response(content="\n".join(xml_lines), media_type="application/xml")
+
 @app.get("/movie/{slug}", response_class=HTMLResponse)
 @app.get("/tv/{slug}", response_class=HTMLResponse)
 async def details(slug: str):
     meta = await get_subject_meta(slug)
     reps = {
-        '<title>Details - Streamfit</title>': f'<title>{meta["title"]}</title>',
+        '<title>Details — Streamfit</title>': f'<title>{meta["title"]}</title>',
         'id="detailsTitle">Title': f'id="detailsTitle">{meta["title"]}',
         'id="watchDescription">Description loading...': f'id="watchDescription">{meta["description"]}',
         'src="/default-cover.png"': f'src="{meta["cover"]}"',
@@ -242,7 +357,7 @@ async def details(slug: str):
 async def watch(slug: str):
     meta = await get_subject_meta(slug)
     reps = {
-        '<title>Watch Online - Streamfit</title>': f'<title>Watching {meta["title"]}</title>',
+        '<title>Watch — Streamfit</title>': f'<title>Watching {meta["title"]}</title>',
         'content="Watch free movies, TV shows, anime and live sports online."': f'content="{meta["description"]}"',
         'content="Streamfit - Free Movies, TV Shows & Anime Streaming"': f'content="{meta["title"]}"',
         'content="https://streamfit.ehealthfinder.com/"': f'content="{meta["url"]}"',
@@ -280,17 +395,7 @@ async def get_banners():
     items = []
     for op in data.get("data", {}).get("operatingList", []):
         if op.get("type") == "BANNER": items.extend(op.get("banner", {}).get("items", []))
-    formatted = []
-    for item in items:
-        sub = item.get("subject") or {}
-        formatted.append({
-            "subject_id": sub.get("subjectId"),
-            "title": item.get("title") or sub.get("title"),
-            "image_url": item.get("image", {}).get("url") or sub.get("cover", {}).get("url"),
-            "detail_path": item.get("detailPath") or sub.get("detailPath"),
-            "subject_type": sub.get("subjectType", 1)
-        })
-    return {"code": 0, "data": {"list": formatted}}
+    return {"code": 0, "data": {"list": items}}
 
 @app.post("/api/filter")
 async def api_filter(request: Request):

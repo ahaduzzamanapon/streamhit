@@ -1851,6 +1851,9 @@ input, select { font-family: inherit; }
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   gap: 14px;
 }
+#watchRecommendationsGrid .content-card {
+  width: 100%;
+}
 
 /* ==========================================================================
    RESOURCES PANEL (Season/Episode Selector)
@@ -2198,19 +2201,41 @@ input, select { font-family: inherit; }
    ========================================================================== */
 @media (max-width: 1200px) {
   .watch-cinema-grid {
-    display: flex !important; flex-direction: column !important;
+    display: flex !important;
+    flex-direction: column !important;
   }
   .cinema-player-section {
-    order: 1; position: sticky; top: 0; z-index: 50;
-    background: #000;
+    order: 1 !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 50 !important;
+    background: #000 !important;
+    grid-column: auto !important;
+    grid-row: auto !important;
   }
-  .cinema-meta-section { order: 2; padding: 14px 16px 0; }
-  .cinema-desc-section { order: 4; margin: 14px 16px 0; }
+  .cinema-meta-section {
+    order: 2 !important;
+    padding: 14px 16px 0 !important;
+    grid-column: auto !important;
+    grid-row: auto !important;
+  }
   .resources-container {
-    order: 3;
-    position: static; max-height: none;
-    border-left: none; border-top: 1px solid var(--border);
-    padding: 16px;
+    order: 3 !important;
+    position: static !important;
+    max-height: none !important;
+    border-left: none !important;
+    border-top: 1px solid var(--border) !important;
+    padding: 16px !important;
+    grid-column: auto !important;
+    grid-row: auto !important;
+    width: 100% !important;
+  }
+  .cinema-desc-section {
+    order: 4 !important;
+    margin: 14px 16px 0 !important;
+    grid-column: auto !important;
+    grid-row: auto !important;
+    width: auto !important;
   }
   .resources-container .episode-grid {
     grid-template-columns: repeat(6, 1fr) !important;
@@ -2230,9 +2255,10 @@ input, select { font-family: inherit; }
   .main-content { margin-left: 0; }
   .mobile-navigation-bar { display: flex; }
 
-  /* Hide the brand text on mobile so only the red square icon is visible */
+  /* Show the brand text on mobile next to the play logo */
   .mobile-brand .logo-text {
-    display: none !important;
+    display: inline-block !important;
+    font-size: 15px !important;
   }
 
   /* Make header layout clean and aligned on mobile */
@@ -2254,7 +2280,14 @@ input, select { font-family: inherit; }
     padding: 6px 12px;
     font-size: 12px;
   }
+  
+  /* Hide header controls on mobile, except for details/watch pages to show the back button */
   .header-controls {
+    display: none !important;
+  }
+  .watch-page-body .header-controls,
+  .details-page-body .header-controls {
+    display: flex !important;
     gap: 8px;
   }
   .header-controls .language-selector {
@@ -2262,7 +2295,6 @@ input, select { font-family: inherit; }
     font-size: 12px;
   }
   .header-controls .language-selector span { display: none; }
-  .header-controls .download-app-btn { display: none; }
 
   /* On details/watch VOD pages, hide the search box entirely on mobile to prevent squishing */
   .details-page-body .header .search-box,
@@ -2314,6 +2346,14 @@ input, select { font-family: inherit; }
   .cinema-meta-section h1 { font-size: 18px; }
 
   .pagination-controls { padding: 20px 14px; }
+
+  #watchRecommendationsGrid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+  #watchRecommendationsGrid .content-card {
+    width: 100% !important;
+  }
 }
 
 @media (max-width: 480px) {
