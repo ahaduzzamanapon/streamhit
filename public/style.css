@@ -1057,7 +1057,7 @@ input, select { font-family: inherit; }
   max-height: 0;
   transition: max-height 0.35s ease;
 }
-.filter-panel.open { max-height: 400px; }
+.filter-panel.open { max-height: 1000px; }
 
 .filter-panel-inner {
   padding: 20px 28px 24px;

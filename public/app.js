@@ -541,6 +541,10 @@ async function initFilterPage() {
     // Read query strings (e.g. pre-selected genre `/movies?genre=Action`)
     const urlParams = new URLSearchParams(window.location.search);
     const genre = urlParams.get("genre");
+    const country = urlParams.get("country");
+    const year = urlParams.get("year");
+    const language = urlParams.get("language");
+    const sort = urlParams.get("sort");
     const keyword = urlParams.get("keyword");
     const typeParam = urlParams.get("type");
     
@@ -592,6 +596,22 @@ async function initFilterPage() {
         state.activeGenre = genre;
         setSelectedFilterOption("filterGenreOpts", genre);
     }
+    if (country) {
+        state.activeCountry = country;
+        setSelectedFilterOption("filterCountryOpts", country);
+    }
+    if (year) {
+        state.activeYear = year;
+        setSelectedFilterOption("filterYearOpts", year);
+    }
+    if (language) {
+        state.activeLang = language;
+        setSelectedFilterOption("filterLangOpts", language);
+    }
+    if (sort) {
+        state.activeSort = sort;
+        setSelectedFilterOption("filterSortOpts", sort);
+    }
 
     // Helper to setup dynamic tag filter click handlers (auto-apply)
     const setupFilterOptions = (containerId, stateKey) => {
@@ -612,6 +632,7 @@ async function initFilterPage() {
     setupFilterOptions("filterGenreOpts", "activeGenre");
     setupFilterOptions("filterCountryOpts", "activeCountry");
     setupFilterOptions("filterYearOpts", "activeYear");
+    setupFilterOptions("filterLangOpts", "activeLang");
     setupFilterOptions("filterSortOpts", "activeSort");
 
     // Infinite scroll listener - highly robust across devices/browsers
@@ -656,6 +677,7 @@ async function loadSearchResults(isAppend = false) {
             genre: state.activeGenre,
             country: state.activeCountry,
             year: state.activeYear,
+            language: state.activeLang,
             sort: state.activeSort
         };
     } else {
@@ -664,7 +686,7 @@ async function loadSearchResults(isAppend = false) {
             genre: state.activeGenre,
             country: state.activeCountry,
             year: state.activeYear,
-            language: "*",
+            language: state.activeLang,
             sort: state.activeSort,
             subjectType: state.subjectType,
             page: state.currentPage,

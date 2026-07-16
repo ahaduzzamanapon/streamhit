@@ -312,12 +312,51 @@ async def get_banners():
 @app.post("/api/filter")
 async def api_filter(request: Request):
     payload = await request.json()
-    tabId = payload.get("tabId", 1)
-    filter_data = payload.get("filter", {"sort": "RECOMMEND", "genre": "ALL", "country": "ALL", "year": "ALL", "language": "ALL"})
+    tabId = payload.get("tabId")
+    if tabId is None:
+        tabId = payload.get("subjectType", 1)
     page = payload.get("page", 1)
     perPage = payload.get("perPage", 24)
+    
+    filter_data = payload.get("filter")
+    if not filter_data:
+        genre = payload.get("genre", "ALL")
+        country = payload.get("country", "ALL")
+        year = payload.get("year", "ALL")
+        language = payload.get("language", "ALL")
+        sort = payload.get("sort", "RECOMMEND")
+    else:
+        genre = filter_data.get("genre", "ALL")
+        country = filter_data.get("country", "ALL")
+        year = filter_data.get("year", "ALL")
+        language = filter_data.get("language", "ALL")
+        sort = filter_data.get("sort", "RECOMMEND")
+        
+    if genre == "*": genre = "ALL"
+    if country == "*": country = "ALL"
+    if year == "*": year = "ALL"
+    if language == "*": language = "ALL"
+    
+    sort_map = {
+        "ForYou": "RECOMMEND",
+        "Hottest": "HOTTEST",
+        "Latest": "NEWEST",
+        "Newest": "NEWEST",
+        "Rating": "RATING",
+        "Top Rated": "RATING"
+    }
+    sort = sort_map.get(sort, sort)
+    
+    final_filter = {
+        "sort": sort,
+        "genre": genre,
+        "country": country,
+        "year": year,
+        "language": language
+    }
+    
     url = f"{API_BASE}/wefeed-h5api-bff/subject/filter"
-    data = await _make_request(url, method="POST", payload={"tabId": tabId, "filter": filter_data, "page": page, "perPage": perPage})
+    data = await _make_request(url, method="POST", payload={"tabId": tabId, "filter": final_filter, "page": page, "perPage": perPage})
     if "data" in data and "subjects" in data["data"]: data["data"]["items"] = data["data"]["subjects"]
     return data
 
