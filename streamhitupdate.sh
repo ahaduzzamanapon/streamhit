@@ -30,10 +30,15 @@ echo "[3/4] Setting up daily sitemap cron job..."
 chmod +x setup_cron.sh
 bash setup_cron.sh
 
-# 4. Run sitemap generator immediately in background
-echo "[4/4] Starting sitemap generator in background..."
-nohup "$PYTHON_BIN" sitemap_generator.py >> sitemap_generator.log 2>&1 &
-echo "Sitemap generator started (PID: $!)"
+# 4. Run sitemap generator in background (only if not already running)
+echo "[4/4] Checking sitemap generator..."
+if pgrep -f "sitemap_generator.py" > /dev/null 2>&1; then
+    echo "Sitemap generator is already running. Skipping."
+else
+    echo "Starting sitemap generator in background..."
+    nohup "$PYTHON_BIN" sitemap_generator.py >> sitemap_generator.log 2>&1 &
+    echo "Sitemap generator started (PID: $!)"
+fi
 
 echo "============================================="
 echo "   Update complete! Website has reloaded.     "
