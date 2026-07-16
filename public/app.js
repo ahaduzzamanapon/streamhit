@@ -2063,7 +2063,7 @@ async function loadPlayResources(subjectId, season = null, episode = null) {
         state.pendingResumeTime = null;
     }
 
-    let url = `/api/resource?subjectId=${subjectId}`;
+    let url = `/api/resource?subjectId=${subjectId}&t=${Date.now()}`;
     if (detailPath) {
         url += `&detailPath=${encodeURIComponent(detailPath)}`;
     }
@@ -2296,7 +2296,7 @@ async function playResources() {
 async function loadSubtitles(subjectId, resourceId) {
     state.availableCaptions = [];
 
-    const result = await apiGet(`/api/captions?subjectId=${subjectId}&resourceId=${resourceId}`);
+    const result = await apiGet(`/api/captions?subjectId=${subjectId}&resourceId=${resourceId}&t=${Date.now()}`);
     if (result && result.data && result.data.extCaptions) {
         const captions = result.data.extCaptions;
         
