@@ -1,15 +1,14 @@
 #!/bin/bash
 
-# Print message
 echo "============================================="
 echo "        STREAMHIT AUTOMATIC UPDATE           "
 echo "============================================="
 
-# Navigate to the script's directory (app root)
 cd "$(dirname "$0")"
 echo "Current directory: $(pwd)"
 
 PYTHON_BIN="/home/lcsyxfen/virtualenv/streamhit.lc-synergy.ltd/3.10/bin/python"
+SITEMAP_PIDFILE="/tmp/sitemap_generator.pid"
 
 # 1. Pull latest code from GitHub
 echo "[1/4] Pulling latest code from origin main..."
@@ -30,13 +29,14 @@ echo "[3/4] Setting up daily sitemap cron job..."
 chmod +x setup_cron.sh
 bash setup_cron.sh
 
-# 4. Run sitemap generator in background (only if not already running)
+# 4. Run sitemap generator (lock file prevents duplicates)
 echo "[4/4] Checking sitemap generator..."
-if pgrep -f "sitemap_generator.py" > /dev/null 2>&1; then
-    echo "Sitemap generator is already running. Skipping."
+if [ -f "$SITEMAP_PIDFILE" ] && kill -0 "$(cat $SITEMAP_PIDFILE)" 2>/dev/null; then
+    echo "Sitemap generator already running (PID: $(cat $SITEMAP_PIDFILE)). Skipping."
 else
     echo "Starting sitemap generator in background..."
     nohup "$PYTHON_BIN" sitemap_generator.py >> sitemap_generator.log 2>&1 &
+    echo $! > "$SITEMAP_PIDFILE"
     echo "Sitemap generator started (PID: $!)"
 fi
 
