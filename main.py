@@ -245,9 +245,9 @@ async def sitemap_index():
         '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
         f'  <sitemap><loc>{base_url}/sitemap_static.xml</loc></sitemap>'
     ]
-    for i in range(1, 51):
+    for i in range(1, 501):
         xml_lines.append(f'  <sitemap><loc>{base_url}/sitemap_movies_{i}.xml</loc></sitemap>')
-    for i in range(1, 51):
+    for i in range(1, 501):
         xml_lines.append(f'  <sitemap><loc>{base_url}/sitemap_tv_{i}.xml</loc></sitemap>')
     xml_lines.append('</sitemapindex>')
     return Response(content="\n".join(xml_lines), media_type="application/xml")
@@ -267,10 +267,10 @@ async def sitemap_static():
 @app.get("/sitemap_movies_{page_num}.xml")
 async def sitemap_movies(page_num: int):
     base_url = "https://streamfit.ehealthfinder.com"
-    start_page = (page_num - 1) * 4 + 1
+    start_page = (page_num - 1) * 400 + 1
     
     urls = []
-    for p in range(start_page, start_page + 4):
+    for p in range(start_page, start_page + 400):
         try:
             url = f"{API_BASE}/wefeed-h5api-bff/subject/filter"
             payload = {
@@ -294,10 +294,10 @@ async def sitemap_movies(page_num: int):
 @app.get("/sitemap_tv_{page_num}.xml")
 async def sitemap_tv(page_num: int):
     base_url = "https://streamfit.ehealthfinder.com"
-    start_page = (page_num - 1) * 4 + 1
+    start_page = (page_num - 1) * 400 + 1
     
     urls = []
-    for p in range(start_page, start_page + 4):
+    for p in range(start_page, start_page + 400):
         try:
             url = f"{API_BASE}/wefeed-h5api-bff/subject/filter"
             payload = {
