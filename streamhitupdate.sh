@@ -9,18 +9,15 @@ echo "============================================="
 cd "$(dirname "$0")"
 echo "Current directory: $(pwd)"
 
+PYTHON_BIN="/home/lcsyxfen/virtualenv/streamhit.lc-synergy.ltd/3.10/bin/python"
+
 # 1. Pull latest code from GitHub
 echo "[1/4] Pulling latest code from origin main..."
 git fetch origin
 git reset --hard origin/main
 
-# # 2. Stop running python processes
-# echo "[2/4] Killing active Python and WSGI processes..."
-# pkill -9 -u $(whoami) -f python 2>/dev/null
-# pkill -9 -u $(whoami) -f lswsgi 2>/dev/null
-
-# 3. Clear stderr logs and touch passenger_wsgi.py to restart the passenger WSGI server
-echo "[3/4] Resetting error logs & triggering Passenger reload..."
+# 2. Reset error logs & trigger Passenger reload
+echo "[2/4] Resetting error logs & triggering Passenger reload..."
 if [ -f "stderr.log" ]; then
     > stderr.log
 fi
@@ -28,11 +25,15 @@ touch passenger_wsgi.py
 mkdir -p tmp
 touch tmp/restart.txt
 
-# 4. Start the background scraper using the specific virtualenv path
-# echo "[4/4] Starting scraper in background..."
-# nohup env RUN_SCRAPER=true /home/lcsyxfen/virtualenv/streamhit.lc-synergy.ltd/3.10/bin/python main.py >> scraper.log 2>&1 &
+# 3. Setup cron job for daily sitemap regeneration at 1 AM
+echo "[3/4] Setting up daily sitemap cron job..."
+chmod +x setup_cron.sh
+bash setup_cron.sh
 
-echo "Scraper logs are being written to scraper.log"
+# 4. Run sitemap generator immediately in background
+echo "[4/4] Starting sitemap generator in background..."
+nohup "$PYTHON_BIN" sitemap_generator.py >> sitemap_generator.log 2>&1 &
+echo "Sitemap generator started (PID: $!)"
 
 echo "============================================="
 echo "   Update complete! Website has reloaded.     "
