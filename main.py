@@ -243,15 +243,13 @@ async def sitemap_index():
     xml_lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-        f'  <sitemap><loc>{base_url}/sitemap_static.xml</loc></sitemap>',
-        f'  <sitemap><loc>{base_url}/sitemap_movies_1.xml</loc></sitemap>',
-        f'  <sitemap><loc>{base_url}/sitemap_movies_2.xml</loc></sitemap>',
-        f'  <sitemap><loc>{base_url}/sitemap_movies_3.xml</loc></sitemap>',
-        f'  <sitemap><loc>{base_url}/sitemap_tv_1.xml</loc></sitemap>',
-        f'  <sitemap><loc>{base_url}/sitemap_tv_2.xml</loc></sitemap>',
-        f'  <sitemap><loc>{base_url}/sitemap_tv_3.xml</loc></sitemap>',
-        '</sitemapindex>'
+        f'  <sitemap><loc>{base_url}/sitemap_static.xml</loc></sitemap>'
     ]
+    for i in range(1, 51):
+        xml_lines.append(f'  <sitemap><loc>{base_url}/sitemap_movies_{i}.xml</loc></sitemap>')
+    for i in range(1, 51):
+        xml_lines.append(f'  <sitemap><loc>{base_url}/sitemap_tv_{i}.xml</loc></sitemap>')
+    xml_lines.append('</sitemapindex>')
     return Response(content="\n".join(xml_lines), media_type="application/xml")
 
 @app.get("/sitemap_static.xml")
