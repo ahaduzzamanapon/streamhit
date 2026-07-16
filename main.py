@@ -337,6 +337,9 @@ async def api_filter(request: Request):
     if year == "*": year = "ALL"
     if language == "*": language = "ALL"
     
+    # Genre should be uppercase for Aoneroom API
+    genre = genre.upper()
+    
     sort_map = {
         "ForYou": "RECOMMEND",
         "Hottest": "HOTTEST",
@@ -347,16 +350,20 @@ async def api_filter(request: Request):
     }
     sort = sort_map.get(sort, sort)
     
-    final_filter = {
-        "sort": sort,
+    # Send flat payload keys as expected by the Aoneroom BFF
+    payload_to_send = {
+        "tabId": tabId,
         "genre": genre,
         "country": country,
         "year": year,
-        "language": language
+        "language": language,
+        "sort": sort,
+        "page": page,
+        "perPage": perPage
     }
     
     url = f"{API_BASE}/wefeed-h5api-bff/subject/filter"
-    data = await _make_request(url, method="POST", payload={"tabId": tabId, "filter": final_filter, "page": page, "perPage": perPage})
+    data = await _make_request(url, method="POST", payload=payload_to_send)
     if "data" in data and "subjects" in data["data"]: data["data"]["items"] = data["data"]["subjects"]
     return data
 
