@@ -187,7 +187,6 @@ async def main():
             urls = []
             for slug in chunk:
                 urls.append({"loc": f"{base_url}/movie/{slug}", "changefreq": "weekly", "priority": "0.8"})
-                urls.append({"loc": f"{base_url}/watch/movie/{slug}", "changefreq": "weekly", "priority": "0.7"})
             file_num = len(movie_sitemaps) + 1
             filename = f"sitemap_movies_{file_num}.xml"
             write_sitemap_file(os.path.join(public_dir, filename), urls)
@@ -201,7 +200,6 @@ async def main():
             urls = []
             for slug in chunk:
                 urls.append({"loc": f"{base_url}/tv/{slug}", "changefreq": "weekly", "priority": "0.8"})
-                urls.append({"loc": f"{base_url}/watch/tv/{slug}", "changefreq": "weekly", "priority": "0.7"})
             file_num = len(tv_sitemaps) + 1
             filename = f"sitemap_tv_{file_num}.xml"
             write_sitemap_file(os.path.join(public_dir, filename), urls)
