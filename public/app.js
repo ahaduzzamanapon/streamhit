@@ -1984,16 +1984,20 @@ function renderEpisodes(season) {
                 const _epSlug = _epPathParts[_epPathParts.length - 1] || "";
                 const _epType = _epPathParts[2] || "movie";
 
+                const urlParams = new URLSearchParams(window.location.search);
+                urlParams.set("season", state.selectedSeason);
+                urlParams.set("episode", state.selectedEpisode);
+
                 // If on details page, redirect to watch page
                 if (!routes.isWatch) {
                     const typeSegment = (state.selectedSubject && state.selectedSubject.subjectType === 2) ? 'tv' : 'movie';
-                    window.location.href = `/watch/${typeSegment}/${encodeURIComponent(_epSlug)}?season=${state.selectedSeason}&episode=${state.selectedEpisode}`;
+                    window.location.href = `/watch/${typeSegment}/${encodeURIComponent(_epSlug)}?${urlParams.toString()}`;
                     return;
                 }
 
                 if (state.playingSeason === state.selectedSeason && Number(epNum) === state.playingEpisode) return; // already playing
 
-                const newUrl = `/watch/${_epType}/${_epSlug}?season=${state.selectedSeason}&episode=${state.selectedEpisode}`;
+                const newUrl = `/watch/${_epType}/${_epSlug}?${urlParams.toString()}`;
                 history.pushState({}, "", newUrl);
 
                 // Highlight active episode button
@@ -2070,8 +2074,12 @@ async function loadPlayResources(subjectId, season = null, episode = null) {
         resumeToast.classList.remove("visible");
     }
 
-    const _pathSegments = window.location.pathname.split("/");
-    const detailPath = decodeURIComponent(_pathSegments[_pathSegments.length - 1] || "");
+    const urlParams = new URLSearchParams(window.location.search);
+    let detailPath = urlParams.get("path") || "";
+    if (!detailPath) {
+        const _pathSegments = window.location.pathname.split("/");
+        detailPath = decodeURIComponent(_pathSegments[_pathSegments.length - 1] || "");
+    }
 
     // Check for saved playback progress for this resource
     const isTv = state.selectedSubject && (state.selectedSubject.seNum > 0 || state.selectedSubject.subjectType === 2);
