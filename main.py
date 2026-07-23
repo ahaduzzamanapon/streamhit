@@ -97,7 +97,8 @@ async def _get_h5_cookie() -> str:
 
 async def _fetch_download_resources(subject_id: str, se: int = 1, ep: int = 1, detail_path: str = "") -> dict:
     cookie = await _get_h5_cookie()
-    for attempt in range(3):
+    last_data = {}
+    for attempt in range(4):
         ip = get_random_singapore_ip()
         headers = {
             "X-Forwarded-For": ip,
@@ -116,12 +117,14 @@ async def _fetch_download_resources(subject_id: str, se: int = 1, ep: int = 1, d
                 resp = await client.get(url, headers=headers)
                 if resp.status_code == 200:
                     data = resp.json().get("data")
-                    if data and (data.get("downloads") or data.get("captions")):
-                        return data
+                    if data:
+                        last_data = data
+                        if data.get("downloads") and len(data["downloads"]) > 0:
+                            return data
         except Exception as e:
             print(f"Error fetching VOD resources (attempt {attempt+1}): {e}")
-        await asyncio.sleep(0.5)
-    return {}
+        await asyncio.sleep(0.3)
+    return last_data
 
 async def _get_bearer_token() -> str:
     global _bearer_token
@@ -455,6 +458,34 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
         
     data = await _fetch_download_resources(subjectId, se, ep, detailPath)
     downloads = data.get("downloads") or []
+
+    # Fallback to Original Audio or sibling dubs if the requested subjectId/dub has no downloads for this episode
+    if not downloads and (detailPath or subjectId):
+        try:
+            fetch_path = detailPath
+            if not fetch_path:
+                det_info = await _make_request(f"{API_BASE}/wefeed-h5api-bff/detail?detailPath={detailPath}")
+                fetch_path = det_info.get("data", {}).get("subject", {}).get("detailPath", "")
+            
+            if fetch_path:
+                det = await _make_request(f"{API_BASE}/wefeed-h5api-bff/detail?detailPath={fetch_path}")
+                dubs = det.get("data", {}).get("subject", {}).get("dubs", [])
+                
+                candidates = [d for d in dubs if str(d.get("subjectId")) != str(subjectId)]
+                orig_candidate = next((d for d in candidates if d.get("original")), None)
+                ordered_candidates = ([orig_candidate] if orig_candidate else []) + [d for d in candidates if d != orig_candidate]
+                
+                for cand in ordered_candidates:
+                    cand_id = cand.get("subjectId")
+                    cand_path = cand.get("detailPath") or fetch_path
+                    if cand_id:
+                        cand_data = await _fetch_download_resources(cand_id, se, ep, cand_path)
+                        cand_dls = cand_data.get("downloads") or []
+                        if cand_dls:
+                            downloads = cand_dls
+                            break
+        except Exception as fallback_err:
+            print(f"Fallback dub check error: {fallback_err}")
     
     items = []
     for d in downloads:
