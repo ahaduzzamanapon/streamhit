@@ -10,6 +10,8 @@ import time
 import base64
 import hashlib
 import hmac
+import aiomysql
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request, HTTPException, Query, Response
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +22,18 @@ from contextlib import asynccontextmanager
 # CONFIGURATION
 # ==========================================================================
 base_dir = os.path.dirname(os.path.abspath(__file__))
+env_path = os.path.join(base_dir, ".env")
+load_dotenv(env_path)
+
+DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
+DB_PORT = int(os.getenv("DB_PORT", "3306"))
+DB_USER = os.getenv("DB_USER", "root")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+DB_NAME = os.getenv("DB_NAME", "moviebox")
+
+db_pool = None
+db_init_lock = None
+
 API_BASE = "https://h5-api.aoneroom.com"
 GATEWAY_SECRET_ONLINE = "76iRl07s0xSN9jqmEWAt79EBJZulIQIsV64FZr2O"
 DEFAULT_GUEST_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjcwNjU5NDg0MTAyMTM4MTYyMzIsInV0cCI6MSwiZXhwIjoxNzkxNzMyMjMzLCJpYXQiOjE3ODM5NTU5MzN9.7iyEzTj4vWAbOF0oXwNnZ0p3Nc1QaO6K9eMiGFyVfGs"
@@ -458,23 +472,197 @@ async def _make_request(url: str, method: str = "GET", payload: dict = None, cus
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Request failed: {str(e)}")
 
+# ==========================================================================
+# DATABASE HELPER & POOL MANAGEMENT
+# ==========================================================================
+async def init_db():
+    global db_pool
+    try:
+        import warnings
+        warnings.filterwarnings("ignore", module="aiomysql")
+        db_pool = await aiomysql.create_pool(
+            host=DB_HOST,
+            port=DB_PORT,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            db=DB_NAME,
+            minsize=1,
+            maxsize=10,
+            autocommit=True,
+            connect_timeout=5
+        )
+        async with db_pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("""
+                    CREATE TABLE IF NOT EXISTS admins (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        username VARCHAR(100) NOT NULL UNIQUE,
+                        password_hash VARCHAR(255) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                await cur.execute("""
+                    CREATE TABLE IF NOT EXISTS subjects (
+                        subject_id VARCHAR(50) PRIMARY KEY,
+                        title VARCHAR(255) NOT NULL,
+                        subject_type INT NOT NULL DEFAULT 1,
+                        cover TEXT,
+                        detail_path VARCHAR(255),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                await cur.execute("""
+                    CREATE TABLE IF NOT EXISTS banners (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        subject_id VARCHAR(50) NOT NULL UNIQUE,
+                        title VARCHAR(255) NOT NULL,
+                        image_url TEXT,
+                        detail_path VARCHAR(255),
+                        subject_type INT DEFAULT 1,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                await cur.execute("""
+                    CREATE TABLE IF NOT EXISTS notifications (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        title VARCHAR(255) NOT NULL,
+                        message TEXT NOT NULL,
+                        subject_id VARCHAR(50),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                await cur.execute("""
+                    CREATE TABLE IF NOT EXISTS app_versions (
+                        version_code INT PRIMARY KEY,
+                        version_name VARCHAR(50) NOT NULL,
+                        apk_url TEXT NOT NULL,
+                        must_update BOOLEAN DEFAULT FALSE,
+                        release_notes TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                await cur.execute("""
+                    CREATE TABLE IF NOT EXISTS live_sports (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        title VARCHAR(255) NOT NULL,
+                        logo TEXT,
+                        team1_name VARCHAR(100),
+                        team1_logo TEXT,
+                        team2_name VARCHAR(100),
+                        team2_logo TEXT,
+                        stream_links TEXT NOT NULL,
+                        referer TEXT,
+                        origin TEXT,
+                        use_bd_proxy BOOLEAN DEFAULT TRUE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                await cur.execute("""
+                    CREATE TABLE IF NOT EXISTS live_tv_channels (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        name VARCHAR(255) NOT NULL,
+                        logo TEXT,
+                        category VARCHAR(100) DEFAULT 'General',
+                        stream_links TEXT NOT NULL,
+                        referer TEXT,
+                        origin TEXT,
+                        use_bd_proxy BOOLEAN DEFAULT TRUE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                # Seed default admin if table is empty
+                await cur.execute("SELECT COUNT(*) FROM admins")
+                row = await cur.fetchone()
+                if row and row[0] == 0:
+                    default_pw = "admin123"
+                    salt = "streamfit_secure_salt_2026"
+                    pw_hash = hashlib.sha256((default_pw + salt).encode('utf-8')).hexdigest()
+                    await cur.execute("INSERT INTO admins (username, password_hash) VALUES (%s, %s)", ("admin", pw_hash))
+                    print("[Database] Created default admin account (admin / admin123).")
+        print("[Database] MySQL pool and tables initialized successfully.")
+    except Exception as e:
+        print(f"[Database Warning] MySQL connection failed ({e}). Running in standalone mode.")
+        db_pool = None
+
+async def get_db_pool():
+    global db_pool, db_init_lock
+    if db_pool is None:
+        if db_init_lock is None:
+            db_init_lock = asyncio.Lock()
+        async with db_init_lock:
+            if db_pool is None:
+                await init_db()
+    return db_pool
+
+def _is_process_alive(pid: int) -> bool:
+    try:
+        if os.name == "nt":
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            process = kernel32.OpenProcess(0x00100000, False, pid)
+            if process:
+                kernel32.CloseHandle(process)
+                return True
+            return False
+        else:
+            os.kill(pid, 0)
+            return True
+    except Exception:
+        return False
+
 async def run_sitemap_generator_background():
+    enable_startup = os.getenv("ENABLE_STARTUP_SITEMAP", "false").strip().lower() in ("true", "1", "yes")
+    if not enable_startup:
+        print("[Sitemap] Startup sitemap generation skipped (handled by daily cron). Set ENABLE_STARTUP_SITEMAP=true to enable.")
+        return
+
+    pid_file = os.path.join(base_dir, ".sitemap_generator.pid")
+    tmp_pid_file = "/tmp/sitemap_generator.pid"
+
+    for pfile in [pid_file, tmp_pid_file]:
+        if os.path.exists(pfile):
+            try:
+                with open(pfile, "r") as f:
+                    old_pid = int(f.read().strip())
+                if _is_process_alive(old_pid):
+                    print(f"[Sitemap] Sitemap generator already running (PID: {old_pid}). Skipping duplicate startup.")
+                    return
+            except Exception:
+                pass
+
     try:
         import sys
         import subprocess
-        print("Starting background sitemap generator subprocess...")
-        subprocess.Popen([sys.executable, "sitemap_generator.py"])
+        print("[Sitemap] Starting background sitemap generator subprocess...")
+        proc = subprocess.Popen([sys.executable, os.path.join(base_dir, "sitemap_generator.py")], cwd=base_dir)
+        try:
+            with open(pid_file, "w") as f:
+                f.write(str(proc.pid))
+        except Exception:
+            pass
+        print(f"[Sitemap] Background sitemap generator launched with PID {proc.pid}.")
     except Exception as e:
-        print(f"Failed to start background sitemap generator: {e}")
+        print(f"[Sitemap] Failed to start background sitemap generator: {e}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     asyncio.create_task(run_sitemap_generator_background())
     yield
     await http_client.aclose()
+    global db_pool
+    if db_pool:
+        try:
+            db_pool.close()
+            await db_pool.wait_closed()
+        except Exception:
+            pass
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+import admin
+app.include_router(admin.router)
 
 @app.middleware("http")
 async def add_no_cache_headers(request: Request, call_next):
@@ -484,6 +672,83 @@ async def add_no_cache_headers(request: Request, call_next):
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
     return response
+
+async def resolve_subject_id(detail_path: str = "", subject_id: str = "") -> str:
+    if subject_id:
+        return str(subject_id).strip()
+    if not detail_path:
+        return ""
+    
+    detail_path = detail_path.strip()
+
+    # 1. Check in-memory mapping
+    if detail_path in _slug_to_id:
+        return str(_slug_to_id[detail_path])
+
+    # 2. Extract numeric subjectId from slug tail (e.g. title-803658983365039832)
+    if "-" in detail_path:
+        tail = detail_path.split("-")[-1]
+        if tail.isdigit():
+            _slug_to_id[detail_path] = tail
+            return tail
+    elif detail_path.isdigit():
+        _slug_to_id[detail_path] = detail_path
+        return detail_path
+
+    # 3. Check MySQL subjects table if DB pool ready
+    try:
+        pool = await get_db_pool()
+        if pool:
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute("SELECT subject_id FROM subjects WHERE detail_path = %s LIMIT 1", (detail_path,))
+                    row = await cur.fetchone()
+                    if row and row[0]:
+                        sid = str(row[0])
+                        _slug_to_id[detail_path] = sid
+                        return sid
+    except Exception:
+        pass
+
+    # 4. Check H5 API detail
+    try:
+        data = await _make_request(f"{API_BASE}/wefeed-h5api-bff/detail?detailPath={detail_path}")
+        subj = data.get("data", {}).get("subject") or {}
+        sid = subj.get("subjectId")
+        if sid:
+            sid = str(sid)
+            _slug_to_id[detail_path] = sid
+            return sid
+    except Exception:
+        pass
+
+    # 5. Reverse match via MovieBox Mobile search using title words extracted from slug
+    try:
+        words = detail_path.rsplit('-', 1)[0] if '-' in detail_path else detail_path
+        clean_words = ' '.join(re.sub(r'[^a-zA-Z0-9]+', ' ', words).split())
+        if clean_words:
+            res = await request_moviebox_mobile(
+                "/wefeed-mobile-bff/subject-api/search",
+                method="POST",
+                data={"keyword": clean_words, "q": clean_words, "page": 1, "pageSize": 10, "type": 0}
+            )
+            items = res.get("data", {}).get("items") or []
+            for it in items:
+                d_url = it.get("detailUrl") or ""
+                it_sid = str(it.get("subjectId") or "")
+                it_path = it.get("detailPath") or ""
+                if detail_path in d_url or detail_path == it_path or (it_sid and detail_path.endswith(it_sid)):
+                    _slug_to_id[detail_path] = it_sid
+                    return it_sid
+            if items:
+                top_sid = str(items[0].get("subjectId") or "")
+                if top_sid:
+                    _slug_to_id[detail_path] = top_sid
+                    return top_sid
+    except Exception as e:
+        print(f"Error resolving slug '{detail_path}': {e}")
+
+    return ""
 
 async def get_subject_meta(slug: str):
     meta = {
@@ -503,11 +768,7 @@ async def get_subject_meta(slug: str):
         pass
 
     if not inner:
-        sid = _slug_to_id.get(slug)
-        if not sid and "-" in slug:
-            tail = slug.split("-")[-1]
-            if tail.isdigit():
-                sid = tail
+        sid = await resolve_subject_id(slug)
         if sid:
             try:
                 mob_res = await request_moviebox_mobile("/wefeed-mobile-bff/subject-api/get", params={"subjectId": sid})
@@ -550,6 +811,9 @@ def serve_html(filename: str, meta_replacements=None):
 
 @app.get("/", response_class=HTMLResponse)
 async def index(): return serve_html("public/index.html")
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_page(): return serve_html("public/admin.html")
 
 @app.get("/movies", response_class=HTMLResponse)
 async def movies(): return serve_html("public/movies.html", {"<title>Explore Movies - Streamfit</title>": "<title>Explore Movies - Streamfit</title>"})
@@ -726,11 +990,12 @@ async def api_search(request: Request):
                 sid = str(it.get("subjectId") or "")
                 title = it.get("title") or ""
                 detail_path = it.get("detailPath") or ""
-                if not detail_path and it.get("detailUrl"):
-                    detail_path = it["detailUrl"].rstrip("/").split("/")[-1]
+                clean_slug = re.sub(r'[^a-zA-Z0-9]+', '-', title.lower()).strip('-')
                 if not detail_path:
-                    clean_slug = re.sub(r'[^a-zA-Z0-9]+', '-', title.lower()).strip('-')
-                    detail_path = f"{clean_slug}-{sid}"
+                    detail_path = f"{clean_slug}-{sid}" if sid else clean_slug
+                if it.get("detailUrl"):
+                    raw_slug = it["detailUrl"].rstrip("/").split("/")[-1]
+                    _slug_to_id[raw_slug] = sid
                     
                 _slug_to_id[detail_path] = sid
                 _slug_to_id[sid] = sid
@@ -797,11 +1062,12 @@ async def search_suggest(q: str = ""):
                 sid = str(it.get("subjectId") or "")
                 title = it.get("title") or ""
                 detail_path = it.get("detailPath") or ""
-                if not detail_path and it.get("detailUrl"):
-                    detail_path = it["detailUrl"].rstrip("/").split("/")[-1]
+                clean_slug = re.sub(r'[^a-zA-Z0-9]+', '-', title.lower()).strip('-')
                 if not detail_path:
-                    clean_slug = re.sub(r'[^a-zA-Z0-9]+', '-', title.lower()).strip('-')
-                    detail_path = f"{clean_slug}-{sid}"
+                    detail_path = f"{clean_slug}-{sid}" if sid else clean_slug
+                if it.get("detailUrl"):
+                    raw_slug = it["detailUrl"].rstrip("/").split("/")[-1]
+                    _slug_to_id[raw_slug] = sid
                 _slug_to_id[detail_path] = sid
                 _slug_to_id[sid] = sid
 
@@ -811,6 +1077,7 @@ async def search_suggest(q: str = ""):
 
                 items.append({
                     "title": title,
+                    "subjectId": sid,
                     "subjectType": it.get("subjectType", 1),
                     "cover": cover,
                     "rating": str(it.get("imdbRatingValue") or "7.5"),
@@ -869,12 +1136,7 @@ async def api_detail(detailPath: str = "", subjectId: str = ""):
             pass
 
     # 2. Fallback to MovieBox Mobile Gateway
-    sid = subjectId or _slug_to_id.get(detailPath)
-    if not sid and detailPath and "-" in detailPath:
-        tail = detailPath.split("-")[-1]
-        if tail.isdigit():
-            sid = tail
-
+    sid = await resolve_subject_id(detailPath, subjectId)
     if sid:
         try:
             mob_res = await request_moviebox_mobile("/wefeed-mobile-bff/subject-api/get", params={"subjectId": sid})
@@ -907,12 +1169,7 @@ async def api_season(detailPath: str = "", subjectId: str = ""):
         except Exception:
             pass
 
-    sid = subjectId or _slug_to_id.get(detailPath)
-    if not sid and detailPath and "-" in detailPath:
-        tail = detailPath.split("-")[-1]
-        if tail.isdigit():
-            sid = tail
-
+    sid = await resolve_subject_id(detailPath, subjectId)
     if sid:
         try:
             mob_res = await request_moviebox_mobile("/wefeed-mobile-bff/subject-api/get", params={"subjectId": sid})
@@ -928,17 +1185,7 @@ async def api_season(detailPath: str = "", subjectId: str = ""):
 @app.get("/api/resource")
 async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId: str = ""):
     if not subjectId and detailPath:
-        subjectId = _slug_to_id.get(detailPath, "")
-        if not subjectId:
-            try:
-                detail_data = await _make_request(f"{API_BASE}/wefeed-h5api-bff/detail?detailPath={detailPath}")
-                subjectId = detail_data.get("data", {}).get("subject", {}).get("subjectId", "")
-            except:
-                pass
-            if not subjectId and "-" in detailPath:
-                tail = detailPath.split("-")[-1]
-                if tail.isdigit():
-                    subjectId = tail
+        subjectId = await resolve_subject_id(detailPath, subjectId)
             
     if not subjectId:
         return {"code": 0, "data": {"list": []}}
@@ -1014,11 +1261,7 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
 @app.get("/api/captions")
 async def api_captions(se: int = 1, ep: int = 1, detailPath: str = "", subjectId: str = ""):
     if not subjectId and detailPath:
-        try:
-            detail_data = await _make_request(f"{API_BASE}/wefeed-h5api-bff/detail?detailPath={detailPath}")
-            subjectId = detail_data.get("data", {}).get("subject", {}).get("subjectId", "")
-        except:
-            pass
+        subjectId = await resolve_subject_id(detailPath, subjectId)
             
     if not subjectId:
         return {"code": 0, "data": {"list": []}}

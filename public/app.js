@@ -795,7 +795,8 @@ function createContentCard(item) {
     card.className = "content-card";
     card.dataset.id = item.subjectId;
     const pathValue = item.detailPath || '';
-    card.href = (item.subjectType === 2 ? '/tv/' : '/movie/') + encodeURIComponent(pathValue);
+    const idParam = item.subjectId ? `?id=${encodeURIComponent(item.subjectId)}` : '';
+    card.href = (item.subjectType === 2 ? '/tv/' : '/movie/') + encodeURIComponent(pathValue) + idParam;
     card.style.textDecoration = 'none';
 
     const title = item.title || 'Unknown Title';
@@ -894,6 +895,7 @@ async function initDetailsPage() {
     const urlParams = new URLSearchParams(window.location.search);
     const reqSeason = urlParams.get("season") ? parseInt(urlParams.get("season")) : 1;
     const reqEpisode = urlParams.get("episode") ? parseInt(urlParams.get("episode")) : 1;
+    const reqId = urlParams.get("id") || "";
 
     if (!detailPath) {
         window.location.href = "/";
@@ -907,7 +909,7 @@ async function initDetailsPage() {
     state.selectedEpisode = reqEpisode;
 
     // Fetch Details
-    const result = await apiGet(`/api/detail?detailPath=${encodeURIComponent(detailPath)}`);
+    const result = await apiGet(`/api/detail?detailPath=${encodeURIComponent(detailPath)}&subjectId=${encodeURIComponent(reqId)}`);
     if (result && result.data) {
         const detail = result.data;
         const subjectId = detail.subjectId;
@@ -949,8 +951,16 @@ async function initDetailsPage() {
             btnDetailsPlay.onclick = () => {
                 const typeSegment = detail.subjectType === 2 ? 'tv' : 'movie';
                 let url = `/watch/${typeSegment}/${encodeURIComponent(detailPath)}`;
+                const q = [];
                 if (detail.subjectType === 2) {
-                    url += `?season=${state.selectedSeason}&episode=${state.selectedEpisode}`;
+                    q.push(`season=${state.selectedSeason}`);
+                    q.push(`episode=${state.selectedEpisode}`);
+                }
+                if (subjectId) {
+                    q.push(`id=${encodeURIComponent(subjectId)}`);
+                }
+                if (q.length > 0) {
+                    url += `?${q.join("&")}`;
                 }
                 window.location.href = url;
             };
@@ -2566,7 +2576,9 @@ function bindCommonEvents() {
                                 itemEl.onclick = (e) => {
                                     e.stopPropagation();
                                     dropdown.style.display = "none";
-                                    window.location.href = `/${item.subjectType === 2 ? 'tv' : 'movie'}/${encodeURIComponent(item.detailPath || '')}`;
+                                    const typeSeg = item.subjectType === 2 ? 'tv' : 'movie';
+                                    const idParam = item.subjectId ? `?id=${encodeURIComponent(item.subjectId)}` : '';
+                                    window.location.href = `/${typeSeg}/${encodeURIComponent(item.detailPath || '')}${idParam}`;
                                 };
                             }
                             dropdown.appendChild(itemEl);
