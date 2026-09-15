@@ -1089,7 +1089,7 @@ async function initWatchPage() {
     const watchSlug = decodeURIComponent(watchPathParts[3] || "");
     const watchTypeSegment = watchPathParts[2] || "movie";
     const urlParams = new URLSearchParams(window.location.search);
-    let subjectId = "";
+    let subjectId = urlParams.get("id") || "";
     const tmdbId = urlParams.get("tmdb");
     const isLiveStream = (window.location.pathname.toLowerCase() === "/watch") && (urlParams.get("type") === "sports" || urlParams.get("type") === "tv");
     const type = isLiveStream ? urlParams.get("type") : watchTypeSegment;
@@ -1426,8 +1426,12 @@ async function initWatchPage() {
             history = JSON.parse(localStorage.getItem("streamfit_history")) || [];
         } catch (e) {}
         
+        const actualDetailPath = (state.selectedSubject && state.selectedSubject.detailPath) 
+            ? state.selectedSubject.detailPath 
+            : (window.location.pathname.split("/").pop() || "");
+        
         // Remove any previous entry for this show/subject to avoid duplicates
-        history = history.filter(item => item.subjectId !== subjectId);
+        history = history.filter(item => String(item.subjectId) !== String(subjectId) && item.detailPath !== actualDetailPath);
         
         const progressPercent = Math.round((currentTime / duration) * 100);
         if (currentTime > 5 && progressPercent < 95) {
@@ -1440,7 +1444,8 @@ async function initWatchPage() {
                 currentTime: currentTime,
                 duration: duration,
                 progressPercent: progressPercent,
-                detailPath: window.location.pathname.split("/").pop() || "",
+                detailPath: actualDetailPath,
+                subjectType: state.selectedSubject.subjectType || (isTv ? 2 : 1),
                 lastWatched: Date.now()
             };
             history.unshift(newItem);
@@ -1679,9 +1684,21 @@ async function initWatchPage() {
     }
 
     const detailPath = watchSlug;
-    const result = await apiGet(`/api/detail?detailPath=${encodeURIComponent(detailPath)}`);
+    let result = await apiGet(`/api/detail?detailPath=${encodeURIComponent(detailPath)}&subjectId=${encodeURIComponent(subjectId)}`);
     if (result && result.data) {
-        const detail = result.data;
+        let detail = result.data;
+
+        // If a specific dub was requested via ?id=, resolve that exact dub's details
+        if (subjectId && String(detail.subjectId) !== String(subjectId) && detail.dubs && detail.dubs.length > 0) {
+            const targetDub = detail.dubs.find(d => String(d.subjectId) === String(subjectId));
+            if (targetDub) {
+                const dubDetailRes = await apiGet(`/api/detail?subjectId=${encodeURIComponent(subjectId)}&detailPath=${encodeURIComponent(targetDub.detailPath || '')}`);
+                if (dubDetailRes && dubDetailRes.data && dubDetailRes.data.title) {
+                    detail = dubDetailRes.data;
+                }
+            }
+        }
+
         state.selectedSubject = detail;
         subjectId = detail.subjectId;
 
@@ -1739,18 +1756,14 @@ async function initWatchPage() {
                     
                     showToastNotification("Switching language track...");
                     
-                    // Update URL silently
-                    const urlParams = new URLSearchParams(window.location.search);
-                    urlParams.set("id", targetSubjectId);
-                    if (targetDetailPath) {
-                        urlParams.set("path", targetDetailPath);
-                    } else {
-                        urlParams.delete("path");
-                    }
-                    history.pushState({}, "", `${window.location.pathname}?${urlParams.toString()}`);
-                    
                     // Update active subject ID
                     subjectId = targetSubjectId;
+                    
+                    const isTv = (state.selectedSubject && state.selectedSubject.subjectType === 2) || (watchTypeSegment === 'tv');
+                    const typeSeg = isTv ? 'tv' : 'movie';
+                    const effectiveSlug = targetDetailPath || watchSlug;
+                    const newUrl = `/watch/${typeSeg}/${encodeURIComponent(effectiveSlug)}?id=${encodeURIComponent(targetSubjectId)}&season=${state.selectedSeason}&episode=${state.selectedEpisode}`;
+                    history.pushState({}, "", newUrl);
                     
                     const result = await apiGet(`/api/detail?subjectId=${targetSubjectId}&detailPath=${encodeURIComponent(targetDetailPath)}`);
                     if (result && result.data) {
@@ -1765,11 +1778,11 @@ async function initWatchPage() {
                         const descEl = document.getElementById("watchDescription");
                         if (descEl) descEl.textContent = newDetail.description || "No description available.";
                         
-                        const isTv = newDetail.subjectType !== 1 && (newDetail.seNum > 0 || newDetail.subjectType === 2);
+                        const isTvNow = newDetail.subjectType !== 1 && (newDetail.seNum > 0 || newDetail.subjectType === 2);
                         const tvSelector = document.getElementById("watchTvSelector");
-                        if (isTv) {
+                        if (isTvNow) {
                             if (tvSelector) tvSelector.style.display = "block";
-                            await loadSeasonEpisodes(targetSubjectId, targetDetailPath);
+                            await loadSeasonEpisodes(targetSubjectId, targetDetailPath || effectiveSlug);
                             await loadPlayResources(targetSubjectId, state.selectedSeason, state.selectedEpisode);
                         } else {
                             if (tvSelector) tvSelector.style.display = "none";
@@ -1904,7 +1917,7 @@ async function loadSeasonEpisodes(subjectId, detailPath = "") {
     seasonTabs.innerHTML = "<span>Loading seasons...</span>";
     episodeGrid.innerHTML = "";
 
-    const result = await apiGet(`/api/season-info?detailPath=${encodeURIComponent(detailPath)}`);
+    const result = await apiGet(`/api/season-info?detailPath=${encodeURIComponent(detailPath)}&subjectId=${encodeURIComponent(subjectId || '')}`);
     if (result && result.data && result.data.seasons && result.data.seasons.length > 0) {
         const seasons = result.data.seasons;
         seasonTabs.innerHTML = "";
@@ -2619,6 +2632,16 @@ function bindCommonEvents() {
     });
 }
 
+function removeContinueWatchingItem(subjectId) {
+    let history = [];
+    try {
+        history = JSON.parse(localStorage.getItem("streamfit_history")) || [];
+    } catch(e) {}
+    history = history.filter(item => String(item.subjectId) !== String(subjectId));
+    localStorage.setItem("streamfit_history", JSON.stringify(history));
+    renderContinueWatchingSection();
+}
+
 function renderContinueWatchingSection() {
     const section = document.getElementById("continueWatchingSection");
     const grid = document.getElementById("continueWatchingGrid");
@@ -2651,15 +2674,22 @@ function renderContinueWatchingSection() {
         const card = document.createElement("div");
         card.className = "continue-card";
         
-        let subTitle = "";
-        if (item.season > 0) {
-            subTitle = `S${item.season}E${item.episode}`;
-        } else {
-            subTitle = "Movie";
+        const isTv = item.subjectType === 2 || item.season > 0;
+        const subTitle = (item.season > 0) ? `S${item.season} E${item.episode}` : "Movie";
+        const cleanTitle = item.title || "Untitled";
+        
+        let langBadge = "";
+        if (cleanTitle.toLowerCase().includes("[hindi]")) {
+            langBadge = `<span class="continue-badge lang">Hindi</span>`;
+        } else if (cleanTitle.toLowerCase().includes("[bengali]")) {
+            langBadge = `<span class="continue-badge lang">Bengali</span>`;
         }
         
-        card.onclick = () => {
-            let url = `/watch?id=${item.subjectId}&path=${encodeURIComponent(item.detailPath)}`;
+        card.onclick = (e) => {
+            if (e.target.closest(".continue-remove-btn")) return;
+            const typeSegment = isTv ? "tv" : "movie";
+            const path = item.detailPath || "";
+            let url = `/watch/${typeSegment}/${encodeURIComponent(path)}?id=${encodeURIComponent(item.subjectId)}`;
             if (item.season > 0) {
                 url += `&season=${item.season}&episode=${item.episode}`;
             }
@@ -2670,7 +2700,14 @@ function renderContinueWatchingSection() {
         
         card.innerHTML = `
             <div class="continue-poster-wrapper">
-                <img src="${coverUrl}" alt="${item.title}" onerror="this.onerror=null; this.src='/default-cover.png';" loading="lazy">
+                <img src="${coverUrl}" alt="${cleanTitle}" onerror="this.onerror=null; this.src='/default-cover.png';" loading="lazy">
+                <div class="continue-badges">
+                    <span class="continue-badge ep">${subTitle}</span>
+                    ${langBadge}
+                </div>
+                <button class="continue-remove-btn" title="Remove from Continue Watching" onclick="event.stopPropagation(); removeContinueWatchingItem('${item.subjectId}');">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
                 <div class="continue-play-overlay">
                     <i class="fa-solid fa-play"></i>
                 </div>
@@ -2679,8 +2716,11 @@ function renderContinueWatchingSection() {
                 </div>
             </div>
             <div class="continue-info">
-                <div class="continue-title" title="${item.title}">${item.title}</div>
-                <div class="continue-sub-title">${subTitle} (${item.progressPercent}% watched)</div>
+                <h3 class="continue-title" title="${cleanTitle}">${cleanTitle}</h3>
+                <div class="continue-sub-title">
+                    <span class="ep-tag">${subTitle}</span>
+                    <span class="percent-tag"><i class="fa-solid fa-play" style="font-size:8px;"></i> ${item.progressPercent}%</span>
+                </div>
             </div>
         `;
         grid.appendChild(card);

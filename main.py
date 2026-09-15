@@ -3,8 +3,13 @@ import re
 import json
 import httpx
 import urllib.parse
+from urllib.parse import urlparse, parse_qsl
 import asyncio
 import random
+import time
+import base64
+import hashlib
+import hmac
 from fastapi import FastAPI, Request, HTTPException, Query, Response
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +21,293 @@ from contextlib import asynccontextmanager
 # ==========================================================================
 base_dir = os.path.dirname(os.path.abspath(__file__))
 API_BASE = "https://h5-api.aoneroom.com"
+GATEWAY_SECRET_ONLINE = "76iRl07s0xSN9jqmEWAt79EBJZulIQIsV64FZr2O"
+DEFAULT_GUEST_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjcwNjU5NDg0MTAyMTM4MTYyMzIsInV0cCI6MSwiZXhwIjoxNzkxNzMyMjMzLCJpYXQiOjE3ODM5NTU5MzN9.7iyEzTj4vWAbOF0oXwNnZ0p3Nc1QaO6K9eMiGFyVfGs"
+
+_slug_to_id = {}
+_banners_cache = None
+_banners_cache_time = 0
+
+def md5_hex(data):
+    if not data: return ""
+    if isinstance(data, str): data = data.encode('utf-8')
+    return hashlib.md5(data).hexdigest()
+
+def generate_client_token():
+    ts = str(int(time.time() * 1000))
+    return f"{ts},{md5_hex(ts[::-1])}"
+
+def generate_tr_signature(method: str, url: str, body_data: str = "", timestamp: int = None) -> str:
+    if timestamp is None:
+        timestamp = int(time.time() * 1000)
+    parsed_url = urlparse(url)
+    path = parsed_url.path
+    query_params = parse_qsl(parsed_url.query, keep_blank_values=True)
+    if query_params:
+        query_params.sort(key=lambda x: x[0])
+        query_string = "&".join([f"{k}={v}" for k, v in query_params])
+        resource = f"{path}?{query_string}"
+    else:
+        resource = path
+    body_for_md5 = body_data[:0x19000] if body_data else ""
+    body_md5 = md5_hex(body_for_md5) if body_data else ""
+    canonical_list = [
+        method.upper(),
+        "application/json",
+        "application/json;charset=UTF-8",
+        str(len(body_data)) if body_data else "",
+        str(timestamp),
+        body_md5,
+        resource
+    ]
+    canonical_string = "\n".join(canonical_list)
+    key = base64.b64decode(GATEWAY_SECRET_ONLINE)
+    h = hmac.new(key, canonical_string.encode('utf-8'), hashlib.md5)
+    signature_b64 = base64.b64encode(h.digest()).decode('utf-8')
+    return f"{timestamp}|2|{signature_b64}"
+
+async def request_moviebox_mobile(endpoint: str, method: str = "GET", params: dict = None, data: dict = None) -> dict:
+    base = "https://apig.inmoviebox.com"
+    netloc = urlparse(base).netloc
+    body_str = json.dumps(data, separators=(',', ':')) if data else ""
+    qp = params.copy() if params else {}
+    if "host" not in qp:
+        qp["host"] = netloc
+    sorted_keys = sorted(qp.keys())
+    query_str = "&".join([f"{k}={qp[k]}" for k in sorted_keys])
+    full_url = f"{base}{endpoint}?{query_str}"
+    ts = int(time.time() * 1000)
+    sig = generate_tr_signature(method, full_url, body_str, ts)
+    client_info = {
+        "package_name": "com.community.oneroom",
+        "version_name": "4.0.02",
+        "version_code": 50020126,
+        "os": "android",
+        "os_version": "14",
+        "install_ch": "ps",
+        "device_id": "868203051234567",
+        "install_store": "ps",
+        "gaid": "",
+        "brand": "Google",
+        "model": "Pixel 6",
+        "system_language": "en",
+        "net": "wifi",
+        "region": "IN",
+        "timezone": "Asia/Kolkata",
+        "sp_code": "404"
+    }
+    headers = {
+        "User-Agent": "MovieBox/4.0.02 (Android 14; Pixel 6)",
+        "Accept": "application/json",
+        "Content-Type": "application/json;charset=UTF-8",
+        "Host": netloc,
+        "X-M-Version": "4.0.02",
+        "X-Sign-Version": "2.0",
+        "X-Client-Token": generate_client_token(),
+        "X-Client-Info": json.dumps(client_info, separators=(',', ':')),
+        "X-Client-Status": "0",
+        "X-Play-Mode": "2",
+        "appid": "4U01pxRu278GqCZKY9",
+        "region": "IN",
+        "lang": "en",
+        "os": "android",
+        "Authorization": f"Bearer {DEFAULT_GUEST_TOKEN}",
+        "x-tr-signature": sig,
+        "X-Timestamp": str(ts)
+    }
+    if body_str:
+        headers["Content-Length"] = str(len(body_str))
+    try:
+        async with httpx.AsyncClient(timeout=15.0, trust_env=False) as client:
+            if method == "POST":
+                res = await client.post(full_url, headers=headers, content=body_str)
+            else:
+                res = await client.get(full_url, headers=headers)
+            return res.json()
+    except Exception as e:
+        print(f"Mobile API error ({endpoint}): {e}")
+        return {}
+
+async def get_latest_banners():
+    global _banners_cache, _banners_cache_time
+    now = time.time()
+    if _banners_cache and (now - _banners_cache_time < 600):
+        return _banners_cache
+
+    banner_items = []
+    seen_ids = set()
+
+    try:
+        rec_res = await request_moviebox_mobile(
+            "/wefeed-mobile-bff/subject-api/daily-movie-rec",
+            method="POST",
+            data={"page": 1, "pageSize": 20}
+        )
+        raw_items = rec_res.get("data", {}).get("items") or []
+        for it in raw_items:
+            sid = str(it.get("subjectId") or "")
+            if not sid or sid in seen_ids:
+                continue
+            seen_ids.add(sid)
+            title = it.get("title") or ""
+            detail_path = it.get("detailPath") or ""
+            if not detail_path and it.get("detailUrl"):
+                detail_path = it["detailUrl"].rstrip("/").split("/")[-1]
+            if not detail_path:
+                clean_slug = re.sub(r'[^a-zA-Z0-9]+', '-', title.lower()).strip('-')
+                detail_path = f"{clean_slug}-{sid}"
+            _slug_to_id[detail_path] = sid
+            _slug_to_id[sid] = sid
+
+            cover = it.get("cover") or {}
+            cover_url = cover.get("url") if isinstance(cover, dict) else (cover if isinstance(cover, str) else "")
+            
+            banner_items.append({
+                "subjectId": sid,
+                "title": title,
+                "content": title,
+                "image": cover_url,
+                "detailPath": detail_path,
+                "subjectType": it.get("subjectType", 1),
+                "subject": {
+                    "subjectId": sid,
+                    "title": title,
+                    "detailPath": detail_path,
+                    "cover": {"url": cover_url} if cover_url else {},
+                    "genre": it.get("genre", "Trending"),
+                    "imdbRatingValue": str(it.get("imdbRatingValue") or "7.5"),
+                    "releaseDate": it.get("releaseDate") or "2026",
+                    "countryName": it.get("countryName") or "USA",
+                    "subjectType": it.get("subjectType", 1)
+                }
+            })
+    except Exception as e:
+        print(f"Error fetching latest banners: {e}")
+
+    if not banner_items:
+        try:
+            h5_data = await _make_request(f"{API_BASE}/wefeed-h5api-bff/home?host=moviebox.ph")
+            for op in h5_data.get("data", {}).get("operatingList", []):
+                if op.get("type") == "BANNER":
+                    banner_items.extend(op.get("banner", {}).get("items", []))
+        except Exception as e:
+            print(f"H5 banner fallback error: {e}")
+
+    _banners_cache = banner_items
+    _banners_cache_time = now
+    return banner_items
+
+_latest_cache = {}
+_latest_cache_time = {}
+
+async def get_latest_content(subject_type: int = 0, limit: int = 36) -> list:
+    global _latest_cache, _latest_cache_time
+    cache_key = f"type_{subject_type}"
+    now = time.time()
+    if cache_key in _latest_cache and (now - _latest_cache_time.get(cache_key, 0) < 600):
+        return _latest_cache[cache_key]
+
+    seen = set()
+    raw_candidates = []
+
+    # 1. Fresh daily recommendations from MovieBox Mobile
+    try:
+        rec_res = await request_moviebox_mobile(
+            "/wefeed-mobile-bff/subject-api/daily-movie-rec",
+            method="POST",
+            data={"page": 1, "pageSize": 20}
+        )
+        for it in (rec_res.get("data", {}).get("items") or []):
+            sid = str(it.get("subjectId") or "")
+            if sid and sid not in seen:
+                seen.add(sid)
+                raw_candidates.append(it)
+    except Exception as e:
+        print(f"Error fetching daily recs: {e}")
+
+    # 2. Year 2026 search (latest releases)
+    try:
+        s26 = await request_moviebox_mobile(
+            "/wefeed-mobile-bff/subject-api/search",
+            method="POST",
+            data={"keyword": "2026", "page": 1, "pageSize": 20, "type": subject_type or 0}
+        )
+        for it in (s26.get("data", {}).get("items") or []):
+            sid = str(it.get("subjectId") or "")
+            if sid and sid not in seen:
+                seen.add(sid)
+                raw_candidates.append(it)
+    except Exception as e:
+        print(f"Error fetching 2026 latest: {e}")
+
+    # 3. Year 2025 search
+    try:
+        s25 = await request_moviebox_mobile(
+            "/wefeed-mobile-bff/subject-api/search",
+            method="POST",
+            data={"keyword": "2025", "page": 1, "pageSize": 15, "type": subject_type or 0}
+        )
+        for it in (s25.get("data", {}).get("items") or []):
+            sid = str(it.get("subjectId") or "")
+            if sid and sid not in seen:
+                seen.add(sid)
+                raw_candidates.append(it)
+    except Exception as e:
+        print(f"Error fetching 2025 latest: {e}")
+
+    # Filter by subject_type if requested (1 = movie, 2 = tv)
+    if subject_type in (1, 2):
+        raw_candidates = [it for it in raw_candidates if it.get("subjectType") == subject_type]
+
+    # Filter out type 6 (music), type 9 (clips/sumo/wwe), type 7 (short vertical dramas)
+    raw_candidates = [it for it in raw_candidates if it.get("subjectType") not in (6, 7, 9)]
+
+    # Sort newest first
+    def get_sort_key(it):
+        d = it.get("releaseDate") or ""
+        return d if d else "1970-01-01"
+
+    raw_candidates.sort(key=get_sort_key, reverse=True)
+
+    cleaned = []
+    for it in raw_candidates[:limit]:
+        sid = str(it.get("subjectId") or "")
+        title = it.get("title") or ""
+        detail_path = it.get("detailPath") or ""
+        if not detail_path and it.get("detailUrl"):
+            detail_path = it["detailUrl"].rstrip("/").split("/")[-1]
+        if not detail_path:
+            clean_slug = re.sub(r'[^a-zA-Z0-9]+', '-', title.lower()).strip('-')
+            detail_path = f"{clean_slug}-{sid}"
+
+        _slug_to_id[detail_path] = sid
+        _slug_to_id[sid] = sid
+
+        cover = it.get("cover") or {}
+        if isinstance(cover, str):
+            cover = {"url": cover}
+
+        genres = it.get("genre") or []
+        if isinstance(genres, str):
+            genres = [g.strip() for g in genres.split(",") if g.strip()]
+
+        cleaned.append({
+            "subjectId": sid,
+            "title": title,
+            "detailPath": detail_path,
+            "subjectType": it.get("subjectType", 1),
+            "cover": cover,
+            "imdbRatingValue": str(it.get("imdbRatingValue") or "7.5"),
+            "releaseDate": it.get("releaseDate") or "",
+            "genre": genres,
+            "duration": it.get("duration") or "",
+            "hasResource": bool(it.get("hasResource", True)),
+            "isCam": bool(it.get("isCam", False))
+        })
+
+    _latest_cache[cache_key] = cleaned
+    _latest_cache_time[cache_key] = now
+    return cleaned
 
 WORKER_PROXIES = [
     "https://frosty-tree-ae87.vidnest-1.workers.dev",
@@ -202,29 +494,50 @@ async def get_subject_meta(slug: str):
         "schema": ""
     }
     if not slug: return meta
+    inner = None
     url = f"{API_BASE}/wefeed-h5api-bff/detail?detailPath={slug}"
     try:
         data = await _make_request(url)
         inner = data.get("data", {}).get("subject", {})
-        if inner:
-            meta["title"] = f"Watch {inner.get('title', 'Movie')} - Streamfit"
-            meta["description"] = inner.get("description", meta["description"]).replace('"', '\\"')
-            meta["cover"] = inner.get("cover", {}).get("url", meta["cover"])
-            schema_obj = {
-                "@context": "https://schema.org",
-                "@type": "VideoObject" if inner.get("subjectType") == 1 else "TVSeries",
-                "name": inner.get("title", ""),
-                "description": inner.get("description", ""),
-                "image": meta["cover"],
-                "url": meta["url"],
-            }
-            if inner.get("subjectType") == 1:
-                schema_obj["thumbnailUrl"] = [meta["cover"]]
-                schema_obj["uploadDate"] = inner.get("releaseDate", "2026-01-01")
-                schema_obj["duration"] = "PT120M"
-            
-            meta["schema"] = f'<script type="application/ld+json">{json.dumps(schema_obj)}</script>'
-    except: pass
+    except Exception:
+        pass
+
+    if not inner:
+        sid = _slug_to_id.get(slug)
+        if not sid and "-" in slug:
+            tail = slug.split("-")[-1]
+            if tail.isdigit():
+                sid = tail
+        if sid:
+            try:
+                mob_res = await request_moviebox_mobile("/wefeed-mobile-bff/subject-api/get", params={"subjectId": sid})
+                mob_data = mob_res.get("data") or {}
+                inner = mob_data.get("subject") or mob_data
+            except Exception:
+                pass
+
+    if inner and isinstance(inner, dict):
+        meta["title"] = f"Watch {inner.get('title', 'Movie')} - Streamfit"
+        meta["description"] = inner.get("description", meta["description"]).replace('"', '\\"')
+        cover_val = inner.get("cover")
+        if isinstance(cover_val, dict):
+            meta["cover"] = cover_val.get("url", meta["cover"])
+        elif isinstance(cover_val, str):
+            meta["cover"] = cover_val
+        schema_obj = {
+            "@context": "https://schema.org",
+            "@type": "VideoObject" if inner.get("subjectType") == 1 else "TVSeries",
+            "name": inner.get("title", ""),
+            "description": inner.get("description", ""),
+            "image": meta["cover"],
+            "url": meta["url"],
+        }
+        if inner.get("subjectType") == 1:
+            schema_obj["thumbnailUrl"] = [meta["cover"]]
+            schema_obj["uploadDate"] = inner.get("releaseDate", "2026-01-01")
+            schema_obj["duration"] = "PT120M"
+        
+        meta["schema"] = f'<script type="application/ld+json">{json.dumps(schema_obj)}</script>'
     return meta
 
 def serve_html(filename: str, meta_replacements=None):
@@ -289,10 +602,17 @@ async def old_details(id: str = None, path: str = None):
     return RedirectResponse(url="/", status_code=301)
 
 @app.get("/watch")
-async def old_watch(request: Request, id: str = None, path: str = None, type: str = None):
-    if type in ["sports", "tv"]:
+async def old_watch(request: Request, id: str = None, path: str = None, type: str = None, season: int = None, episode: int = None):
+    if type in ["sports", "tv"] and not path:
         return serve_html("public/watch.html")
-    if path: return RedirectResponse(url=f"/watch/movie/{path}", status_code=301)
+    if path:
+        q_params = dict(request.query_params)
+        is_tv = (season and season > 0) or (type == "tv")
+        type_segment = "tv" if is_tv else "movie"
+        q_params.pop("path", None)
+        q_params.pop("type", None)
+        q_str = f"?{urllib.parse.urlencode(q_params)}" if q_params else ""
+        return RedirectResponse(url=f"/watch/{type_segment}/{path}{q_str}", status_code=301)
     return RedirectResponse(url="/", status_code=301)
 
 # API
@@ -300,16 +620,30 @@ async def old_watch(request: Request, id: str = None, path: str = None, type: st
 async def get_home(page: int = 1, tabId: int = 0):
     url = f"{API_BASE}/wefeed-h5api-bff/tab-operating?page={page}&tabId={tabId}"
     data = await _make_request(url)
-    if "data" in data and "operatingList" in data["data"]: data["data"]["items"] = data["data"]["operatingList"]
+    if "data" in data and "operatingList" in data["data"]:
+        # Update hero banner items with latest movies from MovieBox Mobile
+        try:
+            latest_banners = await get_latest_banners()
+            banner_found = False
+            for op in data["data"]["operatingList"]:
+                if op.get("type") == "BANNER":
+                    op["banner"] = {"items": latest_banners}
+                    banner_found = True
+                    break
+            if not banner_found and latest_banners:
+                data["data"]["operatingList"].insert(0, {
+                    "type": "BANNER",
+                    "title": "Banners",
+                    "banner": {"items": latest_banners}
+                })
+        except Exception as e:
+            print(f"Error updating home banners: {e}")
+        data["data"]["items"] = data["data"]["operatingList"]
     return data
 
 @app.get("/api/banners")
 async def get_banners():
-    url = f"{API_BASE}/wefeed-h5api-bff/home?host=moviebox.ph"
-    data = await _make_request(url)
-    items = []
-    for op in data.get("data", {}).get("operatingList", []):
-        if op.get("type") == "BANNER": items.extend(op.get("banner", {}).get("items", []))
+    items = await get_latest_banners()
     return {"code": 0, "data": {"list": items}}
 
 @app.post("/api/filter")
@@ -376,6 +710,57 @@ async def api_search(request: Request):
     keyword = payload.get("keyword", "")
     page = payload.get("page", 1)
     perPage = payload.get("perPage", 24)
+    subjectType = payload.get("subjectType", 0)
+
+    # 1. Primary: Official MovieBox Mobile Gateway (contains all latest releases)
+    try:
+        mob_res = await request_moviebox_mobile(
+            "/wefeed-mobile-bff/subject-api/search",
+            method="POST",
+            data={"keyword": keyword, "q": keyword, "page": page, "pageSize": perPage, "type": subjectType or 0}
+        )
+        raw_items = mob_res.get("data", {}).get("items") or []
+        if raw_items:
+            cleaned_items = []
+            for it in raw_items:
+                sid = str(it.get("subjectId") or "")
+                title = it.get("title") or ""
+                detail_path = it.get("detailPath") or ""
+                if not detail_path and it.get("detailUrl"):
+                    detail_path = it["detailUrl"].rstrip("/").split("/")[-1]
+                if not detail_path:
+                    clean_slug = re.sub(r'[^a-zA-Z0-9]+', '-', title.lower()).strip('-')
+                    detail_path = f"{clean_slug}-{sid}"
+                    
+                _slug_to_id[detail_path] = sid
+                _slug_to_id[sid] = sid
+                
+                cover = it.get("cover") or {}
+                if isinstance(cover, str):
+                    cover = {"url": cover}
+                    
+                genres = it.get("genre") or []
+                if isinstance(genres, str):
+                    genres = [g.strip() for g in genres.split(",") if g.strip()]
+                    
+                cleaned_items.append({
+                    "subjectId": sid,
+                    "title": title,
+                    "detailPath": detail_path,
+                    "subjectType": it.get("subjectType", 1),
+                    "cover": cover,
+                    "imdbRatingValue": str(it.get("imdbRatingValue") or "7.5"),
+                    "releaseDate": it.get("releaseDate") or "",
+                    "genre": genres,
+                    "duration": it.get("duration") or "",
+                    "hasResource": bool(it.get("hasResource", True)),
+                    "isCam": bool(it.get("isCam", False))
+                })
+            return {"code": 0, "data": {"items": cleaned_items, "pager": {"hasMore": len(cleaned_items) >= perPage}}}
+    except Exception as e:
+        print(f"Mobile search error: {e}")
+
+    # Fallback to H5 search
     url = f"{API_BASE}/wefeed-h5api-bff/subject/search"
     data = await _make_request(url, method="POST", payload={"keyword": keyword, "page": page, "perPage": perPage})
     if "data" in data and "list" in data["data"]: data["data"]["items"] = data["data"]["list"]
@@ -395,6 +780,49 @@ async def api_sports():
 
 @app.get("/api/search/suggest")
 async def search_suggest(q: str = ""):
+    if not q:
+        return {"code": 0, "data": {"items": []}}
+
+    # Primary: Official MovieBox Mobile Gateway
+    try:
+        mob_res = await request_moviebox_mobile(
+            "/wefeed-mobile-bff/subject-api/search",
+            method="POST",
+            data={"keyword": q, "q": q, "page": 1, "pageSize": 10, "type": 0}
+        )
+        raw_items = mob_res.get("data", {}).get("items") or []
+        if raw_items:
+            items = []
+            for it in raw_items:
+                sid = str(it.get("subjectId") or "")
+                title = it.get("title") or ""
+                detail_path = it.get("detailPath") or ""
+                if not detail_path and it.get("detailUrl"):
+                    detail_path = it["detailUrl"].rstrip("/").split("/")[-1]
+                if not detail_path:
+                    clean_slug = re.sub(r'[^a-zA-Z0-9]+', '-', title.lower()).strip('-')
+                    detail_path = f"{clean_slug}-{sid}"
+                _slug_to_id[detail_path] = sid
+                _slug_to_id[sid] = sid
+
+                cover = it.get("cover") or {}
+                if isinstance(cover, str):
+                    cover = {"url": cover}
+
+                items.append({
+                    "title": title,
+                    "subjectType": it.get("subjectType", 1),
+                    "cover": cover,
+                    "rating": str(it.get("imdbRatingValue") or "7.5"),
+                    "detailPath": detail_path,
+                    "releaseDate": it.get("releaseDate") or "",
+                    "isKeyword": False
+                })
+            return {"code": 0, "data": {"items": items}}
+    except Exception as e:
+        print(f"Mobile search-suggest error: {e}")
+
+    # Fallback to H5 search-suggest
     url = f"{API_BASE}/wefeed-h5api-bff/subject/search-suggest"
     data = await _make_request(url, method="POST", payload={"keyword": q, "perPage": 10})
     if "data" in data and "items" in data["data"]:
@@ -424,34 +852,93 @@ async def search_suggest(q: str = ""):
     return data
 
 @app.get("/api/detail")
-async def api_detail(detailPath: str = ""):
-    url = f"{API_BASE}/wefeed-h5api-bff/detail?detailPath={detailPath}"
-    data = await _make_request(url)
-    if "data" in data and "subject" in data["data"]:
-        subj = data["data"]["subject"]
-        if "resource" in data["data"]:
-            subj["seasons"] = data["data"]["resource"].get("seasons", [])
-            subj["seNum"] = len(subj["seasons"])
-        data["data"] = subj
-    return data
+async def api_detail(detailPath: str = "", subjectId: str = ""):
+    # 1. Try H5 detail first if detailPath given
+    if detailPath:
+        try:
+            url = f"{API_BASE}/wefeed-h5api-bff/detail?detailPath={detailPath}"
+            data = await _make_request(url)
+            if "data" in data and "subject" in data["data"] and data["data"]["subject"]:
+                subj = data["data"]["subject"]
+                if "resource" in data["data"]:
+                    subj["seasons"] = data["data"]["resource"].get("seasons", [])
+                    subj["seNum"] = len(subj["seasons"])
+                data["data"] = subj
+                return data
+        except Exception:
+            pass
+
+    # 2. Fallback to MovieBox Mobile Gateway
+    sid = subjectId or _slug_to_id.get(detailPath)
+    if not sid and detailPath and "-" in detailPath:
+        tail = detailPath.split("-")[-1]
+        if tail.isdigit():
+            sid = tail
+
+    if sid:
+        try:
+            mob_res = await request_moviebox_mobile("/wefeed-mobile-bff/subject-api/get", params={"subjectId": sid})
+            mob_data = mob_res.get("data") or {}
+            subj = mob_data.get("subject") or mob_data
+            if subj and isinstance(subj, dict):
+                subj["subjectId"] = sid
+                if not subj.get("detailPath"):
+                    subj["detailPath"] = detailPath
+                if not subj.get("seasons"):
+                    subj["seasons"] = [{"se": 1, "episodeCount": 1, "allEp": "1"}] if subj.get("subjectType") == 1 else []
+                subj["seNum"] = len(subj["seasons"])
+                return {"code": 0, "data": subj}
+        except Exception as e:
+            print(f"Mobile detail error: {e}")
+
+    return {"code": 404, "message": "subject not found", "data": {}}
 
 @app.get("/api/season-info")
-async def api_season(detailPath: str = ""):
-    url = f"{API_BASE}/wefeed-h5api-bff/detail?detailPath={detailPath}"
-    data = await _make_request(url)
-    seasons = []
-    if "data" in data and "resource" in data["data"]:
-        seasons = data["data"]["resource"].get("seasons", [])
-    return {"code": 0, "data": {"seasons": seasons}}
+async def api_season(detailPath: str = "", subjectId: str = ""):
+    if detailPath:
+        try:
+            url = f"{API_BASE}/wefeed-h5api-bff/detail?detailPath={detailPath}"
+            data = await _make_request(url)
+            seasons = []
+            if "data" in data and "resource" in data["data"]:
+                seasons = data["data"]["resource"].get("seasons", [])
+                if seasons:
+                    return {"code": 0, "data": {"seasons": seasons}}
+        except Exception:
+            pass
+
+    sid = subjectId or _slug_to_id.get(detailPath)
+    if not sid and detailPath and "-" in detailPath:
+        tail = detailPath.split("-")[-1]
+        if tail.isdigit():
+            sid = tail
+
+    if sid:
+        try:
+            mob_res = await request_moviebox_mobile("/wefeed-mobile-bff/subject-api/get", params={"subjectId": sid})
+            mob_data = mob_res.get("data") or {}
+            subj = mob_data.get("subject") or mob_data
+            if subj and subj.get("subjectType") == 1:
+                return {"code": 0, "data": {"seasons": [{"se": 1, "episodeCount": 1, "allEp": "1"}]}}
+        except Exception:
+            pass
+
+    return {"code": 0, "data": {"seasons": []}}
 
 @app.get("/api/resource")
 async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId: str = ""):
     if not subjectId and detailPath:
-        try:
-            detail_data = await _make_request(f"{API_BASE}/wefeed-h5api-bff/detail?detailPath={detailPath}")
-            subjectId = detail_data.get("data", {}).get("subject", {}).get("subjectId", "")
-        except:
-            pass
+        subjectId = _slug_to_id.get(detailPath, "")
+        if not subjectId:
+            try:
+                detail_data = await _make_request(f"{API_BASE}/wefeed-h5api-bff/detail?detailPath={detailPath}")
+                subjectId = detail_data.get("data", {}).get("subject", {}).get("subjectId", "")
+            except:
+                pass
+            if not subjectId and "-" in detailPath:
+                tail = detailPath.split("-")[-1]
+                if tail.isdigit():
+                    subjectId = tail
             
     if not subjectId:
         return {"code": 0, "data": {"list": []}}
@@ -486,6 +973,31 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
                             break
         except Exception as fallback_err:
             print(f"Fallback dub check error: {fallback_err}")
+
+    # Fallback to Mobile Gateway resourceDetectors if downloads is still empty
+    if not downloads and subjectId:
+        try:
+            mob_res = await request_moviebox_mobile(
+                "/wefeed-mobile-bff/subject-api/get",
+                params={"subjectId": subjectId, "se": se, "ep": ep}
+            )
+            mob_subj = mob_res.get("data", {}).get("subject") or mob_res.get("data") or {}
+            detectors = mob_subj.get("resourceDetectors") or []
+            mob_items = []
+            for det in detectors:
+                for r in det.get("resolutionList", []):
+                    r_link = r.get("resourceLink")
+                    if r_link:
+                        mob_items.append({
+                            "resourceId": str(r.get("resourceId") or r.get("id")),
+                            "resolution": int(r.get("resolution", 720)),
+                            "size": int(r.get("size", 0)),
+                            "resourceLink": f"/fetch?source_url={urllib.parse.quote(r_link)}"
+                        })
+            if mob_items:
+                return {"code": 0, "data": {"list": mob_items}}
+        except Exception as mob_err:
+            print(f"Mobile resource detector error: {mob_err}")
     
     items = []
     for d in downloads:
