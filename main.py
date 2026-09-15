@@ -1278,6 +1278,33 @@ async def api_captions(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
         })
     return {"code": 0, "data": {"list": formatted}}
 
+CDN_CANDIDATE_HEADERS = [
+    {
+        "Origin": "https://moviebox.ph",
+        "Referer": "https://moviebox.ph/",
+        "User-Agent": DEFAULT_HEADERS["User-Agent"],
+        "Accept": "*/*"
+    },
+    {
+        "Origin": "https://netfilm.world",
+        "Referer": "https://netfilm.world/",
+        "User-Agent": DEFAULT_HEADERS["User-Agent"],
+        "Accept": "*/*"
+    },
+    {
+        "Origin": "https://123movienow.cc",
+        "Referer": "https://123movienow.cc/",
+        "User-Agent": DEFAULT_HEADERS["User-Agent"],
+        "Accept": "*/*"
+    },
+    {
+        "Origin": "https://h5.aoneroom.com",
+        "Referer": "https://h5.aoneroom.com/",
+        "User-Agent": DEFAULT_HEADERS["User-Agent"],
+        "Accept": "*/*"
+    }
+]
+
 @app.get("/fetch")
 async def handle_fetch(request: Request, source_url: str):
     if not source_url:
@@ -1288,50 +1315,58 @@ async def handle_fetch(request: Request, source_url: str):
     if qp:
         source_url += "&" + urllib.parse.urlencode(qp)
         
-    headers_to_send = {
-        "Origin": "https://fmoviesunblocked.net",
-        "Referer": "https://fmoviesunblocked.net/",
-        "User-Agent": DEFAULT_HEADERS["User-Agent"],
-        "Accept": "*/*"
-    }
-    
     range_header = request.headers.get("Range")
-    if range_header:
-        headers_to_send["Range"] = range_header
-        
     client = httpx.AsyncClient(trust_env=False, timeout=30.0)
-    try:
-        resp = await client.send(client.build_request("GET", source_url, headers=headers_to_send), stream=True)
-        status_code = resp.status_code
-        response_headers = {
-            "Content-Type": resp.headers.get("Content-Type", "video/mp4"),
-            "Access-Control-Allow-Origin": "*",
-        }
-        if resp.headers.get("Content-Range"):
-            response_headers["Content-Range"] = resp.headers.get("Content-Range")
-        if resp.headers.get("Content-Length"):
-            response_headers["Content-Length"] = resp.headers.get("Content-Length")
-        if resp.headers.get("Accept-Ranges"):
-            response_headers["Accept-Ranges"] = resp.headers.get("Accept-Ranges")
+    resp = None
+    last_error_status = 502
+
+    for template in CDN_CANDIDATE_HEADERS:
+        headers_to_send = dict(template)
+        if range_header:
+            headers_to_send["Range"] = range_header
             
-        real_status = status_code if status_code in [200, 206] else 200
-        
-        async def stream_generator():
-            try:
-                async for chunk in resp.aiter_bytes(chunk_size=1024 * 64):
-                    yield chunk
-            finally:
-                await resp.aclose()
-                await client.aclose()
-                
-        return StreamingResponse(
-            stream_generator(),
-            status_code=real_status,
-            headers=response_headers
-        )
-    except Exception as e:
+        try:
+            req = client.build_request("GET", source_url, headers=headers_to_send)
+            candidate_resp = await client.send(req, stream=True)
+            if candidate_resp.status_code in (200, 206):
+                resp = candidate_resp
+                break
+            else:
+                last_error_status = candidate_resp.status_code
+                await candidate_resp.aclose()
+        except Exception:
+            continue
+
+    if not resp:
         await client.aclose()
-        raise HTTPException(status_code=502, detail=f"Failed to connect to video CDN: {e}")
+        raise HTTPException(status_code=last_error_status, detail=f"CDN stream unavailable or rate limited ({last_error_status})")
+
+    response_headers = {
+        "Content-Type": resp.headers.get("Content-Type", "video/mp4"),
+        "Access-Control-Allow-Origin": "*",
+    }
+    if resp.headers.get("Content-Range"):
+        response_headers["Content-Range"] = resp.headers.get("Content-Range")
+    if resp.headers.get("Content-Length"):
+        response_headers["Content-Length"] = resp.headers.get("Content-Length")
+    if resp.headers.get("Accept-Ranges"):
+        response_headers["Accept-Ranges"] = resp.headers.get("Accept-Ranges")
+        
+    real_status = resp.status_code
+    
+    async def stream_generator():
+        try:
+            async for chunk in resp.aiter_bytes(chunk_size=1024 * 64):
+                yield chunk
+        finally:
+            await resp.aclose()
+            await client.aclose()
+            
+    return StreamingResponse(
+        stream_generator(),
+        status_code=real_status,
+        headers=response_headers
+    )
 
 @app.get("/api/proxy-subtitle")
 async def proxy_subtitle(url: str):
