@@ -882,6 +882,7 @@ function triggerAutoplay(player) {
             if (loaderEl) {
                 const statusTxt = loaderEl.querySelector("span");
                 if (statusTxt) statusTxt.innerHTML = '<i class="fa-solid fa-circle-play" style="margin-right: 8px; font-size: 1.2em;"></i> Click to Play';
+                loaderEl.style.background = "transparent";
                 loaderEl.classList.add("visible");
             }
         });
@@ -1237,17 +1238,24 @@ async function initWatchPage() {
         if (loaderOverlay) {
             const statusTxt = loaderOverlay.querySelector("span");
             if (statusTxt) statusTxt.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:8px;"></i>Loading stream...';
-            loaderOverlay.style.background = "rgba(0, 0, 0, 0.8)";
+            const spinner = loaderOverlay.querySelector(".player-spinner");
+            if (spinner) spinner.style.display = "";
+            loaderOverlay.style.background = "transparent";
+            loaderOverlay.style.pointerEvents = "none";
             loaderOverlay.classList.add("visible");
+            const pWrap = document.getElementById("playerWrapperEl");
+            if (pWrap) pWrap.classList.add("is-loading");
         }
     };
     
     const hideLoader = () => {
         if (loaderOverlay) {
+            const pWrap = document.getElementById("playerWrapperEl");
+            if (pWrap) pWrap.classList.remove("is-loading");
             if (playerInstance && playerInstance.muted && !state.userInteracted) {
                 const statusTxt = loaderOverlay.querySelector("span");
                 if (statusTxt) statusTxt.innerHTML = '<i class="fa-solid fa-volume-high" style="margin-right:8px; font-size: 1.2em;"></i> Click to Unmute';
-                loaderOverlay.style.background = "rgba(0, 0, 0, 0.4)";
+                loaderOverlay.style.background = "transparent";
                 loaderOverlay.classList.add("visible");
             } else {
                 loaderOverlay.classList.remove("visible");
@@ -2070,8 +2078,13 @@ async function loadPlayResources(subjectId, season = null, episode = null) {
     if (loaderOverlay) {
         const statusTxt = loaderOverlay.querySelector("span");
         if (statusTxt) statusTxt.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:8px;"></i>Loading stream...';
-        loaderOverlay.style.background = "rgba(0, 0, 0, 0.85)";
+        const spinner = loaderOverlay.querySelector(".player-spinner");
+        if (spinner) spinner.style.display = "";
+        loaderOverlay.style.background = "transparent";
+        loaderOverlay.style.pointerEvents = "none";
         loaderOverlay.classList.add("visible");
+        const pWrap = document.getElementById("playerWrapperEl");
+        if (pWrap) pWrap.classList.add("is-loading");
     }
 
     // Reset auto-quality options on new stream loading
@@ -2180,7 +2193,8 @@ async function loadPlayResources(subjectId, season = null, episode = null) {
                     style="margin-left:12px;background:var(--color-accent,#1dd171);color:#000;border:none;padding:6px 14px;border-radius:6px;font-weight:700;cursor:pointer;font-size:12px;">
                     <i class="fa-solid fa-rotate-right"></i> Retry
                 </button>`;
-            loaderOverlay.style.background = "rgba(0,0,0,0.92)";
+            loaderOverlay.style.background = "rgba(0,0,0,0.85)";
+            loaderOverlay.style.pointerEvents = "auto";
             loaderOverlay.classList.add("visible");
         }
     }

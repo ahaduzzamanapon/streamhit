@@ -1716,31 +1716,33 @@ input, select { font-family: inherit; }
 .player-loader-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0,0,0,0.88);
-  backdrop-filter: blur(12px);
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
+  gap: 16px;
   z-index: 20;
   opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s ease;
+  pointer-events: none !important;
+  transition: opacity 0.25s ease;
 }
 .player-loader-overlay.visible {
   opacity: 1;
-  pointer-events: auto;
+  pointer-events: none !important;
 }
 
 .player-spinner {
   position: relative;
-  width: 52px; height: 52px;
-  border: 3px solid rgba(229,9,20,0.15);
+  width: 50px; height: 50px;
+  border: 3.5px solid rgba(229,9,20,0.2);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
-  box-shadow: 0 0 20px rgba(229,9,20,0.25);
+  box-shadow: 0 0 24px rgba(229,9,20,0.35);
+  pointer-events: none;
 }
 
 /* Pulsing ring behind spinner */
@@ -1748,22 +1750,37 @@ input, select { font-family: inherit; }
   content: '';
   position: absolute;
   top: -12px; left: -12px;
-  width: 76px; height: 76px;
+  width: 74px; height: 74px;
   border-radius: 50%;
-  border: 1px solid rgba(229,9,20,0.2);
+  border: 1px solid rgba(229,9,20,0.25);
   animation: spinnerRingPulse 1.5s ease-out infinite;
 }
 @keyframes spinnerRingPulse {
   0% { transform: scale(1); opacity: 0.6; }
-  100% { transform: scale(1.5); opacity: 0; }
+  100% { transform: scale(1.4); opacity: 0; }
 }
 
 .player-loader-overlay span {
   font-family: 'Outfit', sans-serif;
-  font-size: 14px; font-weight: 600;
-  color: rgba(255,255,255,0.9);
+  font-size: 13px; font-weight: 600;
+  color: rgba(255,255,255,0.95);
   letter-spacing: 0.3px;
-  display: flex; align-items: center; gap: 8px;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 18px;
+  background: rgba(15, 16, 20, 0.82);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 30px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+.player-loader-overlay span:hover {
+  background: rgba(25, 26, 32, 0.95);
+  transform: scale(1.02);
 }
 
 /* Player Header Overlay */
@@ -1775,7 +1792,7 @@ input, select { font-family: inherit; }
   display: flex;
   align-items: center;
   gap: 14px;
-  z-index: 15;
+  z-index: 30;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s ease;
@@ -1783,10 +1800,12 @@ input, select { font-family: inherit; }
 
 .player-wrapper:hover .player-header-overlay,
 .player-wrapper:focus-within .player-header-overlay,
+.player-wrapper.is-loading .player-header-overlay,
+.player-wrapper:has(.player-loader-overlay.visible) .player-header-overlay,
 .plyr:not(.plyr--hide-controls) ~ .player-header-overlay,
 .player-loader-overlay.visible ~ .player-header-overlay {
-  opacity: 1;
-  pointer-events: auto;
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
 
 .player-header-overlay button,
@@ -1833,9 +1852,19 @@ input, select { font-family: inherit; }
    ========================================================================== */
 /* Control bar */
 .plyr--video .plyr__controls {
+  position: absolute !important;
+  z-index: 30 !important;
   background: linear-gradient(transparent, rgba(0,0,0,0.88)) !important;
   padding: 20px 20px 24px !important;
   border-radius: 0 !important;
+  pointer-events: auto !important;
+}
+
+.player-wrapper.is-loading .plyr__controls,
+.player-wrapper:has(.player-loader-overlay.visible) .plyr__controls {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: translateY(0) !important;
 }
 
 /* Control buttons */

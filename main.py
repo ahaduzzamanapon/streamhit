@@ -910,63 +910,247 @@ async def get_banners():
     items = await get_latest_banners()
     return {"code": 0, "data": {"list": items}}
 
+_movies_pool_cache = []
+_movies_pool_cache_time = 0
+
+_tv_pool_cache = []
+_tv_pool_cache_time = 0
+
+async def get_movies_pool() -> list:
+    global _movies_pool_cache, _movies_pool_cache_time
+    now = time.time()
+    if _movies_pool_cache and (now - _movies_pool_cache_time < 900):
+        return _movies_pool_cache
+
+    seen = set()
+    pool = []
+
+    # 1. Fresh latest movies from MovieBox Mobile (2026, 2025, daily recs)
+    try:
+        latest_movies = await get_latest_content(subject_type=1)
+        for m in latest_movies:
+            sid = str(m.get("subjectId") or "")
+            if sid and sid not in seen:
+                seen.add(sid)
+                pool.append(m)
+    except Exception as e:
+        print(f"Error fetching latest movies for pool: {e}")
+
+    # 2. Curated operating list from official Movie tab (tabId=2)
+    try:
+        url = f"{API_BASE}/wefeed-h5api-bff/tab-operating?page=1&tabId=2"
+        d = await _make_request(url)
+        op_list = d.get("data", {}).get("operatingList", [])
+        for op in op_list:
+            for s in op.get("subjects", []):
+                sid = str(s.get("subjectId") or "")
+                st = s.get("subjectType", 1)
+                if st == 1 and sid and sid not in seen:
+                    seen.add(sid)
+                    title = s.get("title") or ""
+                    sid_str = str(sid)
+                    dpath = s.get("detailPath") or ""
+                    clean_slug = re.sub(r'[^a-zA-Z0-9]+', '-', title.lower()).strip('-')
+                    if not dpath:
+                        dpath = f"{clean_slug}-{sid_str}" if sid_str else clean_slug
+                    s["detailPath"] = dpath
+                    _slug_to_id[dpath] = sid_str
+                    _slug_to_id[sid_str] = sid_str
+                    if s.get("detailUrl"):
+                        raw_slug = s["detailUrl"].rstrip("/").split("/")[-1]
+                        _slug_to_id[raw_slug] = sid_str
+                    pool.append(s)
+    except Exception as e:
+        print(f"Error fetching tabId=2 operating movies: {e}")
+
+    _movies_pool_cache = pool
+    _movies_pool_cache_time = now
+    return pool
+
+async def get_tv_pool() -> list:
+    global _tv_pool_cache, _tv_pool_cache_time
+    now = time.time()
+    if _tv_pool_cache and (now - _tv_pool_cache_time < 900):
+        return _tv_pool_cache
+
+    seen = set()
+    pool = []
+
+    # 1. Search popular TV queries with type=2 from MovieBox Mobile
+    tv_queries = ["2026", "2025", "2024", "drama", "series", "hindi", "season"]
+    for q in tv_queries:
+        try:
+            r = await request_moviebox_mobile(
+                "/wefeed-mobile-bff/subject-api/search",
+                method="POST",
+                data={"keyword": q, "q": q, "page": 1, "pageSize": 20, "type": 2}
+            )
+            items = r.get("data", {}).get("items") or []
+            for it in items:
+                sid = str(it.get("subjectId") or "")
+                st = it.get("subjectType")
+                if st == 2 and sid and sid not in seen:
+                    seen.add(sid)
+                    title = it.get("title") or ""
+                    sid_str = str(sid)
+                    dpath = it.get("detailPath") or ""
+                    clean_slug = re.sub(r'[^a-zA-Z0-9]+', '-', title.lower()).strip('-')
+                    if not dpath:
+                        dpath = f"{clean_slug}-{sid_str}" if sid_str else clean_slug
+                    it["detailPath"] = dpath
+                    _slug_to_id[dpath] = sid_str
+                    _slug_to_id[sid_str] = sid_str
+                    if it.get("detailUrl"):
+                        raw_slug = it["detailUrl"].rstrip("/").split("/")[-1]
+                        _slug_to_id[raw_slug] = sid_str
+                    pool.append(it)
+        except Exception as e:
+            print(f"Error searching TV {q}: {e}")
+
+    # 2. Curated operating list from Home tab (tabId=0)
+    try:
+        url = f"{API_BASE}/wefeed-h5api-bff/tab-operating?page=1&tabId=0"
+        d = await _make_request(url)
+        op_list = d.get("data", {}).get("operatingList", [])
+        for op in op_list:
+            for s in op.get("subjects", []):
+                sid = str(s.get("subjectId") or "")
+                st = s.get("subjectType", 2)
+                if st == 2 and sid and sid not in seen:
+                    seen.add(sid)
+                    title = s.get("title") or ""
+                    sid_str = str(sid)
+                    dpath = s.get("detailPath") or ""
+                    clean_slug = re.sub(r'[^a-zA-Z0-9]+', '-', title.lower()).strip('-')
+                    if not dpath:
+                        dpath = f"{clean_slug}-{sid_str}" if sid_str else clean_slug
+                    s["detailPath"] = dpath
+                    _slug_to_id[dpath] = sid_str
+                    _slug_to_id[sid_str] = sid_str
+                    if s.get("detailUrl"):
+                        raw_slug = s["detailUrl"].rstrip("/").split("/")[-1]
+                        _slug_to_id[raw_slug] = sid_str
+                    pool.append(s)
+    except Exception as e:
+        print(f"Error fetching tabId=0 operating TV: {e}")
+
+    _tv_pool_cache = pool
+    _tv_pool_cache_time = now
+    return pool
+
 @app.post("/api/filter")
 async def api_filter(request: Request):
     payload = await request.json()
-    tabId = payload.get("tabId")
-    if tabId is None:
-        tabId = payload.get("subjectType", 1)
-    page = payload.get("page", 1)
-    perPage = payload.get("perPage", 24)
-    
-    filter_data = payload.get("filter")
-    if not filter_data:
-        genre = payload.get("genre", "ALL")
-        country = payload.get("country", "ALL")
-        year = payload.get("year", "ALL")
-        language = payload.get("language", "ALL")
-        sort = payload.get("sort", "RECOMMEND")
-    else:
-        genre = filter_data.get("genre", "ALL")
-        country = filter_data.get("country", "ALL")
-        year = filter_data.get("year", "ALL")
-        language = filter_data.get("language", "ALL")
-        sort = filter_data.get("sort", "RECOMMEND")
-        
-    if genre == "*": genre = "ALL"
-    if country == "*": country = "ALL"
-    if year == "*": year = "ALL"
-    if language == "*": language = "ALL"
-    
-    # Genre should be uppercase for Aoneroom API
-    genre = genre.upper()
-    
-    sort_map = {
-        "ForYou": "RECOMMEND",
-        "Hottest": "HOTTEST",
-        "Latest": "NEWEST",
-        "Newest": "NEWEST",
-        "Rating": "RATING",
-        "Top Rated": "RATING"
+    raw_type = payload.get("subjectType")
+    if raw_type is None:
+        tab_val = payload.get("tabId")
+        raw_type = 2 if tab_val in (2, "2", "tv") else 1
+    subject_type = int(raw_type)
+    if subject_type not in (1, 2):
+        subject_type = 1
+
+    page = int(payload.get("page", 1))
+    per_page = int(payload.get("perPage", 24))
+
+    filter_data = payload.get("filter") or {}
+    genre = payload.get("genre") or filter_data.get("genre") or "ALL"
+    country = payload.get("country") or filter_data.get("country") or "ALL"
+    year = payload.get("year") or filter_data.get("year") or "ALL"
+    sort = payload.get("sort") or filter_data.get("sort") or "RECOMMEND"
+
+    if str(genre).lower() in ("*", "all"): genre = "ALL"
+    if str(country).lower() in ("*", "all"): country = "ALL"
+    if str(year).lower() in ("*", "all"): year = "ALL"
+
+    pool = await (get_movies_pool() if subject_type == 1 else get_tv_pool())
+    filtered = list(pool)
+
+    # 1. Filter by genre
+    if genre != "ALL":
+        g_lower = str(genre).lower()
+        filtered = [
+            m for m in filtered
+            if g_lower in (
+                ", ".join(m.get("genre", [])) if isinstance(m.get("genre"), list) else str(m.get("genre") or "")
+            ).lower()
+        ]
+
+    # 2. Filter by country
+    if country != "ALL":
+        c_lower = str(country).lower()
+        filtered = [
+            m for m in filtered
+            if c_lower in str(m.get("countryName") or m.get("country") or "").lower()
+        ]
+
+    # 3. Filter by year
+    if year != "ALL":
+        y_str = str(year)
+        filtered = [
+            m for m in filtered
+            if y_str in str(m.get("releaseDate") or m.get("year") or "")
+        ]
+
+    # 4. If filter results are few and a specific filter was requested, supplement from Mobile search
+    if len(filtered) < (page * per_page) and (genre != "ALL" or year != "ALL" or country != "ALL"):
+        query = genre if genre != "ALL" else (year if year != "ALL" else country)
+        try:
+            mob_res = await request_moviebox_mobile(
+                "/wefeed-mobile-bff/subject-api/search",
+                method="POST",
+                data={"keyword": query, "q": query, "page": page, "pageSize": per_page, "type": subject_type}
+            )
+            raw_items = mob_res.get("data", {}).get("items") or []
+            existing_ids = {str(m.get("subjectId")) for m in filtered}
+            for it in raw_items:
+                sid = str(it.get("subjectId") or "")
+                if sid and sid not in existing_ids and it.get("subjectType", subject_type) == subject_type:
+                    existing_ids.add(sid)
+                    title = it.get("title") or ""
+                    sid_str = str(sid)
+                    dpath = it.get("detailPath") or ""
+                    clean_slug = re.sub(r'[^a-zA-Z0-9]+', '-', title.lower()).strip('-')
+                    if not dpath:
+                        dpath = f"{clean_slug}-{sid_str}" if sid_str else clean_slug
+                    it["detailPath"] = dpath
+                    _slug_to_id[dpath] = sid_str
+                    _slug_to_id[sid_str] = sid_str
+                    filtered.append(it)
+        except Exception as e:
+            print(f"Error querying mobile search for filter: {e}")
+
+    # 5. Sort
+    sort_upper = str(sort).upper()
+    if sort_upper in ("RATING", "TOP RATED"):
+        def parse_rating(item):
+            try:
+                return float(item.get("imdbRatingValue") or 0)
+            except:
+                return 0.0
+        filtered.sort(key=parse_rating, reverse=True)
+    elif sort_upper in ("NEWEST", "LATEST", "HOTTEST"):
+        def parse_date(item):
+            return str(item.get("releaseDate") or item.get("year") or "")
+        filtered.sort(key=parse_date, reverse=True)
+
+    start = (page - 1) * per_page
+    end = start + per_page
+    items = filtered[start:end]
+    has_more = len(filtered) > end
+
+    return {
+        "code": 0,
+        "message": "ok",
+        "data": {
+            "items": items,
+            "pager": {
+                "hasMore": has_more,
+                "page": page,
+                "perPage": per_page,
+                "totalCount": len(filtered)
+            }
+        }
     }
-    sort = sort_map.get(sort, sort)
-    
-    # Send flat payload keys as expected by the Aoneroom BFF
-    payload_to_send = {
-        "tabId": tabId,
-        "genre": genre,
-        "country": country,
-        "year": year,
-        "language": language,
-        "sort": sort,
-        "page": page,
-        "perPage": perPage
-    }
-    
-    url = f"{API_BASE}/wefeed-h5api-bff/subject/filter"
-    data = await _make_request(url, method="POST", payload=payload_to_send)
-    if "data" in data and "subjects" in data["data"]: data["data"]["items"] = data["data"]["subjects"]
-    return data
 
 @app.post("/api/search")
 async def api_search(request: Request):
