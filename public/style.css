@@ -1935,7 +1935,6 @@ input, select { font-family: inherit; }
 
 /* 2. Flat minimalist control buttons (Play, Mute, Settings, PiP, Fullscreen) */
 .plyr__controls .plyr__control:not(.plyr__menu__container .plyr__control) {
-  order: 2 !important;
   background: transparent !important;
   border: none !important;
   color: #ffffff !important;
@@ -1957,34 +1956,68 @@ input, select { font-family: inherit; }
   transform: none !important;
 }
 .plyr__controls .plyr__control svg {
-  width: 17px !important;
-  height: 17px !important;
+  width: 18px !important;
+  height: 18px !important;
   fill: currentColor !important;
 }
 
-/* 3. Time Display: 00:40 / 42:59 */
-.plyr__controls .plyr__time--current,
-.plyr__controls .plyr__time--duration {
+/* Explicit Control Orders Matching Reference Image 2:
+   [Play] [Mute] [Current / Duration] -------- [Quality] [Settings] [PiP] [Fullscreen] */
+.plyr--video .plyr__controls [data-plyr="play"] {
   order: 2 !important;
+}
+.plyr--video .plyr__controls [data-plyr="mute"] {
+  order: 3 !important;
+}
+.plyr--video .plyr__controls .plyr__volume {
+  order: 4 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+.plyr--video .plyr__controls .plyr__volume input[type="range"] {
+  width: 0 !important;
+  max-width: 0 !important;
+  opacity: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  transition: width 0.2s ease, opacity 0.2s ease, margin 0.2s ease !important;
+}
+.plyr--video .plyr__controls .plyr__volume:hover input[type="range"] {
+  width: 50px !important;
+  max-width: 50px !important;
+  opacity: 1 !important;
+  margin-left: 6px !important;
+}
+
+/* 3. Time Display: 00:40 / 42:59 */
+.plyr--video .plyr__controls .plyr__time--current {
+  order: 5 !important;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
   font-size: 13px !important;
   font-weight: 500 !important;
   color: #cbd5e1 !important;
-  padding: 0 2px !important;
+  padding: 0 1px 0 6px !important;
   letter-spacing: 0.3px !important;
 }
-.plyr__controls .plyr__time--current::after {
+.plyr--video .plyr__controls .plyr__time--current::after {
   content: " / ";
   color: rgba(255, 255, 255, 0.35);
   margin: 0 4px;
 }
-.plyr__controls .plyr__time--duration {
-  margin-right: auto !important; /* Pushes settings, PiP, fullscreen to far right */
+.plyr--video .plyr__controls .plyr__time--duration {
+  order: 6 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: #cbd5e1 !important;
+  padding: 0 4px 0 1px !important;
+  letter-spacing: 0.3px !important;
+  margin-right: auto !important; /* Pushes everything after duration to the far right! */
 }
 
-/* 4. Quality Badge Button (480P / 720P / 1080P) */
-.plyr__controls .plyr__custom-quality-badge {
-  order: 2 !important;
+/* 4. Right Controls Group */
+.plyr--video .plyr__controls .plyr__custom-quality-badge {
+  order: 7 !important;
   background: transparent !important;
   border: none !important;
   color: #e2e8f0 !important;
@@ -1993,7 +2026,7 @@ input, select { font-family: inherit; }
   font-weight: 700 !important;
   letter-spacing: 0.5px !important;
   cursor: pointer !important;
-  padding: 4px 8px !important;
+  padding: 4px 6px !important;
   border-radius: 4px !important;
   transition: color 0.15s ease, background 0.15s ease !important;
   width: auto !important;
@@ -2001,9 +2034,21 @@ input, select { font-family: inherit; }
   display: inline-flex !important;
   align-items: center !important;
 }
-.plyr__controls .plyr__custom-quality-badge:hover {
+.plyr--video .plyr__controls .plyr__custom-quality-badge:hover {
   color: #00e676 !important;
   background: rgba(255, 255, 255, 0.08) !important;
+}
+.plyr--video .plyr__controls [data-plyr="captions"] {
+  order: 8 !important;
+}
+.plyr--video .plyr__controls [data-plyr="settings"] {
+  order: 9 !important;
+}
+.plyr--video .plyr__controls [data-plyr="pip"] {
+  order: 10 !important;
+}
+.plyr--video .plyr__controls [data-plyr="fullscreen"] {
+  order: 11 !important;
 }
 
 /* 5. Minimalist center play button on pause */
