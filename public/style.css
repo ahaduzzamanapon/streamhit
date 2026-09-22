@@ -1892,9 +1892,11 @@ input, select { font-family: inherit; }
 /* 1. Full-width top timeline progress bar */
 .plyr--video .plyr__controls .plyr__progress {
   order: 1 !important;
-  flex: 0 0 calc(100% + 32px) !important;
-  width: calc(100% + 32px) !important;
-  margin: 0 -16px 6px -16px !important;
+  flex: 0 0 100% !important;
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 0 6px 0 !important;
   padding: 0 !important;
   position: relative !important;
   height: 3px !important;
@@ -2038,10 +2040,11 @@ input, select { font-family: inherit; }
   color: #00e676 !important;
   background: rgba(255, 255, 255, 0.08) !important;
 }
-.plyr--video .plyr__controls [data-plyr="captions"] {
+.plyr--video .plyr__controls .plyr__menu,
+.plyr--video .plyr__controls [data-plyr="settings"] {
   order: 8 !important;
 }
-.plyr--video .plyr__controls [data-plyr="settings"] {
+.plyr--video .plyr__controls [data-plyr="captions"] {
   order: 9 !important;
 }
 .plyr--video .plyr__controls [data-plyr="pip"] {
