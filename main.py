@@ -1269,6 +1269,15 @@ async def api_search(request: Request):
 async def api_heartbeat():
     return {"code": 0, "message": "success"}
 
+@app.get("/api/debug-host")
+async def debug_host(request: Request):
+    return {
+        "host": request.headers.get("host"),
+        "x-forwarded-host": request.headers.get("x-forwarded-host"),
+        "url": str(request.url),
+        "headers": dict(request.headers)
+    }
+
 @app.get("/api/notifications/latest")
 async def api_notifications():
     return {"code": 0, "data": []}
