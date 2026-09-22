@@ -950,6 +950,8 @@ async def get_movies_pool() -> list:
                     title = s.get("title") or ""
                     sid_str = str(sid)
                     dpath = s.get("detailPath") or ""
+                    if not dpath and s.get("detailUrl"):
+                        dpath = s["detailUrl"].rstrip("/").split("/")[-1]
                     clean_slug = re.sub(r'[^a-zA-Z0-9]+', '-', title.lower()).strip('-')
                     if not dpath:
                         dpath = f"{clean_slug}-{sid_str}" if sid_str else clean_slug
@@ -994,6 +996,8 @@ async def get_tv_pool() -> list:
                     title = it.get("title") or ""
                     sid_str = str(sid)
                     dpath = it.get("detailPath") or ""
+                    if not dpath and it.get("detailUrl"):
+                        dpath = it["detailUrl"].rstrip("/").split("/")[-1]
                     clean_slug = re.sub(r'[^a-zA-Z0-9]+', '-', title.lower()).strip('-')
                     if not dpath:
                         dpath = f"{clean_slug}-{sid_str}" if sid_str else clean_slug
@@ -1021,6 +1025,8 @@ async def get_tv_pool() -> list:
                     title = s.get("title") or ""
                     sid_str = str(sid)
                     dpath = s.get("detailPath") or ""
+                    if not dpath and s.get("detailUrl"):
+                        dpath = s["detailUrl"].rstrip("/").split("/")[-1]
                     clean_slug = re.sub(r'[^a-zA-Z0-9]+', '-', title.lower()).strip('-')
                     if not dpath:
                         dpath = f"{clean_slug}-{sid_str}" if sid_str else clean_slug
@@ -1174,6 +1180,8 @@ async def api_search(request: Request):
                 sid = str(it.get("subjectId") or "")
                 title = it.get("title") or ""
                 detail_path = it.get("detailPath") or ""
+                if not detail_path and it.get("detailUrl"):
+                    detail_path = it["detailUrl"].rstrip("/").split("/")[-1]
                 clean_slug = re.sub(r'[^a-zA-Z0-9]+', '-', title.lower()).strip('-')
                 if not detail_path:
                     detail_path = f"{clean_slug}-{sid}" if sid else clean_slug
@@ -1246,6 +1254,8 @@ async def search_suggest(q: str = ""):
                 sid = str(it.get("subjectId") or "")
                 title = it.get("title") or ""
                 detail_path = it.get("detailPath") or ""
+                if not detail_path and it.get("detailUrl"):
+                    detail_path = it["detailUrl"].rstrip("/").split("/")[-1]
                 clean_slug = re.sub(r'[^a-zA-Z0-9]+', '-', title.lower()).strip('-')
                 if not detail_path:
                     detail_path = f"{clean_slug}-{sid}" if sid else clean_slug
@@ -1267,6 +1277,7 @@ async def search_suggest(q: str = ""):
                     "rating": str(it.get("imdbRatingValue") or "7.5"),
                     "detailPath": detail_path,
                     "releaseDate": it.get("releaseDate") or "",
+                    "hasResource": bool(it.get("hasResource", True)),
                     "isKeyword": False
                 })
             return {"code": 0, "data": {"items": items}}
@@ -1311,9 +1322,13 @@ async def api_detail(detailPath: str = "", subjectId: str = ""):
             data = await _make_request(url)
             if "data" in data and "subject" in data["data"] and data["data"]["subject"]:
                 subj = data["data"]["subject"]
-                if "resource" in data["data"]:
-                    subj["seasons"] = data["data"]["resource"].get("seasons", [])
-                    subj["seNum"] = len(subj["seasons"])
+                if subj.get("subjectType") == 1:
+                    subj["seasons"] = []
+                    subj["seNum"] = 0
+                else:
+                    if "resource" in data["data"]:
+                        subj["seasons"] = data["data"]["resource"].get("seasons", [])
+                        subj["seNum"] = len(subj["seasons"])
                 data["data"] = subj
                 return data
         except Exception:
@@ -1328,11 +1343,48 @@ async def api_detail(detailPath: str = "", subjectId: str = ""):
             subj = mob_data.get("subject") or mob_data
             if subj and isinstance(subj, dict):
                 subj["subjectId"] = sid
+                d_url = subj.get("detailUrl")
+                if d_url:
+                    official_slug = d_url.rstrip("/").split("/")[-1]
+                    _slug_to_id[official_slug] = sid
+                    _slug_to_id[detailPath] = sid
+                    # Try H5 with official slug
+                    try:
+                        h5_res = await _make_request(f"{API_BASE}/wefeed-h5api-bff/detail?detailPath={official_slug}")
+                        h5_subj = h5_res.get("data", {}).get("subject")
+                        if h5_subj:
+                            if h5_subj.get("subjectType") == 1:
+                                h5_subj["seasons"] = []
+                                h5_subj["seNum"] = 0
+                            else:
+                                if "resource" in h5_res.get("data", {}):
+                                    h5_subj["seasons"] = h5_res["data"]["resource"].get("seasons", [])
+                                    h5_subj["seNum"] = len(h5_subj["seasons"])
+                            h5_subj["subjectId"] = sid
+                            h5_subj["detailPath"] = official_slug
+                            return {"code": 0, "data": h5_subj}
+                    except Exception:
+                        pass
                 if not subj.get("detailPath"):
                     subj["detailPath"] = detailPath
-                if not subj.get("seasons"):
-                    subj["seasons"] = [{"se": 1, "episodeCount": 1, "allEp": "1"}] if subj.get("subjectType") == 1 else []
-                subj["seNum"] = len(subj["seasons"])
+                if subj.get("subjectType") == 1:
+                    subj["seasons"] = []
+                    subj["seNum"] = 0
+                elif subj.get("subjectType") == 2:
+                    if not subj.get("seasons"):
+                        se_num = int(subj.get("seNum") or 1)
+                        detectors = subj.get("resourceDetectors") or []
+                        max_ep = 1
+                        for d in detectors:
+                            ep_cnt = int(d.get("totalEpisode") or 0)
+                            if ep_cnt > max_ep:
+                                max_ep = ep_cnt
+                        subj["seasons"] = [{"se": s, "maxEp": max_ep, "allEp": ",".join(str(i) for i in range(1, max_ep + 1))} for s in range(1, se_num + 1)]
+                        subj["seNum"] = se_num
+                else:
+                    if not subj.get("seasons"):
+                        subj["seasons"] = []
+                    subj["seNum"] = len(subj["seasons"])
                 return {"code": 0, "data": subj}
         except Exception as e:
             print(f"Mobile detail error: {e}")
@@ -1345,6 +1397,9 @@ async def api_season(detailPath: str = "", subjectId: str = ""):
         try:
             url = f"{API_BASE}/wefeed-h5api-bff/detail?detailPath={detailPath}"
             data = await _make_request(url)
+            subj = data.get("data", {}).get("subject") or {}
+            if subj.get("subjectType") == 1:
+                return {"code": 0, "data": {"seasons": []}}
             seasons = []
             if "data" in data and "resource" in data["data"]:
                 seasons = data["data"]["resource"].get("seasons", [])
@@ -1360,11 +1415,40 @@ async def api_season(detailPath: str = "", subjectId: str = ""):
             mob_data = mob_res.get("data") or {}
             subj = mob_data.get("subject") or mob_data
             if subj and subj.get("subjectType") == 1:
-                return {"code": 0, "data": {"seasons": [{"se": 1, "episodeCount": 1, "allEp": "1"}]}}
+                return {"code": 0, "data": {"seasons": []}}
+            d_url = subj.get("detailUrl") if subj else None
+            if d_url:
+                official_slug = d_url.rstrip("/").split("/")[-1]
+                try:
+                    h5_data = await _make_request(f"{API_BASE}/wefeed-h5api-bff/detail?detailPath={official_slug}")
+                    h5_seasons = h5_data.get("data", {}).get("resource", {}).get("seasons", [])
+                    if h5_seasons:
+                        return {"code": 0, "data": {"seasons": h5_seasons}}
+                except Exception:
+                    pass
+            if subj and subj.get("seasons"):
+                return {"code": 0, "data": {"seasons": subj["seasons"]}}
+            if subj and subj.get("subjectType") == 2:
+                se_num = int(subj.get("seNum") or 1)
+                detectors = subj.get("resourceDetectors") or []
+                max_ep = 1
+                for d in detectors:
+                    ep_cnt = int(d.get("totalEpisode") or 0)
+                    if ep_cnt > max_ep:
+                        max_ep = ep_cnt
+                seasons = []
+                for s in range(1, se_num + 1):
+                    all_eps = ",".join(str(i) for i in range(1, max_ep + 1))
+                    seasons.append({
+                        "se": s,
+                        "maxEp": max_ep,
+                        "allEp": all_eps
+                    })
+                return {"code": 0, "data": {"seasons": seasons}}
         except Exception:
             pass
 
-    return {"code": 0, "data": {"seasons": []}}
+    return {"code": 0, "data": {"seasons": [], "isUpcoming": True}}
 
 @app.get("/api/resource")
 async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId: str = ""):
@@ -1376,6 +1460,21 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
         
     data = await _fetch_download_resources(subjectId, se, ep, detailPath)
     downloads = data.get("downloads") or []
+
+    # If downloads empty and detailPath might not match official slug, try resolving official slug
+    if not downloads:
+        try:
+            mob_res = await request_moviebox_mobile("/wefeed-mobile-bff/subject-api/get", params={"subjectId": subjectId, "se": se, "ep": ep})
+            mob_subj = mob_res.get("data", {}).get("subject") or mob_res.get("data") or {}
+            d_url = mob_subj.get("detailUrl")
+            if d_url:
+                official_slug = d_url.rstrip("/").split("/")[-1]
+                if official_slug != detailPath:
+                    cand_data = await _fetch_download_resources(subjectId, se, ep, official_slug)
+                    if cand_data.get("downloads"):
+                        downloads = cand_data["downloads"]
+        except Exception:
+            pass
 
     # Fallback to Original Audio or sibling dubs if the requested subjectId/dub has no downloads for this episode
     if not downloads and (detailPath or subjectId):
@@ -1416,15 +1515,24 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
             detectors = mob_subj.get("resourceDetectors") or []
             mob_items = []
             for det in detectors:
-                for r in det.get("resolutionList", []):
-                    r_link = r.get("resourceLink")
-                    if r_link:
-                        mob_items.append({
-                            "resourceId": str(r.get("resourceId") or r.get("id")),
-                            "resolution": int(r.get("resolution", 720)),
-                            "size": int(r.get("size", 0)),
-                            "resourceLink": f"/fetch?source_url={urllib.parse.quote(r_link)}"
-                        })
+                res_list = det.get("resolutionList", [])
+                if res_list:
+                    for r in res_list:
+                        r_link = r.get("resourceLink")
+                        if r_link and "fzmovies.cms" not in r_link:
+                            mob_items.append({
+                                "resourceId": str(r.get("resourceId") or r.get("id")),
+                                "resolution": int(r.get("resolution", 720)),
+                                "size": int(r.get("size", 0)),
+                                "resourceLink": f"/fetch?source_url={urllib.parse.quote(r_link)}"
+                            })
+                elif det.get("resourceLink") and "fzmovies.cms" not in det.get("resourceLink", ""):
+                    mob_items.append({
+                        "resourceId": str(det.get("resourceId") or "0"),
+                        "resolution": 720,
+                        "size": int(det.get("totalSize") or det.get("firstSize") or 0),
+                        "resourceLink": f"/fetch?source_url={urllib.parse.quote(det['resourceLink'])}"
+                    })
             if mob_items:
                 return {"code": 0, "data": {"list": mob_items}}
         except Exception as mob_err:
@@ -1440,7 +1548,7 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
                 "size": d.get("size", 0),
                 "resourceLink": f"/fetch?source_url={urllib.parse.quote(url_val)}"
             })
-    return {"code": 0, "data": {"list": items}}
+    return {"code": 0, "data": {"list": items, "isUpcoming": len(items) == 0}}
  
 @app.get("/api/captions")
 async def api_captions(se: int = 1, ep: int = 1, detailPath: str = "", subjectId: str = ""):

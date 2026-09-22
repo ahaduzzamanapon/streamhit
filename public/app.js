@@ -87,6 +87,13 @@ function highlightActiveMobileNav() {
     }
 }
 
+function isTvSubject(item) {
+    if (!item) return false;
+    if (item.subjectType === 1) return false;
+    if (item.subjectType === 2) return true;
+    return Boolean(item.seNum && item.seNum > 1);
+}
+
 // Utility function to enable mouse drag-to-scroll and mouse wheel horizontal scrolling
 function enableDragScroll(el) {
     if (!el) return;
@@ -812,6 +819,7 @@ function createContentCard(item) {
         langBadge = `<span class="card-badge lang">Bengali</span>`;
     }
 
+    const upcomingBadge = item.hasResource === false ? `<span class="card-badge upcoming" style="background:#e11d48;color:#fff;">Upcoming</span>` : "";
     const camBadge = item.isCam ? `<span class="card-badge cam">CAM</span>` : "";
     const typeText = item.subjectType === 2 ? "TV Show" : "Movie";
 
@@ -819,6 +827,7 @@ function createContentCard(item) {
         <div class="card-poster">
             <img src="${coverUrl}" alt="${title}" onerror="this.onerror=null; this.src='/default-cover.png';" loading="lazy">
             <div class="card-badges">
+                ${upcomingBadge}
                 ${langBadge}
                 ${camBadge}
             </div>
@@ -950,15 +959,16 @@ async function initDetailsPage() {
         const btnDetailsPlay = document.getElementById("btnDetailsPlay");
         if (btnDetailsPlay) {
             btnDetailsPlay.onclick = () => {
-                const typeSegment = detail.subjectType === 2 ? 'tv' : 'movie';
+                const typeSegment = isTvSubject(detail) ? 'tv' : 'movie';
                 let url = `/watch/${typeSegment}/${encodeURIComponent(detailPath)}`;
                 const q = [];
-                if (detail.subjectType === 2) {
+                if (isTvSubject(detail)) {
                     q.push(`season=${state.selectedSeason}`);
                     q.push(`episode=${state.selectedEpisode}`);
                 }
-                if (subjectId) {
-                    q.push(`id=${encodeURIComponent(subjectId)}`);
+                const sid = subjectId || (detail && detail.subjectId) || reqId;
+                if (sid) {
+                    q.push(`id=${encodeURIComponent(sid)}`);
                 }
                 if (q.length > 0) {
                     url += `?${q.join("&")}`;
@@ -968,7 +978,7 @@ async function initDetailsPage() {
         }
 
         // TV / Show episode selector
-        const isTv = detail.seNum > 0 || detail.subjectType === 2;
+        const isTv = isTvSubject(detail);
         const tvSelector = document.getElementById("watchTvSelector");
         
         if (isTv) {
@@ -1833,7 +1843,7 @@ async function initWatchPage() {
         }
 
         // TV Show episode selector
-        const isTv = detail.subjectType !== 1 && (detail.seNum > 0 || detail.subjectType === 2);
+        const isTv = isTvSubject(detail);
         const tvSelector = document.getElementById("watchTvSelector");
         if (isTv) {
             if (tvSelector) tvSelector.style.display = "block";
@@ -1929,6 +1939,11 @@ async function loadRecommendations(detail) {
 }
 
 async function loadSeasonEpisodes(subjectId, detailPath = "") {
+    if (!isTvSubject(state.selectedSubject)) {
+        const tvSelector = document.getElementById("watchTvSelector");
+        if (tvSelector) tvSelector.style.display = "none";
+        return;
+    }
     const seasonTabs = document.getElementById("watchSeasonTabs");
     const episodeGrid = document.getElementById("watchEpisodeGrid");
     
@@ -1979,7 +1994,10 @@ async function loadSeasonEpisodes(subjectId, detailPath = "") {
         // Apply drag scroll to season tabs
         enableDragScroll(seasonTabs);
     } else {
-        seasonTabs.innerHTML = "<span>No seasons found.</span>";
+        seasonTabs.innerHTML = `<div style="padding:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;color:#9ca3af;font-size:13px;display:flex;align-items:center;gap:8px;">
+            <i class="fa-solid fa-clock" style="color:#f87171;font-size:15px;"></i>
+            <span>Upcoming release — episodes will be available soon.</span>
+        </div>`;
     }
 }
 
@@ -2187,13 +2205,22 @@ async function loadPlayResources(subjectId, season = null, episode = null) {
             if (spinner) spinner.style.display = "none";
             const statusTxt = loaderOverlay.querySelector("span");
             if (statusTxt) statusTxt.innerHTML = `
-                <i class="fa-solid fa-circle-exclamation" style="margin-right:8px;color:#f97316;"></i>
-                Stream currently unavailable.
-                <button onclick="loadPlayResources('${subjectId}',${season !== null ? season : 'null'},${episode !== null ? episode : 'null'})" 
-                    style="margin-left:12px;background:var(--color-accent,#1dd171);color:#000;border:none;padding:6px 14px;border-radius:6px;font-weight:700;cursor:pointer;font-size:12px;">
-                    <i class="fa-solid fa-rotate-right"></i> Retry
-                </button>`;
-            loaderOverlay.style.background = "rgba(0,0,0,0.85)";
+                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:26px 20px;text-align:center;max-width:480px;margin:0 auto;">
+                    <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(239,68,68,0.18);color:#f87171;border:1px solid rgba(239,68,68,0.35);padding:5px 16px;border-radius:24px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;">
+                        <i class="fa-solid fa-clock"></i> Upcoming Title
+                    </div>
+                    <div style="font-size:18px;font-weight:700;color:#fff;line-height:1.3;">Not Yet Available for Streaming</div>
+                    <div style="font-size:13px;color:#9ca3af;line-height:1.5;">This title has not been released or uploaded to streaming servers yet. Streams will appear as soon as they become available.</div>
+                    <div style="display:flex;gap:12px;margin-top:6px;">
+                        <button onclick="window.history.back()" style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.25);padding:8px 18px;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:6px;">
+                            <i class="fa-solid fa-arrow-left"></i> Go Back
+                        </button>
+                        <button onclick="loadPlayResources('${subjectId}',${season !== null ? season : 'null'},${episode !== null ? episode : 'null'})" style="background:var(--accent,#e50914);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:6px;">
+                            <i class="fa-solid fa-rotate-right"></i> Check Again
+                        </button>
+                    </div>
+                </div>`;
+            loaderOverlay.style.background = "rgba(0,0,0,0.88)";
             loaderOverlay.style.pointerEvents = "auto";
             loaderOverlay.classList.add("visible");
         }
@@ -2576,11 +2603,13 @@ function bindCommonEvents() {
                                 const coverUrl = item.cover && item.cover.url ? item.cover.url : "/default-cover.png";
                                 const year = item.releaseDate ? item.releaseDate.split("-")[0] : "";
                                 const rating = item.rating || "7.5";
+                                const upcomingBadge = item.hasResource === false ? `<span class="suggest-badge" style="background:rgba(225,29,72,0.2);color:#fb7185;border:1px solid rgba(225,29,72,0.4);">Upcoming</span>` : "";
                                 itemEl.innerHTML = `
                                     <img class="suggest-cover" src="${coverUrl}" onerror="this.onerror=null; this.src='/default-cover.png';" alt="${item.title}">
                                     <div class="suggest-info">
                                         <div class="suggest-title">${item.title}</div>
                                         <div class="suggest-meta">
+                                            ${upcomingBadge}
                                             <span class="suggest-badge">${typeText}</span>
                                             ${year ? `<span>${year}</span>` : ""}
                                             <span class="suggest-rating"><i class="fa-solid fa-star"></i> ${rating}</span>
