@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <!-- Plyr CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css">
-  <link rel="stylesheet" href="/style.css?v=4.5">
+  <link rel="stylesheet" href="/style.css?v=5.0">
   <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-EGFDL2X6GY"></script>
 <script>
@@ -160,20 +160,44 @@
               <button class="resume-toast-btn" id="resumeToastDismissBtn">OK</button>
             </div>
           </div>
+
+          <!-- Infringement Disclaimer Strip (Below Player) -->
+          <div class="watch-disclaimer-strip">
+            <div class="disclaimer-text">
+              <i class="fa-solid fa-circle-exclamation"></i>
+              <span>Find any content infringes on your rights, please contact us.</span>
+            </div>
+            <button class="disclaimer-report-btn" id="reportContentBtn" onclick="alert('Thank you for reporting. Our moderation team has been notified.')">
+              <i class="fa-solid fa-flag"></i> Report
+            </button>
+          </div>
         </div>
 
         <!-- ── META BELOW PLAYER ─────────────────────────────────── -->
         <div class="cinema-meta-section">
-          <h1 id="watchMetaTitle" style="font-family:'Outfit',sans-serif;font-size:22px;font-weight:900;color:#fff;margin-bottom:8px;"></h1>
-          <div class="meta-row">
-            <span class="rating" id="watchMetaRating"></span>
-            <span id="watchMetaYear"></span>
-            <span id="watchMetaCountry"></span>
-            <span id="watchMetaDuration"></span>
+          <div class="meta-header-row">
+            <div class="meta-title-col">
+              <h1 id="watchMetaTitle"></h1>
+              <div class="meta-row">
+                <span class="rating-badge" id="watchMetaRating"></span>
+                <span id="watchMetaYear"></span>
+                <span id="watchMetaCountry"></span>
+                <span id="watchMetaDuration"></span>
+              </div>
+            </div>
+            <div class="meta-actions">
+              <a id="watchDownloadBtn" href="#" class="meta-action-btn">
+                <i class="fa-solid fa-arrow-down-to-bracket"></i> <span>Download</span>
+              </a>
+              <button id="watchShareBtn" class="meta-action-btn" onclick="navigator.clipboard.writeText(window.location.href); this.innerHTML='<i class=\'fa-solid fa-check\'></i> <span>Copied!</span>'; setTimeout(() => this.innerHTML='<i class=\'fa-solid fa-share-nodes\'></i> <span>Share</span>', 2000);">
+                <i class="fa-solid fa-share-nodes"></i> <span>Share</span>
+              </button>
+            </div>
           </div>
+          <p id="watchDescription" class="watch-synopsis"></p>
         </div>
 
-        <!-- ── DESCRIPTION ───────────────────────────────────────── -->
+        <!-- ── DESCRIPTION & TABS ────────────────────────────────── -->
         <div class="cinema-desc-section" style="margin:0 24px 24px;">
           <div class="watch-tabs-section">
             <div class="watch-tabs-header">
@@ -209,16 +233,25 @@
             <i class="fa-solid fa-circle-question info-icon"></i>
           </div>
 
-          <!-- Dub Selector -->
-          <div class="dub-selector-wrapper" id="watchDubSelectorGroup" style="display:none;">
-            <select id="dubLanguageSelect" class="custom-select"></select>
+          <!-- Dual Selectors: Dub + Season side-by-side -->
+          <div class="resources-controls-row">
+            <div class="dub-selector-wrapper" id="watchDubSelectorGroup" style="display:none;">
+              <select id="dubLanguageSelect" class="custom-select"></select>
+            </div>
+            <div class="season-selector-wrapper" id="watchSeasonSelectorGroup" style="display:none;">
+              <select id="seasonSelect" class="custom-select"></select>
+            </div>
           </div>
 
           <!-- TV Season + Episode Selector -->
           <div class="tv-episode-selector" id="watchTvSelector" style="display:none;">
-            <div class="season-tabs" id="watchSeasonTabs"></div>
+            <div class="season-tabs" id="watchSeasonTabs" style="display:none;"></div>
             <div class="episode-grid scroll-y" id="watchEpisodeGrid"></div>
           </div>
+
+          <!-- Live Stream Links (sports/tv) -->
+          <div class="live-stream-selector" id="watchLiveStreamSelector" style="display:none;"></div>
+        </div>
 
           <!-- Live Stream Links (sports/tv) -->
           <div class="live-stream-selector" id="watchLiveStreamSelector" style="display:none;"></div>
@@ -243,6 +276,6 @@
 <!-- Plyr JS -->
 <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.min.js"></script>
 <!-- App Logic -->
-<script src="/app.js?v=4.4"></script>
+<script src="/app.js?v=5.0"></script>
 </body>
 </html>

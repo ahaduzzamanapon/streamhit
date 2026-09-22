@@ -1203,13 +1203,21 @@ async function initWatchPage() {
         return;
     }
 
-    // Initialize Plyr player with simple controls on mobile and full controls on desktop
+    // Initialize Plyr player with minimalist modern controls matching reference image
     const isMobile = window.innerWidth <= 768;
-    const mobileControls = ['play', 'progress', 'current-time', 'duration', 'mute', 'pip', 'fullscreen'];
-    const desktopControls = ['play-large', 'play', 'rewind', 'fast-forward', 'progress', 'current-time', 'mute', 'volume', 'captions', 'settings', 'pip', 'fullscreen'];
+    const playerControls = [
+        'play', 
+        'progress', 
+        'current-time', 
+        'duration', 
+        'mute', 
+        'settings', 
+        'pip', 
+        'fullscreen'
+    ];
 
     playerInstance = new Plyr('#player', {
-        controls: isMobile ? mobileControls : desktopControls,
+        controls: playerControls,
         settings: ['quality', 'speed'],
         quality: { default: 0, options: [0, 4320, 2880, 2160, 1440, 1080, 720, 576, 480, 360, 240] },
         keyboard: { global: true, focused: true },
@@ -1217,6 +1225,43 @@ async function initWatchPage() {
         volume: 1,
         muted: false
     });
+
+    // Helper to manage dynamic resolution badge (e.g. 480P / 720P / 1080P) matching Image 2
+    window.updateQualityBadgeText = function(q) {
+        const badge = document.getElementById('plyrQualityBadge');
+        if (!badge) return;
+        if (!q || q === 0 || q === '0') {
+            if (state.availableResources && state.availableResources.length > 0) {
+                const res = state.availableResources.find(r => r.resolution && r.resolution > 0);
+                badge.textContent = res ? `${res.resolution}P` : 'Auto';
+            } else {
+                badge.textContent = 'Auto';
+            }
+        } else {
+            badge.textContent = `${q}P`;
+        }
+    };
+
+    window.ensureQualityBadge = function() {
+        let badge = document.getElementById('plyrQualityBadge');
+        const settingsBtn = document.querySelector('.plyr__controls [data-plyr="settings"]');
+        if (!badge && settingsBtn && settingsBtn.parentNode) {
+            badge = document.createElement('button');
+            badge.type = 'button';
+            badge.className = 'plyr__control plyr__custom-quality-badge';
+            badge.id = 'plyrQualityBadge';
+            badge.textContent = 'Auto';
+            badge.title = 'Video Quality';
+            badge.onclick = (e) => {
+                e.stopPropagation();
+                settingsBtn.click();
+            };
+            settingsBtn.parentNode.insertBefore(badge, settingsBtn);
+        }
+        if (playerInstance) {
+            window.updateQualityBadgeText(playerInstance.quality);
+        }
+    };
 
     // Double-tap/click seek handlers
     setTimeout(() => {
@@ -1303,7 +1348,12 @@ async function initWatchPage() {
                 }
             }
         });
-    }, 250);
+
+        // Keep quality badge present and updated
+        if (typeof window.ensureQualityBadge === 'function') {
+            window.ensureQualityBadge();
+        }
+    }, 300);
 
     // Custom Player Loading Overlay event bindings
     const loaderOverlay = document.getElementById("playerLoaderOverlay");
@@ -1370,8 +1420,11 @@ async function initWatchPage() {
     });
     
     playerInstance.on('qualitychange', (event) => {
+        const selectedQ = event.detail.quality;
+        if (typeof window.updateQualityBadgeText === 'function') {
+            window.updateQualityBadgeText(selectedQ);
+        }
         if (!isProgrammaticQualityChange) {
-            const selectedQ = event.detail.quality;
             if (selectedQ === 0) {
                 userSelectedQuality = false;
                 localStorage.removeItem("streamfit_preferred_quality");
@@ -2006,36 +2059,80 @@ async function loadSeasonEpisodes(subjectId, detailPath = "") {
     if (!isTvSubject(state.selectedSubject)) {
         const tvSelector = document.getElementById("watchTvSelector");
         if (tvSelector) tvSelector.style.display = "none";
+        const seasonGroup = document.getElementById("watchSeasonSelectorGroup");
+        if (seasonGroup) seasonGroup.style.display = "none";
         return;
     }
     const seasonTabs = document.getElementById("watchSeasonTabs");
+    const seasonGroup = document.getElementById("watchSeasonSelectorGroup");
+    const seasonSelect = document.getElementById("seasonSelect");
     const episodeGrid = document.getElementById("watchEpisodeGrid");
     
-    seasonTabs.innerHTML = "<span>Loading seasons...</span>";
-    episodeGrid.innerHTML = "";
+    if (seasonTabs) seasonTabs.innerHTML = "<span>Loading seasons...</span>";
+    if (episodeGrid) episodeGrid.innerHTML = "";
 
     const result = await apiGet(`/api/season-info?detailPath=${encodeURIComponent(detailPath)}&subjectId=${encodeURIComponent(subjectId || '')}`);
     if (result && result.data && result.data.seasons && result.data.seasons.length > 0) {
         const seasons = result.data.seasons;
-        seasonTabs.innerHTML = "";
-
-        seasons.forEach((season) => {
-            const btn = document.createElement("button");
-            const isActive = season.se === state.selectedSeason;
-            btn.className = `season-tab ${isActive ? 'active' : ''}`;
-            btn.textContent = `Season ${season.se}`;
-            btn.onclick = () => {
-                document.querySelectorAll(".season-tab").forEach(b => b.classList.remove("active"));
-                btn.classList.add("active");
-                state.selectedSeason = season.se;
-                state.selectedEpisode = season.allEp ? Number(season.allEp.split(',')[0]) : 1;
-                renderEpisodes(season);
+        
+        // Populate Season Select Dropdown (side-by-side with Dub selector matching Image 1)
+        if (seasonGroup && seasonSelect) {
+            seasonGroup.style.display = "block";
+            seasonSelect.innerHTML = "";
+            seasons.forEach((season) => {
+                const opt = document.createElement("option");
+                opt.value = season.se;
+                opt.textContent = `Season ${String(season.se).padStart(2, '0')}`;
+                if (season.se === state.selectedSeason) opt.selected = true;
+                seasonSelect.appendChild(opt);
+            });
+            seasonSelect.onchange = async () => {
+                const newSe = Number(seasonSelect.value);
+                state.selectedSeason = newSe;
+                const targetSeason = seasons.find(s => s.se === newSe) || seasons[0];
+                let firstEp = 1;
+                if (targetSeason.allEp) {
+                    firstEp = Number(targetSeason.allEp.split(',')[0]) || 1;
+                }
+                state.selectedEpisode = firstEp;
+                renderEpisodes(targetSeason);
+                
+                // Update URL and play episode 1 of chosen season
+                const _epPathParts = window.location.pathname.split("/");
+                const _epSlug = _epPathParts[_epPathParts.length - 1] || "";
+                const _epType = _epPathParts[2] || "tv";
+                const urlParams = new URLSearchParams(window.location.search);
+                urlParams.set("season", state.selectedSeason);
+                urlParams.set("episode", state.selectedEpisode);
+                history.pushState({}, "", `/watch/${_epType}/${_epSlug}?${urlParams.toString()}`);
+                
+                await loadPlayResources(state.selectedSubject.subjectId, state.selectedSeason, state.selectedEpisode);
             };
-            seasonTabs.appendChild(btn);
-        });
+        }
+
+        // Fallback season tabs
+        if (seasonTabs) {
+            seasonTabs.innerHTML = "";
+            seasons.forEach((season) => {
+                const btn = document.createElement("button");
+                const isActive = season.se === state.selectedSeason;
+                btn.className = `season-tab ${isActive ? 'active' : ''}`;
+                btn.textContent = `Season ${season.se}`;
+                btn.onclick = () => {
+                    document.querySelectorAll(".season-tab").forEach(b => b.classList.remove("active"));
+                    btn.classList.add("active");
+                    state.selectedSeason = season.se;
+                    if (seasonSelect) seasonSelect.value = season.se;
+                    state.selectedEpisode = season.allEp ? Number(season.allEp.split(',')[0]) : 1;
+                    renderEpisodes(season);
+                };
+                seasonTabs.appendChild(btn);
+            });
+        }
 
         const activeSeasonObj = seasons.find(s => s.se === state.selectedSeason) || seasons[0];
         state.selectedSeason = activeSeasonObj.se;
+        if (seasonSelect) seasonSelect.value = activeSeasonObj.se;
         
         // Ensure state.selectedEpisode exists in the selected season
         let epsArr = [];
@@ -2055,13 +2152,18 @@ async function loadSeasonEpisodes(subjectId, detailPath = "") {
 
         renderEpisodes(activeSeasonObj);
 
-        // Apply drag scroll to season tabs
-        enableDragScroll(seasonTabs);
+        // Apply drag scroll to season tabs if visible
+        if (seasonTabs && seasonTabs.children.length > 0) {
+            enableDragScroll(seasonTabs);
+        }
     } else {
-        seasonTabs.innerHTML = `<div style="padding:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;color:#9ca3af;font-size:13px;display:flex;align-items:center;gap:8px;">
-            <i class="fa-solid fa-clock" style="color:#f87171;font-size:15px;"></i>
-            <span>Upcoming release — episodes will be available soon.</span>
-        </div>`;
+        if (seasonGroup) seasonGroup.style.display = "none";
+        if (seasonTabs) {
+            seasonTabs.innerHTML = `<div style="padding:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;color:#9ca3af;font-size:13px;display:flex;align-items:center;gap:8px;">
+                <i class="fa-solid fa-clock" style="color:#f87171;font-size:15px;"></i>
+                <span>Upcoming release — episodes will be available soon.</span>
+            </div>`;
+        }
     }
 }
 
@@ -2082,7 +2184,9 @@ function renderEpisodes(season) {
             const btn = document.createElement("button");
             const isActive = Number(epNum) === state.selectedEpisode;
             btn.className = `episode-btn ${isActive ? 'active' : ''}`;
-            btn.textContent = epNum;
+            // Two-digit format matching Image 1 (01, 02, 03... 10)
+            const paddedEp = String(epNum).trim().padStart(2, '0');
+            btn.textContent = paddedEp;
 
             if (isActive) {
                 const eq = document.createElement("span");
@@ -2095,7 +2199,7 @@ function renderEpisodes(season) {
                 state.selectedEpisode = Number(epNum);
                 const _epPathParts = window.location.pathname.split("/");
                 const _epSlug = _epPathParts[_epPathParts.length - 1] || "";
-                const _epType = _epPathParts[2] || "movie";
+                const _epType = _epPathParts[2] || "tv";
 
                 const urlParams = new URLSearchParams(window.location.search);
                 urlParams.set("season", state.selectedSeason);
@@ -2304,8 +2408,17 @@ async function playResources() {
     state.directMp4Url = streamUrl;
 
     // Set download button URL
-    const dlBtn = document.getElementById("downloadBtn");
-    if (dlBtn) dlBtn.href = streamUrl;
+    const dlBtn = document.getElementById("watchDownloadBtn") || document.getElementById("downloadBtn");
+    if (dlBtn) {
+        dlBtn.href = streamUrl;
+        dlBtn.setAttribute("target", "_blank");
+        dlBtn.setAttribute("download", "");
+        dlBtn.style.display = "inline-flex";
+    }
+
+    if (typeof window.ensureQualityBadge === 'function') {
+        window.ensureQualityBadge();
+    }
 
     if (hlsInstance) {
         hlsInstance.destroy();
