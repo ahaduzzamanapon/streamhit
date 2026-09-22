@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="nx-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff2a3a" />
+      <stop offset="100%" stop-color="#e50914" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="16" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="#0d0e12"/>
+  <rect x="64" y="64" width="384" height="384" rx="96" fill="url(#nx-grad)" filter="url(#glow)"/>
+  <!-- Bold Stylized N -->
+  <path d="M140 160 L195 160 L285 300 L285 160 L335 160 L335 352 L280 352 L190 212 L190 352 L140 352 Z" fill="#ffffff" fill-rule="evenodd" opacity="0.95"/>
+  <!-- Modern Geometric Accent Dot / Play Triangle -->
+  <path d="M345 320 L375 336 L345 352 Z" fill="#ffffff"/>
+</svg>

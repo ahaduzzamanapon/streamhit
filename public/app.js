@@ -138,8 +138,72 @@ function enableDragScroll(el) {
     }, { passive: false });
 }
 
+// Dynamic Multi-Domain Brand Configuration
+function getBrandConfig() {
+    const host = (window.location.hostname || "").toLowerCase();
+    if (host.includes("nxly")) {
+        return {
+            name: "NXLY",
+            nameHtml: 'NX<span>LY</span>',
+            domain: "nxly.online",
+            fullUrl: "https://nxly.online",
+            favicon: "/favicon-nxly.svg",
+            logoIconHtml: '<span class="logo-nx-glyph">NX</span>',
+            byBrand: "By NXLY"
+        };
+    }
+    return {
+        name: "Streamfit",
+        nameHtml: 'Stream<span>fit</span>',
+        domain: "streamfit.ehealthfinder.com",
+        fullUrl: "https://streamfit.ehealthfinder.com",
+        favicon: "/favicon.svg",
+        logoIconHtml: '<i class="fa-solid fa-play"></i>',
+        byBrand: "By Streamfit"
+    };
+}
+
+function applyBrandTheme() {
+    try {
+        const brand = getBrandConfig();
+
+        // Update favicon
+        const favicons = document.querySelectorAll("link[rel*='icon']");
+        favicons.forEach(el => el.href = brand.favicon);
+
+        // Update all .logo-text elements
+        document.querySelectorAll(".logo-text").forEach(el => {
+            el.innerHTML = brand.nameHtml;
+        });
+
+        // Update all .play-logo icons
+        document.querySelectorAll(".play-logo").forEach(el => {
+            el.innerHTML = brand.logoIconHtml;
+        });
+
+        // Update document title if it mentions the other brand
+        if (document.title.includes("Streamfit") && brand.name !== "Streamfit") {
+            document.title = document.title.replace(/Streamfit/g, brand.name);
+        } else if (document.title.includes("NXLY") && brand.name !== "NXLY") {
+            document.title = document.title.replace(/NXLY/g, brand.name);
+        }
+
+        // Update "Resources By Streamfit"
+        document.querySelectorAll(".upload-by").forEach(el => {
+            el.textContent = brand.byBrand;
+        });
+
+        if (document.body) {
+            document.body.dataset.brand = brand.name.toLowerCase();
+        }
+    } catch (e) {
+        console.error("Error applying brand theme:", e);
+    }
+}
+
 // Initial Load
 document.addEventListener("DOMContentLoaded", () => {
+    applyBrandTheme();
     detectRoute();
     bindCommonEvents();
     initWebNotifications();

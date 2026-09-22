@@ -125,6 +125,18 @@ input, select { font-family: inherit; }
 }
 .logo-text span { color: var(--accent); }
 
+.logo-nx-glyph {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 900;
+  font-size: 14px;
+  letter-spacing: -0.5px;
+  line-height: 1;
+  color: #fff;
+}
+.mobile-brand .play-logo .logo-nx-glyph {
+  font-size: 11px;
+}
+
 /* Nav Menu */
 .nav-menu {
   flex: 1;

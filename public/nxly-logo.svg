@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 40" fill="none">
+  <defs>
+    <linearGradient id="nxMarkGrad" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ff3344"/>
+      <stop offset="1" stop-color="#e50914"/>
+    </linearGradient>
+    <filter id="nxShadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#e50914" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+  <!-- Icon Box -->
+  <g filter="url(#nxShadow)">
+    <rect width="36" height="36" rx="9" fill="url(#nxMarkGrad)"/>
+    <!-- N Glyph -->
+    <path d="M10 10 H14.5 L21.5 21 V10 H25.5 V26 H21 L14 15 V26 H10 Z" fill="#ffffff"/>
+  </g>
+  <!-- Text Brand -->
+  <text x="46" y="27" font-family="'Outfit', sans-serif" font-weight="900" font-size="22" fill="#ffffff" letter-spacing="-0.5">NX<tspan fill="#e50914">LY</tspan></text>
+</svg>

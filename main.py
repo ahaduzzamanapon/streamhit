@@ -750,12 +750,35 @@ async def resolve_subject_id(detail_path: str = "", subject_id: str = "") -> str
 
     return ""
 
-async def get_subject_meta(slug: str):
+def get_brand_config(host: str = "") -> dict:
+    host_lower = (host or "").lower()
+    if "nxly" in host_lower:
+        return {
+            "name": "NXLY",
+            "name_html": 'NX<span>LY</span>',
+            "domain": "nxly.online",
+            "full_url": "https://nxly.online",
+            "favicon": "/favicon-nxly.svg",
+            "logo_icon": '<span class="logo-nx-glyph">NX</span>',
+            "by_brand": "By NXLY"
+        }
+    return {
+        "name": "Streamfit",
+        "name_html": 'Stream<span>fit</span>',
+        "domain": "streamfit.ehealthfinder.com",
+        "full_url": "https://streamfit.ehealthfinder.com",
+        "favicon": "/favicon.svg",
+        "logo_icon": '<i class="fa-solid fa-play"></i>',
+        "by_brand": "By Streamfit"
+    }
+
+async def get_subject_meta(slug: str, host: str = ""):
+    brand = get_brand_config(host)
     meta = {
-        "title": "Streamfit - Watch Free Movies & TV Shows",
-        "description": "Streamfit offers the best free high-quality streaming.",
+        "title": f"{brand['name']} - Watch Free Movies & TV Shows",
+        "description": f"{brand['name']} offers the best free high-quality streaming.",
         "cover": "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=1200&q=80",
-        "url": f"https://streamfit.ehealthfinder.com/movie/{slug}",
+        "url": f"{brand['full_url']}/movie/{slug}",
         "schema": ""
     }
     if not slug: return meta
@@ -778,7 +801,7 @@ async def get_subject_meta(slug: str):
                 pass
 
     if inner and isinstance(inner, dict):
-        meta["title"] = f"Watch {inner.get('title', 'Movie')} - Streamfit"
+        meta["title"] = f"Watch {inner.get('title', 'Movie')} - {brand['name']}"
         meta["description"] = inner.get("description", meta["description"]).replace('"', '\\"')
         cover_val = inner.get("cover")
         if isinstance(cover_val, dict):
@@ -801,35 +824,52 @@ async def get_subject_meta(slug: str):
         meta["schema"] = f'<script type="application/ld+json">{json.dumps(schema_obj)}</script>'
     return meta
 
-def serve_html(filename: str, meta_replacements=None):
+def serve_html(filename: str, meta_replacements=None, host: str = ""):
     path = os.path.join(base_dir, filename)
     if not os.path.exists(path): return HTMLResponse("Not Found", status_code=404)
     with open(path, "r", encoding="utf-8") as f: html = f.read()
+    
+    brand = get_brand_config(host)
+    if brand["name"] != "Streamfit":
+        html = html.replace('Stream<span>fit</span>', brand["name_html"])
+        html = html.replace('Streamfit', brand["name"])
+        html = html.replace('streamfit.ehealthfinder.com', brand["domain"])
+        html = html.replace('/favicon.svg', brand["favicon"])
+        html = html.replace('<div class="play-logo"><i class="fa-solid fa-play"></i></div>', f'<div class="play-logo">{brand["logo_icon"]}</div>')
+        html = html.replace('<div class="play-logo" style="width:28px;height:28px;font-size:11px;"><i class="fa-solid fa-play"></i></div>', f'<div class="play-logo" style="width:28px;height:28px;font-size:11px;">{brand["logo_icon"]}</div>')
+        html = html.replace('By Streamfit', brand["by_brand"])
+
     if meta_replacements:
         for k, v in meta_replacements.items(): html = html.replace(k, v)
     return HTMLResponse(content=html)
 
 @app.get("/", response_class=HTMLResponse)
-async def index(): return serve_html("public/index.html")
+async def index(request: Request): return serve_html("public/index.html", host=request.headers.get("host", ""))
 
 @app.get("/admin", response_class=HTMLResponse)
-async def admin_page(): return serve_html("public/admin.html")
+async def admin_page(request: Request): return serve_html("public/admin.html", host=request.headers.get("host", ""))
 
 @app.get("/movies", response_class=HTMLResponse)
-async def movies(): return serve_html("public/movies.html", {"<title>Explore Movies - Streamfit</title>": "<title>Explore Movies - Streamfit</title>"})
+async def movies(request: Request):
+    host = request.headers.get("host", "")
+    brand = get_brand_config(host)
+    return serve_html("public/movies.html", {"<title>Explore Movies - Streamfit</title>": f"<title>Explore Movies - {brand['name']}</title>"}, host=host)
 
 @app.get("/tv", response_class=HTMLResponse)
-async def tv(): return serve_html("public/tv.html", {"<title>Explore TV Series - Streamfit</title>": "<title>Explore TV Series - Streamfit</title>"})
+async def tv(request: Request):
+    host = request.headers.get("host", "")
+    brand = get_brand_config(host)
+    return serve_html("public/tv.html", {"<title>Explore TV Series - Streamfit</title>": f"<title>Explore TV Series - {brand['name']}</title>"}, host=host)
 
 @app.get("/live-tv", response_class=HTMLResponse)
-async def livetv(): return serve_html("public/live-tv.html")
-
-
+async def livetv(request: Request): return serve_html("public/live-tv.html", host=request.headers.get("host", ""))
 
 @app.get("/movie/{slug}", response_class=HTMLResponse)
 @app.get("/tv/{slug}", response_class=HTMLResponse)
-async def details(slug: str):
-    meta = await get_subject_meta(slug)
+async def details(slug: str, request: Request):
+    host = request.headers.get("host", "")
+    brand = get_brand_config(host)
+    meta = await get_subject_meta(slug, host=host)
     reps = {
         '<title>Details — Streamfit</title>': f'<title>{meta["title"]}</title>',
         'id="detailsTitle">Title': f'id="detailsTitle">{meta["title"]}',
@@ -842,12 +882,14 @@ async def details(slug: str):
         'content="website"': 'content="video.movie"',
         '<!-- SCHEMA_PLACEHOLDER -->': meta.get("schema", "")
     }
-    return serve_html("public/details.html", reps)
+    return serve_html("public/details.html", reps, host=host)
 
 @app.get("/watch/movie/{slug}", response_class=HTMLResponse)
 @app.get("/watch/tv/{slug}", response_class=HTMLResponse)
-async def watch(slug: str):
-    meta = await get_subject_meta(slug)
+async def watch(slug: str, request: Request):
+    host = request.headers.get("host", "")
+    brand = get_brand_config(host)
+    meta = await get_subject_meta(slug, host=host)
     reps = {
         '<title>Watch — Streamfit</title>': f'<title>Watching {meta["title"]}</title>',
         'content="Watch free movies, TV shows, anime and live sports online."': f'content="{meta["description"]}"',
@@ -857,7 +899,7 @@ async def watch(slug: str):
         'content="website"': 'content="video.movie"',
         '<!-- SCHEMA_PLACEHOLDER -->': meta.get("schema", "")
     }
-    return serve_html("public/watch.html", reps)
+    return serve_html("public/watch.html", reps, host=host)
 
 # backward compatibility redirects
 @app.get("/details")
