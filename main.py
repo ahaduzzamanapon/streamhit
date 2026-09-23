@@ -732,6 +732,23 @@ async def api_ping(request: Request):
 import admin
 app.include_router(admin.router)
 
+import traceback
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    err_trace = traceback.format_exc()
+    print(f"GLOBAL APP ERROR [{request.method} {request.url.path}]: {exc}\n{err_trace}")
+    try:
+        with open("/tmp/fastapi_error.log", "a") as f:
+            f.write(f"\n--- ERROR: {request.method} {request.url.path} ---\n{err_trace}\n")
+    except:
+        pass
+    return JSONResponse(
+        status_code=500,
+        content={"code": 500, "message": f"Server Error: {exc}", "trace": err_trace}
+    )
+
 @app.middleware("http")
 async def add_no_cache_headers(request: Request, call_next):
     response = await call_next(request)
