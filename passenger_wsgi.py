@@ -19,23 +19,53 @@ try:
 
         def __call__(self, environ, start_response):
             req_log = os.path.join(base_dir, "scratch/wsgi_access.log")
+            req_err = os.path.join(base_dir, "scratch/wsgi_request_error.log")
+            method = environ.get('REQUEST_METHOD')
+            path = environ.get('PATH_INFO')
             try:
                 with open(req_log, "a") as f:
-                    f.write(f"WSGI IN: {environ.get('REQUEST_METHOD')} {environ.get('PATH_INFO')} content_length={environ.get('CONTENT_LENGTH')}\n")
-            except Exception as le:
+                    f.write(f"WSGI IN: {method} {path} len={environ.get('CONTENT_LENGTH')}\n")
+            except:
                 pass
+
+            def logged_start_response(status, headers, exc_info=None):
+                try:
+                    with open(req_log, "a") as f:
+                        f.write(f"WSGI OUT: {method} {path} -> {status}\n")
+                except:
+                    pass
+                return start_response(status, headers, exc_info) if exc_info else start_response(status, headers)
+
             try:
                 if self._middleware is None:
                     with self._lock:
                         if self._middleware is None:
                             self._middleware = ASGIMiddleware(self.app)
-                return self._middleware(environ, start_response)
+                iterable = self._middleware(environ, logged_start_response)
+
+                def generate():
+                    try:
+                        for chunk in iterable:
+                            yield chunk
+                    except Exception as ge:
+                        import traceback
+                        with open(req_err, "a") as f:
+                            f.write(f"\n--- WSGI ITERATOR ERROR: {ge} ---\n")
+                            f.write(f"METHOD: {method} PATH: {path}\n")
+                            f.write(traceback.format_exc() + "\n")
+                        raise
+                    finally:
+                        if hasattr(iterable, "close"):
+                            try:
+                                iterable.close()
+                            except:
+                                pass
+                return generate()
             except Exception as e:
                 import traceback
-                req_err = os.path.join(base_dir, "scratch/wsgi_request_error.log")
                 with open(req_err, "a") as f:
                     f.write(f"\n--- WSGI ERROR: {e} ---\n")
-                    f.write(f"METHOD: {environ.get('REQUEST_METHOD')} PATH: {environ.get('PATH_INFO')}\n")
+                    f.write(f"METHOD: {method} PATH: {path}\n")
                     f.write(traceback.format_exc() + "\n")
                 raise
 
