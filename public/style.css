@@ -2353,20 +2353,83 @@ input, select { font-family: inherit; }
 .plyr--video .plyr__controls .plyr__volume {
   display: inline-flex !important;
   align-items: center !important;
+  position: relative !important;
+  gap: 4px !important;
 }
 .plyr--video .plyr__controls .plyr__volume input[type="range"] {
-  width: 0 !important;
-  max-width: 0 !important;
-  opacity: 0 !important;
-  padding: 0 !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  width: 60px !important;
+  max-width: 60px !important;
+  height: 20px !important;
+  background: transparent !important;
+  cursor: pointer !important;
   margin: 0 !important;
-  transition: width 0.2s ease, opacity 0.2s ease, margin 0.2s ease !important;
+  padding: 0 !important;
+  opacity: 0.85 !important;
+  outline: none !important;
+  border: none !important;
+  transition: opacity 0.2s ease, width 0.2s ease !important;
+  display: inline-block !important;
 }
-.plyr--video .plyr__controls .plyr__volume:hover input[type="range"] {
-  width: 50px !important;
-  max-width: 50px !important;
+.plyr--video .plyr__controls .plyr__volume:hover input[type="range"],
+.plyr--video .plyr__controls .plyr__volume input[type="range"]:focus,
+.plyr--video .plyr__controls .plyr__volume input[type="range"]:active {
   opacity: 1 !important;
-  margin-left: 6px !important;
+}
+
+/* WebKit Track: Emerald green progress fill based on --value */
+.plyr--video .plyr__controls .plyr__volume input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px !important;
+  border-radius: 2px !important;
+  background: rgba(255, 255, 255, 0.2) !important;
+  background-image: linear-gradient(to right, #00e676 var(--value, 100%), rgba(255, 255, 255, 0.2) var(--value, 100%)) !important;
+  box-shadow: 0 0 6px rgba(0, 230, 118, 0.25) !important;
+  transition: height 0.15s ease !important;
+}
+.plyr--video .plyr__controls .plyr__volume:hover input[type="range"]::-webkit-slider-runnable-track,
+.plyr--video .plyr__controls .plyr__volume input[type="range"]:active::-webkit-slider-runnable-track {
+  height: 5px !important;
+}
+
+/* WebKit Thumb: Elegant neon green glowing knob */
+.plyr--video .plyr__controls .plyr__volume input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none !important;
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 50% !important;
+  background: #00e676 !important;
+  border: 2px solid #ffffff !important;
+  margin-top: -4px !important;
+  cursor: pointer !important;
+  box-shadow: 0 0 8px rgba(0, 230, 118, 0.8), 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+  transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+.plyr--video .plyr__controls .plyr__volume:hover input[type="range"]::-webkit-slider-thumb,
+.plyr--video .plyr__controls .plyr__volume input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.25) !important;
+  box-shadow: 0 0 12px rgba(0, 230, 118, 1), 0 2px 4px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Moz Track & Progress */
+.plyr--video .plyr__controls .plyr__volume input[type="range"]::-moz-range-track {
+  height: 4px !important;
+  border-radius: 2px !important;
+  background: rgba(255, 255, 255, 0.2) !important;
+}
+.plyr--video .plyr__controls .plyr__volume input[type="range"]::-moz-range-progress {
+  height: 4px !important;
+  border-radius: 2px !important;
+  background: #00e676 !important;
+  box-shadow: 0 0 6px rgba(0, 230, 118, 0.5) !important;
+}
+.plyr--video .plyr__controls .plyr__volume input[type="range"]::-moz-range-thumb {
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 50% !important;
+  background: #00e676 !important;
+  border: 2px solid #ffffff !important;
+  cursor: pointer !important;
 }
 
 /* 4. Time Display: 00:40 / 42:59 with clean single slash */
@@ -3498,6 +3561,7 @@ input, select { font-family: inherit; }
   .quick-nav-btn { padding: 5px 9px !important; font-size: 11px !important; }
   .quick-nav-label { font-size: 11px !important; }
   .quick-nav-badge { display: none !important; }
+  .plyr--video .plyr__controls .plyr__volume input[type="range"] { width: 44px !important; max-width: 44px !important; }
   .resources-container .episode-grid { grid-template-columns: repeat(5, 1fr) !important; gap: 4px !important; }
   .episode-btn { height: 34px !important; font-size: 11.5px !important; }
   .hero-dots { display: none; }

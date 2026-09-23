@@ -1211,6 +1211,7 @@ async function initWatchPage() {
         'current-time', 
         'duration', 
         'mute', 
+        'volume',
         'settings', 
         'pip', 
         'fullscreen'
@@ -1619,6 +1620,23 @@ async function initWatchPage() {
         }
 
         if (vol && vol.parentElement !== leftGroup) leftGroup.appendChild(vol);
+
+        // Wire Volume Range Slider
+        const volInput = (vol || controls).querySelector('input[data-plyr="volume"]');
+        if (volInput) {
+            const currentVol = playerInstance ? (playerInstance.muted ? 0 : Math.round((playerInstance.volume ?? 1) * 100)) : 100;
+            volInput.style.setProperty('--value', `${currentVol}%`);
+            if (!volInput._wired) {
+                volInput._wired = true;
+                const updateVolVar = () => {
+                    const val = Math.round(Number(volInput.value) * 100);
+                    volInput.style.setProperty('--value', `${val}%`);
+                };
+                volInput.addEventListener('input', updateVolVar);
+                volInput.addEventListener('change', updateVolVar);
+            }
+        }
+
         if (curTime && curTime.parentElement !== leftGroup) leftGroup.appendChild(curTime);
         if (durTime && durTime.parentElement !== leftGroup) leftGroup.appendChild(durTime);
 
@@ -1891,6 +1909,14 @@ async function initWatchPage() {
     playerInstance.on('canplay', window.organizePlyrControlsLayout);
     playerInstance.on('play', () => window.triggerCenterSplash('play'));
     playerInstance.on('pause', () => window.triggerCenterSplash('pause'));
+    playerInstance.on('volumechange', () => {
+        const volInput = document.querySelector('.plyr__controls input[data-plyr="volume"]');
+        if (volInput) {
+            const val = playerInstance.muted ? 0 : Math.round((playerInstance.volume ?? 1) * 100);
+            volInput.style.setProperty('--value', `${val}%`);
+            volInput.value = playerInstance.muted ? 0 : (playerInstance.volume ?? 1);
+        }
+    });
 
     playerInstance.on('enterfullscreen', () => {
         window.organizePlyrControlsLayout();
