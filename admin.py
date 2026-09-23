@@ -643,3 +643,10 @@ async def admin_import_tv_channels(data: dict, request: Request):
         "code": 0,
         "message": f"Import completed successfully. Added: {added}, Updated (link added): {updated}, Skipped (duplicate): {skipped}"
     }
+
+@router.get("/api/admin/active-users")
+async def get_active_users(request: Request):
+    check_admin_auth(request)
+    from main import get_active_users_stats
+    return get_active_users_stats()
+

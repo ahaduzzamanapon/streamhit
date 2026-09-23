@@ -9,10 +9,10 @@
 /* ── CSS Variables ─────────────────────────────────────────────────────────── */
 :root {
   /* Colors */
-  --accent:        #e50914;
-  --accent-hover:  #c4070f;
-  --accent-2:      #ff6b35;
-  --accent-green:  #10b981;
+  --accent:        #00e676;
+  --accent-hover:  #00c853;
+  --accent-2:      #00df82;
+  --accent-green:  #00e676;
   --accent-gold:   #f5c518;
   --bg-base:       #08080d;
   --bg-surface:    #0f0f18;
@@ -22,14 +22,14 @@
   --bg-glass:      rgba(15, 15, 24, 0.85);
   --border:        rgba(255,255,255,0.08);
   --border-hover:  rgba(255,255,255,0.18);
-  --border-focus:  rgba(229,9,20,0.55);
+  --border-focus:  rgba(0, 230, 118, 0.55);
   --text-primary:  #f4f4f8;
   --text-secondary:#a2a2b8;
   --text-muted:    #656580;
   --shadow-sm:     0 2px 8px rgba(0,0,0,0.35);
   --shadow-md:     0 8px 24px rgba(0,0,0,0.55);
   --shadow-lg:     0 20px 60px rgba(0,0,0,0.75);
-  --shadow-glow:   0 0 32px rgba(229,9,20,0.25);
+  --shadow-glow:   0 0 32px rgba(0, 230, 118, 0.35);
   --radius-sm:     8px;
   --radius-md:     12px;
   --radius-lg:     16px;
@@ -1897,41 +1897,67 @@ input, select { font-family: inherit; }
   max-width: 100% !important;
   margin: 0 !important;
   padding: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
   position: relative !important;
-  height: 3px !important;
+  height: 10px !important;
+  display: flex !important;
+  align-items: center !important;
   cursor: pointer !important;
-  transition: height 0.15s ease !important;
-}
-.plyr--video .plyr__controls .plyr__progress:hover {
-  height: 5px !important;
+  z-index: 10 !important;
 }
 
 /* Progress range slider */
-.plyr__progress input[type=range],
-.plyr__volume input[type=range] {
+.plyr--video .plyr__controls .plyr__progress input[type=range] {
+  width: 100% !important;
+  height: 100% !important;
   color: #00e676 !important;
   cursor: pointer !important;
+  position: relative !important;
+  z-index: 2 !important;
+  margin: 0 !important;
 }
-.plyr__progress input[type=range]::-webkit-slider-runnable-track {
+.plyr--video .plyr__controls .plyr__progress input[type=range]::-webkit-slider-runnable-track {
   background: rgba(255, 255, 255, 0.16) !important;
-  height: 100% !important;
+  height: 3px !important;
+  border-radius: 1.5px !important;
 }
-.plyr__progress__buffer {
+.plyr--video .plyr__controls .plyr__progress input[type=range]::-moz-range-track {
+  background: rgba(255, 255, 255, 0.16) !important;
+  height: 3px !important;
+  border-radius: 1.5px !important;
+}
+.plyr--video .plyr__controls .plyr__progress__buffer {
+  position: absolute !important;
+  top: 50% !important;
+  left: 0 !important;
+  transform: translateY(-50%) !important;
+  height: 3px !important;
+  width: 100% !important;
   color: rgba(255, 255, 255, 0.35) !important;
   background: rgba(255, 255, 255, 0.35) !important;
+  border-radius: 1.5px !important;
+  border: none !important;
+  z-index: 1 !important;
 }
-.plyr__progress input[type=range]::-webkit-slider-thumb {
-  width: 10px !important;
-  height: 10px !important;
+.plyr--video .plyr__controls .plyr__progress input[type=range]::-webkit-slider-thumb {
+  width: 12px !important;
+  height: 12px !important;
   background: #00e676 !important;
   box-shadow: 0 0 10px rgba(0, 230, 118, 0.9) !important;
   border: none !important;
   border-radius: 50% !important;
   transform: scale(0) !important;
   transition: transform 0.15s ease !important;
+  margin-top: -4.5px !important;
 }
+.plyr--video .plyr__controls:hover .plyr__progress input[type=range]::-webkit-slider-thumb,
 .plyr--video .plyr__controls .plyr__progress:hover input[type=range]::-webkit-slider-thumb {
   transform: scale(1) !important;
+}
+.plyr--video .plyr__controls:hover .plyr__progress input[type=range]::-webkit-slider-runnable-track,
+.plyr--video .plyr__controls .plyr__progress:hover input[type=range]::-webkit-slider-runnable-track {
+  height: 4px !important;
 }
 
 /* 2. Dedicated Bottom Controls Row */

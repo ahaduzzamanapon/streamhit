@@ -661,6 +661,68 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
+# ── Active User Tracking ───────────────────────────────────────────────────
+_active_web_users = {}
+_active_app_users = {}
+
+def record_active_user(request: Request):
+    try:
+        now = time.time()
+        client_ip = request.client.host if request.client else "127.0.0.1"
+        forwarded = request.headers.get("X-Forwarded-For")
+        if forwarded:
+            client_ip = forwarded.split(",")[0].strip()
+            
+        user_agent = request.headers.get("User-Agent", "").lower()
+        is_app = ("moviebox" in user_agent or 
+                  "dart" in user_agent or 
+                  "okhttp" in user_agent or 
+                  request.headers.get("X-M-Version") is not None or 
+                  request.headers.get("X-Client-Token") is not None)
+                  
+        if is_app:
+            client_id = request.headers.get("device_id") or request.headers.get("X-Client-Token") or client_ip
+            _active_app_users[client_id] = now
+        else:
+            _active_web_users[client_ip] = now
+    except Exception:
+        pass
+
+def get_active_users_stats():
+    now = time.time()
+    cutoff = now - 300  # active within 5 minutes
+    
+    dead_web = [k for k, v in _active_web_users.items() if v < cutoff]
+    for k in dead_web: _active_web_users.pop(k, None)
+    
+    dead_app = [k for k, v in _active_app_users.items() if v < cutoff]
+    for k in dead_app: _active_app_users.pop(k, None)
+    
+    web_count = len(_active_web_users)
+    app_count = len(_active_app_users)
+    
+    # Always at least 1 web user if admin is active
+    if web_count == 0:
+        web_count = 1
+        
+    return {
+        "total": web_count + app_count,
+        "web": web_count,
+        "app": app_count
+    }
+
+@app.middleware("http")
+async def track_active_users_middleware(request: Request, call_next):
+    path = request.url.path
+    if not path.endswith((".css", ".js", ".png", ".jpg", ".jpeg", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".xml")):
+        record_active_user(request)
+    return await call_next(request)
+
+@app.get("/api/ping")
+async def api_ping(request: Request):
+    record_active_user(request)
+    return {"status": "ok", "t": int(time.time())}
+
 import admin
 app.include_router(admin.router)
 

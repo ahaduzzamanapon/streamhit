@@ -3491,3 +3491,12 @@ function renderLiveStreamLinks() {
         container.style.display = "none";
     }
 }
+
+// Active user heartbeat ping for admin metrics
+try {
+    fetch('/api/ping', { cache: 'no-store' }).catch(() => {});
+    setInterval(() => {
+        fetch('/api/ping', { cache: 'no-store' }).catch(() => {});
+    }, 30000);
+} catch (_) {}
+
