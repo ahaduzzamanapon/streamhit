@@ -425,7 +425,18 @@ function renderHeroBanner(banners) {
         const releaseYear = releaseDate.split('-')[0];
         const country = sub.countryName || item.country || 'USA';
         const bannerUrl = item.image || "";
-        const title = item.title || item.content || sub.title;
+        const title = item.title || item.content || sub.title || "Watch";
+
+        const subjectType = item.subjectType || (sub && sub.subjectType) || 1;
+        const typePath = subjectType === 2 ? 'tv' : 'movie';
+        const subjectId = item.subjectId || (sub && sub.subjectId) || '';
+        let detailPath = item.detailPath || (sub && sub.detailPath) || '';
+        if (!detailPath && subjectId) {
+            const cleanSlug = (title || 'watch').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            detailPath = cleanSlug ? `${cleanSlug}-${subjectId}` : subjectId;
+        }
+        const idParam = subjectId ? `?id=${encodeURIComponent(subjectId)}` : '';
+        const targetUrl = `/${typePath}/${encodeURIComponent(detailPath || subjectId)}${idParam}`;
 
         // Slide element
         const slide = document.createElement("div");
@@ -435,16 +446,16 @@ function renderHeroBanner(banners) {
             <div class="hero-overlay"></div>
             <div class="hero-content">
                 <span class="hero-genre-badge">${genres}</span>
-                <h1 class="hero-title">${title}</h1>
+                <h1 class="hero-title"><a href="${targetUrl}" style="color: inherit; text-decoration: none;">${title}</a></h1>
                 <div class="hero-meta">
                     <span class="rating"><i class="fa-solid fa-star"></i> ${rating}</span>
                     <span>${releaseYear}</span>
                     <span>${country}</span>
                 </div>
                 <div class="hero-buttons">
-                    <button class="btn-primary" onclick="window.location.href=\'/\' + (item.subjectType === 2 ? \'tv\' : \'movie\') + \'/\' + encodeURIComponent(item.detailPath || sub.detailPath || \'\')">
+                    <a href="${targetUrl}" class="btn-primary" style="text-decoration: none;">
                         <i class="fa-solid fa-play"></i> Watch Now
-                    </button>
+                    </a>
                 </div>
             </div>
         `;

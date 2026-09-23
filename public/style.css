@@ -473,11 +473,13 @@ input, select { font-family: inherit; }
   background-size: cover;
   background-position: center top;
   opacity: 0;
-  transition: opacity 0.8s ease;
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 0.8s ease, visibility 0.8s ease;
   will-change: opacity;
 }
 
-.hero-slide.active { opacity: 1; z-index: 1; }
+.hero-slide.active { opacity: 1; pointer-events: auto; visibility: visible; z-index: 1; }
 
 .hero-overlay {
   position: absolute;
@@ -566,7 +568,8 @@ input, select { font-family: inherit; }
   gap: 8px;
   padding: 12px 28px;
   background: linear-gradient(135deg, var(--accent), #00e676);
-  color: #fff;
+  color: #fff !important;
+  text-decoration: none !important;
   border: none;
   border-radius: 50px;
   font-size: 15px;
