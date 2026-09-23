@@ -1232,6 +1232,10 @@
             try {
                 await fetch('/api/admin/logout', { method: 'POST' });
             } catch(_) {}
+            if (_liveUsersPollTimer) {
+                clearInterval(_liveUsersPollTimer);
+                _liveUsersPollTimer = null;
+            }
             token = '';
             localStorage.removeItem('admin_token');
             showLoginModal(true);
@@ -1247,6 +1251,7 @@
             fetchLiveTvChannels();
             populateSportStreamLinks([]);
             populateTvStreamLinks([]);
+            startLiveUsersPoll();
         }
 
         function switchTab(tab) {
@@ -1600,19 +1605,29 @@
 
         // ── Live Active Users Polling ──────────────────────────────────────────
         async function fetchLiveUsers() {
+            if (!token) return;
             try {
                 const res = await fetch('/api/admin/active-users', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                if (!res.ok) return;
+                if (res.status === 401) {
+                    handleLogout();
+                    return;
+                }
+                if (!res.ok) {
+                    document.getElementById('liveLastRefresh').textContent = 'Error loading';
+                    return;
+                }
                 const data = await res.json();
-                document.getElementById('liveTotal').textContent = data.total ?? '–';
-                document.getElementById('liveApp').textContent   = data.app   ?? '–';
-                document.getElementById('liveWeb').textContent   = data.web   ?? '–';
+                document.getElementById('liveTotal').textContent = data.total !== undefined ? data.total : '–';
+                document.getElementById('liveApp').textContent   = data.app !== undefined ? data.app : '–';
+                document.getElementById('liveWeb').textContent   = data.web !== undefined ? data.web : '–';
                 const now = new Date();
                 document.getElementById('liveLastRefresh').textContent =
-                    'Updated ' + now.toLocaleTimeString();
-            } catch (_) {}
+                    'Live (' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ')';
+            } catch (_) {
+                document.getElementById('liveLastRefresh').textContent = 'Network error';
+            }
         }
 
         // Poll every 10 seconds (only after login)
@@ -1623,21 +1638,6 @@
                 _liveUsersPollTimer = setInterval(fetchLiveUsers, 10000);
             }
         }
-
-        // Hook into existing login success flow
-        const _origOnLoad = window.onload;
-        window.addEventListener('DOMContentLoaded', () => {
-            // Watch for login overlay being hidden → start polling
-            const observer = new MutationObserver(() => {
-                const overlay = document.getElementById('loginOverlay');
-                if (overlay && !overlay.classList.contains('active')) {
-                    startLiveUsersPoll();
-                    observer.disconnect();
-                }
-            });
-            const overlay = document.getElementById('loginOverlay');
-            if (overlay) observer.observe(overlay, { attributes: true, attributeFilter: ['class'] });
-        });
 
         // --- STREAM LINKS DYNAMIC MANAGER LOGIC ---
         function createStreamLinkRowHtml(prefix, label = '', url = '') {

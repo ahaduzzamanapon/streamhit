@@ -665,8 +665,36 @@ app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 # ── Active User Tracking ───────────────────────────────────────────────────
+import sqlite3
+
+_ACTIVE_DB_PATH = "/tmp/streamhit_active_users.db"
+try:
+    if not os.path.exists("/tmp") or not os.access("/tmp", os.W_OK):
+        _ACTIVE_DB_PATH = os.path.join(base_dir, "active_users.db")
+except Exception:
+    _ACTIVE_DB_PATH = os.path.join(base_dir, "active_users.db")
+
 _active_web_users = {}
 _active_app_users = {}
+_last_db_sync = {}
+
+def _init_active_db():
+    try:
+        with sqlite3.connect(_ACTIVE_DB_PATH, timeout=5) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS active_sessions (
+                    user_id TEXT PRIMARY KEY,
+                    user_type TEXT NOT NULL,
+                    last_seen REAL NOT NULL
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_active_last_seen ON active_sessions(last_seen)")
+    except Exception:
+        pass
+
+_init_active_db()
 
 def record_active_user(request: Request):
     try:
@@ -683,11 +711,27 @@ def record_active_user(request: Request):
                   request.headers.get("X-M-Version") is not None or 
                   request.headers.get("X-Client-Token") is not None)
                   
+        user_type = "app" if is_app else "web"
+        user_id = (request.headers.get("device_id") or 
+                   request.headers.get("X-Client-Token") or 
+                   client_ip) if is_app else client_ip
+
         if is_app:
-            client_id = request.headers.get("device_id") or request.headers.get("X-Client-Token") or client_ip
-            _active_app_users[client_id] = now
+            _active_app_users[user_id] = now
         else:
-            _active_web_users[client_ip] = now
+            _active_web_users[user_id] = now
+
+        # Throttle DB writes to once every 20s per user to minimize disk I/O
+        if now - _last_db_sync.get(user_id, 0) > 20:
+            _last_db_sync[user_id] = now
+            try:
+                with sqlite3.connect(_ACTIVE_DB_PATH, timeout=2) as conn:
+                    conn.execute(
+                        "INSERT OR REPLACE INTO active_sessions (user_id, user_type, last_seen) VALUES (?, ?, ?)",
+                        (user_id, user_type, now)
+                    )
+            except Exception:
+                pass
     except Exception:
         pass
 
@@ -695,19 +739,42 @@ def get_active_users_stats():
     now = time.time()
     cutoff = now - 300  # active within 5 minutes
     
-    dead_web = [k for k, v in _active_web_users.items() if v < cutoff]
-    for k in dead_web: _active_web_users.pop(k, None)
-    
-    dead_app = [k for k, v in _active_app_users.items() if v < cutoff]
-    for k in dead_app: _active_app_users.pop(k, None)
-    
-    web_count = len(_active_web_users)
-    app_count = len(_active_app_users)
-    
+    web_count = 0
+    app_count = 0
+    db_success = False
+
+    try:
+        with sqlite3.connect(_ACTIVE_DB_PATH, timeout=3) as conn:
+            conn.execute("DELETE FROM active_sessions WHERE last_seen < ?", (now - 3600,))
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT user_type, COUNT(DISTINCT user_id) 
+                FROM active_sessions 
+                WHERE last_seen >= ? 
+                GROUP BY user_type
+            """, (cutoff,))
+            rows = cur.fetchall()
+            for utype, cnt in rows:
+                if utype == "web":
+                    web_count = cnt
+                elif utype == "app":
+                    app_count = cnt
+            db_success = True
+    except Exception:
+        pass
+
+    if not db_success:
+        dead_web = [k for k, v in _active_web_users.items() if v < cutoff]
+        for k in dead_web: _active_web_users.pop(k, None)
+        dead_app = [k for k, v in _active_app_users.items() if v < cutoff]
+        for k in dead_app: _active_app_users.pop(k, None)
+        web_count = len(_active_web_users)
+        app_count = len(_active_app_users)
+
     # Always at least 1 web user if admin is active
     if web_count == 0:
         web_count = 1
-        
+
     return {
         "total": web_count + app_count,
         "web": web_count,
