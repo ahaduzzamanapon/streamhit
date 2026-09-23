@@ -18,11 +18,20 @@ try:
             self._lock = threading.Lock()
 
         def __call__(self, environ, start_response):
-            if self._middleware is None:
-                with self._lock:
-                    if self._middleware is None:
-                        self._middleware = ASGIMiddleware(self.app)
-            return self._middleware(environ, start_response)
+            try:
+                if self._middleware is None:
+                    with self._lock:
+                        if self._middleware is None:
+                            self._middleware = ASGIMiddleware(self.app)
+                return self._middleware(environ, start_response)
+            except Exception as e:
+                import traceback
+                req_err = os.path.join(base_dir, "scratch/wsgi_request_error.log")
+                with open(req_err, "a") as f:
+                    f.write(f"\n--- WSGI ERROR: {e} ---\n")
+                    f.write(f"METHOD: {environ.get('REQUEST_METHOD')} PATH: {environ.get('PATH_INFO')}\n")
+                    f.write(traceback.format_exc() + "\n")
+                raise
 
     application = LazyASGIMiddleware(app)
     
