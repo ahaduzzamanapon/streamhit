@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <!-- Plyr CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css">
-  <link rel="stylesheet" href="/style.css?v=6.2">
+  <link rel="stylesheet" href="/style.css?v=6.3">
   <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-EGFDL2X6GY"></script>
 <script>
@@ -98,18 +98,58 @@
               <span><i class="fa-solid fa-spinner fa-spin" style="margin-right:8px;"></i>Loading stream...</span>
             </div>
 
-            <!-- Player Header Overlay (title + back + theater) -->
+            <!-- Player Ambient Glow -->
+            <div class="player-ambient-glow" id="playerAmbientGlow"></div>
+
+            <!-- Player Header Overlay (Title + Quick Actions) -->
             <div class="player-header-overlay" id="playerHeaderOverlay">
-              <button class="player-back-btn" onclick="window.history.back()">
+              <button class="player-back-btn" id="playerBackBtn" title="Back / Exit Fullscreen">
                 <i class="fa-solid fa-arrow-left"></i>
               </button>
               <div class="player-title-info">
                 <span id="playerMediaCategory">Streaming</span>
                 <h2 id="playerMediaTitle">Loading...</h2>
               </div>
-              <!-- Theater Mode Toggle -->
-              <button class="player-back-btn" id="theaterModeBtn" title="Theater Mode" style="margin-left:auto;">
-                <i class="fa-solid fa-expand" id="theaterModeIcon"></i>
+              <div class="player-header-actions">
+                <!-- Aspect Ratio Toggle: Fit vs Fill -->
+                <button class="player-header-action-btn" id="fsAspectBtn" title="Aspect Ratio (Fit / Zoom Fill)">
+                  <i class="fa-solid fa-expand"></i> <span class="action-btn-text">Fit</span>
+                </button>
+                <!-- Fullscreen Episode Drawer (TV series) -->
+                <button class="player-header-action-btn" id="fsEpisodesBtn" title="Episodes" style="display:none;">
+                  <i class="fa-solid fa-list-ol"></i> <span class="action-btn-text">Episodes</span>
+                </button>
+                <!-- Screen Lock (prevents accidental touch on mobile) -->
+                <button class="player-header-action-btn" id="fsLockBtn" title="Lock Screen">
+                  <i class="fa-solid fa-lock-open"></i>
+                </button>
+                <!-- Theater Mode Toggle (Desktop) -->
+                <button class="player-header-action-btn" id="theaterModeBtn" title="Theater Mode">
+                  <i class="fa-solid fa-table-cells-large" id="theaterModeIcon"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Center Play/Pause Splash -->
+            <div class="center-playback-splash" id="centerPlaybackSplash">
+              <i class="fa-solid fa-play"></i>
+            </div>
+
+            <!-- Fullscreen Episodes Drawer (TV Series) -->
+            <div class="fs-episodes-drawer" id="fsEpisodesDrawer">
+              <div class="fs-drawer-header">
+                <div class="fs-drawer-title"><i class="fa-solid fa-list-ul"></i> Select Episode</div>
+                <button class="fs-drawer-close" id="fsEpisodesDrawerClose"><i class="fa-solid fa-xmark"></i></button>
+              </div>
+              <div class="fs-drawer-season-picker" id="fsDrawerSeasonPicker"></div>
+              <div class="fs-drawer-episode-grid scroll-y" id="fsDrawerEpisodeGrid"></div>
+            </div>
+
+            <!-- Screen Lock Overlay -->
+            <div class="screen-lock-overlay" id="screenLockOverlay" style="display:none;">
+              <button class="screen-unlock-pill" id="screenUnlockBtn">
+                <i class="fa-solid fa-lock"></i>
+                <span>Screen Locked • Tap to Unlock</span>
               </button>
             </div>
 
@@ -117,13 +157,13 @@
             <div class="seek-feedback seek-feedback-left" id="seekFeedbackLeft">
               <div class="seek-icon-circle">
                 <i class="fa-solid fa-backward-fast"></i>
-                <span>-10s</span>
+                <span class="seek-seconds-text">-10s</span>
               </div>
             </div>
             <div class="seek-feedback seek-feedback-right" id="seekFeedbackRight">
               <div class="seek-icon-circle">
                 <i class="fa-solid fa-forward-fast"></i>
-                <span>+10s</span>
+                <span class="seek-seconds-text">+10s</span>
               </div>
             </div>
 
@@ -161,6 +201,20 @@
             </div>
           </div>
 
+          <!-- TV Quick Prev/Next Episode Bar (Below Player) -->
+          <div class="tv-quick-nav-bar" id="tvQuickNavBar" style="display:none;">
+            <button class="quick-nav-btn" id="quickPrevEpBtn" title="Previous Episode">
+              <i class="fa-solid fa-backward-step"></i> <span>Prev Ep</span>
+            </button>
+            <div class="quick-nav-current" id="quickNavCurrentEp">
+              <span class="quick-nav-badge">Playing</span>
+              <span class="quick-nav-label" id="quickNavLabel">Episode 01</span>
+            </div>
+            <button class="quick-nav-btn primary" id="quickNextEpBtn" title="Next Episode">
+              <span>Next Ep</span> <i class="fa-solid fa-forward-step"></i>
+            </button>
+          </div>
+
           <!-- Infringement Disclaimer Strip (Below Player) -->
           <div class="watch-disclaimer-strip">
             <div class="disclaimer-text">
@@ -186,10 +240,13 @@
               </div>
             </div>
             <div class="meta-actions">
+              <button id="watchBookmarkBtn" class="meta-action-btn" title="Add to Watchlist">
+                <i class="fa-regular fa-bookmark"></i> <span>Watchlist</span>
+              </button>
               <a id="watchDownloadBtn" href="#" class="meta-action-btn">
                 <i class="fa-solid fa-arrow-down-to-bracket"></i> <span>Download</span>
               </a>
-              <button id="watchShareBtn" class="meta-action-btn" onclick="navigator.clipboard.writeText(window.location.href); this.innerHTML='<i class=\'fa-solid fa-check\'></i> <span>Copied!</span>'; setTimeout(() => this.innerHTML='<i class=\'fa-solid fa-share-nodes\'></i> <span>Share</span>', 2000);">
+              <button id="watchShareBtn" class="meta-action-btn">
                 <i class="fa-solid fa-share-nodes"></i> <span>Share</span>
               </button>
             </div>
@@ -272,6 +329,6 @@
 <!-- Plyr JS -->
 <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.min.js"></script>
 <!-- App Logic -->
-<script src="/app.js?v=6.2"></script>
+<script src="/app.js?v=6.3"></script>
 </body>
 </html>

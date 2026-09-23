@@ -1242,6 +1242,77 @@ async function initWatchPage() {
         }
     };
 
+    // Watchlist Bookmark Helper
+    window.initWatchlistButton = function() {
+        const btn = document.getElementById('watchBookmarkBtn');
+        if (!btn) return;
+
+        const updateBtnState = () => {
+            const list = JSON.parse(localStorage.getItem('streamfit_watchlist') || '[]');
+            const isSaved = list.some(item => (state.selectedSubject && item.id === state.selectedSubject.id) || (state.selectedSubject && item.id === state.selectedSubject.subjectId));
+            if (isSaved) {
+                btn.innerHTML = '<i class="fa-solid fa-bookmark" style="color:#00e676;"></i> <span>Saved</span>';
+                btn.classList.add('active');
+            } else {
+                btn.innerHTML = '<i class="fa-regular fa-bookmark"></i> <span>Watchlist</span>';
+                btn.classList.remove('active');
+            }
+        };
+
+        updateBtnState();
+
+        btn.onclick = () => {
+            if (!state.selectedSubject) return;
+            let list = JSON.parse(localStorage.getItem('streamfit_watchlist') || '[]');
+            const subj = state.selectedSubject;
+            const targetId = subj.id || subj.subjectId;
+            const idx = list.findIndex(item => item.id === targetId);
+            if (idx !== -1) {
+                list.splice(idx, 1);
+            } else {
+                list.unshift({
+                    id: targetId,
+                    title: subj.title,
+                    poster: subj.coverImage || subj.cover?.url,
+                    rating: subj.imdbRatingValue || subj.rating,
+                    year: subj.releaseDate ? subj.releaseDate.split('-')[0] : subj.year,
+                    type: (subj.seNum > 0 || subj.subjectType === 2) ? 'tv' : 'movie'
+                });
+            }
+            localStorage.setItem('streamfit_watchlist', JSON.stringify(list));
+            updateBtnState();
+        };
+    };
+
+    // Native Share / Clipboard Share Helper
+    window.initShareButton = function() {
+        const btn = document.getElementById('watchShareBtn');
+        if (!btn || btn._wired) return;
+        btn._wired = true;
+        btn.onclick = async () => {
+            const shareData = {
+                title: document.title || 'Streamfit',
+                text: `Watch ${document.getElementById('watchMetaTitle')?.textContent || 'this title'} online for free!`,
+                url: window.location.href
+            };
+            if (navigator.share && /mobile|android|iphone|ipad/i.test(navigator.userAgent)) {
+                try {
+                    await navigator.share(shareData);
+                    return;
+                } catch (e) {}
+            }
+            try {
+                await navigator.clipboard.writeText(window.location.href);
+                btn.innerHTML = '<i class="fa-solid fa-check" style="color:#00e676;"></i> <span>Copied!</span>';
+                setTimeout(() => {
+                    btn.innerHTML = '<i class="fa-solid fa-share-nodes"></i> <span>Share</span>';
+                }, 2000);
+            } catch (err) {
+                prompt('Copy this link:', window.location.href);
+            }
+        };
+    };
+
     window.setupProgressDragHandler = function(progressEl) {
         if (!progressEl || progressEl._dragBound) return;
         progressEl._dragBound = true;
@@ -1336,11 +1407,138 @@ async function initWatchPage() {
         });
     };
 
+    // Episode navigation helpers
+    window.playNextEpisode = function() {
+        const episodeButtons = Array.from(document.querySelectorAll("#watchEpisodeGrid .episode-btn"));
+        const currentIdx = episodeButtons.findIndex(b => b.classList.contains("active"));
+        if (currentIdx !== -1 && currentIdx < episodeButtons.length - 1) {
+            episodeButtons[currentIdx + 1].click();
+        } else {
+            const seasonTabs = Array.from(document.querySelectorAll("#watchSeasonTabs .season-tab"));
+            const currentSeasonIdx = seasonTabs.findIndex(t => t.classList.contains("active"));
+            if (currentSeasonIdx !== -1 && currentSeasonIdx < seasonTabs.length - 1) {
+                seasonTabs[currentSeasonIdx + 1].click();
+                setTimeout(() => {
+                    const firstEp = document.querySelector("#watchEpisodeGrid .episode-btn");
+                    if (firstEp) firstEp.click();
+                }, 500);
+            }
+        }
+    };
+
+    window.playPreviousEpisode = function() {
+        const episodeButtons = Array.from(document.querySelectorAll("#watchEpisodeGrid .episode-btn"));
+        const currentIdx = episodeButtons.findIndex(b => b.classList.contains("active"));
+        if (currentIdx > 0) {
+            episodeButtons[currentIdx - 1].click();
+        }
+    };
+
+    // Fullscreen Aspect Ratio Toggle (Fit vs Zoom Fill)
+    window.toggleAspectRatio = function() {
+        const plyrContainer = playerInstance?.elements?.container || document.querySelector('.plyr');
+        const aspectBtn = document.getElementById('fsAspectBtn');
+        if (!plyrContainer) return;
+
+        const isFill = plyrContainer.classList.toggle('video-aspect-fill');
+        if (aspectBtn) {
+            const text = aspectBtn.querySelector('.action-btn-text');
+            if (text) text.textContent = isFill ? 'Fill' : 'Fit';
+            aspectBtn.title = isFill ? 'Aspect Ratio: Zoom Fill (Click for Fit)' : 'Aspect Ratio: Fit (Click for Fill)';
+            if (isFill) {
+                aspectBtn.classList.add('active');
+            } else {
+                aspectBtn.classList.remove('active');
+            }
+        }
+    };
+
+    // Fullscreen Screen Lock Toggle
+    window.toggleScreenLock = function(lock) {
+        const plyrContainer = playerInstance?.elements?.container || document.querySelector('.plyr');
+        const lockOverlay = document.getElementById('screenLockOverlay');
+        if (!plyrContainer) return;
+
+        if (lock) {
+            plyrContainer.classList.add('controls-locked');
+            if (lockOverlay) lockOverlay.style.display = 'flex';
+        } else {
+            plyrContainer.classList.remove('controls-locked');
+            if (lockOverlay) lockOverlay.style.display = 'none';
+        }
+    };
+
+    // Fullscreen Episodes Drawer
+    window.openFsEpisodesDrawer = function() {
+        const drawer = document.getElementById('fsEpisodesDrawer');
+        const drawerGrid = document.getElementById('fsDrawerEpisodeGrid');
+        const seasonPicker = document.getElementById('fsDrawerSeasonPicker');
+        if (!drawer || !drawerGrid) return;
+
+        // Render season buttons inside drawer if multiple seasons exist
+        if (seasonPicker) {
+            seasonPicker.innerHTML = '';
+            if (state.loadedSeasons && state.loadedSeasons.length > 1) {
+                seasonPicker.style.display = 'flex';
+                state.loadedSeasons.forEach(season => {
+                    const pill = document.createElement('button');
+                    const isActive = season.se === state.selectedSeason;
+                    pill.className = `season-tab ${isActive ? 'active' : ''}`;
+                    pill.textContent = `S${season.se}`;
+                    pill.onclick = () => {
+                        const seasonSelect = document.getElementById('seasonSelect');
+                        if (seasonSelect) {
+                            seasonSelect.value = season.se;
+                            seasonSelect.dispatchEvent(new Event('change'));
+                        }
+                        setTimeout(() => window.openFsEpisodesDrawer(), 250);
+                    };
+                    seasonPicker.appendChild(pill);
+                });
+            } else {
+                seasonPicker.style.display = 'none';
+            }
+        }
+
+        drawerGrid.innerHTML = '';
+        const mainButtons = document.querySelectorAll('#watchEpisodeGrid .episode-btn');
+        mainButtons.forEach(btn => {
+            const cloned = document.createElement('button');
+            cloned.className = btn.className;
+            cloned.innerHTML = btn.innerHTML;
+            cloned.onclick = () => {
+                btn.click();
+                drawer.classList.remove('open');
+            };
+            drawerGrid.appendChild(cloned);
+        });
+
+        drawer.classList.add('open');
+        setTimeout(() => {
+            const active = drawerGrid.querySelector('.episode-btn.active');
+            if (active) active.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 120);
+    };
+
+    // Center Play/Pause Splash feedback
+    window.triggerCenterSplash = function(type) {
+        const splash = document.getElementById('centerPlaybackSplash');
+        if (!splash) return;
+        splash.innerHTML = type === 'pause' ? '<i class="fa-solid fa-pause"></i>' : '<i class="fa-solid fa-play"></i>';
+        splash.classList.remove('show');
+        void splash.offsetWidth;
+        splash.classList.add('show');
+        clearTimeout(splash._timer);
+        splash._timer = setTimeout(() => {
+            splash.classList.remove('show');
+        }, 450);
+    };
+
     window.organizePlyrControlsLayout = function() {
         const controls = document.querySelector('.plyr__controls');
         if (!controls) return;
 
-        // 0. Ensure overlays are inside player container so they are visible in fullscreen
+        // 0. Ensure all overlays are inside player container so they are visible in fullscreen
         const plyrContainer = playerInstance?.elements?.container || document.querySelector('.plyr');
         if (plyrContainer) {
             const overlays = [
@@ -1348,7 +1546,10 @@ async function initWatchPage() {
                 document.getElementById('seekFeedbackRight'),
                 document.getElementById('playerLoaderOverlay'),
                 document.getElementById('playerHeaderOverlay'),
-                document.getElementById('nextEpisodeOverlay')
+                document.getElementById('nextEpisodeOverlay'),
+                document.getElementById('centerPlaybackSplash'),
+                document.getElementById('fsEpisodesDrawer'),
+                document.getElementById('screenLockOverlay')
             ];
             overlays.forEach(el => {
                 if (el && el.parentElement !== plyrContainer) {
@@ -1386,13 +1587,37 @@ async function initWatchPage() {
         const leftGroup = bottomRow.querySelector('.plyr__controls-left-group');
         const rightGroup = bottomRow.querySelector('.plyr__controls-right-group');
 
-        // Move Left Group items: Play, Volume, Current-time, Duration
+        // Move Left Group items: Play, Next-Ep, Volume, Current-time, Duration
         const playBtn = controls.querySelector(':scope > [data-plyr="play"]') || controls.querySelector('[data-plyr="play"]');
         const vol = controls.querySelector(':scope > .plyr__volume') || controls.querySelector('.plyr__volume');
         const curTime = controls.querySelector(':scope > .plyr__time--current') || controls.querySelector('.plyr__time--current');
         const durTime = controls.querySelector(':scope > .plyr__time--duration') || controls.querySelector('.plyr__time--duration');
 
         if (playBtn && playBtn.parentElement !== leftGroup) leftGroup.appendChild(playBtn);
+
+        // Next Episode Button in Player Control Bar
+        const isTv = state.selectedSubject && (state.selectedSubject.seNum > 0 || state.selectedSubject.subjectType === 2);
+        let plyrNext = controls.querySelector('#plyrNextBtn');
+        if (isTv) {
+            if (!plyrNext) {
+                plyrNext = document.createElement('button');
+                plyrNext.type = 'button';
+                plyrNext.className = 'plyr__control plyr__control--next';
+                plyrNext.id = 'plyrNextBtn';
+                plyrNext.title = 'Next Episode';
+                plyrNext.innerHTML = '<i class="fa-solid fa-forward-step" style="font-size:14px;"></i>';
+                plyrNext.onclick = (e) => {
+                    e.stopPropagation();
+                    window.playNextEpisode();
+                };
+            }
+            if (playBtn && playBtn.nextElementSibling !== plyrNext) {
+                leftGroup.insertBefore(plyrNext, playBtn.nextElementSibling);
+            }
+        } else if (plyrNext) {
+            plyrNext.remove();
+        }
+
         if (vol && vol.parentElement !== leftGroup) leftGroup.appendChild(vol);
         if (curTime && curTime.parentElement !== leftGroup) leftGroup.appendChild(curTime);
         if (durTime && durTime.parentElement !== leftGroup) leftGroup.appendChild(durTime);
@@ -1427,10 +1652,52 @@ async function initWatchPage() {
         if (playerInstance) {
             window.updateQualityBadgeText(playerInstance.quality);
         }
+
+        // Wire Header Buttons
+        const backBtn = document.getElementById('playerBackBtn');
+        if (backBtn && !backBtn._wired) {
+            backBtn._wired = true;
+            backBtn.onclick = () => {
+                if (playerInstance && playerInstance.fullscreen && playerInstance.fullscreen.active) {
+                    playerInstance.fullscreen.exit();
+                } else {
+                    window.history.back();
+                }
+            };
+        }
+        const aspectBtn = document.getElementById('fsAspectBtn');
+        if (aspectBtn && !aspectBtn._wired) {
+            aspectBtn._wired = true;
+            aspectBtn.onclick = () => window.toggleAspectRatio();
+        }
+        const fsEpBtn = document.getElementById('fsEpisodesBtn');
+        if (fsEpBtn && !fsEpBtn._wired) {
+            fsEpBtn._wired = true;
+            fsEpBtn.onclick = () => window.openFsEpisodesDrawer();
+        }
+        const fsEpClose = document.getElementById('fsEpisodesDrawerClose');
+        if (fsEpClose && !fsEpClose._wired) {
+            fsEpClose._wired = true;
+            fsEpClose.onclick = () => {
+                const d = document.getElementById('fsEpisodesDrawer');
+                if (d) d.classList.remove('open');
+            };
+        }
+        const lockBtn = document.getElementById('fsLockBtn');
+        if (lockBtn && !lockBtn._wired) {
+            lockBtn._wired = true;
+            lockBtn.onclick = () => window.toggleScreenLock(true);
+        }
+        const unlockBtn = document.getElementById('screenUnlockBtn');
+        if (unlockBtn && !unlockBtn._wired) {
+            unlockBtn._wired = true;
+            unlockBtn.onclick = () => window.toggleScreenLock(false);
+        }
     };
 
     window.ensureQualityBadge = window.organizePlyrControlsLayout;
 
+    // Double Tap Seek with Cumulative Counter
     window.setupDoubleTapSeek = function() {
         const plyrContainer = playerInstance?.elements?.container || document.querySelector('.plyr');
         const wrapper = document.querySelector('.player-wrapper');
@@ -1440,22 +1707,36 @@ async function initWatchPage() {
         const fbRight = document.getElementById('seekFeedbackRight');
         let seekTimerLeft = null;
         let seekTimerRight = null;
+        let leftAccumulator = 0;
+        let rightAccumulator = 0;
 
         const triggerSeek = (direction) => {
             if (!playerInstance) return;
             if (direction === 'left') {
+                leftAccumulator += 10;
                 playerInstance.currentTime = Math.max(0, playerInstance.currentTime - 10);
                 if (fbLeft) {
+                    const txt = fbLeft.querySelector('.seek-seconds-text') || fbLeft.querySelector('span');
+                    if (txt) txt.textContent = `-${leftAccumulator}s`;
                     fbLeft.classList.add('active');
                     clearTimeout(seekTimerLeft);
-                    seekTimerLeft = setTimeout(() => fbLeft.classList.remove('active'), 650);
+                    seekTimerLeft = setTimeout(() => {
+                        fbLeft.classList.remove('active');
+                        leftAccumulator = 0;
+                    }, 650);
                 }
             } else {
+                rightAccumulator += 10;
                 playerInstance.currentTime = Math.min(playerInstance.duration || 0, playerInstance.currentTime + 10);
                 if (fbRight) {
+                    const txt = fbRight.querySelector('.seek-seconds-text') || fbRight.querySelector('span');
+                    if (txt) txt.textContent = `+${rightAccumulator}s`;
                     fbRight.classList.add('active');
                     clearTimeout(seekTimerRight);
-                    seekTimerRight = setTimeout(() => fbRight.classList.remove('active'), 650);
+                    seekTimerRight = setTimeout(() => {
+                        fbRight.classList.remove('active');
+                        rightAccumulator = 0;
+                    }, 650);
                 }
             }
         };
@@ -1467,7 +1748,7 @@ async function initWatchPage() {
             let lastTapTime = 0;
             targetEl.addEventListener('touchstart', (e) => {
                 if (e.touches.length !== 1) return;
-                if (e.target.closest('.plyr__controls') || e.target.closest('.player-header-overlay') || e.target.closest('.plyr__menu') || e.target.closest('.next-episode-overlay')) return;
+                if (e.target.closest('.plyr__controls') || e.target.closest('.player-header-overlay') || e.target.closest('.plyr__menu') || e.target.closest('.next-episode-overlay') || e.target.closest('.fs-episodes-drawer') || e.target.closest('.screen-lock-overlay')) return;
 
                 const now = Date.now();
                 const delay = now - lastTapTime;
@@ -1491,7 +1772,7 @@ async function initWatchPage() {
             }, { passive: false });
 
             targetEl.addEventListener('dblclick', (e) => {
-                if (e.target.closest('.plyr__controls') || e.target.closest('.player-header-overlay') || e.target.closest('.plyr__menu') || e.target.closest('.next-episode-overlay')) return;
+                if (e.target.closest('.plyr__controls') || e.target.closest('.player-header-overlay') || e.target.closest('.plyr__menu') || e.target.closest('.next-episode-overlay') || e.target.closest('.fs-episodes-drawer') || e.target.closest('.screen-lock-overlay')) return;
                 const rect = targetEl.getBoundingClientRect();
                 const clickX = e.clientX - rect.left;
                 if (clickX < rect.width * 0.45) {
@@ -1503,9 +1784,103 @@ async function initWatchPage() {
         });
     };
 
+    // Global Keyboard Shortcuts for Watch Page
+    window.setupWatchKeyboardShortcuts = function() {
+        if (window._watchKeyBound) return;
+        window._watchKeyBound = true;
+
+        document.addEventListener('keydown', (e) => {
+            const activeEl = document.activeElement;
+            if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) {
+                return;
+            }
+            if (!playerInstance) return;
+
+            const key = e.key.toLowerCase();
+
+            // Space or K: Play / Pause
+            if (e.code === 'Space' || key === 'k') {
+                e.preventDefault();
+                playerInstance.togglePlay();
+                return;
+            }
+
+            // ArrowRight or L: Seek forward 10s
+            if (e.key === 'ArrowRight' || key === 'l') {
+                e.preventDefault();
+                playerInstance.currentTime = Math.min(playerInstance.duration || 0, playerInstance.currentTime + 10);
+                const fbRight = document.getElementById('seekFeedbackRight');
+                if (fbRight) {
+                    const txt = fbRight.querySelector('.seek-seconds-text') || fbRight.querySelector('span');
+                    if (txt) txt.textContent = '+10s';
+                    fbRight.classList.add('active');
+                    setTimeout(() => fbRight.classList.remove('active'), 550);
+                }
+                return;
+            }
+
+            // ArrowLeft or J: Seek backward 10s
+            if (e.key === 'ArrowLeft' || key === 'j') {
+                e.preventDefault();
+                playerInstance.currentTime = Math.max(0, playerInstance.currentTime - 10);
+                const fbLeft = document.getElementById('seekFeedbackLeft');
+                if (fbLeft) {
+                    const txt = fbLeft.querySelector('.seek-seconds-text') || fbLeft.querySelector('span');
+                    if (txt) txt.textContent = '-10s';
+                    fbLeft.classList.add('active');
+                    setTimeout(() => fbLeft.classList.remove('active'), 550);
+                }
+                return;
+            }
+
+            // F: Fullscreen Toggle
+            if (key === 'f') {
+                e.preventDefault();
+                if (playerInstance.fullscreen) playerInstance.fullscreen.toggle();
+                return;
+            }
+
+            // M: Mute Toggle
+            if (key === 'm') {
+                e.preventDefault();
+                playerInstance.muted = !playerInstance.muted;
+                return;
+            }
+
+            // T: Theater Mode Toggle
+            if (key === 't') {
+                e.preventDefault();
+                window.toggleTheaterMode();
+                return;
+            }
+
+            // N: Next Episode
+            if (key === 'n') {
+                e.preventDefault();
+                window.playNextEpisode();
+                return;
+            }
+
+            // ArrowUp: Volume up 10%
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                playerInstance.volume = Math.min(1, (playerInstance.volume || 0) + 0.1);
+                return;
+            }
+
+            // ArrowDown: Volume down 10%
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                playerInstance.volume = Math.max(0, (playerInstance.volume || 0) - 0.1);
+                return;
+            }
+        });
+    };
+
     playerInstance.on('ready', () => {
         window.organizePlyrControlsLayout();
         window.setupDoubleTapSeek();
+        window.setupWatchKeyboardShortcuts();
         setTimeout(window.organizePlyrControlsLayout, 50);
         setTimeout(window.organizePlyrControlsLayout, 200);
     });
@@ -1514,9 +1889,15 @@ async function initWatchPage() {
         window.setupDoubleTapSeek();
     });
     playerInstance.on('canplay', window.organizePlyrControlsLayout);
+    playerInstance.on('play', () => window.triggerCenterSplash('play'));
+    playerInstance.on('pause', () => window.triggerCenterSplash('pause'));
+
     playerInstance.on('enterfullscreen', () => {
         window.organizePlyrControlsLayout();
         window.setupDoubleTapSeek();
+        if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('landscape').catch(() => {});
+        }
     });
     playerInstance.on('exitfullscreen', () => {
         window.organizePlyrControlsLayout();
@@ -2080,6 +2461,10 @@ async function initWatchPage() {
         const descEl = document.getElementById("watchDescription");
         if (descEl) descEl.textContent = detail.description || "No description available.";
 
+        // Initialize Action Buttons (Watchlist & Native Share)
+        window.initWatchlistButton();
+        window.initShareButton();
+
         // Populate genre tags
         const genreEl = document.getElementById("watchGenres");
         if (genreEl && detail.genre) {
@@ -2283,6 +2668,7 @@ async function loadSeasonEpisodes(subjectId, detailPath = "") {
     const result = await apiGet(`/api/season-info?detailPath=${encodeURIComponent(detailPath)}&subjectId=${encodeURIComponent(subjectId || '')}`);
     if (result && result.data && result.data.seasons && result.data.seasons.length > 0) {
         const seasons = result.data.seasons;
+        state.loadedSeasons = seasons;
         
         // Populate Season Select Dropdown (side-by-side with Dub selector matching Image 1)
         if (seasonGroup && seasonSelect) {
@@ -2447,6 +2833,38 @@ function renderEpisodes(season) {
         if (!eps.includes(String(state.selectedEpisode))) {
             state.selectedEpisode = Number(eps[0]);
         }
+
+        // Update TV Quick Nav Bar
+        const quickNav = document.getElementById("tvQuickNavBar");
+        const quickLabel = document.getElementById("quickNavLabel");
+        const prevBtn = document.getElementById("quickPrevEpBtn");
+        const nextBtn = document.getElementById("quickNextEpBtn");
+
+        if (quickNav) {
+            quickNav.style.display = "flex";
+            if (quickLabel) {
+                quickLabel.textContent = `Season ${state.selectedSeason} • Ep ${String(state.selectedEpisode || 1).padStart(2, '0')}`;
+            }
+            if (prevBtn && !prevBtn._wired) {
+                prevBtn._wired = true;
+                prevBtn.onclick = () => window.playPreviousEpisode();
+            }
+            if (nextBtn && !nextBtn._wired) {
+                nextBtn._wired = true;
+                nextBtn.onclick = () => window.playNextEpisode();
+            }
+        }
+
+        const fsEpBtn = document.getElementById("fsEpisodesBtn");
+        if (fsEpBtn) fsEpBtn.style.display = "inline-flex";
+
+        // Auto-scroll active episode into center of viewport
+        setTimeout(() => {
+            const activeBtn = grid.querySelector(".episode-btn.active");
+            if (activeBtn) {
+                activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            }
+        }, 150);
     }
 }
 
@@ -2536,6 +2954,14 @@ async function loadPlayResources(subjectId, season = null, episode = null) {
         const titleEl = document.getElementById("playerMediaTitle");
         if (titleEl && state.selectedSubject) {
             titleEl.textContent = `${state.selectedSubject.title} - S${season}E${String(episode).padStart(2, '0')}`;
+        }
+        const quickNav = document.getElementById("tvQuickNavBar");
+        const quickLabel = document.getElementById("quickNavLabel");
+        if (quickNav) {
+            quickNav.style.display = "flex";
+            if (quickLabel) {
+                quickLabel.textContent = `Season ${season} • Ep ${String(episode).padStart(2, '0')}`;
+            }
         }
     } else {
         state.playingSeason = 0;
