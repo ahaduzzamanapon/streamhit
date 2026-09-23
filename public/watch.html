@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <!-- Plyr CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css">
-  <link rel="stylesheet" href="/style.css?v=6.4">
+  <link rel="stylesheet" href="/style.css?v=6.5">
   <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-EGFDL2X6GY"></script>
 <script>
@@ -119,10 +119,6 @@
                 <button class="player-header-action-btn" id="fsEpisodesBtn" title="Episodes" style="display:none;">
                   <i class="fa-solid fa-list-ol"></i> <span class="action-btn-text">Episodes</span>
                 </button>
-                <!-- Screen Lock (prevents accidental touch on mobile) -->
-                <button class="player-header-action-btn" id="fsLockBtn" title="Lock Screen">
-                  <i class="fa-solid fa-lock-open"></i>
-                </button>
                 <!-- Theater Mode Toggle (Desktop) -->
                 <button class="player-header-action-btn" id="theaterModeBtn" title="Theater Mode">
                   <i class="fa-solid fa-table-cells-large" id="theaterModeIcon"></i>
@@ -143,14 +139,6 @@
               </div>
               <div class="fs-drawer-season-picker" id="fsDrawerSeasonPicker"></div>
               <div class="fs-drawer-episode-grid scroll-y" id="fsDrawerEpisodeGrid"></div>
-            </div>
-
-            <!-- Screen Lock Overlay -->
-            <div class="screen-lock-overlay" id="screenLockOverlay" style="display:none;">
-              <button class="screen-unlock-pill" id="screenUnlockBtn">
-                <i class="fa-solid fa-lock"></i>
-                <span>Screen Locked • Tap to Unlock</span>
-              </button>
             </div>
 
             <!-- Seek Feedback Overlays -->
@@ -329,6 +317,6 @@
 <!-- Plyr JS -->
 <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.min.js"></script>
 <!-- App Logic -->
-<script src="/app.js?v=6.4"></script>
+<script src="/app.js?v=6.5"></script>
 </body>
 </html>

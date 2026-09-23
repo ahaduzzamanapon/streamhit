@@ -1454,20 +1454,6 @@ async function initWatchPage() {
         }
     };
 
-    // Fullscreen Screen Lock Toggle
-    window.toggleScreenLock = function(lock) {
-        const plyrContainer = playerInstance?.elements?.container || document.querySelector('.plyr');
-        const lockOverlay = document.getElementById('screenLockOverlay');
-        if (!plyrContainer) return;
-
-        if (lock) {
-            plyrContainer.classList.add('controls-locked');
-            if (lockOverlay) lockOverlay.style.display = 'flex';
-        } else {
-            plyrContainer.classList.remove('controls-locked');
-            if (lockOverlay) lockOverlay.style.display = 'none';
-        }
-    };
 
     // Fullscreen Episodes Drawer
     window.openFsEpisodesDrawer = function() {
@@ -1549,8 +1535,7 @@ async function initWatchPage() {
                 document.getElementById('playerHeaderOverlay'),
                 document.getElementById('nextEpisodeOverlay'),
                 document.getElementById('centerPlaybackSplash'),
-                document.getElementById('fsEpisodesDrawer'),
-                document.getElementById('screenLockOverlay')
+                document.getElementById('fsEpisodesDrawer')
             ];
             overlays.forEach(el => {
                 if (el && el.parentElement !== plyrContainer) {
@@ -1701,16 +1686,6 @@ async function initWatchPage() {
                 if (d) d.classList.remove('open');
             };
         }
-        const lockBtn = document.getElementById('fsLockBtn');
-        if (lockBtn && !lockBtn._wired) {
-            lockBtn._wired = true;
-            lockBtn.onclick = () => window.toggleScreenLock(true);
-        }
-        const unlockBtn = document.getElementById('screenUnlockBtn');
-        if (unlockBtn && !unlockBtn._wired) {
-            unlockBtn._wired = true;
-            unlockBtn.onclick = () => window.toggleScreenLock(false);
-        }
     };
 
     window.ensureQualityBadge = window.organizePlyrControlsLayout;
@@ -1766,7 +1741,7 @@ async function initWatchPage() {
             let lastTapTime = 0;
             targetEl.addEventListener('touchstart', (e) => {
                 if (e.touches.length !== 1) return;
-                if (e.target.closest('.plyr__controls') || e.target.closest('.player-header-overlay') || e.target.closest('.plyr__menu') || e.target.closest('.next-episode-overlay') || e.target.closest('.fs-episodes-drawer') || e.target.closest('.screen-lock-overlay')) return;
+                if (e.target.closest('.plyr__controls') || e.target.closest('.player-header-overlay') || e.target.closest('.plyr__menu') || e.target.closest('.next-episode-overlay') || e.target.closest('.fs-episodes-drawer')) return;
 
                 const now = Date.now();
                 const delay = now - lastTapTime;
@@ -1790,7 +1765,7 @@ async function initWatchPage() {
             }, { passive: false });
 
             targetEl.addEventListener('dblclick', (e) => {
-                if (e.target.closest('.plyr__controls') || e.target.closest('.player-header-overlay') || e.target.closest('.plyr__menu') || e.target.closest('.next-episode-overlay') || e.target.closest('.fs-episodes-drawer') || e.target.closest('.screen-lock-overlay')) return;
+                if (e.target.closest('.plyr__controls') || e.target.closest('.player-header-overlay') || e.target.closest('.plyr__menu') || e.target.closest('.next-episode-overlay') || e.target.closest('.fs-episodes-drawer')) return;
                 const rect = targetEl.getBoundingClientRect();
                 const clickX = e.clientX - rect.left;
                 if (clickX < rect.width * 0.45) {

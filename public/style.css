@@ -2011,46 +2011,9 @@ input, select { font-family: inherit; }
   font-weight: 700;
 }
 
-/* Screen Lock Overlay */
-.screen-lock-overlay {
-  position: absolute !important;
-  inset: 0 !important;
-  z-index: 100 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  background: rgba(0, 0, 0, 0.35) !important;
-  backdrop-filter: blur(4px) !important;
-  pointer-events: auto !important;
-}
-.screen-unlock-pill {
-  background: rgba(13, 16, 23, 0.92) !important;
-  border: 2px solid #00e676 !important;
-  color: #ffffff !important;
-  padding: 12px 24px !important;
-  border-radius: 50px !important;
-  font-family: 'Outfit', sans-serif !important;
-  font-size: 14px !important;
-  font-weight: 700 !important;
-  cursor: pointer !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 10px !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 24px rgba(0, 230, 118, 0.4) !important;
-  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
-}
-.screen-unlock-pill i { color: #00e676; font-size: 16px; }
-.screen-unlock-pill:active { transform: scale(0.96); }
-
 /* Aspect ratio toggle: Zoom Fill vs Fit */
 .video-aspect-fill video {
   object-fit: cover !important;
-}
-
-/* Controls Locked State */
-.controls-locked .plyr__controls,
-.controls-locked .player-header-overlay {
-  display: none !important;
 }
 
 /* TV Quick Prev / Next Bar below player */
