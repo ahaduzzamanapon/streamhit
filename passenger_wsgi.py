@@ -18,6 +18,12 @@ try:
             self._lock = threading.Lock()
 
         def __call__(self, environ, start_response):
+            req_log = os.path.join(base_dir, "scratch/wsgi_access.log")
+            try:
+                with open(req_log, "a") as f:
+                    f.write(f"WSGI IN: {environ.get('REQUEST_METHOD')} {environ.get('PATH_INFO')} content_length={environ.get('CONTENT_LENGTH')}\n")
+            except Exception as le:
+                pass
             try:
                 if self._middleware is None:
                     with self._lock:
