@@ -585,14 +585,20 @@ async def init_db():
         print(f"[Database Warning] MySQL connection failed ({e}). Running in standalone mode.")
         db_pool = None
 
+_db_init_attempted = False
+
 async def get_db_pool():
-    global db_pool, db_init_lock
-    if db_pool is None:
-        if db_init_lock is None:
-            db_init_lock = asyncio.Lock()
-        async with db_init_lock:
-            if db_pool is None:
-                await init_db()
+    global db_pool, db_init_lock, _db_init_attempted
+    if db_pool is not None:
+        return db_pool
+    if _db_init_attempted:
+        return None
+    if db_init_lock is None:
+        db_init_lock = asyncio.Lock()
+    async with db_init_lock:
+        if db_pool is None and not _db_init_attempted:
+            _db_init_attempted = True
+            await init_db()
     return db_pool
 
 def _is_process_alive(pid: int) -> bool:
@@ -984,8 +990,16 @@ async def old_watch(request: Request, id: str = None, path: str = None, type: st
     return RedirectResponse(url="/", status_code=301)
 
 # API
+_home_cache = {}
+_home_cache_time = {}
+
 @app.get("/api/home")
 async def get_home(page: int = 1, tabId: int = 0):
+    cache_key = f"{page}_{tabId}"
+    now = time.time()
+    if cache_key in _home_cache and (now - _home_cache_time.get(cache_key, 0) < 300):
+        return _home_cache[cache_key]
+
     url = f"{API_BASE}/wefeed-h5api-bff/tab-operating?page={page}&tabId={tabId}"
     data = await _make_request(url)
     if "data" in data and "operatingList" in data["data"]:
@@ -1007,6 +1021,8 @@ async def get_home(page: int = 1, tabId: int = 0):
         except Exception as e:
             print(f"Error updating home banners: {e}")
         data["data"]["items"] = data["data"]["operatingList"]
+        _home_cache[cache_key] = data
+        _home_cache_time[cache_key] = now
     return data
 
 @app.get("/api/banners")
@@ -1148,6 +1164,9 @@ async def get_tv_pool() -> list:
     _tv_pool_cache_time = now
     return pool
 
+_filter_cache = {}
+_filter_cache_time = {}
+
 @app.post("/api/filter")
 async def api_filter(request: Request):
     payload = await request.json()
@@ -1171,6 +1190,11 @@ async def api_filter(request: Request):
     if str(genre).lower() in ("*", "all"): genre = "ALL"
     if str(country).lower() in ("*", "all"): country = "ALL"
     if str(year).lower() in ("*", "all"): year = "ALL"
+
+    cache_key = f"{subject_type}_{genre}_{country}_{year}_{sort}_{page}_{per_page}"
+    now = time.time()
+    if cache_key in _filter_cache and (now - _filter_cache_time.get(cache_key, 0) < 600):
+        return _filter_cache[cache_key]
 
     pool = await (get_movies_pool() if subject_type == 1 else get_tv_pool())
     filtered = list(pool)
@@ -1248,7 +1272,7 @@ async def api_filter(request: Request):
     items = filtered[start:end]
     has_more = len(filtered) > end
 
-    return {
+    res = {
         "code": 0,
         "message": "ok",
         "data": {
@@ -1261,6 +1285,9 @@ async def api_filter(request: Request):
             }
         }
     }
+    _filter_cache[cache_key] = res
+    _filter_cache_time[cache_key] = now
+    return res
 
 @app.post("/api/search")
 async def api_search(request: Request):

@@ -372,8 +372,12 @@ async function initHomePage() {
         renderExploreGrid(items);
     }
     showShimmers(false);
-    initCustomCategorySliders();
-    initHomePageSportsAndTv();
+    setTimeout(() => {
+        initCustomCategorySliders();
+    }, 150);
+    setTimeout(() => {
+        initHomePageSportsAndTv();
+    }, 350);
 }
 
 let heroSliderInterval = null;
@@ -597,12 +601,12 @@ async function initCustomCategorySliders() {
         }
     ];
 
-    for (const cat of categories) {
+    categories.forEach((cat, idx) => {
         const section = createCustomSliderSection(cat.title, cat.id, cat.iconClass, cat.seeMoreUrl);
         dynamicSection.parentNode.insertBefore(section, dynamicSection);
         const gridEl = section.querySelector(`#${cat.id}Grid`);
-        loadSliderData(gridEl, cat.filter);
-    }
+        setTimeout(() => loadSliderData(gridEl, cat.filter), idx * 150);
+    });
 }
 
 // ==========================================================================
