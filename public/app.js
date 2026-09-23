@@ -1548,20 +1548,19 @@ async function initWatchPage() {
             });
         }
 
-        // 1. Progress Bar: Must always be the first child (Top Row)
+        // 1. Progress Bar: Must always be on Top Row (order 1)
         const progress = controls.querySelector('.plyr__progress');
         if (progress) {
-            if (controls.firstElementChild !== progress) {
-                controls.insertBefore(progress, controls.firstElementChild);
-            }
+            progress.style.setProperty('order', '1', 'important');
             window.setupProgressDragHandler(progress);
         }
 
-        // 2. Bottom Controls Row Container
+        // 2. Bottom Controls Row Container (order 2)
         let bottomRow = controls.querySelector('.plyr__controls-bottom-row');
         if (!bottomRow) {
             bottomRow = document.createElement('div');
             bottomRow.className = 'plyr__controls-bottom-row';
+            bottomRow.style.setProperty('order', '2', 'important');
 
             const leftGroup = document.createElement('div');
             leftGroup.className = 'plyr__controls-left-group';
@@ -1572,6 +1571,12 @@ async function initWatchPage() {
             bottomRow.appendChild(leftGroup);
             bottomRow.appendChild(rightGroup);
             controls.appendChild(bottomRow);
+        } else {
+            bottomRow.style.setProperty('order', '2', 'important');
+        }
+
+        if (progress && bottomRow && progress.nextElementSibling !== bottomRow) {
+            controls.insertBefore(progress, bottomRow);
         }
 
         const leftGroup = bottomRow.querySelector('.plyr__controls-left-group');

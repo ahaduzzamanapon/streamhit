@@ -1717,6 +1717,8 @@ input, select { font-family: inherit; }
   aspect-ratio: 16/9;
   background: #000;
   overflow: visible;
+  margin-bottom: 16px !important;
+  border-radius: 8px;
 }
 
 .player-wrapper .plyr,
@@ -2023,7 +2025,9 @@ input, select { font-family: inherit; }
   justify-content: space-between;
   padding: 10px 16px;
   background: #11131a;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  margin-bottom: 14px !important;
   gap: 12px;
 }
 .quick-nav-btn {
@@ -2242,13 +2246,14 @@ input, select { font-family: inherit; }
   box-shadow: 0 0 18px rgba(0, 230, 118, 1), 0 2px 6px rgba(0, 0, 0, 0.7) !important;
 }
 
-/* 2. Dedicated Bottom Controls Row */
+/* 2. Dedicated Bottom Controls Row (Order 2: Always Below Progress Bar) */
 .plyr__controls-bottom-row {
+  order: 2 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
   width: 100% !important;
-  padding: 6px 14px 10px 14px !important;
+  padding: 2px 14px 10px 14px !important;
   box-sizing: border-box !important;
 }
 
@@ -2269,13 +2274,15 @@ input, select { font-family: inherit; }
   display: flex !important;
   flex-wrap: wrap !important;
   align-items: center !important;
-  padding: 0 14px 8px 14px !important;
+  padding: 0 14px 10px 14px !important;
 }
 .plyr--video .plyr__controls:not(:has(.plyr__controls-bottom-row)) .plyr__progress {
+  order: 1 !important;
   flex-basis: 100% !important;
   margin-bottom: 6px !important;
 }
 .plyr--video .plyr__controls:not(:has(.plyr__controls-bottom-row)) [data-plyr="play"] { order: 2 !important; }
+.plyr--video .plyr__controls:not(:has(.plyr__controls-bottom-row)) .plyr__control--next { order: 2 !important; }
 .plyr--video .plyr__controls:not(:has(.plyr__controls-bottom-row)) .plyr__volume { order: 3 !important; }
 .plyr--video .plyr__controls:not(:has(.plyr__controls-bottom-row)) .plyr__time--current { order: 4 !important; }
 .plyr--video .plyr__controls:not(:has(.plyr__controls-bottom-row)) .plyr__time--duration { order: 5 !important; margin-right: auto !important; }
@@ -2313,86 +2320,93 @@ input, select { font-family: inherit; }
   fill: currentColor !important;
 }
 
+/* Volume Control Container: Sleek hover-expandable audio slider */
 .plyr--video .plyr__controls .plyr__volume {
   display: inline-flex !important;
   align-items: center !important;
   position: relative !important;
-  gap: 4px !important;
+  gap: 0 !important;
 }
 .plyr--video .plyr__controls .plyr__volume input[type="range"] {
   -webkit-appearance: none !important;
   appearance: none !important;
-  width: 60px !important;
-  max-width: 60px !important;
+  width: 0 !important;
+  max-width: 0 !important;
   height: 20px !important;
   background: transparent !important;
   cursor: pointer !important;
   margin: 0 !important;
   padding: 0 !important;
-  opacity: 0.85 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
   outline: none !important;
   border: none !important;
-  transition: opacity 0.2s ease, width 0.2s ease !important;
+  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease, margin 0.2s ease !important;
   display: inline-block !important;
+  overflow: hidden !important;
 }
 .plyr--video .plyr__controls .plyr__volume:hover input[type="range"],
+.plyr--video .plyr__controls .plyr__volume:focus-within input[type="range"],
 .plyr--video .plyr__controls .plyr__volume input[type="range"]:focus,
 .plyr--video .plyr__controls .plyr__volume input[type="range"]:active {
+  width: 60px !important;
+  max-width: 60px !important;
   opacity: 1 !important;
+  pointer-events: auto !important;
+  margin-left: 6px !important;
 }
 
-/* WebKit Track: Emerald green progress fill based on --value */
+/* WebKit Track: Clean distinct 3px audio volume bar */
 .plyr--video .plyr__controls .plyr__volume input[type="range"]::-webkit-slider-runnable-track {
-  height: 4px !important;
+  height: 3px !important;
   border-radius: 2px !important;
-  background: rgba(255, 255, 255, 0.2) !important;
-  background-image: linear-gradient(to right, #00e676 var(--value, 100%), rgba(255, 255, 255, 0.2) var(--value, 100%)) !important;
-  box-shadow: 0 0 6px rgba(0, 230, 118, 0.25) !important;
+  background: rgba(255, 255, 255, 0.22) !important;
+  background-image: linear-gradient(to right, #00e676 var(--value, 100%), rgba(255, 255, 255, 0.22) var(--value, 100%)) !important;
+  box-shadow: none !important;
   transition: height 0.15s ease !important;
 }
 .plyr--video .plyr__controls .plyr__volume:hover input[type="range"]::-webkit-slider-runnable-track,
 .plyr--video .plyr__controls .plyr__volume input[type="range"]:active::-webkit-slider-runnable-track {
-  height: 5px !important;
+  height: 4px !important;
 }
 
-/* WebKit Thumb: Elegant neon green glowing knob */
+/* WebKit Thumb: Sleek 10px distinct white knob */
 .plyr--video .plyr__controls .plyr__volume input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none !important;
-  width: 12px !important;
-  height: 12px !important;
+  width: 10px !important;
+  height: 10px !important;
   border-radius: 50% !important;
-  background: #00e676 !important;
-  border: 2px solid #ffffff !important;
-  margin-top: -4px !important;
+  background: #ffffff !important;
+  border: none !important;
+  margin-top: -3.5px !important;
   cursor: pointer !important;
-  box-shadow: 0 0 8px rgba(0, 230, 118, 0.8), 0 1px 3px rgba(0, 0, 0, 0.5) !important;
-  transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6) !important;
+  transition: transform 0.15s ease, background 0.15s ease !important;
 }
 .plyr--video .plyr__controls .plyr__volume:hover input[type="range"]::-webkit-slider-thumb,
 .plyr--video .plyr__controls .plyr__volume input[type="range"]:active::-webkit-slider-thumb {
-  transform: scale(1.25) !important;
-  box-shadow: 0 0 12px rgba(0, 230, 118, 1), 0 2px 4px rgba(0, 0, 0, 0.6) !important;
+  transform: scale(1.2) !important;
+  background: #00e676 !important;
+  box-shadow: 0 0 8px rgba(0, 230, 118, 0.9) !important;
 }
 
 /* Moz Track & Progress */
 .plyr--video .plyr__controls .plyr__volume input[type="range"]::-moz-range-track {
-  height: 4px !important;
+  height: 3px !important;
   border-radius: 2px !important;
-  background: rgba(255, 255, 255, 0.2) !important;
+  background: rgba(255, 255, 255, 0.22) !important;
 }
 .plyr--video .plyr__controls .plyr__volume input[type="range"]::-moz-range-progress {
-  height: 4px !important;
+  height: 3px !important;
   border-radius: 2px !important;
   background: #00e676 !important;
-  box-shadow: 0 0 6px rgba(0, 230, 118, 0.5) !important;
 }
 .plyr--video .plyr__controls .plyr__volume input[type="range"]::-moz-range-thumb {
-  width: 12px !important;
-  height: 12px !important;
+  width: 10px !important;
+  height: 10px !important;
   border-radius: 50% !important;
-  background: #00e676 !important;
-  border: 2px solid #ffffff !important;
-  cursor: pointer !important;
+  background: #ffffff !important;
+  border: none !important;
 }
 
 /* 4. Time Display: 00:40 / 42:59 with clean single slash */
@@ -2709,11 +2723,14 @@ input, select { font-family: inherit; }
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 18px;
+  padding: 11px 18px;
   background: #0f1015;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
   font-size: 12.5px;
   color: #8b92a3;
+  margin-top: 14px !important;
+  margin-bottom: 22px !important;
 }
 .disclaimer-text {
   display: flex;
