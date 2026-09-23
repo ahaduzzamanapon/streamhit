@@ -1242,10 +1242,51 @@ async function initWatchPage() {
         }
     };
 
-    window.ensureQualityBadge = function() {
+    window.organizePlyrControlsLayout = function() {
+        const controls = document.querySelector('.plyr__controls');
+        if (!controls) return;
+
+        // 1. Progress Bar: Must always be the first child (Top Row)
+        const progress = controls.querySelector('.plyr__progress');
+        if (progress && controls.firstElementChild !== progress) {
+            controls.insertBefore(progress, controls.firstElementChild);
+        }
+
+        // 2. Bottom Controls Row Container
+        let bottomRow = controls.querySelector('.plyr__controls-bottom-row');
+        if (!bottomRow) {
+            bottomRow = document.createElement('div');
+            bottomRow.className = 'plyr__controls-bottom-row';
+
+            const leftGroup = document.createElement('div');
+            leftGroup.className = 'plyr__controls-left-group';
+
+            const rightGroup = document.createElement('div');
+            rightGroup.className = 'plyr__controls-right-group';
+
+            bottomRow.appendChild(leftGroup);
+            bottomRow.appendChild(rightGroup);
+            controls.appendChild(bottomRow);
+        }
+
+        const leftGroup = bottomRow.querySelector('.plyr__controls-left-group');
+        const rightGroup = bottomRow.querySelector('.plyr__controls-right-group');
+
+        // Move Left Group items: Play, Volume, Current-time, Duration
+        const playBtn = controls.querySelector(':scope > [data-plyr="play"]') || controls.querySelector('[data-plyr="play"]');
+        const vol = controls.querySelector(':scope > .plyr__volume') || controls.querySelector('.plyr__volume');
+        const curTime = controls.querySelector(':scope > .plyr__time--current') || controls.querySelector('.plyr__time--current');
+        const durTime = controls.querySelector(':scope > .plyr__time--duration') || controls.querySelector('.plyr__time--duration');
+
+        if (playBtn && playBtn.parentElement !== leftGroup) leftGroup.appendChild(playBtn);
+        if (vol && vol.parentElement !== leftGroup) leftGroup.appendChild(vol);
+        if (curTime && curTime.parentElement !== leftGroup) leftGroup.appendChild(curTime);
+        if (durTime && durTime.parentElement !== leftGroup) leftGroup.appendChild(durTime);
+
+        // Quality Badge
         let badge = document.getElementById('plyrQualityBadge');
         const settingsBtn = document.querySelector('.plyr__controls [data-plyr="settings"]');
-        if (!badge && settingsBtn && settingsBtn.parentNode) {
+        if (!badge) {
             badge = document.createElement('button');
             badge.type = 'button';
             badge.className = 'plyr__control plyr__custom-quality-badge';
@@ -1254,14 +1295,40 @@ async function initWatchPage() {
             badge.title = 'Video Quality';
             badge.onclick = (e) => {
                 e.stopPropagation();
-                settingsBtn.click();
+                if (settingsBtn) settingsBtn.click();
             };
-            settingsBtn.parentNode.insertBefore(badge, settingsBtn);
         }
+
+        const menu = controls.querySelector(':scope > .plyr__menu') || controls.querySelector('.plyr__menu');
+        const captions = controls.querySelector(':scope > [data-plyr="captions"]') || controls.querySelector('[data-plyr="captions"]');
+        const pip = controls.querySelector(':scope > [data-plyr="pip"]') || controls.querySelector('[data-plyr="pip"]');
+        const fs = controls.querySelector(':scope > [data-plyr="fullscreen"]') || controls.querySelector('[data-plyr="fullscreen"]');
+
+        if (badge && badge.parentElement !== rightGroup) rightGroup.appendChild(badge);
+        if (menu && menu.parentElement !== rightGroup) rightGroup.appendChild(menu);
+        if (captions && captions.parentElement !== rightGroup) rightGroup.appendChild(captions);
+        if (pip && pip.parentElement !== rightGroup) rightGroup.appendChild(pip);
+        if (fs && fs.parentElement !== rightGroup) rightGroup.appendChild(fs);
+
         if (playerInstance) {
             window.updateQualityBadgeText(playerInstance.quality);
         }
     };
+
+    window.ensureQualityBadge = window.organizePlyrControlsLayout;
+
+    playerInstance.on('ready', () => {
+        window.organizePlyrControlsLayout();
+        setTimeout(window.organizePlyrControlsLayout, 50);
+        setTimeout(window.organizePlyrControlsLayout, 200);
+    });
+    playerInstance.on('controlsshown', window.organizePlyrControlsLayout);
+    playerInstance.on('canplay', window.organizePlyrControlsLayout);
+
+    // Initial triggers to ensure styling applies as soon as DOM mounts
+    setTimeout(window.organizePlyrControlsLayout, 100);
+    setTimeout(window.organizePlyrControlsLayout, 400);
+    setTimeout(window.organizePlyrControlsLayout, 1000);
 
     // Double-tap/click seek handlers
     setTimeout(() => {
@@ -2556,6 +2623,9 @@ async function playResources() {
                 playerInstance.play().catch(e => {
                     console.log("[Player] Play triggered to start stream loading:", e);
                 });
+            }
+            if (typeof window.organizePlyrControlsLayout === 'function') {
+                window.organizePlyrControlsLayout();
             }
         }, 150);
     }

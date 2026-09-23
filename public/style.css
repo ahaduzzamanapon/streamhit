@@ -1873,13 +1873,13 @@ input, select { font-family: inherit; }
   bottom: 0 !important;
   z-index: 30 !important;
   display: flex !important;
-  flex-wrap: wrap !important;
-  align-items: center !important;
-  background: linear-gradient(to top, rgba(10, 11, 15, 0.96) 0%, rgba(10, 11, 15, 0.65) 60%, transparent 100%) !important;
-  padding: 0 16px 8px 16px !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  background: linear-gradient(to top, rgba(10, 11, 15, 0.98) 0%, rgba(10, 11, 15, 0.7) 60%, transparent 100%) !important;
+  padding: 0 !important;
   border-radius: 0 !important;
   pointer-events: auto !important;
-  gap: 4px !important;
+  gap: 0 !important;
 }
 
 .player-wrapper.is-loading .plyr__controls,
@@ -1892,11 +1892,10 @@ input, select { font-family: inherit; }
 /* 1. Full-width top timeline progress bar */
 .plyr--video .plyr__controls .plyr__progress {
   order: 1 !important;
-  flex: 0 0 100% !important;
   width: 100% !important;
   min-width: 100% !important;
   max-width: 100% !important;
-  margin: 0 0 6px 0 !important;
+  margin: 0 !important;
   padding: 0 !important;
   position: relative !important;
   height: 3px !important;
@@ -1935,7 +1934,49 @@ input, select { font-family: inherit; }
   transform: scale(1) !important;
 }
 
-/* 2. Flat minimalist control buttons (Play, Mute, Settings, PiP, Fullscreen) */
+/* 2. Dedicated Bottom Controls Row */
+.plyr__controls-bottom-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  padding: 6px 14px 10px 14px !important;
+  box-sizing: border-box !important;
+}
+
+.plyr__controls-left-group {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.plyr__controls-right-group {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+/* Fallback if elements are direct siblings (before DOM organization) */
+.plyr--video .plyr__controls:not(:has(.plyr__controls-bottom-row)) {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  padding: 0 14px 8px 14px !important;
+}
+.plyr--video .plyr__controls:not(:has(.plyr__controls-bottom-row)) .plyr__progress {
+  flex-basis: 100% !important;
+  margin-bottom: 6px !important;
+}
+.plyr--video .plyr__controls:not(:has(.plyr__controls-bottom-row)) [data-plyr="play"] { order: 2 !important; }
+.plyr--video .plyr__controls:not(:has(.plyr__controls-bottom-row)) .plyr__volume { order: 3 !important; }
+.plyr--video .plyr__controls:not(:has(.plyr__controls-bottom-row)) .plyr__time--current { order: 4 !important; }
+.plyr--video .plyr__controls:not(:has(.plyr__controls-bottom-row)) .plyr__time--duration { order: 5 !important; margin-right: auto !important; }
+.plyr--video .plyr__controls:not(:has(.plyr__controls-bottom-row)) .plyr__custom-quality-badge { order: 6 !important; }
+.plyr--video .plyr__controls:not(:has(.plyr__controls-bottom-row)) .plyr__menu { order: 7 !important; }
+.plyr--video .plyr__controls:not(:has(.plyr__controls-bottom-row)) [data-plyr="pip"] { order: 8 !important; }
+.plyr--video .plyr__controls:not(:has(.plyr__controls-bottom-row)) [data-plyr="fullscreen"] { order: 9 !important; }
+
+/* 3. Flat minimalist control buttons (Play, Mute, Settings, PiP, Fullscreen) */
 .plyr__controls .plyr__control:not(.plyr__menu__container .plyr__control) {
   background: transparent !important;
   border: none !important;
@@ -1950,9 +1991,10 @@ input, select { font-family: inherit; }
   transition: color 0.15s ease, background 0.15s ease !important;
   box-shadow: none !important;
   transform: none !important;
+  outline: none !important;
 }
 .plyr__controls .plyr__control:not(.plyr__menu__container .plyr__control):hover {
-  background: rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
   color: #00e676 !important;
   box-shadow: none !important;
   transform: none !important;
@@ -1963,16 +2005,7 @@ input, select { font-family: inherit; }
   fill: currentColor !important;
 }
 
-/* Explicit Control Orders Matching Reference Image 2:
-   [Play] [Mute] [Current / Duration] -------- [Quality] [Settings] [PiP] [Fullscreen] */
-.plyr--video .plyr__controls [data-plyr="play"] {
-  order: 2 !important;
-}
-.plyr--video .plyr__controls [data-plyr="mute"] {
-  order: 3 !important;
-}
 .plyr--video .plyr__controls .plyr__volume {
-  order: 4 !important;
   display: inline-flex !important;
   align-items: center !important;
 }
@@ -1991,67 +2024,47 @@ input, select { font-family: inherit; }
   margin-left: 6px !important;
 }
 
-/* 3. Time Display: 00:40 / 42:59 */
-.plyr--video .plyr__controls .plyr__time--current {
-  order: 5 !important;
+/* 4. Time Display: 00:40 / 42:59 with clean single slash */
+.plyr--video .plyr__controls .plyr__time {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
   font-size: 13px !important;
   font-weight: 500 !important;
   color: #cbd5e1 !important;
-  padding: 0 1px 0 6px !important;
+  padding: 0 !important;
   letter-spacing: 0.3px !important;
 }
 .plyr--video .plyr__controls .plyr__time--current::after {
-  content: " / ";
-  color: rgba(255, 255, 255, 0.35);
-  margin: 0 4px;
+  content: none !important;
+  display: none !important;
 }
-.plyr--video .plyr__controls .plyr__time--duration {
-  order: 6 !important;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
-  color: #cbd5e1 !important;
-  padding: 0 4px 0 1px !important;
-  letter-spacing: 0.3px !important;
-  margin-right: auto !important; /* Pushes everything after duration to the far right! */
+.plyr--video .plyr__controls .plyr__time + .plyr__time::before {
+  content: "/" !important;
+  color: rgba(255, 255, 255, 0.45) !important;
+  margin: 0 5px !important;
 }
 
-/* 4. Right Controls Group */
+/* 5. Quality Badge & Right Controls */
 .plyr--video .plyr__controls .plyr__custom-quality-badge {
-  order: 7 !important;
   background: transparent !important;
   border: none !important;
-  color: #e2e8f0 !important;
+  color: #ffffff !important;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-  font-size: 12.5px !important;
+  font-size: 13px !important;
   font-weight: 700 !important;
   letter-spacing: 0.5px !important;
   cursor: pointer !important;
   padding: 4px 6px !important;
   border-radius: 4px !important;
-  transition: color 0.15s ease, background 0.15s ease !important;
-  width: auto !important;
-  height: 30px !important;
   display: inline-flex !important;
   align-items: center !important;
+  line-height: 1 !important;
+  width: auto !important;
+  height: 30px !important;
+  transition: color 0.15s ease, background 0.15s ease !important;
 }
 .plyr--video .plyr__controls .plyr__custom-quality-badge:hover {
   color: #00e676 !important;
-  background: rgba(255, 255, 255, 0.08) !important;
-}
-.plyr--video .plyr__controls .plyr__menu,
-.plyr--video .plyr__controls [data-plyr="settings"] {
-  order: 8 !important;
-}
-.plyr--video .plyr__controls [data-plyr="captions"] {
-  order: 9 !important;
-}
-.plyr--video .plyr__controls [data-plyr="pip"] {
-  order: 10 !important;
-}
-.plyr--video .plyr__controls [data-plyr="fullscreen"] {
-  order: 11 !important;
+  background: rgba(255, 255, 255, 0.1) !important;
 }
 
 /* 5. Minimalist center play button on pause */
