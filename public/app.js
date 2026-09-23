@@ -1242,14 +1242,128 @@ async function initWatchPage() {
         }
     };
 
+    window.setupProgressDragHandler = function(progressEl) {
+        if (!progressEl || progressEl._dragBound) return;
+        progressEl._dragBound = true;
+
+        const rangeInput = progressEl.querySelector('input[type="range"]');
+        let isDragging = false;
+
+        const getPercent = (clientX) => {
+            const rect = progressEl.getBoundingClientRect();
+            const x = clientX - rect.left;
+            return Math.max(0, Math.min(1, x / rect.width));
+        };
+
+        const applySeek = (percent, commit = false) => {
+            if (!playerInstance || isNaN(playerInstance.duration) || playerInstance.duration <= 0) return;
+            const targetTime = percent * playerInstance.duration;
+            if (rangeInput) {
+                rangeInput.value = percent * 100;
+                rangeInput.style.setProperty('--value', `${(percent * 100).toFixed(2)}%`);
+            }
+            if (commit) {
+                playerInstance.currentTime = targetTime;
+            } else {
+                const tooltip = progressEl.querySelector('.plyr__tooltip');
+                if (tooltip) {
+                    const mins = Math.floor(targetTime / 60);
+                    const secs = Math.floor(targetTime % 60);
+                    tooltip.textContent = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+                    tooltip.style.left = `${(percent * 100).toFixed(2)}%`;
+                }
+            }
+        };
+
+        progressEl.addEventListener('touchstart', (e) => {
+            if (e.touches.length !== 1) return;
+            isDragging = true;
+            progressEl.classList.add('is-dragging');
+            const pct = getPercent(e.touches[0].clientX);
+            applySeek(pct, false);
+        }, { passive: false });
+
+        window.addEventListener('touchmove', (e) => {
+            if (!isDragging || e.touches.length !== 1) return;
+            e.preventDefault();
+            const pct = getPercent(e.touches[0].clientX);
+            applySeek(pct, false);
+        }, { passive: false });
+
+        window.addEventListener('touchend', (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+            progressEl.classList.remove('is-dragging');
+            if (e.changedTouches && e.changedTouches.length > 0) {
+                const pct = getPercent(e.changedTouches[0].clientX);
+                applySeek(pct, true);
+            }
+        });
+
+        window.addEventListener('touchcancel', () => {
+            if (isDragging) {
+                isDragging = false;
+                progressEl.classList.remove('is-dragging');
+            }
+        });
+
+        // Mouse drag support for desktop
+        progressEl.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            isDragging = true;
+            progressEl.classList.add('is-dragging');
+            const pct = getPercent(e.clientX);
+            applySeek(pct, false);
+
+            const onMouseMove = (ev) => {
+                if (!isDragging) return;
+                const p = getPercent(ev.clientX);
+                applySeek(p, false);
+            };
+
+            const onMouseUp = (ev) => {
+                if (!isDragging) return;
+                isDragging = false;
+                progressEl.classList.remove('is-dragging');
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mouseup', onMouseUp);
+                const p = getPercent(ev.clientX);
+                applySeek(p, true);
+            };
+
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+        });
+    };
+
     window.organizePlyrControlsLayout = function() {
         const controls = document.querySelector('.plyr__controls');
         if (!controls) return;
 
+        // 0. Ensure overlays are inside player container so they are visible in fullscreen
+        const plyrContainer = playerInstance?.elements?.container || document.querySelector('.plyr');
+        if (plyrContainer) {
+            const overlays = [
+                document.getElementById('seekFeedbackLeft'),
+                document.getElementById('seekFeedbackRight'),
+                document.getElementById('playerLoaderOverlay'),
+                document.getElementById('playerHeaderOverlay'),
+                document.getElementById('nextEpisodeOverlay')
+            ];
+            overlays.forEach(el => {
+                if (el && el.parentElement !== plyrContainer) {
+                    plyrContainer.appendChild(el);
+                }
+            });
+        }
+
         // 1. Progress Bar: Must always be the first child (Top Row)
         const progress = controls.querySelector('.plyr__progress');
-        if (progress && controls.firstElementChild !== progress) {
-            controls.insertBefore(progress, controls.firstElementChild);
+        if (progress) {
+            if (controls.firstElementChild !== progress) {
+                controls.insertBefore(progress, controls.firstElementChild);
+            }
+            window.setupProgressDragHandler(progress);
         }
 
         // 2. Bottom Controls Row Container
@@ -1317,22 +1431,11 @@ async function initWatchPage() {
 
     window.ensureQualityBadge = window.organizePlyrControlsLayout;
 
-    playerInstance.on('ready', () => {
-        window.organizePlyrControlsLayout();
-        setTimeout(window.organizePlyrControlsLayout, 50);
-        setTimeout(window.organizePlyrControlsLayout, 200);
-    });
-    playerInstance.on('controlsshown', window.organizePlyrControlsLayout);
-    playerInstance.on('canplay', window.organizePlyrControlsLayout);
-
-    // Initial triggers to ensure styling applies as soon as DOM mounts
-    setTimeout(window.organizePlyrControlsLayout, 100);
-    setTimeout(window.organizePlyrControlsLayout, 400);
-    setTimeout(window.organizePlyrControlsLayout, 1000);
-
-    // Double-tap/click seek handlers
-    setTimeout(() => {
+    window.setupDoubleTapSeek = function() {
+        const plyrContainer = playerInstance?.elements?.container || document.querySelector('.plyr');
         const wrapper = document.querySelector('.player-wrapper');
+        const targets = [plyrContainer, wrapper].filter(Boolean);
+
         const fbLeft = document.getElementById('seekFeedbackLeft');
         const fbRight = document.getElementById('seekFeedbackRight');
         let seekTimerLeft = null;
@@ -1345,55 +1448,94 @@ async function initWatchPage() {
                 if (fbLeft) {
                     fbLeft.classList.add('active');
                     clearTimeout(seekTimerLeft);
-                    seekTimerLeft = setTimeout(() => fbLeft.classList.remove('active'), 500);
+                    seekTimerLeft = setTimeout(() => fbLeft.classList.remove('active'), 650);
                 }
             } else {
                 playerInstance.currentTime = Math.min(playerInstance.duration || 0, playerInstance.currentTime + 10);
                 if (fbRight) {
                     fbRight.classList.add('active');
                     clearTimeout(seekTimerRight);
-                    seekTimerRight = setTimeout(() => fbRight.classList.remove('active'), 500);
+                    seekTimerRight = setTimeout(() => fbRight.classList.remove('active'), 650);
                 }
             }
         };
 
-        let lastTapTime = 0;
-        if (wrapper) {
-            // Touch screen double tap
-            wrapper.addEventListener('touchstart', (e) => {
+        targets.forEach(targetEl => {
+            if (targetEl._seekBound) return;
+            targetEl._seekBound = true;
+
+            let lastTapTime = 0;
+            targetEl.addEventListener('touchstart', (e) => {
                 if (e.touches.length !== 1) return;
-                // Ignore if clicked controls or header overlays
-                if (e.target.closest('.plyr__controls') || e.target.closest('.player-header-overlay')) return;
-                
+                if (e.target.closest('.plyr__controls') || e.target.closest('.player-header-overlay') || e.target.closest('.plyr__menu') || e.target.closest('.next-episode-overlay')) return;
+
                 const now = Date.now();
                 const delay = now - lastTapTime;
-                if (delay < 300 && delay > 0) {
-                    const rect = wrapper.getBoundingClientRect();
-                    const touchX = e.touches[0].clientX - rect.left;
-                    if (touchX < rect.width / 2) {
+                const rect = targetEl.getBoundingClientRect();
+                const touchX = e.touches[0].clientX - rect.left;
+
+                if (delay < 350 && delay > 40) {
+                    if (touchX < rect.width * 0.45) {
                         triggerSeek('left');
-                    } else {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    } else if (touchX > rect.width * 0.55) {
                         triggerSeek('right');
+                        e.preventDefault();
+                        e.stopPropagation();
                     }
-                    e.preventDefault();
+                    lastTapTime = 0;
+                    return;
                 }
                 lastTapTime = now;
             }, { passive: false });
 
-            // Desktop double click
-            wrapper.addEventListener('dblclick', (e) => {
-                if (e.target.closest('.plyr__controls') || e.target.closest('.player-header-overlay')) return;
-                
-                const rect = wrapper.getBoundingClientRect();
+            targetEl.addEventListener('dblclick', (e) => {
+                if (e.target.closest('.plyr__controls') || e.target.closest('.player-header-overlay') || e.target.closest('.plyr__menu') || e.target.closest('.next-episode-overlay')) return;
+                const rect = targetEl.getBoundingClientRect();
                 const clickX = e.clientX - rect.left;
-                if (clickX < rect.width / 2) {
+                if (clickX < rect.width * 0.45) {
                     triggerSeek('left');
-                } else {
+                } else if (clickX > rect.width * 0.55) {
                     triggerSeek('right');
                 }
             });
-        }
+        });
+    };
+
+    playerInstance.on('ready', () => {
+        window.organizePlyrControlsLayout();
+        window.setupDoubleTapSeek();
+        setTimeout(window.organizePlyrControlsLayout, 50);
+        setTimeout(window.organizePlyrControlsLayout, 200);
+    });
+    playerInstance.on('controlsshown', () => {
+        window.organizePlyrControlsLayout();
+        window.setupDoubleTapSeek();
+    });
+    playerInstance.on('canplay', window.organizePlyrControlsLayout);
+    playerInstance.on('enterfullscreen', () => {
+        window.organizePlyrControlsLayout();
+        window.setupDoubleTapSeek();
+    });
+    playerInstance.on('exitfullscreen', () => {
+        window.organizePlyrControlsLayout();
+        window.setupDoubleTapSeek();
+    });
+
+    // Initial triggers to ensure styling applies as soon as DOM mounts
+    setTimeout(() => {
+        window.organizePlyrControlsLayout();
+        window.setupDoubleTapSeek();
     }, 100);
+    setTimeout(() => {
+        window.organizePlyrControlsLayout();
+        window.setupDoubleTapSeek();
+    }, 400);
+    setTimeout(() => {
+        window.organizePlyrControlsLayout();
+        window.setupDoubleTapSeek();
+    }, 1000);
 
     // Start background poller to rewrite "0p" label to "Auto" in settings menu and buttons
     setInterval(() => {
@@ -2450,7 +2592,7 @@ async function loadPlayResources(subjectId, season = null, episode = null) {
                         <button onclick="window.history.back()" style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.25);padding:8px 18px;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:6px;">
                             <i class="fa-solid fa-arrow-left"></i> Go Back
                         </button>
-                        <button onclick="loadPlayResources('${subjectId}',${season !== null ? season : 'null'},${episode !== null ? episode : 'null'})" style="background:var(--accent,#e50914);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:6px;">
+                        <button onclick="loadPlayResources('${subjectId}',${season !== null ? season : 'null'},${episode !== null ? episode : 'null'})" style="background:var(--accent,#00e676);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:6px;">
                             <i class="fa-solid fa-rotate-right"></i> Check Again
                         </button>
                     </div>
