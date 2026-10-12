@@ -53,5 +53,4 @@ jobs:
               fi
             done
 
-            echo "=== 3. Recycling Passenger worker processes ==="
-            pkill -f "passenger_wsgi" 2>/dev/null || true
+            echo "=== 3. Finished deployment successfully ==="

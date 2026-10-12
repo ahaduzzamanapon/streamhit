@@ -305,37 +305,41 @@ async def admin_upload_apk(request: Request, file: UploadFile = File(...)):
 @router.get("/api/app/version")
 async def public_get_app_version():
     from main import get_db_pool
+    default_version = {
+        "versionCode": 4,
+        "versionName": "1.0.3",
+        "apkUrl": "https://nxly.online/uploads/apks/NXLY-Stream.apk",
+        "mustUpdate": False,
+        "releaseNotes": "Downloads manager, offline playback, Recent watch resume, and MovieBox Pro UI upgrade."
+    }
     pool = await get_db_pool()
-    if not pool: return {"version": None}
-    async with pool.acquire() as conn:
-        async with conn.cursor(aiomysql.DictCursor) as cur:
-            await cur.execute("SELECT * FROM app_versions ORDER BY version_code DESC LIMIT 1")
-            row = await cur.fetchone()
-            if not row:
-                return {"version": None}
-            return {
-                "version": {
-                    "versionCode": row["version_code"],
-                    "versionName": row["version_name"],
-                    "apkUrl": row["apk_url"],
-                    "mustUpdate": bool(row["must_update"]),
-                    "releaseNotes": row["release_notes"]
+    if not pool: return {"version": default_version}
+    try:
+        async with pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+                await cur.execute("SELECT * FROM app_versions ORDER BY version_code DESC LIMIT 1")
+                row = await cur.fetchone()
+                if not row:
+                    return {"version": default_version}
+                apk_url = row["apk_url"]
+                if "app-release.apk" in apk_url:
+                    apk_url = apk_url.replace("app-release.apk", "NXLY-Stream.apk")
+                return {
+                    "version": {
+                        "versionCode": row["version_code"],
+                        "versionName": row["version_name"],
+                        "apkUrl": apk_url,
+                        "mustUpdate": bool(row["must_update"]),
+                        "releaseNotes": row["release_notes"]
+                    }
                 }
-            }
+    except Exception:
+        return {"version": default_version}
 
 @router.get("/api/app/download")
 async def public_download_latest():
-    from main import get_db_pool
-    pool = await get_db_pool()
-    if not pool: raise HTTPException(status_code=404, detail="No releases found")
-    async with pool.acquire() as conn:
-        async with conn.cursor(aiomysql.DictCursor) as cur:
-            await cur.execute("SELECT * FROM app_versions ORDER BY version_code DESC LIMIT 1")
-            row = await cur.fetchone()
-            if not row:
-                raise HTTPException(status_code=404, detail="No releases found")
-            
-            return RedirectResponse(url=row["apk_url"])
+    # Direct access is blocked to prevent bot scraping; redirect to human verification download page
+    return RedirectResponse(url="/download")
 
 import json
 

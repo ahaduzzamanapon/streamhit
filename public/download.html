@@ -288,12 +288,6 @@
                     </div>
                 </div>
 
-                <div id="directDownloadOption" style="margin-top: 12px; margin-bottom: 16px;">
-                    <a href="/api/app/download" style="color: #00E676; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
-                        <i class="fa-solid fa-download"></i> Direct Download (APK)
-                    </a>
-                </div>
-
                 <!-- Fetching Link Loader -->
                 <div class="status-container" id="statusContainer">
                     <div class="status-loader">
@@ -304,7 +298,7 @@
 
                 <!-- Final download button -->
                 <div class="download-btn-container" id="downloadContainer">
-                    <a href="#" id="downloadLink" class="btn-download-now">
+                    <a href="#" id="downloadLink" download="NXLY-Stream.apk" class="btn-download-now">
                         <i class="fa-solid fa-circle-down"></i> Download APK Now
                     </a>
                     <p style="font-size: 12px; color: var(--text-secondary); margin-top: 12px;">Your download should begin automatically. If it doesn't start, click the button above.</p>
@@ -443,7 +437,7 @@
                         // Trigger auto download
                         const anchor = document.createElement("a");
                         anchor.href = apkUrl;
-                        anchor.download = "";
+                        anchor.download = "NXLY-Stream.apk";
                         document.body.appendChild(anchor);
                         anchor.click();
                         document.body.removeChild(anchor);

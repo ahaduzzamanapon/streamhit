@@ -21,3 +21,9 @@ scratch_*.json
 .vscode/
 .idea/
 streamfit
+
+# Android build cache
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
