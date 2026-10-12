@@ -86,26 +86,56 @@ MB_HOST_POOL = [
     "https://api4.aoneroom.com",
     "https://api3.aoneroom.com"
 ]
-MB_CLIENT_INFO = json.dumps({
-    "package_name": "com.community.oneroom",
-    "version_name": "3.0.03.0529.03",
-    "version_code": 50020046,
-    "os": "android",
-    "os_version": "9",
-    "install_ch": "ps",
-    "device_id": "141c9f8c638592d7fc7365c638f230b9",
-    "install_store": "ps",
-    "gaid": "e42d5548-e08d-4125-b81b-4efa8a35b3e1",
-    "brand": "Redmi",
-    "model": "M2007J20CG",
-    "system_language": "en",
-    "net": "NETWORK_WIFI",
-    "region": "US",
-    "timezone": "America/New_York",
-    "sp_code": "40401",
-    "X-Play-Mode": "2"
-})
-MB_USER_AGENT = "com.community.oneroom/50020046 (Linux; U; Android 9; en_US; M2007J20CG; Build/PQ3A.190605.03081104; Cronet/135.0.7012.3)"
+_mb_current_version_code = 50020131
+_mb_current_version_name = "4.0.03.0922.03"
+_last_version_auto_check = 0
+
+async def auto_refresh_mb_version():
+    global _mb_current_version_code, _mb_current_version_name, _last_version_auto_check
+    now = time.time()
+    if now - _last_version_auto_check < 43200:
+        return
+    _last_version_auto_check = now
+    try:
+        url = "https://h5.aoneroom.com/wefeed-h5-bff/app/get-latest-app-pkgs?app_name=moviebox"
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.get(url)
+            if resp.status_code == 200:
+                data = resp.json().get("data") or []
+                for pkg in data:
+                    if pkg.get("pkgName") == "com.community.oneroom" and pkg.get("versionCode"):
+                        vc = int(pkg["versionCode"])
+                        if vc > _mb_current_version_code:
+                            _mb_current_version_code = vc
+                            _mb_current_version_name = pkg.get("versionName") or _mb_current_version_name
+                            print(f"[Auto-Updater] MovieBox client dynamically upgraded to code {vc} ({_mb_current_version_name})")
+                            break
+    except Exception:
+        pass
+
+def get_mb_client_info() -> str:
+    return json.dumps({
+        "package_name": "com.community.oneroom",
+        "version_name": _mb_current_version_name,
+        "version_code": _mb_current_version_code,
+        "os": "android",
+        "os_version": "9",
+        "install_ch": "ps",
+        "device_id": "141c9f8c638592d7fc7365c638f230b9",
+        "install_store": "ps",
+        "gaid": "e42d5548-e08d-4125-b81b-4efa8a35b3e1",
+        "brand": "Redmi",
+        "model": "M2007J20CG",
+        "system_language": "en",
+        "net": "NETWORK_WIFI",
+        "region": "US",
+        "timezone": "America/New_York",
+        "sp_code": "40401",
+        "X-Play-Mode": "2"
+    })
+
+def get_mb_user_agent() -> str:
+    return f"com.community.oneroom/{_mb_current_version_code} (Linux; U; Android 9; en_US; M2007J20CG; Build/PQ3A.190605.03081104; Cronet/135.0.7012.3)"
 
 class MovieBoxHttpClient:
     def __init__(self, host_pool=MB_HOST_POOL, timeout=15.0):
@@ -159,13 +189,13 @@ class MovieBoxHttpClient:
         sig = f"{ts}|2|{base64.b64encode(mac.digest()).decode()}"
 
         headers = {
-            "User-Agent": MB_USER_AGENT,
+            "User-Agent": get_mb_user_agent(),
             "Accept": accept,
             "Content-Type": content_type,
             "Connection": "keep-alive",
             "X-Client-Token": generate_client_token(),
             "x-tr-signature": sig,
-            "X-Client-Info": MB_CLIENT_INFO,
+            "X-Client-Info": get_mb_client_info(),
             "X-Client-Status": "0"
         }
         if self._runtime_token:
@@ -199,9 +229,9 @@ class MovieBoxHttpClient:
                 continue
         return self._host_pool[0], last_resp
 
-    async def post(self, path, json=None, params=None):
+    async def post(self, path, payload=None, params=None):
         query = ("?" + "&".join(f"{k}={v}" for k, v in params.items())) if params else ""
-        body = json.dumps(json or {}) if isinstance(json, dict) else ""
+        body = json.dumps(payload or {}) if isinstance(payload, dict) else (str(payload or "") if payload else "")
         last_resp = None
         for base in self._host_pool:
             url = f"{base}{path}{query}"
@@ -239,7 +269,7 @@ async def request_moviebox_mobile(endpoint: str, method: str = "GET", params: di
         for attempt in range(2):
             try:
                 if method.upper() == "POST":
-                    base, resp = await client.post(endpoint, json=data or {}, params=params)
+                    base, resp = await client.post(endpoint, payload=data or {}, params=params)
                 else:
                     base, resp = await client.get(endpoint, params=params)
                 
@@ -1804,30 +1834,46 @@ async def api_season(detailPath: str = "", subjectId: str = ""):
 _resource_cache = {}
 _resource_cache_time = {}
 
+DEPRECATED_VIDEO_HASHES = [
+    "80da52722ee7de7a4303290af6783424",
+    "/other/2026/10/10/",
+    "service_update",
+    "discontinued"
+]
+
+def is_deprecated_or_dummy_url(url: str) -> bool:
+    if not url:
+        return True
+    u_lower = str(url).lower()
+    return any(bad in u_lower for bad in DEPRECATED_VIDEO_HASHES)
+
 def _extract_playable_detectors(detectors: list) -> list:
     mob_items = []
     for det in detectors:
         res_list = det.get("resolutionList", [])
         if res_list:
             for r in res_list:
-                r_link = r.get("resourceLink")
-                if r_link and not any(bad in r_link.lower() for bad in ["fzmovies", "southfreak"]):
+                r_link = r.get("resourceLink") or r.get("url")
+                if r_link and not any(bad in r_link.lower() for bad in ["fzmovies", "southfreak"]) and not is_deprecated_or_dummy_url(r_link):
+                    fetch_link = f"/fetch?source_url={urllib.parse.quote(r_link)}" if r_link.startswith("http") else r_link
                     mob_items.append({
                         "resourceId": str(r.get("resourceId") or r.get("id") or "0"),
                         "resolution": int(r.get("resolution", 720)),
                         "size": int(r.get("size", 0)),
-                        "url": r_link,
-                        "resourceLink": r_link
+                        "url": fetch_link,
+                        "resourceLink": fetch_link
                     })
         elif det.get("resourceLink") and not any(bad in det.get("resourceLink", "").lower() for bad in ["fzmovies", "southfreak"]):
             r_link = det["resourceLink"]
-            mob_items.append({
-                "resourceId": str(det.get("resourceId") or "0"),
-                "resolution": 720,
-                "size": int(det.get("totalSize") or det.get("firstSize") or 0),
-                "url": r_link,
-                "resourceLink": r_link
-            })
+            if not is_deprecated_or_dummy_url(r_link):
+                fetch_link = f"/fetch?source_url={urllib.parse.quote(r_link)}" if r_link.startswith("http") else r_link
+                mob_items.append({
+                    "resourceId": str(det.get("resourceId") or "0"),
+                    "resolution": 720,
+                    "size": int(det.get("totalSize") or det.get("firstSize") or 0),
+                    "url": fetch_link,
+                    "resourceLink": fetch_link
+                })
     return mob_items
 
 @app.get("/api/resource")
@@ -1841,32 +1887,34 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
     cache_key = f"{subjectId}_{se}_{ep}_{detailPath}"
     now = time.time()
     if cache_key in _resource_cache and (now - _resource_cache_time.get(cache_key, 0) < 3600):
-        return _resource_cache[cache_key]
+        cached_val = _resource_cache[cache_key]
+        cached_list = cached_val.get("data", {}).get("list") or []
+        if not any(is_deprecated_or_dummy_url(it.get("url", "")) or is_deprecated_or_dummy_url(it.get("resourceLink", "")) for it in cached_list):
+            return cached_val
 
     items = []
 
-    # 1. Primary: Direct Mobile Resource API (fastest, direct CDN, resolves in <0.3s)
+    # 1. Primary: Official H5 Download API (Real full 1080p, 720p, 480p, 360p CDN files)
     try:
-        mob_res_data = await request_moviebox_mobile(
-            "/wefeed-mobile-bff/subject-api/resource",
-            params={"subjectId": subjectId, "se": se, "ep": ep}
-        )
-        res_list = mob_res_data.get("data", {}).get("list") or []
-        for r in res_list:
-            r_link = r.get("resourceLink") or r.get("url")
-            if r_link and not any(bad in r_link.lower() for bad in ["fzmovies", "southfreak"]):
-                res_id = str(r.get("resourceId") or r.get("id") or "0")
-                res_val = int(r.get("resolution") or 720)
-                sz_val = int(r.get("size") or 0)
-                items.append({
-                    "resourceId": res_id,
-                    "resolution": res_val,
-                    "size": sz_val,
-                    "url": r_link,
-                    "resourceLink": r_link
-                })
+        h5_data = await _fetch_download_resources(subjectId, se, ep, detailPath)
+        if isinstance(h5_data, dict):
+            downloads = h5_data.get("downloads") or []
+            for d in downloads:
+                url_val = d.get("url")
+                if url_val and not is_deprecated_or_dummy_url(url_val):
+                    res_id = str(d.get("id") or "0")
+                    res_val = int(d.get("resolution") or 720)
+                    sz_val = int(d.get("size") or 0)
+                    fetch_link = f"/fetch?source_url={urllib.parse.quote(url_val)}"
+                    items.append({
+                        "resourceId": res_id,
+                        "resolution": res_val,
+                        "size": sz_val,
+                        "url": fetch_link,
+                        "resourceLink": fetch_link
+                    })
     except Exception as e:
-        print(f"Direct mobile resource fetch error: {e}")
+        print(f"H5 download resource fetch error: {e}")
 
     if items:
         res = {"code": 0, "data": {"list": items, "isUpcoming": False}}
@@ -1874,87 +1922,49 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
         _resource_cache_time[cache_key] = now
         return res
 
-    # 2. Concurrently initiate H5 and Mobile Subject queries as fallback
-    h5_task = asyncio.create_task(_fetch_download_resources(subjectId, se, ep, detailPath))
-    mob_task = asyncio.create_task(request_moviebox_mobile(
-        "/wefeed-mobile-bff/subject-api/get",
-        params={"subjectId": subjectId, "se": se, "ep": ep}
-    ))
-
-    h5_data, mob_res = await asyncio.gather(h5_task, mob_task, return_exceptions=True)
-
-    # Check H5 downloads
-    if isinstance(h5_data, dict):
-        downloads = h5_data.get("downloads") or []
-        for d in downloads:
-            url_val = d.get("url")
-            if url_val:
-                items.append({
-                    "resourceId": d.get("id"),
-                    "resolution": d.get("resolution", 720),
-                    "size": d.get("size", 0),
-                    "url": url_val,
-                    "resourceLink": url_val
-                })
-
-    # Check Mobile detectors for this subject if H5 has no downloads
+    # 2. Fallback: Query Mobile Subject detectors and Candidate dubs (strictly rejecting deprecation notice videos)
     mob_subj = {}
-    if isinstance(mob_res, dict):
-        mob_subj = mob_res.get("data", {}).get("subject") or mob_res.get("data") or {}
+    try:
+        mob_res = await request_moviebox_mobile(
+            "/wefeed-mobile-bff/subject-api/get",
+            params={"subjectId": subjectId, "se": se, "ep": ep}
+        )
+        if isinstance(mob_res, dict):
+            mob_subj = mob_res.get("data", {}).get("subject") or mob_res.get("data") or {}
+            detectors = mob_subj.get("resourceDetectors") or []
+            items = _extract_playable_detectors(detectors)
+    except Exception as e:
+        print(f"Fallback mobile get error: {e}")
 
-    if not items and mob_subj:
-        detectors = mob_subj.get("resourceDetectors") or []
-        items = _extract_playable_detectors(detectors)
-
-    # Check Original Audio dub or sibling dubs concurrently if still empty
+    # Candidate dubs fallback
     if not items and mob_subj:
         dubs = mob_subj.get("dubs") or []
         orig = next((d for d in dubs if d.get("original") and str(d.get("subjectId")) != str(subjectId)), None)
         other_candidates = [d for d in dubs if str(d.get("subjectId")) != str(subjectId) and d != orig]
         check_candidates = ([orig] if orig else []) + other_candidates[:2]
 
-        async def check_candidate(cand):
+        for cand in check_candidates:
             cand_id = str(cand.get("subjectId") or "")
+            cand_path = cand.get("detailPath") or ""
             if not cand_id:
-                return []
+                continue
             try:
-                c_res = await request_moviebox_mobile(
-                    "/wefeed-mobile-bff/subject-api/resource",
-                    params={"subjectId": cand_id, "se": se, "ep": ep}
-                )
-                c_items = []
-                for r in (c_res.get("data", {}).get("list") or []):
-                    r_link = r.get("resourceLink") or r.get("url")
-                    if r_link:
-                        c_items.append({
-                            "resourceId": str(r.get("resourceId") or r.get("id") or "0"),
-                            "resolution": int(r.get("resolution") or 720),
-                            "size": int(r.get("size") or 0),
-                            "url": r_link,
-                            "resourceLink": r_link
+                cand_h5 = await _fetch_download_resources(cand_id, se, ep, cand_path)
+                for d in (cand_h5.get("downloads") or []):
+                    u = d.get("url")
+                    if u and not is_deprecated_or_dummy_url(u):
+                        fetch_link = f"/fetch?source_url={urllib.parse.quote(u)}"
+                        items.append({
+                            "resourceId": str(d.get("id") or "0"),
+                            "resolution": int(d.get("resolution") or 720),
+                            "size": int(d.get("size") or 0),
+                            "url": fetch_link,
+                            "resourceLink": fetch_link
                         })
-                return c_items
+                if items:
+                    break
             except Exception:
-                return []
-
-        cand_results = await asyncio.gather(*(check_candidate(c) for c in check_candidates), return_exceptions=True)
-        for cr in cand_results:
-            if isinstance(cr, list) and cr:
-                items = cr
-                break
-
-    # Fallback to any raw detector link if absolutely nothing else was found
-    if not items and mob_subj:
-        detectors = mob_subj.get("resourceDetectors") or []
-        for det in detectors:
-            if det.get("resourceLink"):
-                items.append({
-                    "resourceId": str(det.get("resourceId") or "0"),
-                    "resolution": 720,
-                    "size": int(det.get("totalSize") or det.get("firstSize") or 0),
-                    "url": det["resourceLink"],
-                    "resourceLink": det["resourceLink"]
-                })
+                pass
 
     res = {"code": 0, "data": {"list": items, "isUpcoming": len(items) == 0}}
     if items:

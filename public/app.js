@@ -4089,3 +4089,178 @@ try {
     }, 30000);
 } catch (_) {}
 
+// ==========================================================================
+// APP SHARE MODAL & AUTO PROMPT
+// ==========================================================================
+function ensureAppShareModal() {
+    if (document.getElementById("appShareModalOverlay")) return;
+
+    const modalHtml = `
+    <div id="appShareModalOverlay" class="share-modal-overlay" style="display:none;">
+        <div class="share-modal-card">
+            <button class="share-modal-close" onclick="closeAppShareModal()" aria-label="Close">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div class="share-modal-header">
+                <div class="share-modal-icon">
+                    <i class="fa-solid fa-share-nodes"></i>
+                </div>
+                <h3>Share NXLY Stream</h3>
+                <p>Love streaming free Movies, Series & Live TV? Share the app with your friends & family so they can watch too! 🍿</p>
+            </div>
+            
+            <div class="share-channels-grid">
+                <a href="javascript:void(0)" onclick="shareToPlatform('whatsapp')" class="share-channel-btn whatsapp">
+                    <i class="fa-brands fa-whatsapp"></i>
+                    <span>WhatsApp</span>
+                </a>
+                <a href="javascript:void(0)" onclick="shareToPlatform('facebook')" class="share-channel-btn facebook">
+                    <i class="fa-brands fa-facebook-f"></i>
+                    <span>Facebook</span>
+                </a>
+                <a href="javascript:void(0)" onclick="shareToPlatform('telegram')" class="share-channel-btn telegram">
+                    <i class="fa-brands fa-telegram"></i>
+                    <span>Telegram</span>
+                </a>
+                <a href="javascript:void(0)" onclick="shareToPlatform('twitter')" class="share-channel-btn twitter">
+                    <i class="fa-brands fa-x-twitter"></i>
+                    <span>X (Twitter)</span>
+                </a>
+            </div>
+
+            <div class="share-link-box">
+                <input type="text" id="shareAppLinkInput" value="https://nxly.online/download" readonly>
+                <button id="copyShareLinkBtn" onclick="copyAppShareLink()">
+                    <i class="fa-solid fa-copy"></i> Copy Link
+                </button>
+            </div>
+
+            <button class="native-device-share-btn" id="nativeDeviceShareBtn" onclick="shareNativeDevice()" style="display:none;">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> Share via Phone Apps
+            </button>
+        </div>
+    </div>
+    
+    <!-- Floating Share Trigger -->
+    <div id="floatingSharePrompt" class="floating-share-prompt" style="display:none;" onclick="openAppShareModal()">
+        <div class="floating-share-icon"><i class="fa-solid fa-gift"></i></div>
+        <div class="floating-share-text">
+            <strong>Share App with Friends</strong>
+            <small>Free Movies & TV</small>
+        </div>
+        <button class="floating-share-dismiss" onclick="event.stopPropagation(); dismissFloatingShare();" title="Dismiss">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+    `;
+
+    const div = document.createElement("div");
+    div.innerHTML = modalHtml;
+    document.body.appendChild(div);
+
+    if (navigator.share) {
+        const nativeBtn = document.getElementById("nativeDeviceShareBtn");
+        if (nativeBtn) nativeBtn.style.display = "inline-flex";
+    }
+
+    const overlay = document.getElementById("appShareModalOverlay");
+    if (overlay) {
+        overlay.addEventListener("click", (e) => {
+            if (e.target === overlay) closeAppShareModal();
+        });
+    }
+}
+
+window.openAppShareModal = function() {
+    ensureAppShareModal();
+    const overlay = document.getElementById("appShareModalOverlay");
+    if (overlay) {
+        overlay.style.display = "flex";
+        requestAnimationFrame(() => overlay.classList.add("active"));
+    }
+};
+
+window.closeAppShareModal = function() {
+    const overlay = document.getElementById("appShareModalOverlay");
+    if (overlay) {
+        overlay.classList.remove("active");
+        setTimeout(() => { overlay.style.display = "none"; }, 250);
+    }
+};
+
+window.copyAppShareLink = function() {
+    const input = document.getElementById("shareAppLinkInput");
+    const btn = document.getElementById("copyShareLinkBtn");
+    const textToCopy = input ? input.value : "https://nxly.online/download";
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            if (btn) {
+                btn.innerHTML = `<i class="fa-solid fa-check"></i> Copied!`;
+                btn.style.background = "#00e676";
+                btn.style.color = "#000";
+                setTimeout(() => {
+                    btn.innerHTML = `<i class="fa-solid fa-copy"></i> Copy Link`;
+                    btn.style.background = "";
+                    btn.style.color = "";
+                }, 2000);
+            }
+        });
+    }
+};
+
+window.shareToPlatform = function(platform) {
+    const text = encodeURIComponent("🎬 Watch thousands of Movies, Series & Live TV for free on NXLY Stream!\nDownload now: ");
+    const link = encodeURIComponent("https://nxly.online/download");
+    let shareUrl = "";
+
+    switch(platform) {
+        case "whatsapp":
+            shareUrl = `https://api.whatsapp.com/send?text=${text}${link}`;
+            break;
+        case "facebook":
+            shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${link}&quote=${text}`;
+            break;
+        case "telegram":
+            shareUrl = `https://t.me/share/url?url=${link}&text=${text}`;
+            break;
+        case "twitter":
+            shareUrl = `https://twitter.com/intent/tweet?text=${text}&url=${link}`;
+            break;
+    }
+
+    if (shareUrl) {
+        window.open(shareUrl, "_blank", "noopener,noreferrer,width=600,height=500");
+    }
+};
+
+window.shareNativeDevice = function() {
+    if (navigator.share) {
+        navigator.share({
+            title: "NXLY Stream - Free Movies, Series & Live TV",
+            text: "🎬 Watch thousands of Movies, TV Shows & Live TV for free on NXLY Stream!",
+            url: "https://nxly.online/download"
+        }).catch(() => {});
+    }
+};
+
+window.dismissFloatingShare = function() {
+    const prompt = document.getElementById("floatingSharePrompt");
+    if (prompt) prompt.style.display = "none";
+    try { sessionStorage.setItem("floating_share_dismissed", "1"); } catch (_) {}
+};
+
+// Automatic non-intrusive floating prompt trigger after 30 seconds
+setTimeout(() => {
+    try {
+        if (!sessionStorage.getItem("floating_share_dismissed")) {
+            ensureAppShareModal();
+            const prompt = document.getElementById("floatingSharePrompt");
+            if (prompt) {
+                prompt.style.display = "flex";
+                requestAnimationFrame(() => prompt.classList.add("visible"));
+            }
+        }
+    } catch (_) {}
+}, 30000);
+
+

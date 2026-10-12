@@ -14,6 +14,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
+import com.streamhit.app.ui.components.AppShareDialog
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -154,6 +156,7 @@ fun HomeScreen(
     var recentHistory by remember { mutableStateOf<List<WatchHistoryItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var selectedCategoryIndex by remember { mutableStateOf(0) }
+    var showShareDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         recentHistory = RecentHistoryManager.getRecentHistory(context)
@@ -242,54 +245,80 @@ fun HomeScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 14.dp, vertical = 8.dp)
             ) {
-                // Search Pill
-                Surface(
-                    shape = RoundedCornerShape(24.dp),
-                    color = Color.White.copy(alpha = 0.08f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onNavigateToSearch() }
+                // Search Pill & Share Action Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
+                    Surface(
+                        shape = RoundedCornerShape(24.dp),
+                        color = Color.White.copy(alpha = 0.08f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .weight(1f)
+                            .clickable { onNavigateToSearch() }
                     ) {
                         Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = "Search",
-                                tint = TextMuted,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Search movies, series, anime...",
-                                color = TextMuted,
-                                fontSize = 13.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = "Search",
+                                    tint = TextMuted,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Search movies, series, anime...",
+                                    color = TextMuted,
+                                    fontSize = 13.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
 
-                        // Green Search Action Button
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = AccentEmerald,
-                            modifier = Modifier.clickable { onNavigateToSearch() }
-                        ) {
-                            Text(
-                                text = "Search",
-                                color = Color.Black,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            // Green Search Action Button
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = AccentEmerald,
+                                modifier = Modifier.clickable { onNavigateToSearch() }
+                            ) {
+                                Text(
+                                    text = "Search",
+                                    color = Color.Black,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Share App Button
+                    Surface(
+                        shape = CircleShape,
+                        color = Color.White.copy(alpha = 0.08f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AccentEmerald.copy(alpha = 0.35f)),
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clickable { showShareDialog = true }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Share App",
+                                tint = AccentEmerald,
+                                modifier = Modifier.size(19.dp)
                             )
                         }
                     }
@@ -371,6 +400,68 @@ fun HomeScreen(
             }
         }
 
+        // Share App Invite Card
+        if (selectedCategoryIndex == 0) {
+            item {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color.White.copy(alpha = 0.05f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, AccentEmerald.copy(alpha = 0.25f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .clickable { showShareDialog = true }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(AccentEmerald.copy(alpha = 0.18f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = null,
+                                tint = AccentEmerald,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Enjoying NXLY Stream?",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.5.sp
+                            )
+                            Text(
+                                text = "Share with friends to stream free movies together! 🍿",
+                                color = TextSecondary,
+                                fontSize = 11.sp
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = AccentEmerald,
+                            modifier = Modifier.clickable { showShareDialog = true }
+                        ) {
+                            Text(
+                                text = "Share",
+                                color = Color.Black,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.5.sp,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         // Home Sections (Movies, TV Shows, Trending, Filtered Content)
         itemsIndexed(filteredSections.filter { it.subjects != null && it.subjects.isNotEmpty() }) { sectionIndex, section ->
             val subjects = section.subjects ?: emptyList()
@@ -414,6 +505,10 @@ fun HomeScreen(
                 }
             }
         }
+    }
+
+    if (showShareDialog) {
+        AppShareDialog(onDismiss = { showShareDialog = false })
     }
 }
 

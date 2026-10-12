@@ -3566,3 +3566,251 @@ input, select { font-family: inherit; }
 .text-muted { color: var(--text-muted); }
 .font-bold { font-weight: 700; }
 .font-black { font-weight: 900; }
+
+/* ==========================================================================
+   APP SHARE MODAL & FLOATING PROMPT
+   ========================================================================== */
+.share-app-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(0, 230, 118, 0.12);
+  color: var(--accent, #00e676);
+  border: 1px solid rgba(0, 230, 118, 0.3);
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.share-app-btn:hover {
+  background: var(--accent, #00e676);
+  color: #000;
+  box-shadow: 0 0 16px rgba(0, 230, 118, 0.4);
+}
+.share-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  padding: 16px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.share-modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+.share-modal-card {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  background: #11131f;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 24px;
+  padding: 28px 24px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+  transform: scale(0.92) translateY(12px);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: center;
+}
+.share-modal-overlay.active .share-modal-card {
+  transform: scale(1) translateY(0);
+}
+.share-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: #9ca3af;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+.share-modal-close:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+.share-modal-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #00e676 0%, #00b0ff 100%);
+  color: #000;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  margin: 0 auto 14px;
+  box-shadow: 0 8px 24px rgba(0, 230, 118, 0.35);
+}
+.share-modal-header h3 {
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 8px;
+}
+.share-modal-header p {
+  font-size: 13px;
+  color: #a2a2b8;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+.share-channels-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.share-channel-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 13.5px;
+  font-weight: 700;
+  text-decoration: none;
+  color: #fff;
+  transition: transform 0.18s ease, filter 0.18s ease;
+}
+.share-channel-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.15);
+}
+.share-channel-btn.whatsapp { background: #25D366; color: #fff; }
+.share-channel-btn.facebook { background: #1877F2; color: #fff; }
+.share-channel-btn.telegram { background: #0088cc; color: #fff; }
+.share-channel-btn.twitter { background: #111; border: 1px solid rgba(255, 255, 255, 0.2); color: #fff; }
+.share-link-box {
+  display: flex;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 5px;
+  margin-bottom: 14px;
+}
+.share-link-box input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 13px;
+  padding: 8px 12px;
+  outline: none;
+}
+.share-link-box button {
+  background: var(--accent, #00e676);
+  color: #000;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.share-link-box button:hover {
+  filter: brightness(1.1);
+}
+.native-device-share-btn {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+.native-device-share-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+.floating-share-prompt {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: rgba(17, 19, 31, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 230, 118, 0.4);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), 0 0 20px rgba(0, 230, 118, 0.2);
+  border-radius: 50px;
+  padding: 8px 16px 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  z-index: 9998;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.floating-share-prompt.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.floating-share-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent, #00e676);
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+.floating-share-text {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+.floating-share-text strong {
+  font-size: 12.5px;
+  color: #fff;
+  font-weight: 700;
+}
+.floating-share-text small {
+  font-size: 10.5px;
+  color: #00e676;
+}
+.floating-share-dismiss {
+  background: none;
+  border: none;
+  color: #656580;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px;
+  margin-left: 4px;
+}
+.floating-share-dismiss:hover { color: #fff; }
+@media (max-width: 600px) {
+  .floating-share-prompt {
+    bottom: 80px;
+    right: 14px;
+  }
+}
