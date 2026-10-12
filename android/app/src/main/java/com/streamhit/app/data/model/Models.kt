@@ -182,21 +182,59 @@ data class SubjectDetail(
 }
 
 data class SeasonInfo(
-    @SerializedName("seasonNumber") val seasonNumber: Int = 1,
-    @SerializedName("episodes") val episodes: List<EpisodeInfo> = emptyList()
-)
+    @SerializedName("se") val seRaw: Int? = null,
+    @SerializedName("seasonNumber") val seasonNumberRaw: Int? = null,
+    @SerializedName("maxEp") val maxEpRaw: Int? = null,
+    @SerializedName("episodeCount") val episodeCountRaw: Int? = null,
+    @SerializedName("episodes") val episodesRaw: List<EpisodeInfo>? = null
+) {
+    val seasonNumber: Int
+        get() = seRaw ?: seasonNumberRaw ?: 1
+
+    val maxEp: Int
+        get() = maxEpRaw ?: episodeCountRaw ?: (episodesRaw?.size ?: 1)
+
+    val episodes: List<EpisodeInfo>
+        get() {
+            if (!episodesRaw.isNullOrEmpty()) return episodesRaw
+            val count = maxEp.coerceAtLeast(1)
+            return (1..count).map { epNum ->
+                EpisodeInfo(episodeNumberRaw = epNum, title = "Episode $epNum")
+            }
+        }
+}
 
 data class EpisodeInfo(
-    @SerializedName("episodeNumber") val episodeNumber: Int = 1,
+    @SerializedName("ep") val epRaw: Int? = null,
+    @SerializedName("episodeNumber") val episodeNumberRaw: Int? = null,
     @SerializedName("title") val title: String? = null,
     @SerializedName("detailPath") val detailPath: String? = null
-)
+) {
+    val episodeNumber: Int
+        get() = epRaw ?: episodeNumberRaw ?: 1
+}
 
 data class DubInfo(
-    @SerializedName("name") val name: String = "",
-    @SerializedName("language") val language: String = "",
-    @SerializedName("subjectId") val subjectId: String? = null
-)
+    @SerializedName("lanName") val lanNameRaw: String? = null,
+    @SerializedName("name") val nameRaw: String? = null,
+    @SerializedName("lanCode") val lanCodeRaw: String? = null,
+    @SerializedName("language") val languageRaw: String? = null,
+    @SerializedName("subjectId") val subjectIdRaw: String? = null,
+    @SerializedName("detailPath") val detailPathRaw: String? = null,
+    @SerializedName("original") val original: Boolean? = false
+) {
+    val name: String
+        get() = lanNameRaw?.ifBlank { null } ?: (nameRaw?.ifBlank { null } ?: "Audio Dub")
+
+    val language: String
+        get() = lanCodeRaw?.ifBlank { null } ?: (languageRaw?.ifBlank { null } ?: name)
+
+    val subjectId: String
+        get() = subjectIdRaw ?: ""
+
+    val detailPath: String
+        get() = detailPathRaw ?: ""
+}
 
 data class ResourceList(
     @SerializedName("list") val list: List<StreamResource> = emptyList()
@@ -304,15 +342,19 @@ data class LiveTvResponse(
 )
 
 data class LiveTvChannel(
-    @SerializedName("id") val id: Int = 0,
+    @SerializedName("id") val id: String = "",
     @SerializedName("name") val name: String = "",
     @SerializedName("logo") val logo: String = "",
     @SerializedName("category") val category: String = "General",
+    @SerializedName("servers") val servers: List<StreamLinkItem> = emptyList(),
     @SerializedName("streamLinks") val streamLinks: List<StreamLinkItem> = emptyList()
-)
+) {
+    val activeServers: List<StreamLinkItem>
+        get() = if (servers.isNotEmpty()) servers else streamLinks
+}
 
 data class StreamLinkItem(
-    @SerializedName("label") val label: String = "Stream",
+    @SerializedName("label") val label: String = "Server 1",
     @SerializedName("url") val url: String = ""
 )
 

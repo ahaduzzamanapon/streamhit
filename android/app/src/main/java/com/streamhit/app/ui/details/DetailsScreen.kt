@@ -37,7 +37,7 @@ fun DetailsScreen(
     detailPath: String,
     subjectId: String,
     onBackClick: () -> Unit,
-    onPlayClick: (streamUrl: String, title: String) -> Unit,
+    onPlayClick: (streamUrl: String, title: String, coverUrl: String) -> Unit,
     onNavigateToDownloads: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -47,6 +47,10 @@ fun DetailsScreen(
     var isLoading by remember { mutableStateOf(true) }
     var isResourcesLoading by remember { mutableStateOf(true) }
     var selectedSeasonIndex by remember { mutableStateOf(0) }
+    var selectedEpisodeNumber by remember { mutableIntStateOf(1) }
+    var languageDropdownExpanded by remember { mutableStateOf(false) }
+    var seasonDropdownExpanded by remember { mutableStateOf(false) }
+    var selectedDub by remember { mutableStateOf<com.streamhit.app.data.model.DubInfo?>(null) }
     var isResolvingStream by remember { mutableStateOf(false) }
     var showDownloadSheet by remember { mutableStateOf(false) }
     var isDownloadingActive by remember { mutableStateOf(false) }
@@ -57,10 +61,11 @@ fun DetailsScreen(
         isResourcesLoading = true
         val d = repository.getDetail(detailPath, subjectId)
         detail = d
+        selectedDub = d?.dubs?.firstOrNull { it.original == true } ?: d?.dubs?.firstOrNull()
         isLoading = false
 
-        val sId = d?.subjectId?.ifEmpty { subjectId } ?: subjectId
-        val dPath = d?.detailPath?.ifEmpty { detailPath } ?: detailPath
+        val sId = selectedDub?.subjectId?.ifBlank { d?.subjectId?.ifEmpty { subjectId } } ?: subjectId
+        val dPath = selectedDub?.detailPath?.ifBlank { d?.detailPath?.ifEmpty { detailPath } } ?: detailPath
         val resList = repository.getStreamingResources(sId, dPath, 1, 1)
         resources = resList
         isResourcesLoading = false
@@ -69,16 +74,17 @@ fun DetailsScreen(
     fun playStream(res: StreamResource, season: Int = 1, episode: Int = 1) {
         val title = detail?.title ?: "Stream"
         val epText = if (detail?.subjectType == 2) " - S${season}E${episode}" else ""
+        val cover = detail?.coverUrl ?: ""
         if (res.url.isNotBlank()) {
-            onPlayClick(res.url, "$title$epText (${res.displayResolution})")
+            onPlayClick(res.url, "$title$epText (${res.displayResolution})", cover)
         } else {
             Toast.makeText(context, "Streaming link unavailable for this server.", Toast.LENGTH_SHORT).show()
         }
     }
 
     fun playBestContent(season: Int = 1, episode: Int = 1) {
-        val sId = detail?.subjectId?.ifEmpty { subjectId } ?: subjectId
-        val dPath = detail?.detailPath?.ifEmpty { detailPath } ?: detailPath
+        val sId = selectedDub?.subjectId?.ifBlank { detail?.subjectId?.ifEmpty { subjectId } } ?: subjectId
+        val dPath = selectedDub?.detailPath?.ifBlank { detail?.detailPath?.ifEmpty { detailPath } } ?: detailPath
         val title = detail?.title ?: "Stream"
 
         // If we already have resources for season 1 episode 1
@@ -95,7 +101,23 @@ fun DetailsScreen(
                 resources = resList
             }
             isResolvingStream = false
-            val best = resList.maxByOrNull { it.resolution ?: 720 } ?: resList.firstOrNull()
+            var best = resList.maxByOrNull { it.resolution ?: 720 } ?: resList.firstOrNull()
+
+            // Fallback: If no streams found, try candidate dubs (original or other language)
+            if (best == null || best.url.isBlank()) {
+                val candidateDubs = detail?.dubs?.filter { it.subjectId.isNotBlank() && it.subjectId != sId } ?: emptyList()
+                for (dub in candidateDubs) {
+                    val fallbackList = repository.getStreamingResources(dub.subjectId, dub.detailPath.ifBlank { dPath }, season, episode)
+                    val fallbackBest = fallbackList.maxByOrNull { it.resolution ?: 720 } ?: fallbackList.firstOrNull()
+                    if (fallbackBest != null && fallbackBest.url.isNotBlank()) {
+                        resources = fallbackList
+                        selectedDub = dub
+                        playStream(fallbackBest, season, episode)
+                        return@launch
+                    }
+                }
+            }
+
             if (best != null && best.url.isNotBlank()) {
                 playStream(best, season, episode)
             } else {
@@ -313,36 +335,62 @@ fun DetailsScreen(
                 }
             }
 
-            // Audio Languages (Dubs)
+            // Audio Languages Dropdown (User requested: details page e languegse dropdown e asbe)
             if (!item.dubs.isNullOrEmpty()) {
                 item {
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        Text("Audio Languages", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text("Audio Language", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(8.dp))
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(item.dubs) { dub ->
-                                Box(
-                                    modifier = Modifier
-                                        .background(BgCard, RoundedCornerShape(8.dp))
-                                        .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
-                                        .clickable {
-                                            if (!dub.subjectId.isNullOrBlank()) {
-                                                scope.launch {
-                                                    isResourcesLoading = true
-                                                    val res = repository.getStreamingResources(dub.subjectId, detailPath, 1, 1)
-                                                    resources = res
-                                                    isResourcesLoading = false
-                                                    Toast.makeText(context, "Switched to ${dub.name}", Toast.LENGTH_SHORT).show()
-                                                }
+                        Box {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = BgCard,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, AccentEmerald.copy(alpha = 0.5f)),
+                                modifier = Modifier.clickable { languageDropdownExpanded = true }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(Icons.Default.Language, contentDescription = null, tint = AccentEmerald, modifier = Modifier.size(18.dp))
+                                    Text(
+                                        text = selectedDub?.name?.ifBlank { selectedDub?.language } ?: "Audio Dub",
+                                        color = TextPrimary,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = TextMuted)
+                                }
+                            }
+
+                            DropdownMenu(
+                                expanded = languageDropdownExpanded,
+                                onDismissRequest = { languageDropdownExpanded = false },
+                                modifier = Modifier.background(BgCard)
+                            ) {
+                                item.dubs.forEach { dub ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = dub.name.ifBlank { dub.language },
+                                                color = if (selectedDub == dub) AccentEmerald else TextPrimary,
+                                                fontWeight = if (selectedDub == dub) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        },
+                                        onClick = {
+                                            selectedDub = dub
+                                            languageDropdownExpanded = false
+                                            val dubSid = dub.subjectId.ifBlank { subjectId }
+                                            val dubPath = dub.detailPath.ifBlank { detailPath }
+                                            scope.launch {
+                                                isResourcesLoading = true
+                                                val res = repository.getStreamingResources(dubSid, dubPath, selectedSeasonIndex + 1, selectedEpisodeNumber)
+                                                resources = res
+                                                isResourcesLoading = false
+                                                Toast.makeText(context, "Switched to ${dub.name}", Toast.LENGTH_SHORT).show()
                                             }
                                         }
-                                        .padding(horizontal = 14.dp, vertical = 8.dp)
-                                ) {
-                                    Text(
-                                        text = dub.language.ifBlank { dub.name },
-                                        color = AccentCyan,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
@@ -476,84 +524,123 @@ fun DetailsScreen(
                 }
             }
 
-            // TV Series Seasons & Episodes Selector
+            // TV Series Seasons & Episodes Selector (MovieBox / Screenshot 1 Style)
             if (item.subjectType == 2 && !item.seasons.isNullOrEmpty()) {
                 val seasons = item.seasons
+                val currentSeason = seasons.getOrNull(selectedSeasonIndex) ?: seasons.first()
+                val episodes = currentSeason.episodes
+
                 item {
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        Text("Episodes", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Episodes", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
 
-                        // Season selector tabs
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(seasons.size) { index ->
-                                val isSelected = selectedSeasonIndex == index
-                                Box(
-                                    modifier = Modifier
-                                        .background(
-                                            if (isSelected) AccentEmerald else BgCard,
-                                            RoundedCornerShape(8.dp)
-                                        )
-                                        .clickable { selectedSeasonIndex = index }
-                                        .padding(horizontal = 14.dp, vertical = 8.dp)
-                                ) {
-                                    Text(
-                                        text = "Season ${seasons[index].seasonNumber}",
-                                        color = if (isSelected) Color.Black else TextPrimary,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                            // Season Dropdown / Tabs
+                            if (seasons.size > 1) {
+                                Box {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = BgCard,
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                                        modifier = Modifier.clickable { seasonDropdownExpanded = true }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Text(
+                                                text = "Season ${currentSeason.seasonNumber}",
+                                                color = AccentEmerald,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = AccentEmerald, modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+
+                                    DropdownMenu(
+                                        expanded = seasonDropdownExpanded,
+                                        onDismissRequest = { seasonDropdownExpanded = false },
+                                        modifier = Modifier.background(BgCard)
+                                    ) {
+                                        seasons.forEachIndexed { idx, s ->
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Text(
+                                                        text = "Season ${s.seasonNumber}",
+                                                        color = if (selectedSeasonIndex == idx) AccentEmerald else TextPrimary,
+                                                        fontWeight = if (selectedSeasonIndex == idx) FontWeight.Bold else FontWeight.Normal
+                                                    )
+                                                },
+                                                onClick = {
+                                                    selectedSeasonIndex = idx
+                                                    seasonDropdownExpanded = false
+                                                    selectedEpisodeNumber = 1
+                                                    scope.launch {
+                                                        isResourcesLoading = true
+                                                        val sid = selectedDub?.subjectId?.ifBlank { subjectId } ?: subjectId
+                                                        val path = selectedDub?.detailPath?.ifBlank { detailPath } ?: detailPath
+                                                        resources = repository.getStreamingResources(sid, path, s.seasonNumber, 1)
+                                                        isResourcesLoading = false
+                                                    }
+                                                }
+                                            )
+                                        }
+                                    }
                                 }
+                            } else {
+                                Text("Season ${currentSeason.seasonNumber}", color = TextMuted, fontSize = 12.sp)
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                        // Episodes Grid
-                        val currentSeason = seasons.getOrNull(selectedSeasonIndex) ?: seasons.first()
-                        val episodes = currentSeason.episodes
-
+                        // Episode Grid (screenshot style: 01, 02, 03... chips in rows of 6)
+                        val epChunks = episodes.chunked(6)
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            episodes.forEach { ep ->
+                            epChunks.forEach { rowEpisodes ->
                                 Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(BgCard, RoundedCornerShape(10.dp))
-                                        .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(10.dp))
-                                    .clickable { playBestContent(currentSeason.seasonNumber, ep.episodeNumber) }
-                                        .padding(14.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Box(
+                                    rowEpisodes.forEach { ep ->
+                                        val isSelected = selectedEpisodeNumber == ep.episodeNumber
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = if (isSelected) AccentEmerald else BgCard,
+                                            border = androidx.compose.foundation.BorderStroke(
+                                                1.dp,
+                                                if (isSelected) AccentEmerald else Color.White.copy(alpha = 0.08f)
+                                            ),
                                             modifier = Modifier
-                                                .size(32.dp)
-                                                .background(AccentEmerald.copy(alpha = 0.15f), RoundedCornerShape(6.dp)),
-                                            contentAlignment = Alignment.Center
+                                                .weight(1f)
+                                                .height(44.dp)
+                                                .clickable {
+                                                    selectedEpisodeNumber = ep.episodeNumber
+                                                    playBestContent(currentSeason.seasonNumber, ep.episodeNumber)
+                                                }
                                         ) {
-                                            Text(
-                                                text = "${ep.episodeNumber}",
-                                                color = AccentEmerald,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 13.sp
-                                            )
+                                            Box(
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = if (ep.episodeNumber < 10) "0${ep.episodeNumber}" else "${ep.episodeNumber}",
+                                                    color = if (isSelected) Color.Black else TextPrimary,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
                                         }
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Text(
-                                            text = ep.title ?: "Episode ${ep.episodeNumber}",
-                                            color = TextPrimary,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
                                     }
-
-                                    Icon(
-                                        Icons.Default.PlayArrow,
-                                        contentDescription = "Play Episode",
-                                        tint = AccentEmerald,
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                                    repeat(6 - rowEpisodes.size) {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
                                 }
                             }
                         }

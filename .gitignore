@@ -16,6 +16,7 @@ Thumbs.db
 scratch_*.json
 .scraper_progress.json
 *.log
+*.db
 
 # IDEs
 .vscode/

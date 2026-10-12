@@ -20,12 +20,14 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.filled.Tv
 import com.streamhit.app.data.model.AppVersionInfo
 import com.streamhit.app.data.repository.MovieRepository
 import com.streamhit.app.ui.details.DetailsScreen
 import com.streamhit.app.ui.downloads.DownloadsScreen
 import com.streamhit.app.ui.explore.ExploreScreen
 import com.streamhit.app.ui.home.HomeScreen
+import com.streamhit.app.ui.livetv.LiveTvScreen
 import com.streamhit.app.ui.player.PlayerActivity
 import com.streamhit.app.ui.search.SearchScreen
 import com.streamhit.app.ui.theme.*
@@ -61,6 +63,7 @@ class MainActivity : ComponentActivity() {
 
 sealed class Screen(val title: String, val icon: ImageVector) {
     object Home : Screen("Home", Icons.Default.Home)
+    object LiveTv : Screen("Live TV", Icons.Default.Tv)
     object Explore : Screen("Explore", Icons.Default.Movie)
     object Downloads : Screen("Downloads", Icons.Default.FileDownload)
     object Search : Screen("Search", Icons.Default.Search)
@@ -101,7 +104,7 @@ fun MainAppScreen(
                     contentColor = TextPrimary,
                     tonalElevation = 8.dp
                 ) {
-                    val tabs = listOf(Screen.Home, Screen.Explore, Screen.Downloads, Screen.Search)
+                    val tabs = listOf(Screen.Home, Screen.LiveTv, Screen.Explore, Screen.Downloads, Screen.Search)
                     tabs.forEach { tab ->
                         val isSelected = currentTab == tab
                         NavigationBarItem(
@@ -146,8 +149,8 @@ fun MainAppScreen(
                         activeDetailPath = null
                         activeSubjectId = null
                     },
-                    onPlayClick = { url, title ->
-                        onPlayVideo(url, title, activeSubjectId ?: "", activeDetailPath ?: "", "")
+                    onPlayClick = { url, title, cover ->
+                        onPlayVideo(url, title, activeSubjectId ?: "", activeDetailPath ?: "", cover)
                     },
                     onNavigateToDownloads = {
                         activeDetailPath = null
@@ -168,6 +171,11 @@ fun MainAppScreen(
                         },
                         onNavigateToSearch = {
                             currentTab = Screen.Search
+                        }
+                    )
+                    Screen.LiveTv -> LiveTvScreen(
+                        onPlayStream = { url, title ->
+                            onPlayVideo(url, title, "", "", "")
                         }
                     )
                     Screen.Explore -> ExploreScreen(

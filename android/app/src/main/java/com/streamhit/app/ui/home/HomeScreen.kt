@@ -1,5 +1,6 @@
 package com.streamhit.app.ui.home
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -27,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.streamhit.app.data.local.HomeCacheManager
 import com.streamhit.app.data.local.RecentHistoryManager
 import com.streamhit.app.data.local.WatchHistoryItem
 import com.streamhit.app.data.model.BannerItem
@@ -36,6 +39,106 @@ import com.streamhit.app.ui.components.HeroBannerSlider
 import com.streamhit.app.ui.components.MediaCard
 import com.streamhit.app.ui.components.SectionHeader
 import com.streamhit.app.ui.theme.*
+
+@Composable
+fun rememberShimmerBrush(): Brush {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val translateAnim by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1000f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmer_anim"
+    )
+    return Brush.linearGradient(
+        colors = listOf(
+            Color(0xFF161C2C),
+            Color(0xFF28344E),
+            Color(0xFF161C2C)
+        ),
+        start = Offset(translateAnim - 350f, translateAnim - 350f),
+        end = Offset(translateAnim, translateAnim)
+    )
+}
+
+@Composable
+fun HomeScreenShimmer(brush: Brush) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BgDark)
+            .padding(horizontal = 14.dp, vertical = 10.dp)
+    ) {
+        // Search bar skeleton
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(44.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(brush)
+        )
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Category pills skeleton
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            repeat(5) {
+                Box(
+                    modifier = Modifier
+                        .width(72.dp)
+                        .height(30.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(brush)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Hero banner skeleton
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(290.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(brush)
+        )
+        Spacer(modifier = Modifier.height(22.dp))
+
+        // Section title skeleton
+        Box(
+            modifier = Modifier
+                .width(140.dp)
+                .height(20.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(brush)
+        )
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Media cards skeleton row
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            repeat(4) {
+                Column {
+                    Box(
+                        modifier = Modifier
+                            .width(115.dp)
+                            .height(165.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(brush)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .width(80.dp)
+                            .height(12.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(brush)
+                    )
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun HomeScreen(
@@ -53,24 +156,77 @@ fun HomeScreen(
     var selectedCategoryIndex by remember { mutableStateOf(0) }
 
     LaunchedEffect(Unit) {
-        val b = repository.getBanners()
-        val s = repository.getHomeFeed()
-        banners = if (b.isNotEmpty()) b else (s.firstOrNull { it.banner != null && it.banner.items.isNotEmpty() }?.banner?.items ?: emptyList())
-        sections = s
         recentHistory = RecentHistoryManager.getRecentHistory(context)
-        isLoading = false
+        val cachedBanners = HomeCacheManager.getCachedBanners(context)
+        val cachedSections = HomeCacheManager.getCachedSections(context)
+        val isExpired = HomeCacheManager.isCacheExpired(context)
+
+        // Show cache instantly if available
+        if (cachedBanners.isNotEmpty() || cachedSections.isNotEmpty()) {
+            banners = cachedBanners
+            sections = cachedSections
+            isLoading = false
+        }
+
+        // Fetch fresh data once a day (or if cache is empty)
+        if (isExpired || cachedSections.isEmpty()) {
+            try {
+                val b = repository.getBanners()
+                val s = repository.getHomeFeed()
+                val finalBanners = if (b.isNotEmpty()) b else (s.firstOrNull { it.banner != null && it.banner.items.isNotEmpty() }?.banner?.items ?: emptyList())
+                if (finalBanners.isNotEmpty() || s.isNotEmpty()) {
+                    banners = finalBanners
+                    sections = s
+                    HomeCacheManager.saveHomeCache(context, finalBanners, s)
+                }
+            } catch (_: Exception) {}
+            isLoading = false
+        }
     }
 
     if (isLoading) {
-        Box(
-            modifier = modifier
-                .fillMaxSize()
-                .background(BgDark),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularProgressIndicator(color = AccentEmerald)
-        }
+        val shimmerBrush = rememberShimmerBrush()
+        HomeScreenShimmer(shimmerBrush)
         return
+    }
+
+    val categories = listOf("Trending", "Movies", "TV Shows", "Bengali", "Hindi Dub", "Anime")
+
+    // Dynamic filtering based on category selection
+    val filteredSections = remember(sections, selectedCategoryIndex) {
+        if (selectedCategoryIndex == 0) {
+            sections
+        } else {
+            val cat = categories[selectedCategoryIndex]
+            val result = sections.mapNotNull { sec ->
+                val matching = sec.subjects?.filter { item ->
+                    when (cat) {
+                        "Movies" -> item.subjectType == 1 || sec.title?.contains("Movie", ignoreCase = true) == true
+                        "TV Shows" -> item.subjectType == 2 || sec.title?.contains("TV", ignoreCase = true) == true || sec.title?.contains("Series", ignoreCase = true) == true
+                        "Bengali" -> item.title.contains("Bangla", ignoreCase = true) || item.title.contains("Bengali", ignoreCase = true) || item.genres.contains("Bengali", ignoreCase = true)
+                        "Hindi Dub" -> item.title.contains("Hindi", ignoreCase = true) || item.genres.contains("Hindi", ignoreCase = true)
+                        "Anime" -> item.genres.contains("Anime", ignoreCase = true) || item.genres.contains("Animation", ignoreCase = true) || item.title.contains("Anime", ignoreCase = true)
+                        else -> true
+                    }
+                } ?: emptyList()
+                if (matching.isNotEmpty()) sec.copy(subjects = matching) else null
+            }
+            if (result.isNotEmpty()) result
+            else {
+                val allSubjects = sections.flatMap { it.subjects ?: emptyList() }
+                val fallback = allSubjects.filter { item ->
+                    when (cat) {
+                        "Movies" -> item.subjectType == 1
+                        "TV Shows" -> item.subjectType == 2
+                        "Bengali" -> item.title.contains("Bangla", ignoreCase = true) || item.title.contains("Bengali", ignoreCase = true)
+                        "Hindi Dub" -> item.title.contains("Hindi", ignoreCase = true)
+                        "Anime" -> item.genres.contains("Anime", ignoreCase = true) || item.genres.contains("Animation", ignoreCase = true)
+                        else -> true
+                    }
+                }
+                if (fallback.isNotEmpty()) listOf(HomeSection(title = cat, subjects = fallback)) else emptyList()
+            }
+        }
     }
 
     LazyColumn(
@@ -142,7 +298,6 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 // Category Filter Pills
-                val categories = listOf("Trending", "Movies", "TV Shows", "Bengali", "Hindi Dub", "Anime")
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(horizontal = 2.dp)
@@ -172,7 +327,7 @@ fun HomeScreen(
         }
 
         // Hero Banner
-        if (banners.isNotEmpty()) {
+        if (banners.isNotEmpty() && selectedCategoryIndex == 0) {
             item {
                 HeroBannerSlider(
                     banners = banners,
@@ -184,8 +339,8 @@ fun HomeScreen(
             }
         }
 
-        // Continue Watching / Recently Viewed (User Request)
-        if (recentHistory.isNotEmpty()) {
+        // Continue Watching / Recently Viewed
+        if (recentHistory.isNotEmpty() && selectedCategoryIndex == 0) {
             item {
                 Column(modifier = Modifier.padding(vertical = 12.dp)) {
                     SectionHeader(title = "Continue Watching")
@@ -211,8 +366,8 @@ fun HomeScreen(
             }
         }
 
-        // Home Sections (Movies, TV Shows, Trending)
-        itemsIndexed(sections.filter { it.subjects != null && it.subjects.isNotEmpty() }) { sectionIndex, section ->
+        // Home Sections (Movies, TV Shows, Trending, Filtered Content)
+        itemsIndexed(filteredSections.filter { it.subjects != null && it.subjects.isNotEmpty() }) { sectionIndex, section ->
             val subjects = section.subjects ?: emptyList()
             val title = section.title ?: "Trending"
             val isRankedSection = sectionIndex == 0 || title.contains("Top", ignoreCase = true) || title.contains("Trending", ignoreCase = true)
@@ -238,7 +393,7 @@ fun HomeScreen(
             }
         }
 
-        if (sections.isEmpty() && banners.isEmpty()) {
+        if (filteredSections.isEmpty()) {
             item {
                 Box(
                     modifier = Modifier
@@ -246,7 +401,11 @@ fun HomeScreen(
                         .padding(top = 100.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("No content found. Check connection.", color = TextMuted, fontSize = 14.sp)
+                    Text(
+                        text = if (selectedCategoryIndex > 0) "No ${categories[selectedCategoryIndex]} titles found." else "No content found. Check connection.",
+                        color = TextMuted,
+                        fontSize = 14.sp
+                    )
                 }
             }
         }

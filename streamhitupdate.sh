@@ -36,9 +36,12 @@ if [ -f "$SITEMAP_PIDFILE" ] && kill -0 "$(cat $SITEMAP_PIDFILE)" 2>/dev/null; t
 else
     echo "Starting sitemap generator in background..."
     nohup "$PYTHON_BIN" sitemap_generator.py >> sitemap_generator.log 2>&1 &
-    echo $! > "$SITEMAP_PIDFILE"
     echo "Sitemap generator started (PID: $!)"
 fi
+
+# 5. Update app version in database
+echo "[5/5] Updating mobile app version in database..."
+"$PYTHON_BIN" update_app_version.py || true
 
 echo "============================================="
 echo "   Update complete! Website has reloaded.     "
