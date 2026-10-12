@@ -238,9 +238,9 @@ fun DetailsScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                    // Big Watch Now Button
+                    // Big Watch Now Button (Compact & Modern)
                     Button(
                         onClick = { playBestContent(1, 1) },
                         colors = ButtonDefaults.buttonColors(
@@ -250,21 +250,21 @@ fun DetailsScreen(
                         shape = RoundedCornerShape(50.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(50.dp),
+                            .height(44.dp),
                         enabled = !isResolvingStream
                     ) {
                         if (isResolvingStream) {
-                            CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(24.dp))
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text("Connecting Server...", fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                        } else {
-                            Icon(Icons.Default.PlayArrow, contentDescription = "Play", modifier = Modifier.size(22.dp))
+                            CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Watch Online Now", fontSize = 16.sp, fontWeight = FontWeight.Black)
+                            Text("Connecting Server...", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        } else {
+                            Icon(Icons.Default.PlayArrow, contentDescription = "Play", modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Watch Online Now", fontSize = 15.sp, fontWeight = FontWeight.Black)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     // Action Buttons Row (Add to list, Share, Download - Screenshot 5)
                     Row(
@@ -619,7 +619,7 @@ fun DetailsScreen(
                                             ),
                                             modifier = Modifier
                                                 .weight(1f)
-                                                .height(44.dp)
+                                                .height(36.dp)
                                                 .clickable {
                                                     selectedEpisodeNumber = ep.episodeNumber
                                                     playBestContent(currentSeason.seasonNumber, ep.episodeNumber)
