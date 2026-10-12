@@ -1855,7 +1855,7 @@ def _extract_playable_detectors(detectors: list) -> list:
             for r in res_list:
                 r_link = r.get("resourceLink") or r.get("url")
                 if r_link and not any(bad in r_link.lower() for bad in ["fzmovies", "southfreak"]) and not is_deprecated_or_dummy_url(r_link):
-                    fetch_link = f"/fetch?source_url={urllib.parse.quote(r_link)}" if r_link.startswith("http") else r_link
+                    fetch_link = f"https://nxly.online/fetch?source_url={urllib.parse.quote(r_link)}" if r_link.startswith("http") else r_link
                     mob_items.append({
                         "resourceId": str(r.get("resourceId") or r.get("id") or "0"),
                         "resolution": int(r.get("resolution", 720)),
@@ -1866,7 +1866,7 @@ def _extract_playable_detectors(detectors: list) -> list:
         elif det.get("resourceLink") and not any(bad in det.get("resourceLink", "").lower() for bad in ["fzmovies", "southfreak"]):
             r_link = det["resourceLink"]
             if not is_deprecated_or_dummy_url(r_link):
-                fetch_link = f"/fetch?source_url={urllib.parse.quote(r_link)}" if r_link.startswith("http") else r_link
+                fetch_link = f"https://nxly.online/fetch?source_url={urllib.parse.quote(r_link)}" if r_link.startswith("http") else r_link
                 mob_items.append({
                     "resourceId": str(det.get("resourceId") or "0"),
                     "resolution": 720,
@@ -1905,7 +1905,7 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
                     res_id = str(d.get("id") or "0")
                     res_val = int(d.get("resolution") or 720)
                     sz_val = int(d.get("size") or 0)
-                    fetch_link = f"/fetch?source_url={urllib.parse.quote(url_val)}"
+                    fetch_link = f"https://nxly.online/fetch?source_url={urllib.parse.quote(url_val)}"
                     items.append({
                         "resourceId": res_id,
                         "resolution": res_val,
@@ -1953,7 +1953,7 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
                 for d in (cand_h5.get("downloads") or []):
                     u = d.get("url")
                     if u and not is_deprecated_or_dummy_url(u):
-                        fetch_link = f"/fetch?source_url={urllib.parse.quote(u)}"
+                        fetch_link = f"https://nxly.online/fetch?source_url={urllib.parse.quote(u)}"
                         items.append({
                             "resourceId": str(d.get("id") or "0"),
                             "resolution": int(d.get("resolution") or 720),
@@ -1994,7 +1994,19 @@ async def api_captions(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
 
 CDN_CANDIDATE_HEADERS = [
     {
-        "User-Agent": DEFAULT_HEADERS["User-Agent"],
+        "User-Agent": "okhttp/4.12.0",
+        "Accept": "*/*"
+    },
+    {
+        "Origin": "https://123movienow.cc",
+        "Referer": "https://123movienow.cc/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "*/*"
+    },
+    {
+        "Origin": "https://123movienow.cc",
+        "Referer": "https://123movienow.cc/",
+        "User-Agent": "okhttp/4.12.0",
         "Accept": "*/*"
     },
     {
@@ -2010,14 +2022,6 @@ CDN_CANDIDATE_HEADERS = [
         "Accept": "*/*"
     },
     {
-        "Origin": "https://123movienow.cc",
-        "Referer": "https://123movienow.cc/",
-        "User-Agent": DEFAULT_HEADERS["User-Agent"],
-        "Accept": "*/*"
-    },
-    {
-        "Origin": "https://h5.aoneroom.com",
-        "Referer": "https://h5.aoneroom.com/",
         "User-Agent": DEFAULT_HEADERS["User-Agent"],
         "Accept": "*/*"
     }
@@ -2062,6 +2066,8 @@ async def handle_fetch(request: Request, source_url: str):
     response_headers = {
         "Content-Type": resp.headers.get("Content-Type", "video/mp4"),
         "Access-Control-Allow-Origin": "*",
+        "X-Accel-Buffering": "no",
+        "Cache-Control": "no-cache, no-store, must-revalidate"
     }
     if resp.headers.get("Content-Range"):
         response_headers["Content-Range"] = resp.headers.get("Content-Range")

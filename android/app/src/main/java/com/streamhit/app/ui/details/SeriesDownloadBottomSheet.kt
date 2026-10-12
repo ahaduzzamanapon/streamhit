@@ -387,6 +387,11 @@ fun SeriesDownloadBottomSheet(
                                     ?: resList.firstOrNull()
 
                                 if (matchingRes != null && matchingRes.url.isNotBlank()) {
+                                    val finalDownloadUrl = when {
+                                        matchingRes.url.startsWith("http://") || matchingRes.url.startsWith("https://") -> matchingRes.url
+                                        matchingRes.url.startsWith("/") -> "https://nxly.online${matchingRes.url}"
+                                        else -> "https://nxly.online/${matchingRes.url}"
+                                    }
                                     MediaDownloadManager.startDownload(
                                         context = context,
                                         subjectId = activeSubjectId,
@@ -394,7 +399,7 @@ fun SeriesDownloadBottomSheet(
                                         title = epTitle,
                                         coverUrl = detail.coverUrl,
                                         quality = "${selectedResolution}p",
-                                        downloadUrl = matchingRes.url,
+                                        downloadUrl = finalDownloadUrl,
                                         isSeries = true,
                                         seriesTitle = seriesName,
                                         seasonNum = sNum,

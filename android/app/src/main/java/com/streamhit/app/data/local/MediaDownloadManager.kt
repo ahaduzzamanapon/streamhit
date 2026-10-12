@@ -117,20 +117,30 @@ object MediaDownloadManager {
         episodeNum: Int = 1
     ): Long {
         return try {
+            val fullDownloadUrl = when {
+                downloadUrl.startsWith("http://") || downloadUrl.startsWith("https://") -> downloadUrl
+                downloadUrl.startsWith("/") -> "https://nxly.online$downloadUrl"
+                else -> "https://nxly.online/$downloadUrl"
+            }
+
             val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
             val cleanTitle = title.replace(Regex("[^a-zA-Z0-9.-]"), "_")
             val fileName = "${cleanTitle}_${quality}_${System.currentTimeMillis()}.mp4"
 
             val targetDir = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES) ?: context.filesDir
+            if (!targetDir.exists()) {
+                targetDir.mkdirs()
+            }
             val targetFile = File(targetDir, fileName)
 
-            val request = DownloadManager.Request(Uri.parse(downloadUrl)).apply {
+            val request = DownloadManager.Request(Uri.parse(fullDownloadUrl)).apply {
                 setTitle(title)
                 setDescription("Downloading $quality - Streamfit")
                 setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                 setDestinationUri(Uri.fromFile(targetFile))
                 setAllowedOverMetered(true)
                 setAllowedOverRoaming(true)
+                addRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
             }
 
             val id = dm.enqueue(request)
@@ -142,7 +152,7 @@ object MediaDownloadManager {
                 title = title,
                 coverUrl = coverUrl,
                 quality = quality,
-                downloadUrl = downloadUrl,
+                downloadUrl = fullDownloadUrl,
                 localFilePath = targetFile.absolutePath,
                 status = DownloadStatus.DOWNLOADING,
                 isSeries = isSeries,
@@ -229,7 +239,12 @@ object MediaDownloadManager {
                         item.downloadedBytes = file.length()
                         item.totalBytes = file.length()
                     } else {
-                        item.status = DownloadStatus.FAILED
+                        // Keep DOWNLOADING status for 15s grace period while DownloadManager initializes
+                        if (System.currentTimeMillis() - item.addedTime < 15000) {
+                            item.status = DownloadStatus.DOWNLOADING
+                        } else {
+                            item.status = DownloadStatus.FAILED
+                        }
                     }
                     changed = true
                 }

@@ -69,7 +69,7 @@ fun DownloadsScreen(
     }
 
     val downloadingList = downloadItems.filter {
-        it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.PENDING || it.status == DownloadStatus.PAUSED
+        it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.PENDING || it.status == DownloadStatus.PAUSED || it.status == DownloadStatus.FAILED
     }
     val completedList = downloadItems.filter { it.status == DownloadStatus.COMPLETED }
 
