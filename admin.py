@@ -459,6 +459,64 @@ async def admin_get_tv_channels(request: Request):
                 })
             return {"list": items}
 
+@router.get("/api/sports/list")
+@router.get("/api/sports/live")
+async def public_get_sports():
+    from main import get_db_pool
+    pool = await get_db_pool()
+    if not pool: return {"code": 0, "list": []}
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute("SELECT * FROM live_sports ORDER BY created_at DESC")
+            rows = await cur.fetchall()
+            items = []
+            for r in rows:
+                try:
+                    links = json.loads(r["stream_links"])
+                except Exception:
+                    links = []
+                items.append({
+                    "id": r["id"],
+                    "title": r["title"],
+                    "logo": r["logo"] or "",
+                    "team1Name": r["team1_name"] or "",
+                    "team1Logo": r["team1_logo"] or "",
+                    "team2Name": r["team2_name"] or "",
+                    "team2Logo": r["team2_logo"] or "",
+                    "streamLinks": links,
+                    "referer": r["referer"] or "",
+                    "origin": r["origin"] or "",
+                    "useBdProxy": bool(r["use_bd_proxy"])
+                })
+            return {"code": 0, "list": items}
+
+@router.get("/api/tv/channels")
+async def public_get_tv_channels():
+    from main import get_db_pool
+    pool = await get_db_pool()
+    if not pool: return {"code": 0, "list": []}
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute("SELECT * FROM live_tv_channels ORDER BY created_at DESC")
+            rows = await cur.fetchall()
+            items = []
+            for r in rows:
+                try:
+                    links = json.loads(r["stream_links"])
+                except Exception:
+                    links = []
+                items.append({
+                    "id": r["id"],
+                    "name": r["name"],
+                    "logo": r["logo"] or "",
+                    "category": r["category"] or "General",
+                    "streamLinks": links,
+                    "referer": r["referer"] or "",
+                    "origin": r["origin"] or "",
+                    "useBdProxy": bool(r["use_bd_proxy"])
+                })
+            return {"code": 0, "list": items}
+
 @router.post("/api/admin/tv-channels")
 async def admin_save_tv_channel(data: dict, request: Request):
     check_admin_auth(request)

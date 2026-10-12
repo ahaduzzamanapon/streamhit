@@ -1013,6 +1013,13 @@ async def tv(request: Request):
 @app.get("/live-tv", response_class=HTMLResponse)
 async def livetv(request: Request): return serve_html("public/live-tv.html", host=request.headers.get("host", ""))
 
+@app.get("/download", response_class=HTMLResponse)
+@app.get("/download.html", response_class=HTMLResponse)
+@app.get("/app", response_class=HTMLResponse)
+async def download_page(request: Request):
+    host = request.headers.get("host", "")
+    return serve_html("public/download.html", host=host)
+
 @app.get("/movie/{slug}", response_class=HTMLResponse)
 @app.get("/tv/{slug}", response_class=HTMLResponse)
 async def details(slug: str, request: Request):
