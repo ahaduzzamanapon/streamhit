@@ -17,6 +17,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, Red
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
+from moviebox_api.v3.http_client import MovieBoxHttpClient
 
 # ==========================================================================
 # CONFIGURATION
@@ -80,67 +81,47 @@ def generate_tr_signature(method: str, url: str, body_data: str = "", timestamp:
     signature_b64 = base64.b64encode(h.digest()).decode('utf-8')
     return f"{timestamp}|2|{signature_b64}"
 
+_mb_client = None
+_mb_lock = asyncio.Lock()
+
+async def get_moviebox_client():
+    global _mb_client
+    if _mb_client is None:
+        async with _mb_lock:
+            if _mb_client is None:
+                client = MovieBoxHttpClient(timeout=15.0)
+                await client.__aenter__()
+                try:
+                    await client.get("/wefeed-mobile-bff/tab-operating", params={"tabId": "0"})
+                except Exception as e:
+                    print(f"Token bootstrap notice: {e}")
+                _mb_client = client
+    return _mb_client
+
 async def request_moviebox_mobile(endpoint: str, method: str = "GET", params: dict = None, data: dict = None) -> dict:
-    base = "https://apig.inmoviebox.com"
-    netloc = urlparse(base).netloc
-    body_str = json.dumps(data, separators=(',', ':')) if data else ""
-    qp = params.copy() if params else {}
-    if "host" not in qp:
-        qp["host"] = netloc
-    sorted_keys = sorted(qp.keys())
-    query_str = "&".join([f"{k}={qp[k]}" for k in sorted_keys])
-    full_url = f"{base}{endpoint}?{query_str}"
-    ts = int(time.time() * 1000)
-    sig = generate_tr_signature(method, full_url, body_str, ts)
-    client_info = {
-        "package_name": "com.community.oneroom",
-        "version_name": "4.0.02",
-        "version_code": 50020126,
-        "os": "android",
-        "os_version": "14",
-        "install_ch": "ps",
-        "device_id": "868203051234567",
-        "install_store": "ps",
-        "gaid": "",
-        "brand": "Google",
-        "model": "Pixel 6",
-        "system_language": "en",
-        "net": "wifi",
-        "region": "IN",
-        "timezone": "Asia/Kolkata",
-        "sp_code": "404"
-    }
-    headers = {
-        "User-Agent": "MovieBox/4.0.02 (Android 14; Pixel 6)",
-        "Accept": "application/json",
-        "Content-Type": "application/json;charset=UTF-8",
-        "Host": netloc,
-        "X-M-Version": "4.0.02",
-        "X-Sign-Version": "2.0",
-        "X-Client-Token": generate_client_token(),
-        "X-Client-Info": json.dumps(client_info, separators=(',', ':')),
-        "X-Client-Status": "0",
-        "X-Play-Mode": "2",
-        "appid": "4U01pxRu278GqCZKY9",
-        "region": "IN",
-        "lang": "en",
-        "os": "android",
-        "Authorization": f"Bearer {DEFAULT_GUEST_TOKEN}",
-        "x-tr-signature": sig,
-        "X-Timestamp": str(ts)
-    }
-    if body_str:
-        headers["Content-Length"] = str(len(body_str))
     try:
-        async with httpx.AsyncClient(timeout=15.0, trust_env=False) as client:
-            if method == "POST":
-                res = await client.post(full_url, headers=headers, content=body_str)
-            else:
-                res = await client.get(full_url, headers=headers)
-            return res.json()
+        client = await get_moviebox_client()
+        for attempt in range(2):
+            try:
+                if method.upper() == "POST":
+                    base, resp = await client.post(endpoint, json=data or {}, params=params)
+                else:
+                    base, resp = await client.get(endpoint, params=params)
+                
+                res_json = resp.json()
+                if resp.status_code in (401, 441) or res_json.get("code") in (401, 441):
+                    client._runtime_token = None
+                    await client.get("/wefeed-mobile-bff/tab-operating", params={"tabId": "0"})
+                    continue
+                return res_json
+            except Exception as e:
+                if attempt == 1:
+                    print(f"Mobile API error ({endpoint}): {e}")
+                    return {}
     except Exception as e:
-        print(f"Mobile API error ({endpoint}): {e}")
+        print(f"Mobile API fatal error ({endpoint}): {e}")
         return {}
+    return {}
 
 async def get_latest_banners():
     global _banners_cache, _banners_cache_time
@@ -1591,6 +1572,21 @@ async def api_detail(detailPath: str = "", subjectId: str = ""):
                     subj["seNum"] = 0
                 elif subj.get("subjectType") == 2:
                     if not subj.get("seasons"):
+                        try:
+                            s_mob = await request_moviebox_mobile(
+                                "/wefeed-mobile-bff/subject-api/season-info",
+                                params={"subjectId": sid}
+                            )
+                            s_data = s_mob.get("data", {}).get("seasons") or []
+                            if s_data:
+                                for s in s_data:
+                                    if not s.get("allEp") and s.get("maxEp"):
+                                        s["allEp"] = ",".join(str(i) for i in range(1, int(s["maxEp"]) + 1))
+                                subj["seasons"] = s_data
+                                subj["seNum"] = len(s_data)
+                        except Exception:
+                            pass
+                    if not subj.get("seasons"):
                         se_num = int(subj.get("seNum") or 1)
                         detectors = subj.get("resourceDetectors") or []
                         max_ep = 1
@@ -1630,21 +1626,22 @@ async def api_season(detailPath: str = "", subjectId: str = ""):
     sid = await resolve_subject_id(detailPath, subjectId)
     if sid:
         try:
+            mob_res = await request_moviebox_mobile("/wefeed-mobile-bff/subject-api/season-info", params={"subjectId": sid})
+            seasons = mob_res.get("data", {}).get("seasons") or []
+            if seasons:
+                for s in seasons:
+                    if not s.get("allEp") and s.get("maxEp"):
+                        s["allEp"] = ",".join(str(i) for i in range(1, int(s["maxEp"]) + 1))
+                return {"code": 0, "data": {"seasons": seasons}}
+        except Exception:
+            pass
+
+        try:
             mob_res = await request_moviebox_mobile("/wefeed-mobile-bff/subject-api/get", params={"subjectId": sid})
             mob_data = mob_res.get("data") or {}
             subj = mob_data.get("subject") or mob_data
             if subj and subj.get("subjectType") == 1:
                 return {"code": 0, "data": {"seasons": []}}
-            d_url = subj.get("detailUrl") if subj else None
-            if d_url:
-                official_slug = d_url.rstrip("/").split("/")[-1]
-                try:
-                    h5_data = await _make_request(f"{API_BASE}/wefeed-h5api-bff/detail?detailPath={official_slug}")
-                    h5_seasons = h5_data.get("data", {}).get("resource", {}).get("seasons", [])
-                    if h5_seasons:
-                        return {"code": 0, "data": {"seasons": h5_seasons}}
-                except Exception:
-                    pass
             if subj and subj.get("seasons"):
                 return {"code": 0, "data": {"seasons": subj["seasons"]}}
             if subj and subj.get("subjectType") == 2:
@@ -1684,14 +1681,17 @@ def _extract_playable_detectors(detectors: list) -> list:
                         "resourceId": str(r.get("resourceId") or r.get("id") or "0"),
                         "resolution": int(r.get("resolution", 720)),
                         "size": int(r.get("size", 0)),
-                        "resourceLink": f"/fetch?source_url={urllib.parse.quote(r_link)}"
+                        "url": r_link,
+                        "resourceLink": r_link
                     })
         elif det.get("resourceLink") and not any(bad in det.get("resourceLink", "").lower() for bad in ["fzmovies", "southfreak"]):
+            r_link = det["resourceLink"]
             mob_items.append({
                 "resourceId": str(det.get("resourceId") or "0"),
                 "resolution": 720,
                 "size": int(det.get("totalSize") or det.get("firstSize") or 0),
-                "resourceLink": f"/fetch?source_url={urllib.parse.quote(det['resourceLink'])}"
+                "url": r_link,
+                "resourceLink": r_link
             })
     return mob_items
 
@@ -1708,7 +1708,38 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
     if cache_key in _resource_cache and (now - _resource_cache_time.get(cache_key, 0) < 3600):
         return _resource_cache[cache_key]
 
-    # Concurrently initiate H5 and Mobile Subject queries
+    items = []
+
+    # 1. Primary: Direct Mobile Resource API (fastest, direct CDN, resolves in <0.3s)
+    try:
+        mob_res_data = await request_moviebox_mobile(
+            "/wefeed-mobile-bff/subject-api/resource",
+            params={"subjectId": subjectId, "se": se, "ep": ep}
+        )
+        res_list = mob_res_data.get("data", {}).get("list") or []
+        for r in res_list:
+            r_link = r.get("resourceLink") or r.get("url")
+            if r_link and not any(bad in r_link.lower() for bad in ["fzmovies", "southfreak"]):
+                res_id = str(r.get("resourceId") or r.get("id") or "0")
+                res_val = int(r.get("resolution") or 720)
+                sz_val = int(r.get("size") or 0)
+                items.append({
+                    "resourceId": res_id,
+                    "resolution": res_val,
+                    "size": sz_val,
+                    "url": r_link,
+                    "resourceLink": r_link
+                })
+    except Exception as e:
+        print(f"Direct mobile resource fetch error: {e}")
+
+    if items:
+        res = {"code": 0, "data": {"list": items, "isUpcoming": False}}
+        _resource_cache[cache_key] = res
+        _resource_cache_time[cache_key] = now
+        return res
+
+    # 2. Concurrently initiate H5 and Mobile Subject queries as fallback
     h5_task = asyncio.create_task(_fetch_download_resources(subjectId, se, ep, detailPath))
     mob_task = asyncio.create_task(request_moviebox_mobile(
         "/wefeed-mobile-bff/subject-api/get",
@@ -1717,9 +1748,7 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
 
     h5_data, mob_res = await asyncio.gather(h5_task, mob_task, return_exceptions=True)
 
-    items = []
-
-    # 1. Check H5 downloads
+    # Check H5 downloads
     if isinstance(h5_data, dict):
         downloads = h5_data.get("downloads") or []
         for d in downloads:
@@ -1729,10 +1758,11 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
                     "resourceId": d.get("id"),
                     "resolution": d.get("resolution", 720),
                     "size": d.get("size", 0),
-                    "resourceLink": f"/fetch?source_url={urllib.parse.quote(url_val)}"
+                    "url": url_val,
+                    "resourceLink": url_val
                 })
 
-    # 2. Check Mobile detectors for this subject if H5 has no downloads
+    # Check Mobile detectors for this subject if H5 has no downloads
     mob_subj = {}
     if isinstance(mob_res, dict):
         mob_subj = mob_res.get("data", {}).get("subject") or mob_res.get("data") or {}
@@ -1741,44 +1771,42 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
         detectors = mob_subj.get("resourceDetectors") or []
         items = _extract_playable_detectors(detectors)
 
-    # 3. Check Original Audio dub or sibling dubs if still empty
+    # Check Original Audio dub or sibling dubs concurrently if still empty
     if not items and mob_subj:
         dubs = mob_subj.get("dubs") or []
         orig = next((d for d in dubs if d.get("original") and str(d.get("subjectId")) != str(subjectId)), None)
         other_candidates = [d for d in dubs if str(d.get("subjectId")) != str(subjectId) and d != orig]
         check_candidates = ([orig] if orig else []) + other_candidates[:2]
 
-        for cand in check_candidates:
+        async def check_candidate(cand):
             cand_id = str(cand.get("subjectId") or "")
-            cand_path = cand.get("detailPath") or ""
             if not cand_id:
-                continue
+                return []
             try:
-                cand_mob = await request_moviebox_mobile(
-                    "/wefeed-mobile-bff/subject-api/get",
+                c_res = await request_moviebox_mobile(
+                    "/wefeed-mobile-bff/subject-api/resource",
                     params={"subjectId": cand_id, "se": se, "ep": ep}
                 )
-                cand_subj = cand_mob.get("data", {}).get("subject") or cand_mob.get("data") or {}
-                cand_detectors = cand_subj.get("resourceDetectors") or []
-                cand_items = _extract_playable_detectors(cand_detectors)
-                if cand_items:
-                    items = cand_items
-                    break
-                # Also try cand H5 if detector had no links
-                cand_h5 = await _fetch_download_resources(cand_id, se, ep, cand_path)
-                for d in (cand_h5.get("downloads") or []):
-                    u = d.get("url")
-                    if u:
-                        items.append({
-                            "resourceId": d.get("id"),
-                            "resolution": d.get("resolution", 720),
-                            "size": d.get("size", 0),
-                            "resourceLink": f"/fetch?source_url={urllib.parse.quote(u)}"
+                c_items = []
+                for r in (c_res.get("data", {}).get("list") or []):
+                    r_link = r.get("resourceLink") or r.get("url")
+                    if r_link:
+                        c_items.append({
+                            "resourceId": str(r.get("resourceId") or r.get("id") or "0"),
+                            "resolution": int(r.get("resolution") or 720),
+                            "size": int(r.get("size") or 0),
+                            "url": r_link,
+                            "resourceLink": r_link
                         })
-                if items:
-                    break
-            except Exception as e:
-                print(f"Error checking candidate dub {cand_id}: {e}")
+                return c_items
+            except Exception:
+                return []
+
+        cand_results = await asyncio.gather(*(check_candidate(c) for c in check_candidates), return_exceptions=True)
+        for cr in cand_results:
+            if isinstance(cr, list) and cr:
+                items = cr
+                break
 
     # Fallback to any raw detector link if absolutely nothing else was found
     if not items and mob_subj:
@@ -1789,7 +1817,8 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
                     "resourceId": str(det.get("resourceId") or "0"),
                     "resolution": 720,
                     "size": int(det.get("totalSize") or det.get("firstSize") or 0),
-                    "resourceLink": f"/fetch?source_url={urllib.parse.quote(det['resourceLink'])}"
+                    "url": det["resourceLink"],
+                    "resourceLink": det["resourceLink"]
                 })
 
     res = {"code": 0, "data": {"list": items, "isUpcoming": len(items) == 0}}

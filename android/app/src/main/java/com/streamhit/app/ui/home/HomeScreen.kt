@@ -144,7 +144,7 @@ fun HomeScreenShimmer(brush: Brush) {
 fun HomeScreen(
     repository: MovieRepository,
     onMediaClick: (detailPath: String, subjectId: String, subjectType: Int) -> Unit,
-    onPlayDirect: (streamUrl: String, title: String) -> Unit = { _, _ -> },
+    onPlayDirect: (streamUrl: String, title: String, subjectId: String, detailPath: String, coverUrl: String) -> Unit = { _, _, _, _, _ -> },
     onNavigateToSearch: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -353,10 +353,15 @@ fun HomeScreen(
                             ContinueWatchingCard(
                                 item = item,
                                 onClick = {
+                                    val path = item.detailPath.ifEmpty { item.subjectId }
+                                    onMediaClick(path, item.subjectId, item.subjectType)
+                                },
+                                onResumeClick = {
                                     if (item.streamUrl.isNotBlank()) {
-                                        onPlayDirect(item.streamUrl, item.title)
+                                        onPlayDirect(item.streamUrl, item.title, item.subjectId, item.detailPath, item.coverUrl)
                                     } else {
-                                        onMediaClick(item.detailPath, item.subjectId, 1)
+                                        val path = item.detailPath.ifEmpty { item.subjectId }
+                                        onMediaClick(path, item.subjectId, item.subjectType)
                                     }
                                 }
                             )
@@ -415,7 +420,8 @@ fun HomeScreen(
 @Composable
 fun ContinueWatchingCard(
     item: WatchHistoryItem,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onResumeClick: () -> Unit = onClick
 ) {
     Card(
         modifier = Modifier
@@ -447,16 +453,17 @@ fun ContinueWatchingCard(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(32.dp)
-                            .background(Color.Black.copy(alpha = 0.6f), CircleShape)
-                            .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape),
+                            .size(36.dp)
+                            .background(Color.Black.copy(alpha = 0.65f), CircleShape)
+                            .border(1.5.dp, AccentEmerald, CircleShape)
+                            .clickable(onClick = onResumeClick),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.PlayArrow,
                             contentDescription = "Resume",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
+                            tint = AccentEmerald,
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                 }
@@ -483,11 +490,23 @@ fun ContinueWatchingCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "${item.progressPercent}% watched",
-                    color = TextMuted,
-                    fontSize = 10.sp
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (item.subjectType == 2) "Series" else "Movie",
+                        color = AccentEmerald,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = "${item.progressPercent}%",
+                        color = TextMuted,
+                        fontSize = 10.sp
+                    )
+                }
             }
         }
     }

@@ -13,6 +13,7 @@ data class WatchHistoryItem(
     val streamUrl: String,
     val positionMs: Long,
     val durationMs: Long,
+    val subjectType: Int = 1,
     val timestamp: Long = System.currentTimeMillis()
 ) {
     val progressPercent: Int
@@ -48,7 +49,8 @@ object RecentHistoryManager {
         coverUrl: String,
         streamUrl: String,
         positionMs: Long,
-        durationMs: Long
+        durationMs: Long,
+        subjectType: Int = 1
     ) {
         if (positionMs <= 1000L || durationMs <= 0L) return
 
@@ -68,6 +70,7 @@ object RecentHistoryManager {
                     streamUrl = streamUrl,
                     positionMs = positionMs,
                     durationMs = durationMs,
+                    subjectType = subjectType,
                     timestamp = System.currentTimeMillis()
                 )
             )

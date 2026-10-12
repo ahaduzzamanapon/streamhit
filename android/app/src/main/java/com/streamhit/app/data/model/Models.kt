@@ -186,13 +186,20 @@ data class SeasonInfo(
     @SerializedName("seasonNumber") val seasonNumberRaw: Int? = null,
     @SerializedName("maxEp") val maxEpRaw: Int? = null,
     @SerializedName("episodeCount") val episodeCountRaw: Int? = null,
+    @SerializedName("allEp") val allEpRaw: String? = null,
     @SerializedName("episodes") val episodesRaw: List<EpisodeInfo>? = null
 ) {
     val seasonNumber: Int
         get() = seRaw ?: seasonNumberRaw ?: 1
 
+    val se: Int
+        get() = seasonNumber
+
     val maxEp: Int
         get() = maxEpRaw ?: episodeCountRaw ?: (episodesRaw?.size ?: 1)
+
+    val allEp: String
+        get() = allEpRaw ?: (1..maxEp).joinToString(",")
 
     val episodes: List<EpisodeInfo>
         get() {
@@ -225,6 +232,9 @@ data class DubInfo(
 ) {
     val name: String
         get() = lanNameRaw?.ifBlank { null } ?: (nameRaw?.ifBlank { null } ?: "Audio Dub")
+
+    val lanName: String
+        get() = name
 
     val language: String
         get() = lanCodeRaw?.ifBlank { null } ?: (languageRaw?.ifBlank { null } ?: name)

@@ -69,7 +69,10 @@ import com.streamhit.app.data.repository.LiveTvRepository
 import com.streamhit.app.data.repository.MovieRepository
 import com.streamhit.app.ui.components.MediaCard
 import com.streamhit.app.ui.details.DownloadQualityBottomSheet
+import com.streamhit.app.ui.details.SeriesDownloadBottomSheet
 import com.streamhit.app.ui.theme.*
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -307,30 +310,76 @@ fun AdaptivePlayerScreen(
         Toast.makeText(context, "Playing ${channel.name}", Toast.LENGTH_SHORT).show()
     }
 
+    // Helper to select fastest playable resolution (720p / 480p first for instant playback, then 1080p)
+    fun selectFastestResolution(resList: List<StreamResource>): StreamResource? {
+        if (resList.isEmpty()) return null
+        return resList.firstOrNull { it.resolution == 720 }
+            ?: resList.firstOrNull { it.resolution == 480 }
+            ?: resList.firstOrNull { it.resolution == 1080 }
+            ?: resList.firstOrNull { it.resolution == 360 }
+            ?: resList.firstOrNull()
+    }
+
     // Load detail & available resources & recommendations
     LaunchedEffect(detailPath, subjectId) {
         if (detailPath.isNotBlank() || subjectId.isNotBlank()) {
-            val d = repository.getDetail(detailPath, subjectId)
-            detail = d
-            selectedDub = d?.dubs?.firstOrNull { it.original == true } ?: d?.dubs?.firstOrNull()
+            val sIdParam = subjectId.ifBlank { detailPath }
+            coroutineScope {
+                // If initial stream was empty, fetch resources immediately in parallel
+                val resDeferred = async {
+                    try {
+                        repository.getStreamingResources(sIdParam, detailPath, currentSeasonNum, currentEpisodeNum)
+                    } catch (_: Exception) {
+                        emptyList()
+                    }
+                }
+                val detailDeferred = async {
+                    try {
+                        repository.getDetail(detailPath, subjectId)
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
 
-            val sId = selectedDub?.subjectId?.ifBlank { d?.subjectId?.ifEmpty { subjectId } } ?: subjectId
-            val dPath = selectedDub?.detailPath?.ifBlank { d?.detailPath?.ifEmpty { detailPath } } ?: detailPath
+                val resList = resDeferred.await()
+                if (resList.isNotEmpty()) {
+                    resources = resList
+                    if (currentStreamUrl.isBlank()) {
+                        val best = selectFastestResolution(resList)
+                        if (best != null && best.url.isNotBlank()) {
+                            currentStreamUrl = best.url
+                        }
+                    }
+                }
 
-            val resList = repository.getStreamingResources(sId, dPath, currentSeasonNum, currentEpisodeNum)
-            resources = resList
+                val d = detailDeferred.await()
+                detail = d
+                if (selectedDub == null) {
+                    selectedDub = d?.dubs?.firstOrNull { it.original == true } ?: d?.dubs?.firstOrNull()
+                }
 
-            // If initial stream was empty, pick fastest resolution
-            if (currentStreamUrl.isBlank() && resList.isNotEmpty()) {
-                val best = resList.maxByOrNull { it.resolution ?: 720 } ?: resList.first()
-                currentStreamUrl = best.url
+                // If first attempt returned no resources, try with dub subjectId
+                if (resources.isEmpty()) {
+                    val sId = selectedDub?.subjectId?.ifBlank { d?.subjectId?.ifEmpty { subjectId } } ?: subjectId
+                    val dPath = selectedDub?.detailPath?.ifBlank { d?.detailPath?.ifEmpty { detailPath } } ?: detailPath
+                    val dubRes = repository.getStreamingResources(sId, dPath, currentSeasonNum, currentEpisodeNum)
+                    resources = dubRes
+                    if (currentStreamUrl.isBlank()) {
+                        val best = selectFastestResolution(dubRes)
+                        if (best != null && best.url.isNotBlank()) {
+                            currentStreamUrl = best.url
+                        }
+                    }
+                }
+
+                // Fetch recommendations in background
+                launch {
+                    try {
+                        val recs = repository.filterContent(page = 1, subjectType = d?.subjectType ?: 1)
+                        recommendations = recs.filter { it.subjectId != (d?.subjectId ?: subjectId) }
+                    } catch (_: Exception) {}
+                }
             }
-
-            // Fetch recommendations
-            try {
-                val recs = repository.filterContent(page = 1, subjectType = d?.subjectType ?: 1)
-                recommendations = recs.filter { it.subjectId != (d?.subjectId ?: subjectId) }
-            } catch (_: Exception) {}
         }
     }
 
@@ -344,13 +393,13 @@ fun AdaptivePlayerScreen(
             val dPath = selectedDub?.detailPath?.ifBlank { detail?.detailPath?.ifEmpty { detailPath } } ?: detailPath
             val resList = repository.getStreamingResources(sId, dPath, season, episode)
             resources = resList
-            val best = resList.maxByOrNull { it.resolution ?: 720 } ?: resList.firstOrNull()
+            val best = selectFastestResolution(resList)
             if (best != null && best.url.isNotBlank()) {
                 currentStreamUrl = best.url
                 val baseTitle = detail?.title ?: initialVideoTitle
                 currentVideoTitle = "$baseTitle S${season}E${episode}"
                 exoPlayer?.apply {
-                    setMediaItem(MediaItem.fromUri(Uri.parse(best.url)))
+                    setMediaItem(MediaItem.fromUri(Uri.parse(best.url)), 0L)
                     prepare()
                     play()
                 }
@@ -368,9 +417,8 @@ fun AdaptivePlayerScreen(
             currentStreamUrl = res.url
             val savedPos = exoPlayer?.currentPosition ?: 0L
             exoPlayer?.apply {
-                setMediaItem(MediaItem.fromUri(Uri.parse(res.url)))
+                setMediaItem(MediaItem.fromUri(Uri.parse(res.url)), savedPos)
                 prepare()
-                seekTo(savedPos)
                 play()
             }
             Toast.makeText(context, "Playing ${res.displayResolution}", Toast.LENGTH_SHORT).show()
@@ -383,19 +431,36 @@ fun AdaptivePlayerScreen(
         isBuffering = true
 
         val httpDataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
-            .setUserAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
+            .setUserAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
             .setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(15000)
-            .setReadTimeoutMs(20000)
+            .setConnectTimeoutMs(8000)
+            .setReadTimeoutMs(15000)
 
         val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(context)
             .setDataSourceFactory(httpDataSourceFactory)
 
+        val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                2_500,  // minBufferMs (2.5s buffer threshold)
+                30_000, // maxBufferMs (30s max buffer)
+                500,    // bufferForPlaybackMs - starts video playback in 500ms!
+                1_000   // bufferForPlaybackAfterRebufferMs - resumes in 1 sec
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .setBackBuffer(10_000, false)
+            .build()
+
+        // Read saved progress before prepare so we start directly at the saved position without double-buffering
+        val savedPos = RecentHistoryManager.getSavedPosition(context, currentStreamUrl, subjectId)
+        val initialStartMs = if (savedPos > 3000L) savedPos else 0L
+
         val player = ExoPlayer.Builder(context)
             .setMediaSourceFactory(mediaSourceFactory)
+            .setLoadControl(loadControl)
+            .setSeekParameters(androidx.media3.exoplayer.SeekParameters.CLOSEST_SYNC)
             .build().apply {
                 val mediaItem = MediaItem.fromUri(Uri.parse(currentStreamUrl))
-                setMediaItem(mediaItem)
+                setMediaItem(mediaItem, initialStartMs)
                 prepare()
                 playWhenReady = true
             }
@@ -408,8 +473,6 @@ fun AdaptivePlayerScreen(
 
         exoPlayer = player
         loudnessEnhancer = enhancer
-
-        var hasResumedPosition = false
 
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
@@ -426,13 +489,6 @@ fun AdaptivePlayerScreen(
                     Player.STATE_READY -> {
                         isBuffering = false
                         totalDuration = player.duration.coerceAtLeast(0L)
-                        if (!hasResumedPosition) {
-                            hasResumedPosition = true
-                            val savedPos = RecentHistoryManager.getSavedPosition(context, currentStreamUrl, subjectId)
-                            if (savedPos > 3000L && savedPos < player.duration - 5000L) {
-                                player.seekTo(savedPos)
-                            }
-                        }
                     }
                     Player.STATE_ENDED -> {
                         isBuffering = false
@@ -466,7 +522,8 @@ fun AdaptivePlayerScreen(
                     coverUrl = detail?.coverUrl ?: initialCoverUrl,
                     streamUrl = currentStreamUrl,
                     positionMs = player.currentPosition,
-                    durationMs = player.duration
+                    durationMs = player.duration,
+                    subjectType = detail?.subjectType ?: 1
                 )
             }
             player.removeListener(listener)
@@ -526,25 +583,35 @@ fun AdaptivePlayerScreen(
     }
 
     // Download bottom sheet
-    if (showDownloadSheet && resources.isNotEmpty()) {
-        DownloadQualityBottomSheet(
-            resources = resources,
-            title = detail?.title ?: currentVideoTitle,
-            onDismiss = { showDownloadSheet = false },
-            onDownloadSelected = { res ->
-                showDownloadSheet = false
-                MediaDownloadManager.startDownload(
-                    context = context,
-                    subjectId = detail?.subjectId ?: subjectId,
-                    detailPath = detail?.detailPath ?: detailPath,
-                    title = "${detail?.title ?: currentVideoTitle} (${res.displayResolution})",
-                    coverUrl = detail?.coverUrl ?: initialCoverUrl,
-                    quality = res.displayResolution,
-                    downloadUrl = res.url
-                )
-                Toast.makeText(context, "Download started: ${res.displayResolution}", Toast.LENGTH_SHORT).show()
-            }
-        )
+    if (showDownloadSheet) {
+        if (detail?.subjectType == 2 && detail != null) {
+            SeriesDownloadBottomSheet(
+                detail = detail!!,
+                repository = repository,
+                initialSeason = currentSeasonNum,
+                onDismiss = { showDownloadSheet = false }
+            )
+        } else if (resources.isNotEmpty()) {
+            DownloadQualityBottomSheet(
+                resources = resources,
+                title = detail?.title ?: currentVideoTitle,
+                onDismiss = { showDownloadSheet = false },
+                onDownloadSelected = { res ->
+                    showDownloadSheet = false
+                    MediaDownloadManager.startDownload(
+                        context = context,
+                        subjectId = detail?.subjectId ?: subjectId,
+                        detailPath = detail?.detailPath ?: detailPath,
+                        title = "${detail?.title ?: currentVideoTitle} (${res.displayResolution})",
+                        coverUrl = detail?.coverUrl ?: initialCoverUrl,
+                        quality = res.displayResolution,
+                        downloadUrl = res.url,
+                        isSeries = false
+                    )
+                    Toast.makeText(context, "Download started: ${res.displayResolution}", Toast.LENGTH_SHORT).show()
+                }
+            )
+        }
     }
 
     // Gesture detector definition

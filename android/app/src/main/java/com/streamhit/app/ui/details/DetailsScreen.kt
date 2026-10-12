@@ -29,6 +29,8 @@ import com.streamhit.app.data.model.StreamResource
 import com.streamhit.app.data.model.SubjectDetail
 import com.streamhit.app.data.repository.MovieRepository
 import com.streamhit.app.ui.theme.*
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 @Composable
@@ -56,19 +58,39 @@ fun DetailsScreen(
     var isDownloadingActive by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
+    fun selectFastestPlayable(resList: List<StreamResource>): StreamResource? {
+        if (resList.isEmpty()) return null
+        return resList.firstOrNull { it.resolution == 720 }
+            ?: resList.firstOrNull { it.resolution == 480 }
+            ?: resList.firstOrNull { it.resolution == 1080 }
+            ?: resList.firstOrNull { it.resolution == 360 }
+            ?: resList.firstOrNull()
+    }
+
     LaunchedEffect(detailPath, subjectId) {
         isLoading = true
         isResourcesLoading = true
-        val d = repository.getDetail(detailPath, subjectId)
-        detail = d
-        selectedDub = d?.dubs?.firstOrNull { it.original == true } ?: d?.dubs?.firstOrNull()
-        isLoading = false
+        coroutineScope {
+            val sIdParam = subjectId.ifBlank { detailPath }
+            val dDeferred = async { repository.getDetail(detailPath, subjectId) }
+            val resDeferred = if (sIdParam.isNotBlank()) {
+                async { repository.getStreamingResources(sIdParam, detailPath, 1, 1) }
+            } else null
 
-        val sId = selectedDub?.subjectId?.ifBlank { d?.subjectId?.ifEmpty { subjectId } } ?: subjectId
-        val dPath = selectedDub?.detailPath?.ifBlank { d?.detailPath?.ifEmpty { detailPath } } ?: detailPath
-        val resList = repository.getStreamingResources(sId, dPath, 1, 1)
-        resources = resList
-        isResourcesLoading = false
+            val d = dDeferred.await()
+            detail = d
+            selectedDub = d?.dubs?.firstOrNull { it.original == true } ?: d?.dubs?.firstOrNull()
+            isLoading = false
+
+            var resList = resDeferred?.await() ?: emptyList()
+            if (resList.isEmpty()) {
+                val sId = selectedDub?.subjectId?.ifBlank { d?.subjectId?.ifEmpty { subjectId } } ?: subjectId
+                val dPath = selectedDub?.detailPath?.ifBlank { d?.detailPath?.ifEmpty { detailPath } } ?: detailPath
+                resList = repository.getStreamingResources(sId, dPath, 1, 1)
+            }
+            resources = resList
+            isResourcesLoading = false
+        }
     }
 
     fun playStream(res: StreamResource, season: Int = 1, episode: Int = 1) {
@@ -89,7 +111,7 @@ fun DetailsScreen(
 
         // If we already have resources for season 1 episode 1
         if (season == 1 && episode == 1 && resources.isNotEmpty()) {
-            val best = resources.maxByOrNull { it.resolution ?: 720 } ?: resources.first()
+            val best = selectFastestPlayable(resources) ?: resources.first()
             playStream(best, season, episode)
             return
         }
@@ -101,14 +123,14 @@ fun DetailsScreen(
                 resources = resList
             }
             isResolvingStream = false
-            var best = resList.maxByOrNull { it.resolution ?: 720 } ?: resList.firstOrNull()
+            var best = selectFastestPlayable(resList)
 
             // Fallback: If no streams found, try candidate dubs (original or other language)
             if (best == null || best.url.isBlank()) {
                 val candidateDubs = detail?.dubs?.filter { it.subjectId.isNotBlank() && it.subjectId != sId } ?: emptyList()
                 for (dub in candidateDubs) {
                     val fallbackList = repository.getStreamingResources(dub.subjectId, dub.detailPath.ifBlank { dPath }, season, episode)
-                    val fallbackBest = fallbackList.maxByOrNull { it.resolution ?: 720 } ?: fallbackList.firstOrNull()
+                    val fallbackBest = selectFastestPlayable(fallbackList)
                     if (fallbackBest != null && fallbackBest.url.isNotBlank()) {
                         resources = fallbackList
                         selectedDub = dub
@@ -745,33 +767,43 @@ fun DetailsScreen(
             }
         }
 
-        // Download Quality Bottom Sheet Modal (Screenshot 4)
+        // Download Bottom Sheet Modal (Series multi-episode download or Movie quality)
         if (showDownloadSheet) {
-            DownloadQualityBottomSheet(
-                resources = resources,
-                title = item.title,
-                onDismiss = { showDownloadSheet = false },
-                onDownloadSelected = { res ->
-                    showDownloadSheet = false
-                    val sId = item.subjectId.ifEmpty { subjectId }
-                    val dPath = item.detailPath.ifEmpty { detailPath }
-                    val downloadId = com.streamhit.app.data.local.MediaDownloadManager.startDownload(
-                        context = context,
-                        subjectId = sId,
-                        detailPath = dPath,
-                        title = item.title,
-                        coverUrl = item.coverUrl,
-                        quality = res.displayResolution,
-                        downloadUrl = res.url
-                    )
-                    if (downloadId != -1L) {
-                        isDownloadingActive = true
-                        Toast.makeText(context, "Downloading ${res.displayResolution} ${item.title}", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(context, "Failed to start download.", Toast.LENGTH_SHORT).show()
+            if (item.subjectType == 2) {
+                SeriesDownloadBottomSheet(
+                    detail = item,
+                    repository = repository,
+                    initialSeason = selectedSeasonIndex + 1,
+                    onDismiss = { showDownloadSheet = false }
+                )
+            } else {
+                DownloadQualityBottomSheet(
+                    resources = resources,
+                    title = item.title,
+                    onDismiss = { showDownloadSheet = false },
+                    onDownloadSelected = { res ->
+                        showDownloadSheet = false
+                        val sId = item.subjectId.ifEmpty { subjectId }
+                        val dPath = item.detailPath.ifEmpty { detailPath }
+                        val downloadId = com.streamhit.app.data.local.MediaDownloadManager.startDownload(
+                            context = context,
+                            subjectId = sId,
+                            detailPath = dPath,
+                            title = item.title,
+                            coverUrl = item.coverUrl,
+                            quality = res.displayResolution,
+                            downloadUrl = res.url,
+                            isSeries = false
+                        )
+                        if (downloadId != -1L) {
+                            isDownloadingActive = true
+                            Toast.makeText(context, "Downloading ${res.displayResolution} ${item.title}", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "Failed to start download.", Toast.LENGTH_SHORT).show()
+                        }
                     }
-                }
-            )
+                )
+            }
         }
     }
 }

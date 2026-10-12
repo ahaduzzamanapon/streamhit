@@ -2,8 +2,11 @@ package com.streamhit.app
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -74,11 +77,68 @@ fun MainAppScreen(
     repository: MovieRepository,
     onPlayVideo: (streamUrl: String, title: String, subjectId: String, detailPath: String, coverUrl: String) -> Unit
 ) {
-    var currentTab by remember { mutableStateOf<Screen>(Screen.Home) }
+    val context = LocalContext.current
+    val activity = context as? ComponentActivity
+    var lastBackPressedTime by remember { mutableLongStateOf(0L) }
 
-    // Navigation state to DetailsScreen
+    var currentTab by remember { mutableStateOf<Screen>(Screen.Home) }
+    val tabBackStack = remember { mutableStateListOf<Screen>() }
+
+    // Navigation state to DetailsScreen & stack for nested details
     var activeDetailPath by remember { mutableStateOf<String?>(null) }
     var activeSubjectId by remember { mutableStateOf<String?>(null) }
+    val detailBackStack = remember { mutableStateListOf<Pair<String, String>>() }
+
+    fun navigateToDetails(path: String, id: String) {
+        if (activeDetailPath != null) {
+            detailBackStack.add(Pair(activeDetailPath!!, activeSubjectId ?: ""))
+        }
+        activeDetailPath = path
+        activeSubjectId = id
+    }
+
+    fun popDetails() {
+        if (detailBackStack.isNotEmpty()) {
+            val prev = detailBackStack.removeAt(detailBackStack.size - 1)
+            activeDetailPath = prev.first
+            activeSubjectId = prev.second
+        } else {
+            activeDetailPath = null
+            activeSubjectId = null
+        }
+    }
+
+    fun switchTab(newTab: Screen) {
+        if (currentTab != newTab) {
+            tabBackStack.remove(newTab)
+            tabBackStack.add(currentTab)
+            currentTab = newTab
+        }
+    }
+
+    // Android System Back Button Handler
+    BackHandler(enabled = true) {
+        if (activeDetailPath != null) {
+            // 1. If currently in Details page, back returns to previous page / details
+            popDetails()
+        } else if (tabBackStack.isNotEmpty()) {
+            // 2. If navigated from other tabs, back returns to previous tab
+            val prevTab = tabBackStack.removeAt(tabBackStack.size - 1)
+            currentTab = prevTab
+        } else if (currentTab != Screen.Home) {
+            // 3. Fallback: If not on Home, back goes to Home page
+            currentTab = Screen.Home
+        } else {
+            // 4. On Home screen: Double-back to exit within 2 seconds
+            val now = System.currentTimeMillis()
+            if (now - lastBackPressedTime < 2000L) {
+                activity?.finish()
+            } else {
+                lastBackPressedTime = now
+                Toast.makeText(context, "Press back again to exit", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     // In-app Version Control State
     var updateInfo by remember { mutableStateOf<AppVersionInfo?>(null) }
@@ -109,7 +169,7 @@ fun MainAppScreen(
                         val isSelected = currentTab == tab
                         NavigationBarItem(
                             selected = isSelected,
-                            onClick = { currentTab = tab },
+                            onClick = { switchTab(tab) },
                             icon = {
                                 Icon(
                                     imageVector = tab.icon,
@@ -146,8 +206,7 @@ fun MainAppScreen(
                     detailPath = activeDetailPath!!,
                     subjectId = activeSubjectId ?: "",
                     onBackClick = {
-                        activeDetailPath = null
-                        activeSubjectId = null
+                        popDetails()
                     },
                     onPlayClick = { url, title, cover ->
                         onPlayVideo(url, title, activeSubjectId ?: "", activeDetailPath ?: "", cover)
@@ -155,7 +214,8 @@ fun MainAppScreen(
                     onNavigateToDownloads = {
                         activeDetailPath = null
                         activeSubjectId = null
-                        currentTab = Screen.Downloads
+                        detailBackStack.clear()
+                        switchTab(Screen.Downloads)
                     }
                 )
             } else {
@@ -163,14 +223,13 @@ fun MainAppScreen(
                     Screen.Home -> HomeScreen(
                         repository = repository,
                         onMediaClick = { path, id, _ ->
-                            activeDetailPath = path
-                            activeSubjectId = id
+                            navigateToDetails(path, id)
                         },
-                        onPlayDirect = { url, title ->
-                            onPlayVideo(url, title, "", "", "")
+                        onPlayDirect = { url, title, subjectId, detailPath, coverUrl ->
+                            onPlayVideo(url, title, subjectId, detailPath, coverUrl)
                         },
                         onNavigateToSearch = {
-                            currentTab = Screen.Search
+                            switchTab(Screen.Search)
                         }
                     )
                     Screen.LiveTv -> LiveTvScreen(
@@ -181,8 +240,7 @@ fun MainAppScreen(
                     Screen.Explore -> ExploreScreen(
                         repository = repository,
                         onMediaClick = { path, id, _ ->
-                            activeDetailPath = path
-                            activeSubjectId = id
+                            navigateToDetails(path, id)
                         }
                     )
                     Screen.Downloads -> DownloadsScreen(
@@ -191,15 +249,13 @@ fun MainAppScreen(
                             onPlayVideo(localUri, title, "", "", "")
                         },
                         onNavigateToDetails = { path, id ->
-                            activeDetailPath = path
-                            activeSubjectId = id
+                            navigateToDetails(path, id)
                         }
                     )
                     Screen.Search -> SearchScreen(
                         repository = repository,
                         onMediaClick = { path, id, _ ->
-                            activeDetailPath = path
-                            activeSubjectId = id
+                            navigateToDetails(path, id)
                         }
                     )
                 }

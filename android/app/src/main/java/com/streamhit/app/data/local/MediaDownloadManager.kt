@@ -31,6 +31,10 @@ data class DownloadItem(
     var totalBytes: Long = 0L,
     var downloadedBytes: Long = 0L,
     var status: DownloadStatus = DownloadStatus.DOWNLOADING,
+    val isSeries: Boolean = false,
+    val seriesTitle: String = "",
+    val seasonNum: Int = 1,
+    val episodeNum: Int = 1,
     val addedTime: Long = System.currentTimeMillis()
 ) {
     val progressPercent: Int
@@ -106,7 +110,11 @@ object MediaDownloadManager {
         title: String,
         coverUrl: String,
         quality: String,
-        downloadUrl: String
+        downloadUrl: String,
+        isSeries: Boolean = false,
+        seriesTitle: String = "",
+        seasonNum: Int = 1,
+        episodeNum: Int = 1
     ): Long {
         return try {
             val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
@@ -137,11 +145,19 @@ object MediaDownloadManager {
                 downloadUrl = downloadUrl,
                 localFilePath = targetFile.absolutePath,
                 status = DownloadStatus.DOWNLOADING,
+                isSeries = isSeries,
+                seriesTitle = if (seriesTitle.isNotBlank()) seriesTitle else title,
+                seasonNum = seasonNum,
+                episodeNum = episodeNum,
                 addedTime = System.currentTimeMillis()
             )
 
             val list = getAllDownloads(context).toMutableList()
-            list.removeAll { it.subjectId == subjectId && it.quality == quality }
+            if (isSeries) {
+                list.removeAll { it.subjectId == subjectId && it.seasonNum == seasonNum && it.episodeNum == episodeNum && it.quality == quality }
+            } else {
+                list.removeAll { it.subjectId == subjectId && it.quality == quality }
+            }
             list.add(0, item)
             saveDownloads(context, list)
             id
