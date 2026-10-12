@@ -20,22 +20,38 @@ jobs:
           port: 21098
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            echo "Searching for all deployments in home directory..."
-            for gitdir in $(find ~ -maxdepth 3 -name ".git" 2>/dev/null); do
-              appdir=$(dirname "$gitdir")
-              echo "Checking $appdir..."
-              cd "$appdir"
-              remote_url=$(git config --get remote.origin.url || true)
-              if echo "$remote_url" | grep -qi "streamhit"; then
-                echo "--> Updating $appdir from origin main..."
-                git fetch origin
-                git reset --hard origin/main
-                touch passenger_wsgi.py 2>/dev/null || true
-                mkdir -p tmp 2>/dev/null || true
-                touch tmp/restart.txt 2>/dev/null || true
-                if [ -f "streamhitupdate.sh" ]; then
-                  chmod +x streamhitupdate.sh
-                  ./streamhitupdate.sh || true
+            echo "=== 1. Updating streamhit.lc-synergy.ltd ==="
+            cd ~/streamhit.lc-synergy.ltd/
+            git fetch origin
+            git reset --hard origin/main
+            touch passenger_wsgi.py
+            mkdir -p tmp
+            touch tmp/restart.txt
+            chmod +x streamhitupdate.sh
+            ./streamhitupdate.sh || true
+
+            echo "=== 2. Finding all other Python/Passenger apps (including nxly.online) ==="
+            find ~ -maxdepth 3 \( -name "main.py" -o -name "passenger_wsgi.py" \) 2>/dev/null | while read -r filepath; do
+              appdir=$(dirname "$filepath")
+              if [ "$appdir" != "$HOME/streamhit.lc-synergy.ltd" ]; then
+                echo "Found app in $appdir"
+                if [ -d "$appdir/.git" ]; then
+                  echo "Updating git repo in $appdir..."
+                  cd "$appdir"
+                  git fetch origin 2>/dev/null || true
+                  git reset --hard origin/main 2>/dev/null || true
+                else
+                  echo "Copying latest files to $appdir..."
+                  cp -f ~/streamhit.lc-synergy.ltd/main.py "$appdir/" 2>/dev/null || true
+                  cp -f ~/streamhit.lc-synergy.ltd/admin.py "$appdir/" 2>/dev/null || true
+                  mkdir -p "$appdir/public"
+                  cp -rf ~/streamhit.lc-synergy.ltd/public/* "$appdir/public/" 2>/dev/null || true
                 fi
+                touch "$appdir/passenger_wsgi.py" 2>/dev/null || true
+                mkdir -p "$appdir/tmp" 2>/dev/null || true
+                touch "$appdir/tmp/restart.txt" 2>/dev/null || true
               fi
             done
+
+            echo "=== 3. Recycling Passenger worker processes ==="
+            pkill -f "passenger_wsgi" 2>/dev/null || true
