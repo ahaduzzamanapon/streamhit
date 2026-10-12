@@ -17,7 +17,6 @@ from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, Red
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
-from moviebox_api.v3.http_client import MovieBoxHttpClient
 
 # ==========================================================================
 # CONFIGURATION
@@ -80,6 +79,142 @@ def generate_tr_signature(method: str, url: str, body_data: str = "", timestamp:
     h = hmac.new(key, canonical_string.encode('utf-8'), hashlib.md5)
     signature_b64 = base64.b64encode(h.digest()).decode('utf-8')
     return f"{timestamp}|2|{signature_b64}"
+
+MB_HOST_POOL = [
+    "https://api6.aoneroom.com",
+    "https://api5.aoneroom.com",
+    "https://api4.aoneroom.com",
+    "https://api3.aoneroom.com"
+]
+MB_CLIENT_INFO = json.dumps({
+    "package_name": "com.community.oneroom",
+    "version_name": "3.0.03.0529.03",
+    "version_code": 50020046,
+    "os": "android",
+    "os_version": "9",
+    "install_ch": "ps",
+    "device_id": "141c9f8c638592d7fc7365c638f230b9",
+    "install_store": "ps",
+    "gaid": "e42d5548-e08d-4125-b81b-4efa8a35b3e1",
+    "brand": "Redmi",
+    "model": "M2007J20CG",
+    "system_language": "en",
+    "net": "NETWORK_WIFI",
+    "region": "US",
+    "timezone": "America/New_York",
+    "sp_code": "40401",
+    "X-Play-Mode": "2"
+})
+MB_USER_AGENT = "com.community.oneroom/50020046 (Linux; U; Android 9; en_US; M2007J20CG; Build/PQ3A.190605.03081104; Cronet/135.0.7012.3)"
+
+class MovieBoxHttpClient:
+    def __init__(self, host_pool=MB_HOST_POOL, timeout=15.0):
+        self._host_pool = host_pool
+        self._timeout = timeout
+        self._client = None
+        self._runtime_token = None
+
+    async def __aenter__(self):
+        self._client = httpx.AsyncClient(timeout=self._timeout, follow_redirects=True)
+        return self
+
+    async def __aexit__(self, *args):
+        if self._client:
+            await self._client.aclose()
+
+    def _build_headers(self, method, url, body="", content_type="application/json"):
+        ts = int(time.time() * 1000)
+        accept = "application/json"
+        parsed = urlparse(url)
+        path = parsed.path or ""
+        qs = parse_qsl(parsed.query, keep_blank_values=True)
+        if qs:
+            qs.sort(key=lambda x: x[0])
+            query = "&".join([f"{k}={v}" for k, v in qs])
+            canonical_url = f"{path}?{query}"
+        else:
+            canonical_url = path
+
+        body_bytes = body.encode("utf-8") if body else None
+        if body_bytes is not None:
+            truncated = body_bytes[:0x19000]
+            body_hash = md5_hex(truncated)
+            body_length = str(len(body_bytes))
+        else:
+            body_hash = ""
+            body_length = ""
+
+        canonical = (
+            f"{method.upper()}\n"
+            f"{accept}\n"
+            f"{content_type}\n"
+            f"{body_length}\n"
+            f"{ts}\n"
+            f"{body_hash}\n"
+            f"{canonical_url}"
+        )
+        padding = (4 - len(GATEWAY_SECRET_ONLINE) % 4) % 4
+        key = base64.b64decode(GATEWAY_SECRET_ONLINE + "=" * padding)
+        mac = hmac.new(key, canonical.encode("utf-8"), hashlib.md5)
+        sig = f"{ts}|2|{base64.b64encode(mac.digest()).decode()}"
+
+        headers = {
+            "User-Agent": MB_USER_AGENT,
+            "Accept": accept,
+            "Content-Type": content_type,
+            "Connection": "keep-alive",
+            "X-Client-Token": generate_client_token(),
+            "x-tr-signature": sig,
+            "X-Client-Info": MB_CLIENT_INFO,
+            "X-Client-Status": "0"
+        }
+        if self._runtime_token:
+            headers["Authorization"] = f"Bearer {self._runtime_token}"
+        return headers
+
+    def _absorb_x_user(self, headers):
+        x_user = headers.get("x-user", "")
+        if x_user:
+            try:
+                p = json.loads(x_user)
+                t = p.get("token")
+                if t:
+                    self._runtime_token = t
+            except Exception:
+                pass
+
+    async def get(self, path, params=None):
+        query = ("?" + "&".join(f"{k}={v}" for k, v in params.items())) if params else ""
+        last_resp = None
+        for base in self._host_pool:
+            url = f"{base}{path}{query}"
+            try:
+                headers = self._build_headers("GET", url, content_type="application/json")
+                resp = await self._client.get(url, headers=headers)
+                self._absorb_x_user(resp.headers)
+                last_resp = resp
+                if resp.status_code not in (403, 429, 500, 502, 503, 504):
+                    return base, resp
+            except Exception:
+                continue
+        return self._host_pool[0], last_resp
+
+    async def post(self, path, json=None, params=None):
+        query = ("?" + "&".join(f"{k}={v}" for k, v in params.items())) if params else ""
+        body = json.dumps(json or {}) if isinstance(json, dict) else ""
+        last_resp = None
+        for base in self._host_pool:
+            url = f"{base}{path}{query}"
+            try:
+                headers = self._build_headers("POST", url, body, content_type="application/json; charset=utf-8")
+                resp = await self._client.post(url, headers=headers, content=body.encode("utf-8"))
+                self._absorb_x_user(resp.headers)
+                last_resp = resp
+                if resp.status_code not in (403, 429, 500, 502, 503, 504):
+                    return base, resp
+            except Exception:
+                continue
+        return self._host_pool[0], last_resp
 
 _mb_client = None
 _mb_lock = asyncio.Lock()
