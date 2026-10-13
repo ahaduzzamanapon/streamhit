@@ -15,7 +15,14 @@ import com.streamhit.app.BuildConfig
 import com.streamhit.app.data.api.RetrofitClient
 import com.streamhit.app.data.model.AppVersionInfo
 import com.streamhit.app.data.repository.MovieRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 object AppUpdateManager {
 
@@ -75,6 +82,63 @@ object AppUpdateManager {
             }
         }
 
+        Toast.makeText(context, "Downloading update v${versionInfo.versionName}...", Toast.LENGTH_SHORT).show()
+
+        // 1. Direct high-speed OkHttp in-app download (bypasses DownloadManager restrictions)
+        CoroutineScope(Dispatchers.IO).launch {
+            var directDownloadSuccess = false
+            val targetDir = File(context.cacheDir, "updates").apply { if (!exists()) mkdirs() }
+            val destinationFile = File(targetDir, "Streamfit-v${versionInfo.versionName}.apk")
+
+            try {
+                if (destinationFile.exists()) {
+                    destinationFile.delete()
+                }
+
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(15, TimeUnit.SECONDS)
+                    .readTimeout(120, TimeUnit.SECONDS)
+                    .followRedirects(true)
+                    .followSslRedirects(true)
+                    .build()
+
+                val request = Request.Builder()
+                    .url(fullUrl)
+                    .header("User-Agent", "StreamfitMobile/1.0.10 (Android)")
+                    .build()
+
+                val response = client.newCall(request).execute()
+                if (response.isSuccessful && response.body != null) {
+                    val body = response.body!!
+                    body.byteStream().use { input ->
+                        destinationFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+
+                    if (destinationFile.exists() && destinationFile.length() > 500_000) {
+                        directDownloadSuccess = true
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(context, "Download complete. Starting installation...", Toast.LENGTH_SHORT).show()
+                            installApk(context, destinationFile)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("AppUpdateManager", "Direct OkHttp download failed: ${e.message}")
+            }
+
+            // 2. Fallback to system DownloadManager if direct OkHttp did not succeed
+            if (!directDownloadSuccess) {
+                withContext(Dispatchers.Main) {
+                    startDownloadManagerDownload(context, versionInfo)
+                }
+            }
+        }
+    }
+
+    private fun startDownloadManagerDownload(context: Context, versionInfo: AppVersionInfo) {
+        val fullUrl = getResolvedUrl(versionInfo)
         try {
             val fileName = "Streamfit-v${versionInfo.versionName}.apk"
             val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
@@ -95,12 +159,14 @@ object AppUpdateManager {
                 setTitle("Downloading Update v${versionInfo.versionName}")
                 setDescription("NXLY Streamhit Update")
                 setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI or DownloadManager.Request.NETWORK_MOBILE)
+                setAllowedOverMetered(true)
+                setAllowedOverRoaming(true)
                 setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, fileName)
                 setMimeType("application/vnd.android.package-archive")
             }
 
             val downloadId = downloadManager.enqueue(request)
-            Toast.makeText(context, "Downloading update v${versionInfo.versionName}...", Toast.LENGTH_LONG).show()
 
             // Broadcast receiver for completion
             val onComplete = object : BroadcastReceiver() {
@@ -127,7 +193,6 @@ object AppUpdateManager {
                             Toast.makeText(ctxt, "Download complete. Starting installation...", Toast.LENGTH_SHORT).show()
                             installApk(ctxt, destinationFile)
                         } else {
-                            Toast.makeText(ctxt, "In-app download interrupted, opening browser...", Toast.LENGTH_SHORT).show()
                             openBrowserDownload(ctxt, versionInfo)
                         }
                     }
@@ -141,7 +206,6 @@ object AppUpdateManager {
             }
 
         } catch (e: Exception) {
-            // Fallback: Open browser to download
             openBrowserDownload(context, versionInfo)
         }
     }
