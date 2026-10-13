@@ -16,6 +16,9 @@ import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -29,8 +32,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import androidx.compose.material.icons.filled.Tv
 import com.streamhit.app.data.model.AppVersionInfo
 import com.streamhit.app.data.repository.MovieRepository
@@ -133,8 +139,23 @@ fun MainAppScreen(
         }
     }
 
+    // In-app Version Control State
+    var updateInfo by remember { mutableStateOf<AppVersionInfo?>(null) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
     // Android System Back Button Handler
     BackHandler(enabled = true) {
+        if (showUpdateDialog && updateInfo?.mustUpdate == true) {
+            val now = System.currentTimeMillis()
+            if (now - lastBackPressedTime < 2000L) {
+                activity?.finish()
+            } else {
+                lastBackPressedTime = now
+                Toast.makeText(context, "App update is required. Press back again to exit", Toast.LENGTH_SHORT).show()
+            }
+            return@BackHandler
+        }
         if (activeDetailPath != null) {
             // 1. If currently in Details page, back returns to previous page / details
             popDetails()
@@ -157,11 +178,6 @@ fun MainAppScreen(
         }
     }
 
-    // In-app Version Control State
-    var updateInfo by remember { mutableStateOf<AppVersionInfo?>(null) }
-    var showUpdateDialog by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-
     // Check version update against backend admin panel
     LaunchedEffect(Unit) {
         scope.launch {
@@ -175,7 +191,7 @@ fun MainAppScreen(
 
     Scaffold(
         bottomBar = {
-            if (activeDetailPath == null) {
+            if (activeDetailPath == null && !(showUpdateDialog && updateInfo?.mustUpdate == true)) {
                 // Sleek, compact animated bottom navigation bar
                 Surface(
                     color = Color(0xFF0F1420).copy(alpha = 0.96f),
@@ -322,23 +338,217 @@ fun MainAppScreen(
                 }
             }
 
-            // In-app Update Dialog (Version Controller)
-            if (showUpdateDialog && updateInfo != null) {
+            // ─── STRICT MANDATORY UPDATE LOCK SCREEN ───
+            if (showUpdateDialog && updateInfo != null && updateInfo!!.mustUpdate) {
+                val info = updateInfo!!
+                val context = androidx.compose.ui.platform.LocalContext.current
+                var isDownloading by remember { mutableStateOf(false) }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(BgDark)
+                        .zIndex(999f)
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = BgSurface),
+                        shape = RoundedCornerShape(20.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE50914).copy(alpha = 0.45f)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .wrapContentHeight()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(22.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            // High-contrast Warning Pill
+                            Surface(
+                                color = Color(0xFFE50914).copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(50),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE50914).copy(alpha = 0.5f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = "Alert",
+                                        tint = Color(0xFFFF4D4D),
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "CRITICAL UPDATE REQUIRED",
+                                        color = Color(0xFFFF4D4D),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            Text(
+                                text = "App Update Required",
+                                color = Color.White,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = "v${com.streamhit.app.BuildConfig.VERSION_NAME} ➔ v${info.versionName}",
+                                color = AccentEmerald,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Text(
+                                text = "This update is required to continue streaming movies and live TV. Please update the app to proceed.",
+                                color = TextSecondary,
+                                fontSize = 13.sp,
+                                lineHeight = 18.sp,
+                                textAlign = TextAlign.Center
+                            )
+
+                            if (!info.releaseNotes.isNullOrBlank()) {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Surface(
+                                    color = Color.White.copy(alpha = 0.04f),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Text(
+                                            text = "What's New in v${info.versionName}:",
+                                            color = Color.White,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = info.releaseNotes,
+                                            color = TextMuted,
+                                            fontSize = 12.sp,
+                                            lineHeight = 16.sp
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (isDownloading) {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                LinearProgressIndicator(
+                                    modifier = Modifier.fillMaxWidth().height(6.dp),
+                                    color = AccentEmerald,
+                                    trackColor = Color.White.copy(alpha = 0.1f)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Downloading update package in background... Installation will start automatically once downloaded.",
+                                    color = AccentEmerald,
+                                    fontSize = 11.5.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(18.dp))
+
+                            // Action Buttons
+                            Button(
+                                onClick = {
+                                    isDownloading = true
+                                    AppUpdateManager.startDownloadAndInstall(context, info)
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(44.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = AccentEmerald),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Download,
+                                    contentDescription = "Update",
+                                    tint = Color.Black,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isDownloading) "Downloading..." else "Update Now",
+                                    color = Color.Black,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            OutlinedButton(
+                                onClick = {
+                                    AppUpdateManager.openBrowserDownload(context, info)
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(40.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text("Download via Browser", fontSize = 13.sp)
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            TextButton(
+                                onClick = { activity?.finish() }
+                            ) {
+                                Text("Exit App", color = TextMuted, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ─── OPTIONAL UPDATE DIALOG ───
+            if (showUpdateDialog && updateInfo != null && !updateInfo!!.mustUpdate) {
                 val info = updateInfo!!
                 val context = androidx.compose.ui.platform.LocalContext.current
                 var isDownloading by remember { mutableStateOf(false) }
 
                 AlertDialog(
                     onDismissRequest = {
-                        if (!info.mustUpdate) showUpdateDialog = false
+                        showUpdateDialog = false
                     },
+                    properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true),
                     title = {
-                        Text(
-                            text = "Update Available (v${info.versionName})",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.SystemUpdate,
+                                contentDescription = "Update",
+                                tint = AccentEmerald,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Update Available (v${info.versionName})",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 17.sp
+                            )
+                        }
                     },
                     text = {
                         Column {
@@ -348,15 +558,6 @@ fun MainAppScreen(
                                 fontSize = 13.sp,
                                 lineHeight = 18.sp
                             )
-                            if (info.mustUpdate) {
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Text(
-                                    text = "This is a required update to continue watching.",
-                                    color = AccentPink,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
                             if (isDownloading) {
                                 Spacer(modifier = Modifier.height(14.dp))
                                 LinearProgressIndicator(
@@ -378,7 +579,7 @@ fun MainAppScreen(
                             OutlinedButton(
                                 onClick = {
                                     AppUpdateManager.openBrowserDownload(context, info)
-                                    if (!info.mustUpdate) showUpdateDialog = false
+                                    showUpdateDialog = false
                                 },
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                                 border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)),
@@ -391,7 +592,7 @@ fun MainAppScreen(
                                 onClick = {
                                     isDownloading = true
                                     AppUpdateManager.startDownloadAndInstall(context, info)
-                                    if (!info.mustUpdate) showUpdateDialog = false
+                                    showUpdateDialog = false
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = AccentEmerald),
                                 shape = RoundedCornerShape(8.dp)
@@ -406,10 +607,8 @@ fun MainAppScreen(
                         }
                     },
                     dismissButton = {
-                        if (!info.mustUpdate) {
-                            TextButton(onClick = { showUpdateDialog = false }) {
-                                Text("Later", color = TextMuted)
-                            }
+                        TextButton(onClick = { showUpdateDialog = false }) {
+                            Text("Later", color = TextMuted)
                         }
                     },
                     containerColor = BgSurface,
