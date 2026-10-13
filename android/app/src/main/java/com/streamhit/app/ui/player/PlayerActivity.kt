@@ -58,6 +58,7 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import androidx.compose.ui.text.style.TextAlign
+import com.streamhit.app.data.local.MediaCacheManager
 import com.streamhit.app.data.local.MediaDownloadManager
 import com.streamhit.app.data.local.RecentHistoryManager
 import com.streamhit.app.data.model.DubInfo
@@ -100,6 +101,9 @@ class PlayerActivity : ComponentActivity() {
         val subjectId = intent.getStringExtra("EXTRA_SUBJECT_ID") ?: ""
         val detailPath = intent.getStringExtra("EXTRA_DETAIL_PATH") ?: ""
         val coverUrl = intent.getStringExtra("EXTRA_COVER_URL") ?: ""
+        val seasonNum = intent.getIntExtra("EXTRA_SEASON_NUM", 1).coerceAtLeast(1)
+        val episodeNum = intent.getIntExtra("EXTRA_EPISODE_NUM", 1).coerceAtLeast(1)
+        val startPositionMs = intent.getLongExtra("EXTRA_START_POSITION_MS", 0L)
 
         setContent {
             StreamfitTheme {
@@ -109,6 +113,9 @@ class PlayerActivity : ComponentActivity() {
                     subjectId = subjectId,
                     detailPath = detailPath,
                     initialCoverUrl = coverUrl,
+                    initialSeasonNum = seasonNum,
+                    initialEpisodeNum = episodeNum,
+                    initialStartPositionMs = startPositionMs,
                     onBack = { finish() },
                     onEnterPip = { enterPipMode() }
                 )
@@ -149,6 +156,9 @@ fun AdaptivePlayerScreen(
     subjectId: String = "",
     detailPath: String = "",
     initialCoverUrl: String = "",
+    initialSeasonNum: Int = 1,
+    initialEpisodeNum: Int = 1,
+    initialStartPositionMs: Long = 0L,
     onBack: () -> Unit,
     onEnterPip: () -> Unit
 ) {
@@ -185,8 +195,8 @@ fun AdaptivePlayerScreen(
     var detail by remember { mutableStateOf<SubjectDetail?>(null) }
     var resources by remember { mutableStateOf<List<StreamResource>>(emptyList()) }
     var recommendations by remember { mutableStateOf<List<SubjectSummary>>(emptyList()) }
-    var currentSeasonNum by remember { mutableIntStateOf(1) }
-    var currentEpisodeNum by remember { mutableIntStateOf(1) }
+    var currentSeasonNum by remember { mutableIntStateOf(initialSeasonNum) }
+    var currentEpisodeNum by remember { mutableIntStateOf(initialEpisodeNum) }
     var selectedDub by remember { mutableStateOf<DubInfo?>(null) }
     var showDownloadSheet by remember { mutableStateOf(false) }
 
@@ -202,7 +212,11 @@ fun AdaptivePlayerScreen(
     var isBuffering by remember { mutableStateOf(true) }
     var currentPosition by remember { mutableLongStateOf(0L) }
     var totalDuration by remember { mutableLongStateOf(0L) }
+    var bufferedPosition by remember { mutableLongStateOf(0L) }
+    var bufferedAheadMs by remember { mutableLongStateOf(0L) }
     var playbackSpeed by remember { mutableFloatStateOf(1.0f) }
+    var isFastForwarding2x by remember { mutableStateOf(false) }
+    var overlayDismissToken by remember { mutableLongStateOf(0L) }
     var resizeMode by remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
 
     // Gesture indicator states
@@ -410,6 +424,57 @@ fun AdaptivePlayerScreen(
         }
     }
 
+    fun switchDub(dub: DubInfo) {
+        selectedDub = dub
+        val currentPos = exoPlayer?.currentPosition ?: 0L
+        isBuffering = true
+        scope.launch {
+            val sId = dub.subjectId.ifBlank { detail?.subjectId?.ifEmpty { subjectId } } ?: subjectId
+            val dPath = dub.detailPath.ifBlank { detail?.detailPath?.ifEmpty { detailPath } } ?: detailPath
+            val resList = repository.getStreamingResources(sId, dPath, currentSeasonNum, currentEpisodeNum)
+            resources = resList
+            val best = selectFastestResolution(resList)
+            if (best != null && best.url.isNotBlank()) {
+                currentStreamUrl = best.url
+                exoPlayer?.apply {
+                    setMediaItem(MediaItem.fromUri(Uri.parse(best.url)), currentPos)
+                    prepare()
+                    play()
+                }
+                Toast.makeText(context, "Audio: ${dub.name.ifBlank { dub.language }}", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(context, "Stream unavailable for this audio track", Toast.LENGTH_SHORT).show()
+                isBuffering = false
+            }
+        }
+    }
+
+    val hasNextEpisode = remember(detail, currentSeasonNum, currentEpisodeNum) {
+        if (detail?.subjectType != 2) false
+        else {
+            val s = detail?.seasons?.firstOrNull { it.seasonNumber == currentSeasonNum }
+            val maxEp = s?.episodes?.maxOfOrNull { it.episodeNumber } ?: 0
+            if (currentEpisodeNum < maxEp) true
+            else {
+                val nextS = detail?.seasons?.firstOrNull { it.seasonNumber == currentSeasonNum + 1 }
+                nextS != null && (nextS.episodes?.isNotEmpty() == true)
+            }
+        }
+    }
+
+    fun playNextEpisode() {
+        val s = detail?.seasons?.firstOrNull { it.seasonNumber == currentSeasonNum }
+        val maxEp = s?.episodes?.maxOfOrNull { it.episodeNumber } ?: 0
+        if (currentEpisodeNum < maxEp) {
+            switchEpisode(currentSeasonNum, currentEpisodeNum + 1)
+        } else {
+            val nextS = detail?.seasons?.firstOrNull { it.seasonNumber == currentSeasonNum + 1 }
+            if (nextS != null && (nextS.episodes?.isNotEmpty() == true)) {
+                switchEpisode(currentSeasonNum + 1, 1)
+            }
+        }
+    }
+
     // Switch Quality
     fun switchQuality(res: StreamResource) {
         if (res.url.isNotBlank()) {
@@ -425,34 +490,46 @@ fun AdaptivePlayerScreen(
         }
     }
 
-    // Initialize ExoPlayer
+    // Helper to format buffered ahead time for UI
+    fun formatBufferedAhead(aheadMs: Long): String {
+        val totalSecs = (aheadMs.coerceAtLeast(0L) / 1000L)
+        val mins = totalSecs / 60
+        val secs = totalSecs % 60
+        return if (mins > 0) "${mins}m ${secs}s ahead" else "${secs}s ahead"
+    }
+
+    // Initialize ExoPlayer with MediaCacheManager and tuned LoadControl
     DisposableEffect(currentStreamUrl) {
         if (currentStreamUrl.isBlank()) return@DisposableEffect onDispose {}
         isBuffering = true
 
-        val httpDataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
-            .setUserAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
-            .setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(8000)
-            .setReadTimeoutMs(15000)
-
+        val dataSourceFactory = MediaCacheManager.getDataSourceFactory(context)
         val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(context)
-            .setDataSourceFactory(httpDataSourceFactory)
+            .setDataSourceFactory(dataSourceFactory)
 
         val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                2_500,  // minBufferMs (2.5s buffer threshold)
-                30_000, // maxBufferMs (30s max buffer)
-                500,    // bufferForPlaybackMs - starts video playback in 500ms!
-                1_000   // bufferForPlaybackAfterRebufferMs - resumes in 1 sec
+                2_500,  // minBufferMs (2.5s buffer before playback)
+                60_000, // maxBufferMs (60s max buffer cap to bound memory & speculative downloading)
+                1_000,  // bufferForPlaybackMs (1.0s buffer required to start playback)
+                2_000   // bufferForPlaybackAfterRebufferMs (2.0s buffer required after stall/rebuffer)
             )
             .setPrioritizeTimeOverSizeThresholds(true)
             .setBackBuffer(10_000, false)
             .build()
 
         // Read saved progress before prepare so we start directly at the saved position without double-buffering
-        val savedPos = RecentHistoryManager.getSavedPosition(context, currentStreamUrl, subjectId)
+        val savedPos = if (initialStartPositionMs > 1000L) {
+            initialStartPositionMs
+        } else {
+            RecentHistoryManager.getSavedPosition(context, currentStreamUrl, subjectId)
+        }
         val initialStartMs = if (savedPos > 3000L) savedPos else 0L
+
+        val prepareStartTimeMs = System.currentTimeMillis()
+        var firstFrameRendered = false
+        var rebufferStartTimeMs = 0L
+        var rebufferCount = 0
 
         val player = ExoPlayer.Builder(context)
             .setMediaSourceFactory(mediaSourceFactory)
@@ -475,20 +552,77 @@ fun AdaptivePlayerScreen(
         loudnessEnhancer = enhancer
 
         val listener = object : Player.Listener {
+            override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+                for (group in tracks.groups) {
+                    if (group.type == androidx.media3.common.C.TRACK_TYPE_VIDEO && group.isSelected) {
+                        for (i in 0 until group.length) {
+                            if (group.isTrackSelected(i)) {
+                                val f = group.getTrackFormat(i)
+                                android.util.Log.d(
+                                    "StreamHitPlayer",
+                                    "Selected Video Track: ${f.width}x${f.height} @ ${f.bitrate} bps, mime=${f.sampleMimeType}"
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             override fun onIsPlayingChanged(playing: Boolean) {
                 isPlaying = playing
                 if (playing) {
                     isBuffering = false
                 }
             }
+
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
                     Player.STATE_BUFFERING -> {
                         isBuffering = true
+                        if (firstFrameRendered) {
+                            rebufferStartTimeMs = System.currentTimeMillis()
+                            rebufferCount++
+                            android.util.Log.d(
+                                "StreamHitPlayer",
+                                "Rebuffering started at pos=${player.currentPosition}ms (rebufferCount=$rebufferCount)"
+                            )
+                        } else {
+                            android.util.Log.d("StreamHitPlayer", "Initial buffering...")
+                        }
                     }
                     Player.STATE_READY -> {
                         isBuffering = false
+                        if (!firstFrameRendered) {
+                            firstFrameRendered = true
+                            val startupLatency = System.currentTimeMillis() - prepareStartTimeMs
+                            android.util.Log.d(
+                                "StreamHitPlayer",
+                                "Startup time to first STATE_READY: ${startupLatency}ms. CurrentPos=${player.currentPosition}ms, BufferedPos=${player.bufferedPosition}ms"
+                            )
+                        } else if (rebufferStartTimeMs > 0L) {
+                            val duration = System.currentTimeMillis() - rebufferStartTimeMs
+                            rebufferStartTimeMs = 0L
+                            android.util.Log.d(
+                                "StreamHitPlayer",
+                                "Rebuffer resolved in ${duration}ms. Resume pos=${player.currentPosition}ms, bufferedAhead=${(player.bufferedPosition - player.currentPosition).coerceAtLeast(0)}ms"
+                            )
+                        }
                         totalDuration = player.duration.coerceAtLeast(0L)
+                        if (player.duration > 0L) {
+                            RecentHistoryManager.saveProgress(
+                                context = context,
+                                subjectId = subjectId,
+                                detailPath = detailPath,
+                                title = currentVideoTitle,
+                                coverUrl = detail?.coverUrl ?: initialCoverUrl,
+                                streamUrl = currentStreamUrl,
+                                positionMs = player.currentPosition,
+                                durationMs = player.duration,
+                                subjectType = detail?.subjectType ?: 1,
+                                seasonNum = currentSeasonNum,
+                                episodeNum = currentEpisodeNum
+                            )
+                        }
                     }
                     Player.STATE_ENDED -> {
                         isBuffering = false
@@ -498,7 +632,12 @@ fun AdaptivePlayerScreen(
                     }
                 }
             }
+
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                android.util.Log.e(
+                    "StreamHitPlayer",
+                    "Playback error: codeName=${error.errorCodeName} (${error.errorCode}), message=${error.message}"
+                )
                 val servers = currentChannel?.activeServers ?: emptyList()
                 if (isLiveTv && servers.size > 1 && currentServerIndex < servers.size - 1) {
                     val nextIdx = currentServerIndex + 1
@@ -513,7 +652,7 @@ fun AdaptivePlayerScreen(
         player.addListener(listener)
 
         onDispose {
-            if (player.currentPosition > 2000L && player.duration > 0L) {
+            if (player.duration > 0L) {
                 RecentHistoryManager.saveProgress(
                     context = context,
                     subjectId = subjectId,
@@ -523,7 +662,9 @@ fun AdaptivePlayerScreen(
                     streamUrl = currentStreamUrl,
                     positionMs = player.currentPosition,
                     durationMs = player.duration,
-                    subjectType = detail?.subjectType ?: 1
+                    subjectType = detail?.subjectType ?: 1,
+                    seasonNum = currentSeasonNum,
+                    episodeNum = currentEpisodeNum
                 )
             }
             player.removeListener(listener)
@@ -532,19 +673,51 @@ fun AdaptivePlayerScreen(
         }
     }
 
-    // Auto-update playback position
+    // Periodic progress saving for continuous resume accuracy
+    LaunchedEffect(exoPlayer, isPlaying) {
+        while (true) {
+            delay(5000)
+            exoPlayer?.let { p ->
+                if (p.isPlaying && p.duration > 0L) {
+                    RecentHistoryManager.saveProgress(
+                        context = context,
+                        subjectId = subjectId,
+                        detailPath = detailPath,
+                        title = currentVideoTitle,
+                        coverUrl = detail?.coverUrl ?: initialCoverUrl,
+                        streamUrl = currentStreamUrl,
+                        positionMs = p.currentPosition,
+                        durationMs = p.duration,
+                        subjectType = detail?.subjectType ?: 1,
+                        seasonNum = currentSeasonNum,
+                        episodeNum = currentEpisodeNum
+                    )
+                }
+            }
+        }
+    }
+
+    // Auto-update playback position and buffer stats
     LaunchedEffect(exoPlayer) {
         while (true) {
             exoPlayer?.let { p ->
-                currentPosition = p.currentPosition.coerceAtLeast(0L)
-                totalDuration = p.duration.coerceAtLeast(0L)
+                val pos = p.currentPosition.coerceAtLeast(0L)
+                val dur = p.duration.coerceAtLeast(0L)
+                val buf = p.bufferedPosition.coerceAtLeast(pos)
+                val ahead = (buf - pos).coerceAtLeast(0L)
+
+                currentPosition = pos
+                totalDuration = dur
+                bufferedPosition = buf
+                bufferedAheadMs = ahead
+
                 if (p.playbackState == Player.STATE_BUFFERING) {
                     isBuffering = true
                 } else if (p.playbackState == Player.STATE_READY && p.isPlaying) {
                     isBuffering = false
                 }
             }
-            delay(500)
+            delay(400)
         }
     }
 
@@ -560,6 +733,8 @@ fun AdaptivePlayerScreen(
         val clamped = percent.coerceIn(0, 200)
         volumePercent = clamped
         showVolumeOverlay = true
+        showBrightnessOverlay = false
+        overlayDismissToken = System.currentTimeMillis()
 
         if (clamped <= 100) {
             val sysVol = ((clamped / 100f) * maxSystemVolume).roundToInt()
@@ -576,6 +751,8 @@ fun AdaptivePlayerScreen(
         val clamped = percent.coerceIn(0, 100)
         brightnessPercent = clamped
         showBrightnessOverlay = true
+        showVolumeOverlay = false
+        overlayDismissToken = System.currentTimeMillis()
 
         val lp = activity.window.attributes
         lp.screenBrightness = (clamped / 100f).coerceIn(0.01f, 1.0f)
@@ -640,12 +817,23 @@ fun AdaptivePlayerScreen(
                 }
                 return true
             }
+
+            override fun onLongPress(e: MotionEvent) {
+                if (isLocked) return
+                isFastForwarding2x = true
+                exoPlayer?.setPlaybackSpeed(2.0f)
+            }
         })
     }
 
     // Gesture indicator timers
-    LaunchedEffect(showVolumeOverlay) { if (showVolumeOverlay) { delay(1200); showVolumeOverlay = false } }
-    LaunchedEffect(showBrightnessOverlay) { if (showBrightnessOverlay) { delay(1200); showBrightnessOverlay = false } }
+    LaunchedEffect(overlayDismissToken) {
+        if (overlayDismissToken > 0L) {
+            delay(1000)
+            showVolumeOverlay = false
+            showBrightnessOverlay = false
+        }
+    }
     LaunchedEffect(showDoubleTapFeedback) { if (showDoubleTapFeedback) { delay(700); showDoubleTapFeedback = false } }
 
     var initialTouchX by remember { mutableFloatStateOf(0f) }
@@ -739,6 +927,11 @@ fun AdaptivePlayerScreen(
                                             exoPlayer?.seekTo(seekTargetTime)
                                             showSeekOverlay = false
                                         }
+                                        if (isFastForwarding2x) {
+                                            isFastForwarding2x = false
+                                            exoPlayer?.setPlaybackSpeed(playbackSpeed)
+                                        }
+                                        overlayDismissToken = System.currentTimeMillis()
                                         isHorizontalScrub = false
                                         isVerticalSwipe = false
                                     }
@@ -749,6 +942,58 @@ fun AdaptivePlayerScreen(
                     },
                     modifier = Modifier.fillMaxSize()
                 )
+
+                // 2X Speed Hold Indicator Badge
+                if (isFastForwarding2x) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 36.dp)
+                            .background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(20.dp))
+                            .border(1.dp, AccentEmerald, RoundedCornerShape(20.dp))
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.FastForward,
+                                contentDescription = null,
+                                tint = AccentEmerald,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "2X Speed >>",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+                }
+
+                // Next Episode Countdown card (Landscape)
+                if (hasNextEpisode && totalDuration > 45000L && (totalDuration - currentPosition) in 1000L..35000L) {
+                    val remainingSecs = ((totalDuration - currentPosition) / 1000L).coerceAtLeast(1)
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 24.dp, bottom = 64.dp)
+                            .background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(10.dp))
+                            .border(1.dp, AccentEmerald, RoundedCornerShape(10.dp))
+                            .clickable { playNextEpisode() }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column {
+                                Text("Next Ep in ${remainingSecs}s", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text("Play Now", color = AccentEmerald, fontSize = 10.sp)
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = AccentEmerald, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
 
                 // Gesture Overlays
                 if (showVolumeOverlay) {
@@ -858,6 +1103,38 @@ fun AdaptivePlayerScreen(
                                 }
 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
+                                    // Landscape Dub Language Selector
+                                    if ((detail?.dubs?.size ?: 0) > 1) {
+                                        var landscapeLangDropdownOpen by remember { mutableStateOf(false) }
+                                        Box {
+                                            IconButton(onClick = { landscapeLangDropdownOpen = true }) {
+                                                Icon(Icons.Default.Translate, contentDescription = "Audio Language", tint = Color.White)
+                                            }
+                                            DropdownMenu(
+                                                expanded = landscapeLangDropdownOpen,
+                                                onDismissRequest = { landscapeLangDropdownOpen = false },
+                                                modifier = Modifier.background(BgCard)
+                                            ) {
+                                                (detail?.dubs ?: emptyList()).forEach { dub ->
+                                                    DropdownMenuItem(
+                                                        text = {
+                                                            Text(
+                                                                text = dub.name.ifBlank { dub.language },
+                                                                color = if (selectedDub == dub) AccentEmerald else TextPrimary,
+                                                                fontWeight = if (selectedDub == dub) FontWeight.Bold else FontWeight.Normal,
+                                                                fontSize = 12.sp
+                                                            )
+                                                        },
+                                                        onClick = {
+                                                            landscapeLangDropdownOpen = false
+                                                            switchDub(dub)
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
                                     IconButton(
                                         onClick = {
                                             resizeMode = when (resizeMode) {
@@ -895,7 +1172,7 @@ fun AdaptivePlayerScreen(
                         } else {
                             Row(
                                 modifier = Modifier.align(Alignment.Center),
-                                horizontalArrangement = Arrangement.spacedBy(40.dp),
+                                horizontalArrangement = Arrangement.spacedBy(32.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 IconButton(
@@ -923,6 +1200,15 @@ fun AdaptivePlayerScreen(
                                 ) {
                                     Icon(Icons.Default.Forward10, contentDescription = "Forward", tint = Color.White)
                                 }
+
+                                if (hasNextEpisode) {
+                                    IconButton(
+                                        onClick = { playNextEpisode() },
+                                        modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape).size(48.dp)
+                                    ) {
+                                        Icon(Icons.Default.SkipNext, contentDescription = "Next Episode", tint = AccentEmerald)
+                                    }
+                                }
                             }
                         }
 
@@ -935,28 +1221,75 @@ fun AdaptivePlayerScreen(
                                 .padding(horizontal = 20.dp, vertical = 12.dp)
                         ) {
                             Column {
-                                Slider(
-                                    value = currentPosition.toFloat(),
-                                    onValueChange = { newPos ->
-                                        currentPosition = newPos.toLong()
-                                        exoPlayer?.seekTo(newPos.toLong())
-                                    },
-                                    valueRange = 0f..totalDuration.coerceAtLeast(1L).toFloat(),
-                                    colors = SliderDefaults.colors(thumbColor = AccentEmerald, activeTrackColor = AccentEmerald),
-                                    modifier = Modifier.fillMaxWidth().height(20.dp)
-                                )
+                                val bufferedRatio = if (totalDuration > 0L) {
+                                    (bufferedPosition.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f)
+                                } else 0f
+
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(24.dp),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    // Background base track & buffered progress track
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 8.dp)
+                                            .height(4.dp)
+                                            .clip(RoundedCornerShape(2.dp))
+                                            .background(Color.White.copy(alpha = 0.2f)),
+                                        contentAlignment = Alignment.CenterStart
+                                    ) {
+                                        if (bufferedRatio > 0f) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxHeight()
+                                                    .fillMaxWidth(fraction = bufferedRatio)
+                                                    .background(Color.White.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
+                                            )
+                                        }
+                                    }
+
+                                    // Playback active track & thumb
+                                    Slider(
+                                        value = currentPosition.toFloat(),
+                                        onValueChange = { newPos ->
+                                            currentPosition = newPos.toLong()
+                                            exoPlayer?.seekTo(newPos.toLong())
+                                        },
+                                        valueRange = 0f..totalDuration.coerceAtLeast(1L).toFloat(),
+                                        colors = SliderDefaults.colors(
+                                            thumbColor = AccentEmerald,
+                                            activeTrackColor = AccentEmerald,
+                                            inactiveTrackColor = Color.Transparent
+                                        ),
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
 
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = "${formatDuration(currentPosition)} / ${formatDuration(totalDuration)}",
-                                        color = Color.White,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = "${formatDuration(currentPosition)} / ${formatDuration(totalDuration)}",
+                                            color = Color.White,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        if (bufferedAheadMs > 0L && totalDuration > 0L) {
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Text(
+                                                text = "•  Buffer: ${formatBufferedAhead(bufferedAheadMs)}",
+                                                color = AccentEmerald.copy(alpha = 0.85f),
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                    }
 
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                                         // Speed button
@@ -1026,12 +1359,76 @@ fun AdaptivePlayerScreen(
                         modifier = Modifier.fillMaxSize()
                     )
 
-                    // Touch listener on player
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clickable { showControls = !showControls }
+                    // Touch & Gesture listener on portrait player (Supports 2X Hold, Taps, and Double Tap Seek)
+                    AndroidView(
+                        factory = { ctx ->
+                            View(ctx).apply {
+                                setOnTouchListener { _, event ->
+                                    gestureDetector.onTouchEvent(event)
+                                    if (event.action == MotionEvent.ACTION_UP || event.action == MotionEvent.ACTION_CANCEL) {
+                                        if (isFastForwarding2x) {
+                                            isFastForwarding2x = false
+                                            exoPlayer?.setPlaybackSpeed(playbackSpeed)
+                                        }
+                                    }
+                                    true
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
                     )
+
+                    // 2X Speed Hold Indicator Badge (Portrait)
+                    if (isFastForwarding2x) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = 16.dp)
+                                .background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(20.dp))
+                                .border(1.dp, AccentEmerald, RoundedCornerShape(20.dp))
+                                .padding(horizontal = 14.dp, vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.FastForward,
+                                    contentDescription = null,
+                                    tint = AccentEmerald,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "2X Speed >>",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+                    }
+
+                    // Next Episode Countdown card (Portrait)
+                    if (hasNextEpisode && totalDuration > 45000L && (totalDuration - currentPosition) in 1000L..35000L) {
+                        val remainingSecs = ((totalDuration - currentPosition) / 1000L).coerceAtLeast(1)
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(end = 10.dp, bottom = 32.dp)
+                                .background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(10.dp))
+                                .border(1.dp, AccentEmerald, RoundedCornerShape(10.dp))
+                                .clickable { playNextEpisode() }
+                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column {
+                                    Text("Next Ep in ${remainingSecs}s", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    Text("Play Now", color = AccentEmerald, fontSize = 9.sp)
+                                }
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = AccentEmerald, modifier = Modifier.size(14.dp))
+                            }
+                        }
+                    }
 
                     // Always show buffer loader if buffering and controls hidden
                     if (isBuffering && !showControls) {
@@ -1102,7 +1499,7 @@ fun AdaptivePlayerScreen(
                             } else {
                                 Row(
                                     modifier = Modifier.align(Alignment.Center),
-                                    horizontalArrangement = Arrangement.spacedBy(30.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(24.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     IconButton(
@@ -1129,6 +1526,15 @@ fun AdaptivePlayerScreen(
                                         modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape).size(36.dp)
                                     ) {
                                         Icon(Icons.Default.Forward10, contentDescription = "Forward", tint = Color.White)
+                                    }
+
+                                    if (hasNextEpisode) {
+                                        IconButton(
+                                            onClick = { playNextEpisode() },
+                                            modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape).size(36.dp)
+                                        ) {
+                                            Icon(Icons.Default.SkipNext, contentDescription = "Next Episode", tint = AccentEmerald)
+                                        }
                                     }
                                 }
                             }
@@ -1157,6 +1563,14 @@ fun AdaptivePlayerScreen(
                                             Text("LIVE STREAM", color = Color.Red, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                         }
 
+                                        if (bufferedAheadMs > 0L) {
+                                            Text(
+                                                text = "Buffer: ${formatBufferedAhead(bufferedAheadMs)}",
+                                                color = Color.White.copy(alpha = 0.75f),
+                                                fontSize = 10.sp
+                                            )
+                                        }
+
                                         IconButton(
                                             onClick = { isFullscreen = true },
                                             modifier = Modifier.size(28.dp)
@@ -1170,28 +1584,75 @@ fun AdaptivePlayerScreen(
                                     }
                                 } else {
                                     Column {
-                                        Slider(
-                                            value = currentPosition.toFloat(),
-                                            onValueChange = { newPos ->
-                                                currentPosition = newPos.toLong()
-                                                exoPlayer?.seekTo(newPos.toLong())
-                                            },
-                                            valueRange = 0f..totalDuration.coerceAtLeast(1L).toFloat(),
-                                            colors = SliderDefaults.colors(thumbColor = AccentEmerald, activeTrackColor = AccentEmerald),
-                                            modifier = Modifier.fillMaxWidth().height(14.dp)
-                                        )
+                                        val bufferedRatio = if (totalDuration > 0L) {
+                                            (bufferedPosition.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f)
+                                        } else 0f
+
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(20.dp),
+                                            contentAlignment = Alignment.CenterStart
+                                        ) {
+                                            // Base track & buffered track
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 8.dp)
+                                                    .height(3.dp)
+                                                    .clip(RoundedCornerShape(1.5.dp))
+                                                    .background(Color.White.copy(alpha = 0.2f)),
+                                                contentAlignment = Alignment.CenterStart
+                                            ) {
+                                                if (bufferedRatio > 0f) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxHeight()
+                                                            .fillMaxWidth(fraction = bufferedRatio)
+                                                            .background(Color.White.copy(alpha = 0.5f), RoundedCornerShape(1.5.dp))
+                                                    )
+                                                }
+                                            }
+
+                                            // Slider on top
+                                            Slider(
+                                                value = currentPosition.toFloat(),
+                                                onValueChange = { newPos ->
+                                                    currentPosition = newPos.toLong()
+                                                    exoPlayer?.seekTo(newPos.toLong())
+                                                },
+                                                valueRange = 0f..totalDuration.coerceAtLeast(1L).toFloat(),
+                                                colors = SliderDefaults.colors(
+                                                    thumbColor = AccentEmerald,
+                                                    activeTrackColor = AccentEmerald,
+                                                    inactiveTrackColor = Color.Transparent
+                                                ),
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
 
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(
-                                                text = "${formatDuration(currentPosition)} / ${formatDuration(totalDuration)}",
-                                                color = Color.White,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = "${formatDuration(currentPosition)} / ${formatDuration(totalDuration)}",
+                                                    color = Color.White,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                                if (bufferedAheadMs > 0L && totalDuration > 0L) {
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Text(
+                                                        text = "•  Buf: ${formatBufferedAhead(bufferedAheadMs)}",
+                                                        color = AccentEmerald.copy(alpha = 0.85f),
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Medium
+                                                    )
+                                                }
+                                            }
 
                                             IconButton(
                                                 onClick = { isFullscreen = true },
@@ -1490,9 +1951,8 @@ fun AdaptivePlayerScreen(
                                                         )
                                                     },
                                                     onClick = {
-                                                        selectedDub = dub
                                                         langDropdownOpen = false
-                                                        switchEpisode(currentSeasonNum, currentEpisodeNum)
+                                                        switchDub(dub)
                                                     }
                                                 )
                                             }

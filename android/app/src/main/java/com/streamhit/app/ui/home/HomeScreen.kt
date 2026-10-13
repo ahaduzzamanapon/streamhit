@@ -1,5 +1,6 @@
 package com.streamhit.app.ui.home
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -146,7 +147,7 @@ fun HomeScreenShimmer(brush: Brush) {
 fun HomeScreen(
     repository: MovieRepository,
     onMediaClick: (detailPath: String, subjectId: String, subjectType: Int) -> Unit,
-    onPlayDirect: (streamUrl: String, title: String, subjectId: String, detailPath: String, coverUrl: String) -> Unit = { _, _, _, _, _ -> },
+    onPlayDirect: (streamUrl: String, title: String, subjectId: String, detailPath: String, coverUrl: String, seasonNum: Int, episodeNum: Int, startPositionMs: Long) -> Unit = { _, _, _, _, _, _, _, _ -> },
     onNavigateToSearch: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -157,6 +158,20 @@ fun HomeScreen(
     var isLoading by remember { mutableStateOf(true) }
     var selectedCategoryIndex by remember { mutableStateOf(0) }
     var showShareDialog by remember { mutableStateOf(false) }
+
+    // Live refresh when returning to HomeScreen from PlayerActivity
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                recentHistory = RecentHistoryManager.getRecentHistory(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     LaunchedEffect(Unit) {
         recentHistory = RecentHistoryManager.getRecentHistory(context)
@@ -243,7 +258,7 @@ fun HomeScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                    .padding(horizontal = 14.dp, vertical = 6.dp)
             ) {
                 // Search Pill & Share Action Row
                 Row(
@@ -251,9 +266,9 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Surface(
-                        shape = RoundedCornerShape(24.dp),
-                        color = Color.White.copy(alpha = 0.08f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color.White.copy(alpha = 0.06f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
                         modifier = Modifier
                             .weight(1f)
                             .clickable { onNavigateToSearch() }
@@ -261,7 +276,7 @@ fun HomeScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -273,13 +288,13 @@ fun HomeScreen(
                                     imageVector = Icons.Default.Search,
                                     contentDescription = "Search",
                                     tint = TextMuted,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = "Search movies, series, anime...",
                                     color = TextMuted,
-                                    fontSize = 13.sp,
+                                    fontSize = 12.5.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -287,16 +302,16 @@ fun HomeScreen(
 
                             // Green Search Action Button
                             Surface(
-                                shape = RoundedCornerShape(16.dp),
+                                shape = RoundedCornerShape(14.dp),
                                 color = AccentEmerald,
                                 modifier = Modifier.clickable { onNavigateToSearch() }
                             ) {
                                 Text(
                                     text = "Search",
                                     color = Color.Black,
-                                    fontSize = 12.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                                 )
                             }
                         }
@@ -307,10 +322,10 @@ fun HomeScreen(
                     // Share App Button
                     Surface(
                         shape = CircleShape,
-                        color = Color.White.copy(alpha = 0.08f),
+                        color = Color.White.copy(alpha = 0.06f),
                         border = androidx.compose.foundation.BorderStroke(1.dp, AccentEmerald.copy(alpha = 0.35f)),
                         modifier = Modifier
-                            .size(42.dp)
+                            .size(36.dp)
                             .clickable { showShareDialog = true }
                     ) {
                         Box(contentAlignment = Alignment.Center) {
@@ -318,36 +333,46 @@ fun HomeScreen(
                                 imageVector = Icons.Default.Share,
                                 contentDescription = "Share App",
                                 tint = AccentEmerald,
-                                modifier = Modifier.size(19.dp)
+                                modifier = Modifier.size(17.dp)
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                // Category Filter Pills
+                // Animated Category Filter Pills
                 LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(horizontal = 2.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    contentPadding = PaddingValues(horizontal = 1.dp)
                 ) {
                     itemsIndexed(categories) { index, cat ->
                         val isSelected = selectedCategoryIndex == index
+                        val bgColor by animateColorAsState(
+                            targetValue = if (isSelected) AccentEmerald.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.04f),
+                            label = "catBg"
+                        )
+                        val borderColor by animateColorAsState(
+                            targetValue = if (isSelected) AccentEmerald else Color.White.copy(alpha = 0.10f),
+                            label = "catBorder"
+                        )
+                        val textColor by animateColorAsState(
+                            targetValue = if (isSelected) AccentEmerald else TextSecondary,
+                            label = "catText"
+                        )
+
                         Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = if (isSelected) AccentEmerald.copy(alpha = 0.2f) else Color.Transparent,
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                if (isSelected) AccentEmerald else Color.White.copy(alpha = 0.12f)
-                            ),
+                            shape = RoundedCornerShape(14.dp),
+                            color = bgColor,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
                             modifier = Modifier.clickable { selectedCategoryIndex = index }
                         ) {
                             Text(
                                 text = cat,
-                                color = if (isSelected) AccentEmerald else TextSecondary,
-                                fontSize = 12.sp,
+                                color = textColor,
+                                fontSize = 11.5.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                                modifier = Modifier.padding(horizontal = 11.dp, vertical = 4.5.dp)
                             )
                         }
                     }
@@ -386,12 +411,17 @@ fun HomeScreen(
                                     onMediaClick(path, item.subjectId, item.subjectType)
                                 },
                                 onResumeClick = {
-                                    if (item.streamUrl.isNotBlank()) {
-                                        onPlayDirect(item.streamUrl, item.title, item.subjectId, item.detailPath, item.coverUrl)
-                                    } else {
-                                        val path = item.detailPath.ifEmpty { item.subjectId }
-                                        onMediaClick(path, item.subjectId, item.subjectType)
-                                    }
+                                    val path = item.detailPath.ifEmpty { item.subjectId }
+                                    onPlayDirect(
+                                        item.streamUrl,
+                                        item.title,
+                                        item.subjectId,
+                                        path,
+                                        item.coverUrl,
+                                        item.seasonNum,
+                                        item.episodeNum,
+                                        item.positionMs
+                                    )
                                 }
                             )
                         }
@@ -468,12 +498,12 @@ fun HomeScreen(
             val title = section.title ?: "Trending"
             val isRankedSection = sectionIndex == 0 || title.contains("Top", ignoreCase = true) || title.contains("Trending", ignoreCase = true)
 
-            Column(modifier = Modifier.padding(vertical = 8.dp)) {
+            Column(modifier = Modifier.padding(vertical = 4.dp)) {
                 SectionHeader(title = title)
 
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    contentPadding = PaddingValues(horizontal = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     itemsIndexed(subjects) { index, subject ->
                         MediaCard(
@@ -520,7 +550,7 @@ fun ContinueWatchingCard(
 ) {
     Card(
         modifier = Modifier
-            .width(160.dp)
+            .width(145.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(containerColor = BgCard)
@@ -529,7 +559,7 @@ fun ContinueWatchingCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(95.dp)
+                    .height(85.dp)
                     .background(Color.Black)
             ) {
                 AsyncImage(
@@ -591,10 +621,10 @@ fun ContinueWatchingCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (item.subjectType == 2) "Series" else "Movie",
+                        text = if (item.subjectType == 2) item.episodeBadge.ifBlank { "Series" } else "Movie",
                         color = AccentEmerald,
                         fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "${item.progressPercent}%",

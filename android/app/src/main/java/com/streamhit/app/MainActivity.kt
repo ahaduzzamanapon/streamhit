@@ -8,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -16,8 +17,15 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -35,6 +43,8 @@ import com.streamhit.app.ui.player.PlayerActivity
 import com.streamhit.app.ui.search.SearchScreen
 import com.streamhit.app.ui.theme.*
 import com.streamhit.app.update.AppUpdateManager
+import com.streamhit.app.data.analytics.AppAnalyticsManager
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -44,17 +54,24 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Register device & start telemetry heartbeat
+        AppAnalyticsManager.getDeviceId(this)
+        AppAnalyticsManager.startHeartbeat(this, lifecycleScope)
+
         setContent {
             StreamfitTheme {
                 MainAppScreen(
                     repository = repository,
-                    onPlayVideo = { url, title, subjectId, detailPath, coverUrl ->
+                    onPlayVideo = { url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPositionMs ->
                         val intent = Intent(this, PlayerActivity::class.java).apply {
                             putExtra("EXTRA_STREAM_URL", url)
                             putExtra("EXTRA_VIDEO_TITLE", title)
                             putExtra("EXTRA_SUBJECT_ID", subjectId)
                             putExtra("EXTRA_DETAIL_PATH", detailPath)
                             putExtra("EXTRA_COVER_URL", coverUrl)
+                            putExtra("EXTRA_SEASON_NUM", seasonNum)
+                            putExtra("EXTRA_EPISODE_NUM", episodeNum)
+                            putExtra("EXTRA_START_POSITION_MS", startPositionMs)
                         }
                         startActivity(intent)
                     }
@@ -75,7 +92,7 @@ sealed class Screen(val title: String, val icon: ImageVector) {
 @Composable
 fun MainAppScreen(
     repository: MovieRepository,
-    onPlayVideo: (streamUrl: String, title: String, subjectId: String, detailPath: String, coverUrl: String) -> Unit
+    onPlayVideo: (streamUrl: String, title: String, subjectId: String, detailPath: String, coverUrl: String, seasonNum: Int, episodeNum: Int, startPositionMs: Long) -> Unit
 ) {
     val context = LocalContext.current
     val activity = context as? ComponentActivity
@@ -159,36 +176,80 @@ fun MainAppScreen(
     Scaffold(
         bottomBar = {
             if (activeDetailPath == null) {
-                NavigationBar(
-                    containerColor = BgSurface,
-                    contentColor = TextPrimary,
-                    tonalElevation = 8.dp
+                // Sleek, compact animated bottom navigation bar
+                Surface(
+                    color = Color(0xFF0F1420).copy(alpha = 0.96f),
+                    tonalElevation = 8.dp,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                    shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+                    modifier = Modifier.fillMaxWidth().navigationBarsPadding()
                 ) {
-                    val tabs = listOf(Screen.Home, Screen.LiveTv, Screen.Explore, Screen.Downloads, Screen.Search)
-                    tabs.forEach { tab ->
-                        val isSelected = currentTab == tab
-                        NavigationBarItem(
-                            selected = isSelected,
-                            onClick = { switchTab(tab) },
-                            icon = {
-                                Icon(
-                                    imageVector = tab.icon,
-                                    contentDescription = tab.title,
-                                    tint = if (isSelected) AccentEmerald else TextMuted
-                                )
-                            },
-                            label = {
-                                Text(
-                                    text = tab.title,
-                                    color = if (isSelected) AccentEmerald else TextMuted,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                )
-                            },
-                            colors = NavigationBarItemDefaults.colors(
-                                indicatorColor = AccentEmerald.copy(alpha = 0.12f)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceAround,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val tabs = listOf(Screen.Home, Screen.LiveTv, Screen.Explore, Screen.Downloads, Screen.Search)
+                        tabs.forEach { tab ->
+                            val isSelected = currentTab == tab
+                            val iconScale by animateFloatAsState(
+                                targetValue = if (isSelected) 1.12f else 1.0f,
+                                animationSpec = tween(220),
+                                label = "tabIconScale"
                             )
-                        )
+                            val tintColor by animateColorAsState(
+                                targetValue = if (isSelected) AccentEmerald else TextMuted,
+                                animationSpec = tween(220),
+                                label = "tabColor"
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .padding(horizontal = 2.dp, vertical = 2.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) AccentEmerald.copy(alpha = 0.12f) else Color.Transparent)
+                                    .clickable { switchTab(tab) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = tab.icon,
+                                        contentDescription = tab.title,
+                                        tint = tintColor,
+                                        modifier = Modifier
+                                            .size(19.dp)
+                                            .graphicsLayer {
+                                                scaleX = iconScale
+                                                scaleY = iconScale
+                                            }
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = tab.title,
+                                        color = tintColor,
+                                        fontSize = 9.5.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        maxLines = 1
+                                    )
+                                    if (isSelected) {
+                                        Spacer(modifier = Modifier.height(1.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .size(3.dp)
+                                                .background(AccentEmerald, CircleShape)
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -208,8 +269,8 @@ fun MainAppScreen(
                     onBackClick = {
                         popDetails()
                     },
-                    onPlayClick = { url, title, cover ->
-                        onPlayVideo(url, title, activeSubjectId ?: "", activeDetailPath ?: "", cover)
+                    onPlayClick = { url, title, cover, seasonNum, episodeNum, startPos ->
+                        onPlayVideo(url, title, activeSubjectId ?: "", activeDetailPath ?: "", cover, seasonNum, episodeNum, startPos)
                     },
                     onNavigateToDownloads = {
                         activeDetailPath = null
@@ -225,8 +286,8 @@ fun MainAppScreen(
                         onMediaClick = { path, id, _ ->
                             navigateToDetails(path, id)
                         },
-                        onPlayDirect = { url, title, subjectId, detailPath, coverUrl ->
-                            onPlayVideo(url, title, subjectId, detailPath, coverUrl)
+                        onPlayDirect = { url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPos ->
+                            onPlayVideo(url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPos)
                         },
                         onNavigateToSearch = {
                             switchTab(Screen.Search)
@@ -234,7 +295,7 @@ fun MainAppScreen(
                     )
                     Screen.LiveTv -> LiveTvScreen(
                         onPlayStream = { url, title ->
-                            onPlayVideo(url, title, "", "", "")
+                            onPlayVideo(url, title, "", "", "", 1, 1, 0L)
                         }
                     )
                     Screen.Explore -> ExploreScreen(
@@ -246,7 +307,7 @@ fun MainAppScreen(
                     Screen.Downloads -> DownloadsScreen(
                         repository = repository,
                         onPlayOffline = { localUri, title ->
-                            onPlayVideo(localUri, title, "", "", "")
+                            onPlayVideo(localUri, title, "", "", "", 1, 1, 0L)
                         },
                         onNavigateToDetails = { path, id ->
                             navigateToDetails(path, id)

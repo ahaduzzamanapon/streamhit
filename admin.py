@@ -712,3 +712,9 @@ async def get_active_users(request: Request):
     from main import get_active_users_stats
     return get_active_users_stats()
 
+@router.get("/api/admin/app-users")
+async def get_app_users_admin(request: Request):
+    check_admin_auth(request)
+    from main import get_app_users_list
+    return get_app_users_list()
+

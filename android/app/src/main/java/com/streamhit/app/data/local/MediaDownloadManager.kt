@@ -1,6 +1,5 @@
 package com.streamhit.app.data.local
 
-import android.app.DownloadManager
 import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
@@ -8,8 +7,15 @@ import android.os.Environment
 import android.os.StatFs
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.*
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.io.File
+import java.io.FileOutputStream
 import java.text.DecimalFormat
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
+import kotlin.random.Random
 
 enum class DownloadStatus {
     PENDING,
@@ -49,7 +55,7 @@ data class DownloadItem(
     val playUri: String
         get() {
             val file = File(localFilePath)
-            return if (file.exists()) {
+            return if (file.exists() && file.length() > 0) {
                 Uri.fromFile(file).toString()
             } else {
                 downloadUrl
@@ -77,6 +83,18 @@ object MediaDownloadManager {
     private const val KEY_DOWNLOADS = "download_items_json"
     private val gson = Gson()
 
+    private val downloadScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val activeJobs = ConcurrentHashMap<Long, Job>()
+
+    private val okHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .build()
+    }
+
     private fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
     }
@@ -103,6 +121,28 @@ object MediaDownloadManager {
     }
 
     @Synchronized
+    private fun updateItemProgress(context: Context, item: DownloadItem) {
+        val list = getAllDownloads(context).toMutableList()
+        val idx = list.indexOfFirst { it.downloadId == item.downloadId }
+        if (idx >= 0) {
+            list[idx].downloadedBytes = item.downloadedBytes
+            list[idx].totalBytes = item.totalBytes
+            list[idx].status = item.status
+            saveDownloads(context, list)
+        }
+    }
+
+    @Synchronized
+    fun updateStatus(context: Context, downloadId: Long, status: DownloadStatus) {
+        val list = getAllDownloads(context).toMutableList()
+        val idx = list.indexOfFirst { it.downloadId == downloadId }
+        if (idx >= 0) {
+            list[idx].status = status
+            saveDownloads(context, list)
+        }
+    }
+
+    @Synchronized
     fun startDownload(
         context: Context,
         subjectId: String,
@@ -123,30 +163,19 @@ object MediaDownloadManager {
                 else -> "https://nxly.online/$downloadUrl"
             }
 
-            val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            val downloadId = System.currentTimeMillis() + Random.nextLong(1000)
             val cleanTitle = title.replace(Regex("[^a-zA-Z0-9.-]"), "_")
-            val fileName = "${cleanTitle}_${quality}_${System.currentTimeMillis()}.mp4"
+            val fileName = "${cleanTitle}_${quality}_${downloadId}.mp4"
 
-            val targetDir = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES) ?: context.filesDir
+            // Store in app-internal dedicated directory (zero external gallery/device pollution)
+            val targetDir = File(context.filesDir, "in_app_downloads")
             if (!targetDir.exists()) {
                 targetDir.mkdirs()
             }
             val targetFile = File(targetDir, fileName)
 
-            val request = DownloadManager.Request(Uri.parse(fullDownloadUrl)).apply {
-                setTitle(title)
-                setDescription("Downloading $quality - Streamfit")
-                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                setDestinationUri(Uri.fromFile(targetFile))
-                setAllowedOverMetered(true)
-                setAllowedOverRoaming(true)
-                addRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-            }
-
-            val id = dm.enqueue(request)
-
             val item = DownloadItem(
-                downloadId = id,
+                downloadId = downloadId,
                 subjectId = subjectId,
                 detailPath = detailPath,
                 title = title,
@@ -170,86 +199,163 @@ object MediaDownloadManager {
             }
             list.add(0, item)
             saveDownloads(context, list)
-            id
+
+            executeDownload(context.applicationContext, item, targetFile)
+
+            downloadId
         } catch (e: Exception) {
             e.printStackTrace()
             -1L
         }
     }
 
+    private fun executeDownload(context: Context, item: DownloadItem, targetFile: File) {
+        val job = downloadScope.launch {
+            try {
+                var existingLength = if (targetFile.exists()) targetFile.length() else 0L
+
+                val requestBuilder = Request.Builder()
+                    .url(item.downloadUrl)
+                    .header("User-Agent", "okhttp/4.12.0")
+                    .header("Accept", "*/*")
+
+                if (existingLength > 0L) {
+                    requestBuilder.header("Range", "bytes=$existingLength-")
+                }
+
+                val request = requestBuilder.build()
+                val response = okHttpClient.newCall(request).execute()
+
+                if (!response.isSuccessful && response.code != 206) {
+                    if (response.code == 416) {
+                        targetFile.delete()
+                        existingLength = 0L
+                        val freshReq = Request.Builder()
+                            .url(item.downloadUrl)
+                            .header("User-Agent", "okhttp/4.12.0")
+                            .header("Accept", "*/*")
+                            .build()
+                        val freshResp = okHttpClient.newCall(freshReq).execute()
+                        if (!freshResp.isSuccessful) {
+                            updateStatus(context, item.downloadId, DownloadStatus.FAILED)
+                            freshResp.close()
+                            return@launch
+                        }
+                        writeStreamToFile(context, item, targetFile, freshResp, 0L)
+                    } else {
+                        updateStatus(context, item.downloadId, DownloadStatus.FAILED)
+                        response.close()
+                        return@launch
+                    }
+                } else {
+                    writeStreamToFile(context, item, targetFile, response, existingLength)
+                }
+            } catch (e: CancellationException) {
+                // Paused or cancelled
+            } catch (e: Exception) {
+                e.printStackTrace()
+                updateStatus(context, item.downloadId, DownloadStatus.FAILED)
+            } finally {
+                activeJobs.remove(item.downloadId)
+            }
+        }
+        activeJobs[item.downloadId] = job
+    }
+
+    private fun writeStreamToFile(
+        context: Context,
+        item: DownloadItem,
+        targetFile: File,
+        response: okhttp3.Response,
+        existingLength: Long
+    ) {
+        val body = response.body ?: run {
+            updateStatus(context, item.downloadId, DownloadStatus.FAILED)
+            return
+        }
+
+        val contentLength = body.contentLength()
+        val total = if (contentLength > 0) existingLength + contentLength else item.totalBytes
+        item.totalBytes = total
+        item.downloadedBytes = existingLength
+        item.status = DownloadStatus.DOWNLOADING
+        updateItemProgress(context, item)
+
+        val buffer = ByteArray(32 * 1024)
+        var bytesCopied = existingLength
+        var lastUpdateMs = System.currentTimeMillis()
+
+        val inputStream = body.byteStream()
+        val outputStream = FileOutputStream(targetFile, existingLength > 0L)
+
+        try {
+            var read: Int
+            while (inputStream.read(buffer).also { read = it } != -1) {
+                outputStream.write(buffer, 0, read)
+                bytesCopied += read
+                item.downloadedBytes = bytesCopied
+
+                val now = System.currentTimeMillis()
+                if (now - lastUpdateMs >= 350L) {
+                    lastUpdateMs = now
+                    updateItemProgress(context, item)
+                }
+            }
+            outputStream.flush()
+
+            if (targetFile.exists() && targetFile.length() > 0) {
+                item.status = DownloadStatus.COMPLETED
+                item.totalBytes = targetFile.length()
+                item.downloadedBytes = targetFile.length()
+                updateItemProgress(context, item)
+            } else {
+                updateStatus(context, item.downloadId, DownloadStatus.FAILED)
+            }
+        } finally {
+            try { inputStream.close() } catch (_: Exception) {}
+            try { outputStream.close() } catch (_: Exception) {}
+            response.close()
+        }
+    }
+
+    @Synchronized
+    fun resumeDownload(context: Context, downloadId: Long) {
+        val items = getAllDownloads(context)
+        val target = items.firstOrNull { it.downloadId == downloadId } ?: return
+        if (target.status == DownloadStatus.COMPLETED) return
+
+        activeJobs[downloadId]?.cancel()
+        target.status = DownloadStatus.DOWNLOADING
+        updateItemProgress(context, target)
+
+        val targetFile = File(target.localFilePath)
+        executeDownload(context.applicationContext, target, targetFile)
+    }
+
+    @Synchronized
+    fun pauseDownload(context: Context, downloadId: Long) {
+        activeJobs[downloadId]?.cancel()
+        activeJobs.remove(downloadId)
+        updateStatus(context, downloadId, DownloadStatus.PAUSED)
+    }
+
     @Synchronized
     fun refreshDownloadStatuses(context: Context): List<DownloadItem> {
-        val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val items = getAllDownloads(context).toMutableList()
         var changed = false
 
         for (item in items) {
+            val file = File(item.localFilePath)
             if (item.status == DownloadStatus.COMPLETED) {
-                // Verify local file still exists
-                if (!File(item.localFilePath).exists()) {
+                if (!file.exists() || file.length() == 0L) {
                     item.status = DownloadStatus.FAILED
                     changed = true
                 }
-                continue
-            }
-
-            try {
-                val query = DownloadManager.Query().setFilterById(item.downloadId)
-                val cursor = dm.query(query)
-                if (cursor != null && cursor.moveToFirst()) {
-                    val bytesCol = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
-                    val totalCol = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
-                    val statusCol = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
-
-                    if (bytesCol != -1) item.downloadedBytes = cursor.getLong(bytesCol)
-                    if (totalCol != -1) {
-                        val total = cursor.getLong(totalCol)
-                        if (total > 0) item.totalBytes = total
-                    }
-
-                    if (statusCol != -1) {
-                        when (cursor.getInt(statusCol)) {
-                            DownloadManager.STATUS_SUCCESSFUL -> {
-                                item.status = DownloadStatus.COMPLETED
-                                if (item.totalBytes <= 0 && item.downloadedBytes > 0) {
-                                    item.totalBytes = item.downloadedBytes
-                                }
-                                changed = true
-                            }
-                            DownloadManager.STATUS_PAUSED -> {
-                                item.status = DownloadStatus.PAUSED
-                                changed = true
-                            }
-                            DownloadManager.STATUS_FAILED -> {
-                                item.status = DownloadStatus.FAILED
-                                changed = true
-                            }
-                            DownloadManager.STATUS_RUNNING -> {
-                                item.status = DownloadStatus.DOWNLOADING
-                                changed = true
-                            }
-                        }
-                    }
-                    cursor.close()
-                } else {
-                    // Download query returned nothing, check file existence
-                    val file = File(item.localFilePath)
-                    if (file.exists() && file.length() > 0) {
-                        item.status = DownloadStatus.COMPLETED
-                        item.downloadedBytes = file.length()
-                        item.totalBytes = file.length()
-                    } else {
-                        // Keep DOWNLOADING status for 15s grace period while DownloadManager initializes
-                        if (System.currentTimeMillis() - item.addedTime < 15000) {
-                            item.status = DownloadStatus.DOWNLOADING
-                        } else {
-                            item.status = DownloadStatus.FAILED
-                        }
-                    }
-                    changed = true
+            } else if (item.status == DownloadStatus.DOWNLOADING) {
+                if (!activeJobs.containsKey(item.downloadId)) {
+                    // Re-attach active job if it was downloading but app restarted
+                    executeDownload(context.applicationContext, item, file)
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
             }
         }
 
@@ -262,8 +368,8 @@ object MediaDownloadManager {
     @Synchronized
     fun deleteDownload(context: Context, downloadId: Long) {
         try {
-            val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-            dm.remove(downloadId)
+            activeJobs[downloadId]?.cancel()
+            activeJobs.remove(downloadId)
 
             val items = getAllDownloads(context).toMutableList()
             val target = items.firstOrNull { it.downloadId == downloadId }

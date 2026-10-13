@@ -20,11 +20,18 @@ object RetrofitClient {
             .readTimeout(25, TimeUnit.SECONDS)
             .writeTimeout(20, TimeUnit.SECONDS)
             .addInterceptor { chain ->
-                val request = chain.request().newBuilder()
-                    .header("User-Agent", "StreamfitMobile/1.0.0 (Android)")
+                val builder = chain.request().newBuilder()
+                    .header("User-Agent", "StreamfitMobile/1.0.8 (Android)")
                     .header("Accept", "application/json")
-                    .build()
-                chain.proceed(request)
+
+                com.streamhit.app.data.analytics.AppAnalyticsManager.cachedDeviceId?.let {
+                    builder.header("X-App-Device-Id", it)
+                }
+                builder.header("X-App-Model", com.streamhit.app.data.analytics.AppAnalyticsManager.getDeviceModel())
+                builder.header("X-App-OS", com.streamhit.app.data.analytics.AppAnalyticsManager.getOsVersion())
+                builder.header("X-App-Version", com.streamhit.app.data.analytics.AppAnalyticsManager.getAppVersion())
+
+                chain.proceed(builder.build())
             }
             .addInterceptor(logging)
             .build()

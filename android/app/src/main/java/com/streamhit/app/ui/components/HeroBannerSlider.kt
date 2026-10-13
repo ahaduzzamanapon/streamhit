@@ -1,5 +1,6 @@
 package com.streamhit.app.ui.components
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -55,7 +56,7 @@ fun HeroBannerSlider(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(260.dp)
+            .height(240.dp)
     ) {
         HorizontalPager(
             state = pagerState,
@@ -190,10 +191,15 @@ fun HeroBannerSlider(
         ) {
             repeat(banners.size.coerceAtMost(8)) { index ->
                 val isSelected = pagerState.currentPage == index
+                val dotWidth by animateDpAsState(
+                    targetValue = if (isSelected) 18.dp else 5.dp,
+                    animationSpec = tween(350),
+                    label = "dotWidth"
+                )
                 Box(
                     modifier = Modifier
                         .height(5.dp)
-                        .width(if (isSelected) 18.dp else 5.dp)
+                        .width(dotWidth)
                         .clip(CircleShape)
                         .background(if (isSelected) AccentEmerald else Color.White.copy(alpha = 0.35f))
                 )

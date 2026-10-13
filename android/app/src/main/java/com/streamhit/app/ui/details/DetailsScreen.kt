@@ -39,7 +39,7 @@ fun DetailsScreen(
     detailPath: String,
     subjectId: String,
     onBackClick: () -> Unit,
-    onPlayClick: (streamUrl: String, title: String, coverUrl: String) -> Unit,
+    onPlayClick: (streamUrl: String, title: String, coverUrl: String, seasonNum: Int, episodeNum: Int, startPositionMs: Long) -> Unit,
     onNavigateToDownloads: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -56,6 +56,7 @@ fun DetailsScreen(
     var isResolvingStream by remember { mutableStateOf(false) }
     var showDownloadSheet by remember { mutableStateOf(false) }
     var isDownloadingActive by remember { mutableStateOf(false) }
+    var savedHistory by remember { mutableStateOf<com.streamhit.app.data.local.WatchHistoryItem?>(null) }
     val scope = rememberCoroutineScope()
 
     fun selectFastestPlayable(resList: List<StreamResource>): StreamResource? {
@@ -71,57 +72,67 @@ fun DetailsScreen(
         isLoading = true
         isResourcesLoading = true
         coroutineScope {
+            val history = com.streamhit.app.data.local.RecentHistoryManager.getHistoryForSubject(context, subjectId, detailPath)
+            savedHistory = history
+
             val sIdParam = subjectId.ifBlank { detailPath }
             val dDeferred = async { repository.getDetail(detailPath, subjectId) }
+            val initialSeason = history?.seasonNum ?: 1
+            val initialEp = history?.episodeNum ?: 1
+
             val resDeferred = if (sIdParam.isNotBlank()) {
-                async { repository.getStreamingResources(sIdParam, detailPath, 1, 1) }
+                async { repository.getStreamingResources(sIdParam, detailPath, initialSeason, initialEp) }
             } else null
 
             val d = dDeferred.await()
             detail = d
             selectedDub = d?.dubs?.firstOrNull { it.original == true } ?: d?.dubs?.firstOrNull()
+
+            if (history != null && d?.subjectType == 2) {
+                val sIdx = (history.seasonNum - 1).coerceAtLeast(0)
+                selectedSeasonIndex = sIdx
+                selectedEpisodeNumber = history.episodeNum
+            }
+
             isLoading = false
 
             var resList = resDeferred?.await() ?: emptyList()
             if (resList.isEmpty()) {
                 val sId = selectedDub?.subjectId?.ifBlank { d?.subjectId?.ifEmpty { subjectId } } ?: subjectId
                 val dPath = selectedDub?.detailPath?.ifBlank { d?.detailPath?.ifEmpty { detailPath } } ?: detailPath
-                resList = repository.getStreamingResources(sId, dPath, 1, 1)
+                resList = repository.getStreamingResources(sId, dPath, initialSeason, initialEp)
             }
             resources = resList
             isResourcesLoading = false
         }
     }
 
-    fun playStream(res: StreamResource, season: Int = 1, episode: Int = 1) {
+    fun playStream(res: StreamResource, season: Int = 1, episode: Int = 1, startPos: Long = 0L) {
         val title = detail?.title ?: "Stream"
         val epText = if (detail?.subjectType == 2) " - S${season}E${episode}" else ""
         val cover = detail?.coverUrl ?: ""
         if (res.url.isNotBlank()) {
-            onPlayClick(res.url, "$title$epText (${res.displayResolution})", cover)
+            onPlayClick(res.url, "$title$epText (${res.displayResolution})", cover, season, episode, startPos)
         } else {
             Toast.makeText(context, "Streaming link unavailable for this server.", Toast.LENGTH_SHORT).show()
         }
     }
 
-    fun playBestContent(season: Int = 1, episode: Int = 1) {
+    fun playBestContent(season: Int = 1, episode: Int = 1, startPos: Long = 0L) {
         val sId = selectedDub?.subjectId?.ifBlank { detail?.subjectId?.ifEmpty { subjectId } } ?: subjectId
         val dPath = selectedDub?.detailPath?.ifBlank { detail?.detailPath?.ifEmpty { detailPath } } ?: detailPath
-        val title = detail?.title ?: "Stream"
 
-        // If we already have resources for season 1 episode 1
-        if (season == 1 && episode == 1 && resources.isNotEmpty()) {
+        // If we already have resources for season & episode
+        if (resources.isNotEmpty() && season == (savedHistory?.seasonNum ?: 1) && episode == (savedHistory?.episodeNum ?: 1)) {
             val best = selectFastestPlayable(resources) ?: resources.first()
-            playStream(best, season, episode)
+            playStream(best, season, episode, startPos)
             return
         }
 
         isResolvingStream = true
         scope.launch {
             val resList = repository.getStreamingResources(sId, dPath, season, episode)
-            if (season == 1 && episode == 1) {
-                resources = resList
-            }
+            resources = resList
             isResolvingStream = false
             var best = selectFastestPlayable(resList)
 
@@ -134,14 +145,14 @@ fun DetailsScreen(
                     if (fallbackBest != null && fallbackBest.url.isNotBlank()) {
                         resources = fallbackList
                         selectedDub = dub
-                        playStream(fallbackBest, season, episode)
+                        playStream(fallbackBest, season, episode, startPos)
                         return@launch
                     }
                 }
             }
 
             if (best != null && best.url.isNotBlank()) {
-                playStream(best, season, episode)
+                playStream(best, season, episode, startPos)
             } else {
                 Toast.makeText(context, "Streaming sources are being updated. Please try again shortly.", Toast.LENGTH_LONG).show()
             }
@@ -262,9 +273,27 @@ fun DetailsScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Big Watch Now Button (Compact & Modern)
+                    // Big Watch / Resume Button
+                    val resumeTargetSeason = savedHistory?.seasonNum ?: 1
+                    val resumeTargetEpisode = savedHistory?.episodeNum ?: 1
+                    val resumeTargetPos = savedHistory?.positionMs ?: 0L
+                    val hasResume = savedHistory != null && (savedHistory!!.positionMs > 2000L || savedHistory!!.seasonNum > 1 || savedHistory!!.episodeNum > 1)
+
+                    val buttonLabel = when {
+                        isResolvingStream -> "Connecting Server..."
+                        hasResume && item.subjectType == 2 -> "Resume S${resumeTargetSeason} E${resumeTargetEpisode} (${savedHistory?.progressPercent}%)"
+                        hasResume -> "Resume Movie (${savedHistory?.progressPercent}%)"
+                        else -> "Watch Online Now"
+                    }
+
                     Button(
-                        onClick = { playBestContent(1, 1) },
+                        onClick = {
+                            if (hasResume) {
+                                playBestContent(resumeTargetSeason, resumeTargetEpisode, resumeTargetPos)
+                            } else {
+                                playBestContent(1, 1, 0L)
+                            }
+                        },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = AccentEmerald,
                             contentColor = Color.Black
@@ -282,7 +311,7 @@ fun DetailsScreen(
                         } else {
                             Icon(Icons.Default.PlayArrow, contentDescription = "Play", modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Watch Online Now", fontSize = 15.sp, fontWeight = FontWeight.Black)
+                            Text(buttonLabel, fontSize = 15.sp, fontWeight = FontWeight.Black)
                         }
                     }
 
@@ -644,7 +673,8 @@ fun DetailsScreen(
                                                 .height(36.dp)
                                                 .clickable {
                                                     selectedEpisodeNumber = ep.episodeNumber
-                                                    playBestContent(currentSeason.seasonNumber, ep.episodeNumber)
+                                                    val epStartPos = if (savedHistory?.seasonNum == currentSeason.seasonNumber && savedHistory?.episodeNum == ep.episodeNumber) (savedHistory?.positionMs ?: 0L) else 0L
+                                                    playBestContent(currentSeason.seasonNumber, ep.episodeNumber, epStartPos)
                                                 }
                                         ) {
                                             Box(

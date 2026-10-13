@@ -49,4 +49,8 @@ interface ApiService {
     // In-app Version Control
     @GET("api/app/version")
     suspend fun getAppVersion(): Response<AppVersionResponse>
+
+    // Telemetry & Device Heartbeat
+    @POST("api/app/heartbeat")
+    suspend fun sendHeartbeat(@Body payload: Map<String, String>): Response<Map<String, Any>>
 }

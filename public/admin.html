@@ -753,11 +753,12 @@
             <button onclick="switchTab('version')" id="btn-version" class="tab-btn">Version Control & APK</button>
             <button onclick="switchTab('sports')" id="btn-sports" class="tab-btn">Live Sports</button>
             <button onclick="switchTab('tv')" id="btn-tv" class="tab-btn">Live TV Channels</button>
+            <button onclick="switchTab('app-users')" id="btn-app-users" class="tab-btn">App Users & Installs</button>
         </div>
 
         <!-- ── Live Active Users Bar ── -->
-        <div class="live-users-bar">
-            <!-- Total -->
+        <div class="live-users-bar" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+            <!-- Total Active -->
             <div class="live-card" style="--card-glow: #ffffff; border-color: rgba(255,255,255,0.12);">
                 <div class="live-card-icon" style="background: rgba(255,255,255,0.06);">
                     🌐
@@ -768,14 +769,24 @@
                     <span class="live-refresh-label" id="liveLastRefresh">Fetching...</span>
                 </div>
             </div>
-            <!-- App Users -->
-            <div class="live-card" style="--card-glow: #FF2A54; border-color: rgba(255,42,84,0.2);">
+            <!-- App Users Live -->
+            <div class="live-card" style="--card-glow: #FF2A54; border-color: rgba(255,42,84,0.2); cursor: pointer;" onclick="switchTab('app-users')">
                 <div class="live-card-icon" style="background: rgba(255,42,84,0.1);">
                     📱
                 </div>
                 <div class="live-card-info">
-                    <span class="live-card-label">App Users</span>
+                    <span class="live-card-label">App Users (Live)</span>
                     <span class="live-card-count" id="liveApp" style="color: var(--accent-color);">–</span>
+                </div>
+            </div>
+            <!-- Total Installs -->
+            <div class="live-card" style="--card-glow: #10B981; border-color: rgba(16,185,129,0.25); cursor: pointer;" onclick="switchTab('app-users')">
+                <div class="live-card-icon" style="background: rgba(16,185,129,0.1); color: #10B981;">
+                    📲
+                </div>
+                <div class="live-card-info">
+                    <span class="live-card-label">Total Installs</span>
+                    <span class="live-card-count" id="liveInstalls" style="color: #10B981;">–</span>
                 </div>
             </div>
             <!-- Web Users -->
@@ -1149,6 +1160,79 @@
                 </div>
             </div>
         </div>
+
+        <!-- App Users Tab Panel -->
+        <div id="panel-app-users" class="tab-panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+                <div>
+                    <h2>📱 App Users & Installations</h2>
+                    <p style="color: var(--text-muted); font-size: 14px; margin-top: -12px;">Real-time tracking of app installations, active users, and device telemetry.</p>
+                </div>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <button class="btn btn-secondary" onclick="fetchAppUsers()" style="padding: 10px 18px; font-size: 13px;">
+                        Refresh List
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats Mini Bar -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                <div class="card" style="margin-bottom: 0; padding: 20px; background: rgba(16,185,129,0.06); border-color: rgba(16,185,129,0.25);">
+                    <div style="font-size: 11px; color: #10B981; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Total Installations</div>
+                    <div style="font-size: 32px; font-weight: 800; color: #fff; margin-top: 4px;" id="appUsersStatTotal">0</div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Unique devices registered</div>
+                </div>
+
+                <div class="card" style="margin-bottom: 0; padding: 20px; background: rgba(255,42,84,0.06); border-color: rgba(255,42,84,0.25);">
+                    <div style="font-size: 11px; color: var(--accent-color); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+                        <span class="live-dot"></span> Live Active Now
+                    </div>
+                    <div style="font-size: 32px; font-weight: 800; color: #fff; margin-top: 4px;" id="appUsersStatLive">0</div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">In-app within last 5 minutes</div>
+                </div>
+
+                <div class="card" style="margin-bottom: 0; padding: 20px; background: rgba(0,240,255,0.06); border-color: rgba(0,240,255,0.25);">
+                    <div style="font-size: 11px; color: var(--secondary-accent); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Active Today</div>
+                    <div style="font-size: 32px; font-weight: 800; color: #fff; margin-top: 4px;" id="appUsersStatToday">0</div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Used app today</div>
+                </div>
+            </div>
+
+            <!-- Filter bar -->
+            <div class="card" style="padding: 16px 20px; margin-bottom: 16px;">
+                <div style="display: flex; gap: 14px; align-items: center; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 250px;">
+                        <input type="text" id="appUserSearch" oninput="filterAppUsersTable(this.value)" placeholder="Search by Device Model, IP, or App Version..." style="margin-bottom: 0; padding: 10px 14px; font-size: 13px;">
+                    </div>
+                    <div style="color: var(--text-muted); font-size: 12px;" id="appUsersCountLabel">
+                        Showing 0 users
+                    </div>
+                </div>
+            </div>
+
+            <!-- Users Table -->
+            <div class="card" style="padding: 0; overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; min-width: 850px;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid var(--border-color); background: rgba(255,255,255,0.02); text-align: left;">
+                            <th style="padding: 14px 16px; font-size: 12px; color: var(--text-muted); width: 45px;">#</th>
+                            <th style="padding: 14px 16px; font-size: 12px; color: var(--text-muted); width: 110px;">Status</th>
+                            <th style="padding: 14px 16px; font-size: 12px; color: var(--text-muted);">Device Model</th>
+                            <th style="padding: 14px 16px; font-size: 12px; color: var(--text-muted); width: 130px;">Android OS</th>
+                            <th style="padding: 14px 16px; font-size: 12px; color: var(--text-muted); width: 110px;">App Version</th>
+                            <th style="padding: 14px 16px; font-size: 12px; color: var(--text-muted); width: 160px;">First Installed</th>
+                            <th style="padding: 14px 16px; font-size: 12px; color: var(--text-muted); width: 140px;">Last Active</th>
+                            <th style="padding: 14px 16px; font-size: 12px; color: var(--text-muted); width: 140px;">IP Address</th>
+                        </tr>
+                    </thead>
+                    <tbody id="appUsersTableBody">
+                        <tr>
+                            <td colspan="8" style="padding: 30px; text-align: center; color: var(--text-muted);">Loading app users...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <!-- Toast Notification element -->
@@ -1249,6 +1333,7 @@
             fetchCurrentVersion();
             fetchLiveSports();
             fetchLiveTvChannels();
+            fetchAppUsers();
             populateSportStreamLinks([]);
             populateTvStreamLinks([]);
             startLiveUsersPoll();
@@ -1257,11 +1342,17 @@
         function switchTab(tab) {
             // Update buttons
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            document.getElementById(`btn-${tab}`).classList.add('active');
+            const targetBtn = document.getElementById(`btn-${tab}`);
+            if (targetBtn) targetBtn.classList.add('active');
             
             // Update panels
             document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
-            document.getElementById(`panel-${tab}`).classList.add('active');
+            const targetPanel = document.getElementById(`panel-${tab}`);
+            if (targetPanel) targetPanel.classList.add('active');
+
+            if (tab === 'app-users') {
+                fetchAppUsers();
+            }
         }
 
         // --- BANNERS TAB LOGIC ---
@@ -1619,9 +1710,12 @@
                     return;
                 }
                 const data = await res.json();
-                document.getElementById('liveTotal').textContent = data.total !== undefined ? data.total : '–';
-                document.getElementById('liveApp').textContent   = data.app !== undefined ? data.app : '–';
-                document.getElementById('liveWeb').textContent   = data.web !== undefined ? data.web : '–';
+                document.getElementById('liveTotal').textContent    = data.total !== undefined ? data.total : '–';
+                document.getElementById('liveApp').textContent      = data.app !== undefined ? data.app : '–';
+                document.getElementById('liveWeb').textContent      = data.web !== undefined ? data.web : '–';
+                if (document.getElementById('liveInstalls')) {
+                    document.getElementById('liveInstalls').textContent = data.total_installs !== undefined ? data.total_installs : '–';
+                }
                 const now = new Date();
                 document.getElementById('liveLastRefresh').textContent =
                     'Live (' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ')';
@@ -1635,8 +1729,108 @@
         function startLiveUsersPoll() {
             fetchLiveUsers();
             if (!_liveUsersPollTimer) {
-                _liveUsersPollTimer = setInterval(fetchLiveUsers, 10000);
+                _liveUsersPollTimer = setInterval(() => {
+                    fetchLiveUsers();
+                    // If App Users tab is active, refresh the table too
+                    const appTab = document.getElementById('panel-app-users');
+                    if (appTab && appTab.classList.contains('active')) {
+                        fetchAppUsers();
+                    }
+                }, 10000);
             }
+        }
+
+        // ── App Users Management ──────────────────────────────────────────────
+        let _allAppUsers = [];
+
+        async function fetchAppUsers() {
+            if (!token) return;
+            try {
+                const res = await fetch('/api/admin/app-users', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                const totalEl = document.getElementById('appUsersStatTotal');
+                const liveEl = document.getElementById('appUsersStatLive');
+                const todayEl = document.getElementById('appUsersStatToday');
+                if (totalEl) totalEl.textContent = data.total_installs || 0;
+                if (liveEl)  liveEl.textContent  = data.live_count || 0;
+                if (todayEl) todayEl.textContent = data.today_count || 0;
+                
+                _allAppUsers = data.users || [];
+                renderAppUsersTable(_allAppUsers);
+            } catch (_) {}
+        }
+
+        function formatUserTime(ts) {
+            if (!ts) return '–';
+            const now = Date.now() / 1000;
+            const diff = now - ts;
+            if (diff < 60) return 'Just now';
+            if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+            if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+            if (diff < 86400 * 7) return Math.floor(diff / 86400) + 'd ago';
+            return new Date(ts * 1000).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        function renderAppUsersTable(users) {
+            const tbody = document.getElementById('appUsersTableBody');
+            if (!tbody) return;
+            const countLabel = document.getElementById('appUsersCountLabel');
+            if (countLabel) countLabel.textContent = `Showing ${users.length} device(s)`;
+            
+            if (!users || users.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" style="padding: 32px; text-align: center; color: var(--text-muted);">No app installations recorded yet. Launch the Android app to register!</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = users.map((u, i) => {
+                const isOnline = u.is_online;
+                const statusBadge = isOnline 
+                    ? `<span style="display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.3);"><span class="live-dot" style="width: 6px; height: 6px;"></span>Online</span>`
+                    : `<span style="display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.04); color: var(--text-muted); border: 1px solid rgba(255,255,255,0.08);">Offline</span>`;
+
+                const firstDate = u.first_seen ? new Date(u.first_seen * 1000).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : '–';
+                const lastActiveStr = formatUserTime(u.last_seen);
+                const safeModel = (u.device_model || 'Android Device').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const safeOs = (u.os_version || 'Android').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const safeVer = (u.app_version || '1.0.7').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const safeIp = (u.ip || '–').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const safeId = (u.device_id || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+                return `
+                    <tr style="border-bottom: 1px solid var(--border-color); font-size: 13px;">
+                        <td style="padding: 12px 16px; color: var(--text-muted);">${i + 1}</td>
+                        <td style="padding: 12px 16px;">${statusBadge}</td>
+                        <td style="padding: 12px 16px; font-weight: 700; color: #fff;">
+                            📱 ${safeModel}
+                            <div style="font-size: 10px; color: var(--text-muted); font-weight: 400; font-family: monospace;">${safeId.substring(0, 16)}...</div>
+                        </td>
+                        <td style="padding: 12px 16px; color: var(--text-muted);">${safeOs}</td>
+                        <td style="padding: 12px 16px;"><span style="background: rgba(0,240,255,0.08); color: var(--secondary-accent); border: 1px solid rgba(0,240,255,0.2); border-radius: 6px; padding: 2px 7px; font-size: 11px; font-weight: 700;">${safeVer}</span></td>
+                        <td style="padding: 12px 16px; color: var(--text-muted); font-size: 12px;">${firstDate}</td>
+                        <td style="padding: 12px 16px; color: ${isOnline ? '#22c55e' : 'var(--text-color)'}; font-weight: ${isOnline ? '700' : '500'};">${lastActiveStr}</td>
+                        <td style="padding: 12px 16px; color: var(--text-muted); font-family: monospace; font-size: 12px;">${safeIp}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function filterAppUsersTable(q) {
+            const query = (q || '').toLowerCase().trim();
+            if (!query) {
+                renderAppUsersTable(_allAppUsers);
+                return;
+            }
+            const filtered = _allAppUsers.filter(u => 
+                (u.device_model || '').toLowerCase().includes(query) ||
+                (u.ip || '').toLowerCase().includes(query) ||
+                (u.os_version || '').toLowerCase().includes(query) ||
+                (u.app_version || '').toLowerCase().includes(query) ||
+                (u.device_id || '').toLowerCase().includes(query)
+            );
+            renderAppUsersTable(filtered);
         }
 
         // --- STREAM LINKS DYNAMIC MANAGER LOGIC ---

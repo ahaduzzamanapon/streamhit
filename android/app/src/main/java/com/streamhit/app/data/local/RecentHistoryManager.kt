@@ -14,10 +14,15 @@ data class WatchHistoryItem(
     val positionMs: Long,
     val durationMs: Long,
     val subjectType: Int = 1,
+    val seasonNum: Int = 1,
+    val episodeNum: Int = 1,
     val timestamp: Long = System.currentTimeMillis()
 ) {
     val progressPercent: Int
         get() = if (durationMs > 0) ((positionMs * 100) / durationMs).toInt().coerceIn(0, 100) else 0
+
+    val episodeBadge: String
+        get() = if (subjectType == 2) "S${seasonNum} E${episodeNum}" else ""
 }
 
 object RecentHistoryManager {
@@ -41,6 +46,15 @@ object RecentHistoryManager {
     }
 
     @Synchronized
+    fun getHistoryForSubject(context: Context, subjectId: String, detailPath: String = ""): WatchHistoryItem? {
+        val list = getRecentHistory(context)
+        return list.firstOrNull {
+            (subjectId.isNotBlank() && it.subjectId == subjectId) ||
+            (detailPath.isNotBlank() && it.detailPath == detailPath)
+        }
+    }
+
+    @Synchronized
     fun saveProgress(
         context: Context,
         subjectId: String,
@@ -50,33 +64,53 @@ object RecentHistoryManager {
         streamUrl: String,
         positionMs: Long,
         durationMs: Long,
-        subjectType: Int = 1
+        subjectType: Int = 1,
+        seasonNum: Int = 1,
+        episodeNum: Int = 1
     ) {
-        if (positionMs <= 1000L || durationMs <= 0L) return
+        if (title.isBlank() && subjectId.isBlank() && detailPath.isBlank()) return
 
         try {
             val list = getRecentHistory(context).toMutableList()
-            // Remove existing entry for same subject or stream
-            list.removeAll { it.subjectId == subjectId || (subjectId.isEmpty() && it.streamUrl == streamUrl) }
+            // Find any existing entry to preserve duration or metadata if incoming is empty/0
+            val existing = list.firstOrNull {
+                (subjectId.isNotBlank() && it.subjectId == subjectId) ||
+                (detailPath.isNotBlank() && it.detailPath == detailPath) ||
+                (subjectId.isEmpty() && streamUrl.isNotBlank() && it.streamUrl == streamUrl)
+            }
 
-            // Add new entry at top
+            // Remove existing entry for same subject or path or stream
+            list.removeAll {
+                (subjectId.isNotBlank() && it.subjectId == subjectId) ||
+                (detailPath.isNotBlank() && it.detailPath == detailPath) ||
+                (subjectId.isEmpty() && streamUrl.isNotBlank() && it.streamUrl == streamUrl)
+            }
+
+            val finalDuration = if (durationMs > 0L) durationMs else (existing?.durationMs ?: 0L)
+            val finalCover = coverUrl.ifBlank { existing?.coverUrl ?: "" }
+            val finalTitle = title.ifBlank { existing?.title ?: "Watching" }
+            val finalStream = streamUrl.ifBlank { existing?.streamUrl ?: "" }
+
+            // Add updated/new entry at the top of history
             list.add(
                 0,
                 WatchHistoryItem(
                     subjectId = subjectId,
                     detailPath = detailPath,
-                    title = title,
-                    coverUrl = coverUrl,
-                    streamUrl = streamUrl,
-                    positionMs = positionMs,
-                    durationMs = durationMs,
+                    title = finalTitle,
+                    coverUrl = finalCover,
+                    streamUrl = finalStream,
+                    positionMs = positionMs.coerceAtLeast(0L),
+                    durationMs = finalDuration,
                     subjectType = subjectType,
+                    seasonNum = seasonNum,
+                    episodeNum = episodeNum,
                     timestamp = System.currentTimeMillis()
                 )
             )
 
-            // Keep max 20 items
-            val trimmed = list.take(20)
+            // Keep max 25 items
+            val trimmed = list.take(25)
             val json = gson.toJson(trimmed)
             getPrefs(context).edit().putString(KEY_HISTORY, json).apply()
         } catch (e: Exception) {
@@ -85,9 +119,13 @@ object RecentHistoryManager {
     }
 
     @Synchronized
-    fun getSavedPosition(context: Context, streamUrl: String, subjectId: String): Long {
+    fun getSavedPosition(context: Context, streamUrl: String, subjectId: String, detailPath: String = ""): Long {
         val list = getRecentHistory(context)
-        val item = list.firstOrNull { it.subjectId == subjectId || (subjectId.isEmpty() && it.streamUrl == streamUrl) }
+        val item = list.firstOrNull {
+            (subjectId.isNotBlank() && it.subjectId == subjectId) ||
+            (detailPath.isNotBlank() && it.detailPath == detailPath) ||
+            (subjectId.isEmpty() && streamUrl.isNotBlank() && it.streamUrl == streamUrl)
+        }
         return item?.positionMs ?: 0L
     }
 

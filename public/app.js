@@ -57,7 +57,8 @@ function detectRoute() {
         routes.isTv = true;
         state.subjectType = 2;
     } else if (path.startsWith("/live-tv")) {
-        routes.isLiveTv = true;
+        window.location.replace("/download");
+        return;
     } else {
         routes.isHome = true;
         state.subjectType = 0;
@@ -3762,24 +3763,6 @@ async function initHomePageSportsAndTv() {
             setupSliderNavigation(sportsGrid);
         } else {
             sportsSection.style.display = "none";
-        }
-    }
-
-    // 2. Init Live TV
-    const tvGrid = document.getElementById("liveTvGrid");
-    const tvSection = document.getElementById("liveTvSection");
-    if (tvGrid && tvSection) {
-        const result = await apiGet("/api/tv/channels");
-        if (result && result.code === 0 && result.list && result.list.length > 0) {
-            tvGrid.innerHTML = "";
-            result.list.slice(0, 12).forEach(chan => {
-                const card = createTvCard(chan);
-                tvGrid.appendChild(card);
-            });
-            tvSection.style.display = "block";
-            setupSliderNavigation(tvGrid);
-        } else {
-            tvSection.style.display = "none";
         }
     }
 }

@@ -10,7 +10,7 @@ async def update_version():
                 async with conn.cursor() as cur:
                     await cur.execute("""
                         INSERT INTO app_versions (id, version_code, version_name, apk_url, must_update, release_notes)
-                        VALUES (1, 8, '1.0.7', 'https://nxly.online/uploads/apks/NXLY-Stream.apk', 0, 'Self-healing automated stream resolution, deprecated video auto-filtering, and new App Share modal to easily invite friends & family.')
+                        VALUES (1, 9, '1.0.8', 'https://nxly.online/uploads/apks/NXLY-Stream.apk', 0, 'Compact modern navigation, press-and-hold 2X speed, fixed landscape gestures, series next episode button, recent search history, and in-app download engine.')
                         ON DUPLICATE KEY UPDATE
                             version_code = VALUES(version_code),
                             version_name = VALUES(version_name),
@@ -18,7 +18,7 @@ async def update_version():
                             must_update = VALUES(must_update),
                             release_notes = VALUES(release_notes)
                     """)
-                    print("Updated database app_versions table to v1.0.7")
+                    print("Updated database app_versions table to v1.0.8")
         else:
             print("Database pool not available for version update")
     except Exception as e:

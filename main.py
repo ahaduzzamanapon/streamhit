@@ -837,10 +837,46 @@ def _init_active_db():
                 )
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_active_last_seen ON active_sessions(last_seen)")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS app_installations (
+                    device_id TEXT PRIMARY KEY,
+                    ip TEXT,
+                    device_model TEXT,
+                    os_version TEXT,
+                    app_version TEXT,
+                    first_seen REAL NOT NULL,
+                    last_seen REAL NOT NULL
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_installs_last_seen ON app_installations(last_seen)")
     except Exception:
         pass
 
 _init_active_db()
+
+def record_app_device(device_id: str, ip: str = "", device_model: str = "Android Device", os_version: str = "Android", app_version: str = "1.0.7"):
+    if not device_id:
+        return
+    now = time.time()
+    _active_app_users[device_id] = now
+    try:
+        with sqlite3.connect(_ACTIVE_DB_PATH, timeout=2) as conn:
+            conn.execute("""
+                INSERT INTO app_installations (device_id, ip, device_model, os_version, app_version, first_seen, last_seen)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(device_id) DO UPDATE SET
+                    ip = excluded.ip,
+                    device_model = CASE WHEN excluded.device_model != '' THEN excluded.device_model ELSE app_installations.device_model END,
+                    os_version = CASE WHEN excluded.os_version != '' THEN excluded.os_version ELSE app_installations.os_version END,
+                    app_version = CASE WHEN excluded.app_version != '' THEN excluded.app_version ELSE app_installations.app_version END,
+                    last_seen = excluded.last_seen
+            """, (device_id, ip, device_model, os_version, app_version, now, now))
+            conn.execute(
+                "INSERT OR REPLACE INTO active_sessions (user_id, user_type, last_seen) VALUES (?, ?, ?)",
+                (device_id, "app", now)
+            )
+    except Exception:
+        pass
 
 def record_active_user(request: Request):
     try:
@@ -851,19 +887,27 @@ def record_active_user(request: Request):
             client_ip = forwarded.split(",")[0].strip()
             
         user_agent = request.headers.get("User-Agent", "").lower()
-        is_app = ("moviebox" in user_agent or 
+        app_dev_id = request.headers.get("X-App-Device-Id") or request.headers.get("device_id")
+        
+        is_app = (app_dev_id is not None or 
+                  "streamfit" in user_agent or 
+                  "streamhit" in user_agent or
+                  "moviebox" in user_agent or 
                   "dart" in user_agent or 
                   "okhttp" in user_agent or 
                   request.headers.get("X-M-Version") is not None or 
                   request.headers.get("X-Client-Token") is not None)
                   
         user_type = "app" if is_app else "web"
-        user_id = (request.headers.get("device_id") or 
-                   request.headers.get("X-Client-Token") or 
-                   client_ip) if is_app else client_ip
+        user_id = app_dev_id or (request.headers.get("X-Client-Token") if is_app else None) or client_ip
 
         if is_app:
             _active_app_users[user_id] = now
+            dev_model = request.headers.get("X-App-Model", "Android Device")
+            dev_os = request.headers.get("X-App-OS", "Android")
+            dev_ver = request.headers.get("X-App-Version", "1.0.7")
+            if app_dev_id:
+                record_app_device(app_dev_id, client_ip, dev_model, dev_os, dev_ver)
         else:
             _active_web_users[user_id] = now
 
@@ -887,6 +931,7 @@ def get_active_users_stats():
     
     web_count = 0
     app_count = 0
+    total_installs = 0
     db_success = False
 
     try:
@@ -905,6 +950,14 @@ def get_active_users_stats():
                     web_count = cnt
                 elif utype == "app":
                     app_count = cnt
+
+            # Also check app_installations for live apps
+            cur.execute("SELECT COUNT(DISTINCT device_id) FROM app_installations WHERE last_seen >= ?", (cutoff,))
+            installed_live = cur.fetchone()[0] or 0
+            app_count = max(app_count, installed_live)
+
+            cur.execute("SELECT COUNT(*) FROM app_installations")
+            total_installs = cur.fetchone()[0] or 0
             db_success = True
     except Exception:
         pass
@@ -916,6 +969,7 @@ def get_active_users_stats():
         for k in dead_app: _active_app_users.pop(k, None)
         web_count = len(_active_web_users)
         app_count = len(_active_app_users)
+        total_installs = app_count
 
     # Always at least 1 web user if admin is active
     if web_count == 0:
@@ -924,7 +978,54 @@ def get_active_users_stats():
     return {
         "total": web_count + app_count,
         "web": web_count,
-        "app": app_count
+        "app": app_count,
+        "total_installs": total_installs
+    }
+
+def get_app_users_list():
+    now = time.time()
+    cutoff = now - 300  # 5 min live
+    today_start = now - (now % 86400)
+    users = []
+    total_installs = 0
+    live_count = 0
+    today_count = 0
+    try:
+        with sqlite3.connect(_ACTIVE_DB_PATH, timeout=3) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cur.execute("SELECT COUNT(*) as cnt FROM app_installations")
+            total_installs = cur.fetchone()["cnt"]
+            cur.execute("SELECT COUNT(*) as cnt FROM app_installations WHERE last_seen >= ?", (cutoff,))
+            live_count = cur.fetchone()["cnt"]
+            cur.execute("SELECT COUNT(*) as cnt FROM app_installations WHERE last_seen >= ?", (today_start,))
+            today_count = cur.fetchone()["cnt"]
+
+            cur.execute("""
+                SELECT device_id, ip, device_model, os_version, app_version, first_seen, last_seen
+                FROM app_installations
+                ORDER BY last_seen DESC
+                LIMIT 200
+            """)
+            for row in cur.fetchall():
+                last = row["last_seen"]
+                users.append({
+                    "device_id": row["device_id"],
+                    "ip": row["ip"] or "",
+                    "device_model": row["device_model"] or "Android Device",
+                    "os_version": row["os_version"] or "Android",
+                    "app_version": row["app_version"] or "1.0.7",
+                    "first_seen": row["first_seen"],
+                    "last_seen": row["last_seen"],
+                    "is_online": (last >= cutoff)
+                })
+    except Exception:
+        pass
+    return {
+        "total_installs": total_installs,
+        "live_count": live_count,
+        "today_count": today_count,
+        "users": users
     }
 
 @app.middleware("http")
@@ -933,6 +1034,27 @@ async def track_active_users_middleware(request: Request, call_next):
     if not path.endswith((".css", ".js", ".png", ".jpg", ".jpeg", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".xml")):
         record_active_user(request)
     return await call_next(request)
+
+@app.post("/api/app/heartbeat")
+async def api_app_heartbeat(request: Request):
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    now = time.time()
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+
+    device_id = data.get("device_id") or request.headers.get("X-App-Device-Id") or client_ip
+    device_model = data.get("device_model") or request.headers.get("X-App-Model", "Android Device")
+    os_version = data.get("os_version") or request.headers.get("X-App-OS", "Android")
+    app_version = data.get("app_version") or request.headers.get("X-App-Version", "1.0.7")
+
+    record_app_device(device_id, client_ip, device_model, os_version, app_version)
+    record_active_user(request)
+    return {"code": 0, "status": "ok", "t": int(now)}
 
 @app.get("/api/ping")
 async def api_ping(request: Request):
@@ -1156,8 +1278,10 @@ async def tv(request: Request):
     brand = get_brand_config(host)
     return serve_html("public/tv.html", {"<title>Explore TV Series - Streamfit</title>": f"<title>Explore TV Series - {brand['name']}</title>"}, host=host)
 
-@app.get("/live-tv", response_class=HTMLResponse)
-async def livetv(request: Request): return serve_html("public/live-tv.html", host=request.headers.get("host", ""))
+@app.get("/live-tv")
+@app.get("/live-tv.html")
+async def livetv(request: Request):
+    return RedirectResponse(url="/download", status_code=302)
 
 @app.get("/download", response_class=HTMLResponse)
 @app.get("/download.html", response_class=HTMLResponse)
