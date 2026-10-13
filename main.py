@@ -288,6 +288,55 @@ async def request_moviebox_mobile(endpoint: str, method: str = "GET", params: di
         return {}
     return {}
 
+ADULT_GENRES = {
+    'erotic', 'hot', 'adult', '18+', '18', 'ecchi', 'hentai', 'porn', 'pornography',
+    'sex', 'sensual', 'nudity', 'sexual', 'uncensored', 'nsfw', 'softcore', 'hardcore'
+}
+
+ADULT_KEYWORDS = [
+    '18+', '18 +', 'r18', 'r-18', 'nc-17', 'erotic', 'erotica', 'softcore', 'hardcore',
+    'porn', 'pornography', 'adult movie', 'adult series', 'adult film', 'sensual',
+    'uncensored', 'nudity', 'sexual', 'masturbat', 'seduction', 'striptease',
+    'kaam sastra', 'charmsukh', 'palang tod', 'riti riwaj', 'kavita bhabhi', 'chull',
+    'hotspot', 'gandii baat', 'kama sutra', 'kamasutra', 'mastram', 'tandoor', 'rasikan',
+    'dani daniels', 'mia khalifa', 'eva elfie', 'kendra lust', 'johnny sins',
+    'lana rhoades', 'angela white', 'riley reid', 'leah gotti', 'sunny leone adult',
+    'ullu', 'kooku', 'primeshots', 'hunters', 'voovi', 'moodx', 'besharams',
+    'rabbit movies', 'neonx', 'hotx', 'feneo', 'jalva', 'boomx', 'big bang'
+]
+
+def is_adult_content(item: dict) -> bool:
+    if not isinstance(item, dict):
+        return False
+
+    # 1. Check genres
+    genres = item.get("genre") or []
+    if isinstance(genres, str):
+        genres = [g.strip() for g in genres.replace("/", ",").split(",")]
+    elif not isinstance(genres, list):
+        genres = [str(genres)]
+
+    for g in genres:
+        if str(g).lower().strip() in ADULT_GENRES:
+            return True
+
+    # 2. Check content ratings
+    rating = str(item.get("classification") or item.get("ageRating") or item.get("rating") or "").lower().strip()
+    if rating in ("18", "18+", "r18", "r-18", "nc-17", "adult", "x", "xxx"):
+        return True
+
+    # 3. Check title, description, content, detailPath
+    title = str(item.get("title") or "").lower()
+    desc = str(item.get("description") or item.get("content") or "").lower()
+    dpath = str(item.get("detailPath") or item.get("detailUrl") or "").lower()
+    combined = f"{title} {desc} {dpath}"
+
+    for kw in ADULT_KEYWORDS:
+        if kw in title or kw in dpath or re.search(r'\b' + re.escape(kw) + r'\b', combined):
+            return True
+
+    return False
+
 async def get_latest_banners():
     global _banners_cache, _banners_cache_time
     now = time.time()
@@ -306,7 +355,7 @@ async def get_latest_banners():
         raw_items = rec_res.get("data", {}).get("items") or []
         for it in raw_items:
             sid = str(it.get("subjectId") or "")
-            if not sid or sid in seen_ids:
+            if not sid or sid in seen_ids or is_adult_content(it):
                 continue
             seen_ids.add(sid)
             title = it.get("title") or ""
@@ -1364,6 +1413,7 @@ async def get_home(page: int = 1, tabId: int = 0):
         # Update hero banner items with latest movies from MovieBox Mobile
         try:
             latest_banners = await get_latest_banners()
+            latest_banners = [b for b in latest_banners if not is_adult_content(b)]
             banner_found = False
             for op in data["data"]["operatingList"]:
                 if op.get("type") == "BANNER":
@@ -1378,7 +1428,24 @@ async def get_home(page: int = 1, tabId: int = 0):
                 })
         except Exception as e:
             print(f"Error updating home banners: {e}")
-        data["data"]["items"] = data["data"]["operatingList"]
+
+        # Filter out adult content from operatingList
+        filtered_op_list = []
+        for op in data["data"]["operatingList"]:
+            if op.get("type") == "BANNER":
+                banner_items = op.get("banner", {}).get("items") or []
+                clean_banner = [b for b in banner_items if not is_adult_content(b)]
+                if clean_banner:
+                    op["banner"]["items"] = clean_banner
+                    filtered_op_list.append(op)
+            else:
+                subjects = op.get("subjects") or []
+                clean_subjs = [s for s in subjects if not is_adult_content(s)]
+                if clean_subjs:
+                    op["subjects"] = clean_subjs
+                    filtered_op_list.append(op)
+        data["data"]["operatingList"] = filtered_op_list
+        data["data"]["items"] = filtered_op_list
         _home_cache[cache_key] = data
         _home_cache_time[cache_key] = now
     return data
@@ -1408,7 +1475,7 @@ async def get_movies_pool() -> list:
         latest_movies = await get_latest_content(subject_type=1)
         for m in latest_movies:
             sid = str(m.get("subjectId") or "")
-            if sid and sid not in seen:
+            if sid and sid not in seen and not is_adult_content(m):
                 seen.add(sid)
                 pool.append(m)
     except Exception as e:
@@ -1423,7 +1490,7 @@ async def get_movies_pool() -> list:
             for s in op.get("subjects", []):
                 sid = str(s.get("subjectId") or "")
                 st = s.get("subjectType", 1)
-                if st == 1 and sid and sid not in seen:
+                if st == 1 and sid and sid not in seen and not is_adult_content(s):
                     seen.add(sid)
                     title = s.get("title") or ""
                     sid_str = str(sid)
@@ -1469,7 +1536,7 @@ async def get_tv_pool() -> list:
             for it in items:
                 sid = str(it.get("subjectId") or "")
                 st = it.get("subjectType")
-                if st == 2 and sid and sid not in seen:
+                if st == 2 and sid and sid not in seen and not is_adult_content(it):
                     seen.add(sid)
                     title = it.get("title") or ""
                     sid_str = str(sid)
@@ -1498,7 +1565,7 @@ async def get_tv_pool() -> list:
             for s in op.get("subjects", []):
                 sid = str(s.get("subjectId") or "")
                 st = s.get("subjectType", 2)
-                if st == 2 and sid and sid not in seen:
+                if st == 2 and sid and sid not in seen and not is_adult_content(s):
                     seen.add(sid)
                     title = s.get("title") or ""
                     sid_str = str(sid)
@@ -1689,6 +1756,9 @@ async def api_search(request: Request):
                 if isinstance(genres, str):
                     genres = [g.strip() for g in genres.split(",") if g.strip()]
                     
+                if is_adult_content(it):
+                    continue
+
                 cleaned_items.append({
                     "subjectId": sid,
                     "title": title,
@@ -1709,7 +1779,8 @@ async def api_search(request: Request):
     # Fallback to H5 search
     url = f"{API_BASE}/wefeed-h5api-bff/subject/search"
     data = await _make_request(url, method="POST", payload={"keyword": keyword, "page": page, "perPage": perPage})
-    if "data" in data and "list" in data["data"]: data["data"]["items"] = data["data"]["list"]
+    if "data" in data and "list" in data["data"]:
+        data["data"]["items"] = [it for it in data["data"]["list"] if not is_adult_content(it)]
     return data
 
 @app.post("/api/heartbeat")
@@ -1740,6 +1811,8 @@ async def search_suggest(q: str = ""):
         if raw_items:
             items = []
             for it in raw_items:
+                if is_adult_content(it):
+                    continue
                 sid = str(it.get("subjectId") or "")
                 title = it.get("title") or ""
                 detail_path = it.get("detailPath") or ""

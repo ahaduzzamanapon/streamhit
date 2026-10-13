@@ -11,7 +11,8 @@ class MovieRepository {
         return try {
             val response = api.getBanners()
             if (response.isSuccessful) {
-                response.body()?.data?.list ?: emptyList()
+                val list = response.body()?.data?.list ?: emptyList()
+                list.filter { !com.streamhit.app.util.AdultContentFilter.isAdult(it.title, it.subject?.genres, it.detailPath) }
             } else emptyList()
         } catch (e: Exception) {
             emptyList()
@@ -22,7 +23,21 @@ class MovieRepository {
         return try {
             val response = api.getHomeFeed()
             if (response.isSuccessful) {
-                response.body()?.data?.items ?: emptyList()
+                val sections = response.body()?.data?.items ?: emptyList()
+                sections.mapNotNull { section ->
+                    val cleanSubjects = section.subjects?.filter { 
+                        !com.streamhit.app.util.AdultContentFilter.isAdult(it.title, it.genres, it.detailPath) 
+                    }
+                    val cleanBanner = section.banner?.items?.filter {
+                        !com.streamhit.app.util.AdultContentFilter.isAdult(it.title, it.subject?.genres, it.detailPath)
+                    }
+                    if ((cleanSubjects != null && cleanSubjects.isNotEmpty()) || (cleanBanner != null && cleanBanner.isNotEmpty())) {
+                        section.copy(
+                            subjects = cleanSubjects,
+                            banner = if (cleanBanner != null) section.banner.copy(items = cleanBanner) else section.banner
+                        )
+                    } else null
+                }
             } else emptyList()
         } catch (e: Exception) {
             emptyList()
@@ -39,7 +54,8 @@ class MovieRepository {
         return try {
             val response = api.filterContent(FilterRequest(page, 24, subjectType, genre, sort, year))
             if (response.isSuccessful) {
-                response.body()?.data?.items ?: emptyList()
+                val items = response.body()?.data?.items ?: emptyList()
+                items.filter { !com.streamhit.app.util.AdultContentFilter.isAdult(it.title, it.genres, it.detailPath) }
             } else emptyList()
         } catch (e: Exception) {
             emptyList()
@@ -75,7 +91,8 @@ class MovieRepository {
         return try {
             val response = api.search(SearchRequest(keyword = query, page = page))
             if (response.isSuccessful) {
-                response.body()?.data?.items ?: emptyList()
+                val items = response.body()?.data?.items ?: emptyList()
+                items.filter { !com.streamhit.app.util.AdultContentFilter.isAdult(it.title, it.genres, it.detailPath) }
             } else emptyList()
         } catch (e: Exception) {
             emptyList()

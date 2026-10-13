@@ -1,456 +1,875 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="bn">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Download App - Streamfit Secure Verification</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Streamfit App Download - অফিশিয়াল অ্যান্ড্রয়েড অ্যাপ</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     
-    <!-- Google Fonts -->
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-EGFDL2X6GY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-EGFDL2X6GY');
+    </script>
+
+    <!-- Google Fonts: Outfit, Plus Jakarta Sans, Hind Siliguri -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Plus+Jakarta+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Outfit:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
     
     <!-- FontAwesome icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Custom CSS Variables and Global resets -->
-    <link rel="stylesheet" href="style.css?v=6.8">
 
     <style>
-        .verification-container {
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        :root {
+            --primary-glow: #00ff87;
+            --primary-bright: #00df6d;
+            --primary-gradient: linear-gradient(135deg, #00ff87 0%, #60efff 100%);
+            --btn-gradient: linear-gradient(135deg, #00ff87 0%, #00b054 100%);
+            --bg-deep: #090b14;
+            --card-surface: #121626;
+            --card-surface-hover: #181d33;
+            --card-border: rgba(255, 255, 255, 0.12);
+            --card-border-glow: rgba(0, 255, 135, 0.4);
+            --text-pure: #ffffff;
+            --text-sub: #cbd5e1;
+            --text-muted: #94a3b8;
+            --badge-bg: rgba(0, 255, 135, 0.15);
+            --badge-border: rgba(0, 255, 135, 0.4);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            background-image: 
+                radial-gradient(at 50% 0%, rgba(0, 255, 135, 0.18) 0px, transparent 50%),
+                radial-gradient(at 90% 40%, rgba(96, 239, 255, 0.12) 0px, transparent 50%),
+                radial-gradient(at 10% 80%, rgba(139, 92, 246, 0.12) 0px, transparent 50%);
+            font-family: 'Hind Siliguri', 'Plus Jakarta Sans', sans-serif;
+            color: var(--text-pure);
             min-height: 100vh;
-            width: 100%;
-            background-color: var(--bg-primary);
-            padding: 20px;
-        }
-
-        .verification-card {
-            background-color: var(--bg-secondary);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: var(--border-radius-lg);
-            padding: 40px 30px;
-            width: 100%;
-            max-width: 440px;
-            text-align: center;
-            box-shadow: var(--shadow-lg);
-            position: relative;
-            overflow: hidden;
-            backdrop-filter: blur(10px);
-        }
-
-        .verification-card::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(255, 42, 58, 0.05) 0%, transparent 70%);
-            pointer-events: none;
-            z-index: 1;
-        }
-
-        .card-content {
-            position: relative;
-            z-index: 2;
-        }
-
-        .verify-icon-wrapper {
-            width: 80px;
-            height: 80px;
-            background: rgba(255, 42, 58, 0.1);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 24px auto;
-            border: 1px solid rgba(255, 42, 58, 0.2);
-            box-shadow: 0 0 20px rgba(255, 42, 58, 0.1);
-            transition: all 0.3s ease;
-        }
-
-        .verify-icon-wrapper.success {
-            background: rgba(46, 213, 115, 0.1);
-            border-color: rgba(46, 213, 115, 0.2);
-            box-shadow: 0 0 20px rgba(46, 213, 115, 0.2);
-            color: #2ed573;
-        }
-
-        .verify-icon {
-            font-size: 32px;
-            color: var(--color-accent);
-            transition: all 0.3s ease;
-        }
-
-        .verify-icon-wrapper.success .verify-icon {
-            color: #2ed573;
-        }
-
-        .verify-title {
-            font-family: 'Outfit', sans-serif;
-            font-size: 24px;
-            font-weight: 800;
-            margin-bottom: 12px;
-            letter-spacing: -0.5px;
-        }
-
-        .verify-desc {
-            font-size: 14px;
-            color: var(--text-secondary);
-            line-height: 1.6;
-            margin-bottom: 35px;
-        }
-
-        /* Slider Styles */
-        .slider-track {
-            width: 100%;
-            height: 56px;
-            background-color: var(--bg-primary);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 28px;
-            position: relative;
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            user-select: none;
-            margin-bottom: 20px;
-        }
-
-        .slider-text {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            pointer-events: none;
-            z-index: 2;
-            transition: opacity 0.2s ease;
-        }
-
-        .slider-handle {
-            width: 48px;
-            height: 48px;
-            background: var(--color-accent-gradient);
-            border-radius: 50%;
-            position: absolute;
-            left: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: grab;
-            color: var(--bg-primary);
-            z-index: 3;
-            box-shadow: 0 2px 10px rgba(255, 42, 58, 0.3);
-            transition: transform 0.1s ease;
-        }
-
-        .slider-handle:active {
-            cursor: grabbing;
-        }
-
-        .slider-handle i {
-            font-size: 18px;
-        }
-
-        .slider-progress {
-            position: absolute;
-            left: 0;
-            top: 0;
-            height: 100%;
-            width: 0;
-            background: rgba(255, 42, 58, 0.1);
-            border-radius: 28px 0 0 28px;
-            z-index: 1;
-            pointer-events: none;
-        }
-
-        /* Status UI */
-        .status-container {
-            display: none;
-            margin-top: 10px;
-        }
-
-        .status-loader {
             display: flex;
             flex-direction: column;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Top Header Navbar */
+        .site-header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(9, 11, 20, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--card-border);
+            padding: 14px 20px;
+        }
+
+        .nav-container {
+            max-width: 1040px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .brand-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+        }
+
+        .brand-icon {
+            width: 38px;
+            height: 38px;
+            background: var(--btn-gradient);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #06090e;
+            font-size: 16px;
+            box-shadow: 0 4px 16px rgba(0, 255, 135, 0.5);
+        }
+
+        .brand-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: #ffffff;
+        }
+
+        .brand-title span {
+            color: var(--primary-glow);
+        }
+
+        .nav-actions {
+            display: flex;
             align-items: center;
             gap: 12px;
         }
 
-        .spinner {
-            width: 32px;
-            height: 32px;
-            border: 3px solid rgba(255, 42, 58, 0.1);
-            border-top-color: var(--color-accent);
-            border-radius: 50%;
-            animation: spin 1s infinite linear;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .status-text {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        /* Success Button */
-        .download-btn-container {
-            display: none;
-            margin-top: 10px;
-            animation: fadeIn 0.4s ease;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .btn-download-now {
-            background: linear-gradient(135deg, #2ed573 0%, #7bed9f 100%);
-            color: var(--bg-primary);
-            font-weight: 800;
-            font-size: 15px;
-            padding: 14px 28px;
-            border-radius: var(--border-radius-md);
-            cursor: pointer;
+        .nav-btn {
             display: inline-flex;
             align-items: center;
-            gap: 10px;
-            box-shadow: 0 4px 15px rgba(46, 213, 115, 0.3);
-            transition: var(--transition-fast);
-            margin-top: 10px;
+            gap: 6px;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            border-radius: 20px;
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s ease;
         }
 
-        .btn-download-now:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(46, 213, 115, 0.4);
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.16);
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
         }
 
-        .brand-link {
+        /* Hero Wrapper */
+        .hero-wrap {
+            max-width: 900px;
+            margin: 24px auto 30px auto;
+            padding: 0 18px;
+            text-align: center;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Top Pill Badge */
+        .live-badge {
             display: inline-flex;
             align-items: center;
             gap: 8px;
+            padding: 8px 20px;
+            background: var(--badge-bg);
+            border: 1px solid var(--badge-border);
+            border-radius: 50px;
+            color: var(--primary-glow);
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
             margin-bottom: 20px;
-            cursor: pointer;
+            box-shadow: 0 0 20px rgba(0, 255, 135, 0.2);
+            animation: pulse-glow 2.5s infinite;
         }
 
-        .brand-link span {
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 15px rgba(0, 255, 135, 0.2); }
+            50% { box-shadow: 0 0 28px rgba(0, 255, 135, 0.5); }
+        }
+
+        .live-indicator {
+            width: 10px;
+            height: 10px;
+            background: #00ff87;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #00ff87;
+        }
+
+        /* Main Big Heading */
+        .main-headline {
+            font-family: 'Outfit', sans-serif;
+            font-size: clamp(30px, 6vw, 48px);
+            font-weight: 900;
+            line-height: 1.2;
+            letter-spacing: -0.5px;
+            color: #ffffff;
+            margin-bottom: 14px;
+        }
+
+        .main-headline .highlight-text {
+            background: linear-gradient(135deg, #00ff87 0%, #60efff 50%, #ffffff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 10px 30px rgba(0, 255, 135, 0.3);
+        }
+
+        .headline-sub {
+            font-size: clamp(16px, 3vw, 18px);
+            color: #cbd5e1;
+            line-height: 1.6;
+            max-width: 650px;
+            margin: 0 auto 30px auto;
+            font-weight: 500;
+        }
+
+        /* Central Download Hero Card */
+        .main-card {
+            background: var(--card-surface);
+            border: 2px solid rgba(0, 255, 135, 0.3);
+            border-radius: 28px;
+            padding: 36px 24px;
+            max-width: 640px;
+            margin: 0 auto;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), 0 0 45px rgba(0, 255, 135, 0.18);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card-top-shine {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #60efff, #00ff87, #60efff);
+        }
+
+        /* Primary Download Action Button */
+        .btn-download-big {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            background: var(--btn-gradient);
+            color: #06090e;
+            padding: 22px 30px;
+            border-radius: 20px;
+            text-decoration: none;
+            box-shadow: 0 14px 35px rgba(0, 255, 135, 0.5), 0 0 25px rgba(0, 255, 135, 0.3);
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            cursor: pointer;
+            border: none;
+            width: 100%;
+        }
+
+        .btn-download-big:hover {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 20px 45px rgba(0, 255, 135, 0.7), 0 0 35px rgba(0, 255, 135, 0.45);
+        }
+
+        .btn-download-big:active {
+            transform: translateY(1px) scale(0.99);
+        }
+
+        .btn-icon-pulse {
+            font-size: 34px;
+            color: #06090e;
+            animation: bounce-icon 2s infinite ease-in-out;
+        }
+
+        @keyframes bounce-icon {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(4px); }
+        }
+
+        .btn-content {
+            text-align: left;
+            flex-grow: 1;
+        }
+
+        .btn-primary-text {
+            font-family: 'Outfit', sans-serif;
+            font-size: 23px;
+            font-weight: 900;
+            letter-spacing: -0.3px;
+            line-height: 1.15;
+            display: block;
+        }
+
+        .btn-secondary-text {
+            font-size: 14px;
+            font-weight: 700;
+            color: #123821;
+            display: block;
+            margin-top: 3px;
+        }
+
+        .btn-arrow {
+            font-size: 26px;
+            color: #06090e;
+        }
+
+        /* Success Download Trigger Alert */
+        #download-alert {
+            display: none;
+            background: rgba(0, 255, 135, 0.16);
+            border: 2px solid #00ff87;
+            border-radius: 16px;
+            padding: 16px 20px;
+            margin-top: 22px;
+            text-align: left;
+            color: #ffffff;
+            font-size: 15px;
+            line-height: 1.5;
+            animation: slideInDown 0.3s ease;
+        }
+
+        @keyframes slideInDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        #download-alert strong {
+            color: var(--primary-glow);
+            font-size: 16px;
+        }
+
+        /* File Information Specs */
+        .specs-grid {
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid var(--card-border);
+        }
+
+        .spec-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #cbd5e1;
+            font-weight: 600;
+        }
+
+        .spec-item i {
+            color: var(--primary-glow);
+            font-size: 16px;
+        }
+
+        /* Mirror Links */
+        .mirror-wrap {
+            margin-top: 22px;
+            padding: 12px 18px;
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 13px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .mirror-btn {
+            color: #60efff;
+            text-decoration: underline;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: color 0.2s;
+        }
+
+        .mirror-btn:hover {
+            color: #a5f3fc;
+        }
+
+        /* 3-Step Clear Guide Section */
+        .guide-container {
+            max-width: 900px;
+            margin: 40px auto 60px auto;
+            padding: 0 18px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .guide-title-box {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .guide-label {
+            display: inline-block;
+            font-family: 'Outfit', sans-serif;
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            color: var(--primary-glow);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .guide-title {
+            font-size: clamp(24px, 4.5vw, 34px);
+            font-weight: 800;
+            color: #ffffff;
+            margin-bottom: 8px;
+        }
+
+        .guide-subtitle {
+            font-size: 15px;
+            color: #94a3b8;
+        }
+
+        .steps-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+            gap: 20px;
+        }
+
+        .step-box {
+            background: var(--card-surface);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 26px 22px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .step-box:hover {
+            transform: translateY(-4px);
+            border-color: rgba(0, 255, 135, 0.4);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+            background: var(--card-surface-hover);
+        }
+
+        .step-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .step-count {
+            width: 40px;
+            height: 40px;
+            background: rgba(0, 255, 135, 0.15);
+            border: 2px solid var(--primary-glow);
+            border-radius: 12px;
+            color: var(--primary-glow);
+            font-family: 'Outfit', sans-serif;
+            font-weight: 900;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .step-icon {
+            font-size: 26px;
+            color: #60efff;
+        }
+
+        .step-name {
+            font-size: 20px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 10px;
+        }
+
+        .step-desc {
+            font-size: 14px;
+            color: #cbd5e1;
+            line-height: 1.6;
+            margin-bottom: 18px;
+            flex-grow: 1;
+        }
+
+        /* Mockup Visual Box inside each step */
+        .step-visual-mockup {
+            background: #090c17;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .mockup-alert {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #fbbf24;
+        }
+
+        .mockup-btn-highlight {
+            background: #2563eb;
+            color: #ffffff;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 10px rgba(37, 99, 235, 0.4);
+        }
+
+        .mockup-btn-install {
+            background: #10b981;
+            color: #ffffff;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(16, 185, 129, 0.4);
+        }
+
+        /* FAQ Section */
+        .faq-section {
+            max-width: 900px;
+            margin: 0 auto 50px auto;
+            padding: 0 18px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .faq-card {
+            background: var(--card-surface);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 28px 24px;
+        }
+
+        .faq-card-title {
+            font-size: 21px;
+            font-weight: 800;
+            color: #ffffff;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .faq-row {
+            padding: 14px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .faq-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .faq-question {
+            font-size: 16px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .faq-question i {
+            color: var(--primary-glow);
+            font-size: 13px;
+        }
+
+        .faq-answer {
+            font-size: 14px;
+            color: #94a3b8;
+            line-height: 1.6;
+            padding-left: 20px;
+        }
+
+        /* Sticky Bottom Mobile Bar */
+        .mobile-sticky-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 999;
+            background: rgba(9, 11, 20, 0.95);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-top: 1px solid rgba(0, 255, 135, 0.3);
+            padding: 12px 20px;
+            display: none;
+            box-shadow: 0 -8px 25px rgba(0, 0, 0, 0.6);
+        }
+
+        .sticky-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: var(--btn-gradient);
+            color: #06090e;
+            padding: 14px 20px;
+            border-radius: 14px;
+            text-decoration: none;
             font-family: 'Outfit', sans-serif;
             font-weight: 800;
-            font-size: 20px;
+            font-size: 17px;
+            box-shadow: 0 4px 18px rgba(0, 255, 135, 0.5);
+            width: 100%;
         }
 
-        .brand-link span span {
-            background: var(--color-accent-gradient);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
+        @media (max-width: 768px) {
+            .mobile-sticky-bar {
+                display: block;
+            }
+            body {
+                padding-bottom: 70px;
+            }
+            .hero-wrap {
+                margin-top: 16px;
+            }
+            .main-card {
+                padding: 26px 18px;
+            }
+            .btn-download-big {
+                padding: 18px 20px;
+            }
+            .btn-primary-text {
+                font-size: 20px;
+            }
         }
 
-        .error-message {
-            color: var(--color-danger);
-            font-size: 14px;
-            margin-top: 15px;
-            display: none;
+        /* Footer */
+        .footer-wrap {
+            margin-top: auto;
+            text-align: center;
+            padding: 30px 18px;
+            border-top: 1px solid var(--card-border);
+            color: #64748b;
+            font-size: 13px;
         }
     </style>
 </head>
 <body>
 
-    <div class="verification-container">
-        <div class="verification-card">
-            <div class="card-content">
-                <!-- Brand logo link -->
-                <div class="brand-link" onclick="window.location.href='/'">
-                    <i class="fa-solid fa-play play-logo"></i>
-                    <span>Stream<span>fit</span></span>
-                </div>
-
-                <div class="verify-icon-wrapper" id="iconWrapper">
-                    <i class="fa-solid fa-shield-halved verify-icon" id="statusIcon"></i>
-                </div>
-
-                <h1 class="verify-title" id="verifyTitle">Human Verification</h1>
-                <p class="verify-desc" id="verifyDesc">Complete the slider check below to verify your session and start downloading the Streamfit App.</p>
-
-                <!-- Slider Interface -->
-                <div class="slider-track" id="sliderTrack">
-                    <div class="slider-progress" id="sliderProgress"></div>
-                    <div class="slider-text" id="sliderText">Slide to Verify & Download</div>
-                    <div class="slider-handle" id="sliderHandle">
-                        <i class="fa-solid fa-angle-right"></i>
-                    </div>
-                </div>
-
-                <!-- Fetching Link Loader -->
-                <div class="status-container" id="statusContainer">
-                    <div class="status-loader">
-                        <div class="spinner"></div>
-                        <span class="status-text">Fetching secure download link...</span>
-                    </div>
-                </div>
-
-                <!-- Final download button -->
-                <div class="download-btn-container" id="downloadContainer">
-                    <a href="#" id="downloadLink" download="NXLY-Stream.apk" class="btn-download-now">
-                        <i class="fa-solid fa-circle-down"></i> Download APK Now
-                    </a>
-                    <p style="font-size: 12px; color: var(--text-secondary); margin-top: 12px;">Your download should begin automatically. If it doesn't start, click the button above.</p>
-                </div>
-
-                <div class="error-message" id="errorMessage">Verification failed. Headless browser detected.</div>
+    <!-- Site Header -->
+    <header class="site-header">
+        <div class="nav-container">
+            <a href="/" class="brand-link">
+                <div class="brand-icon"><i class="fa-solid fa-play"></i></div>
+                <div class="brand-title">Stream<span>fit</span></div>
+            </a>
+            <div class="nav-actions">
+                <a href="/" class="nav-btn"><i class="fa-solid fa-house"></i> হোম</a>
+                <a href="/movies" class="nav-btn"><i class="fa-solid fa-film"></i> মুভিজ</a>
             </div>
         </div>
+    </header>
+
+    <!-- Main Hero -->
+    <main class="hero-wrap">
+        <!-- Live Release Badge -->
+        <div class="live-badge">
+            <span class="live-indicator"></span>
+            <span>অফিশিয়াল অ্যান্ড্রয়েড অ্যাপ • লেটেস্ট রিলিজ v1.0.13</span>
+        </div>
+
+        <h1 class="main-headline">
+            সরাসরি অ্যাপে দেখুন<br>
+            <span class="highlight-text">বাফারিং ছাড়াই ফুল স্পিডে</span>
+        </h1>
+
+        <p class="headline-sub">
+            অ্যান্ড্রয়েড ফোনের জন্য তৈরি অফিশিয়াল Streamfit অ্যাপ। জিরো বাফারিং, হিন্দি ও বাংলা ডাবিং মুভি, ফুল এইচডি কোয়ালিটি এবং রিয়েল-টাইম অডিও সিঙ্ক কন্ট্রোল।
+        </p>
+
+        <!-- Central Download Box -->
+        <div class="main-card">
+            <div class="card-top-shine"></div>
+
+            <!-- Big Glowing Download Button -->
+            <a href="/uploads/apks/NXLY-Stream.apk" class="btn-download-big" id="primary-dl-btn" download="NXLY-Stream.apk">
+                <i class="fa-brands fa-android btn-icon-pulse"></i>
+                <div class="btn-content">
+                    <span class="btn-primary-text" id="dl-title-text">ডাউনলোড করুন (Download APK)</span>
+                    <span class="btn-secondary-text">👉 এখানে চাপ দিলেই সরাসরি ডাউনলোড শুরু হবে</span>
+                </div>
+                <i class="fa-solid fa-circle-arrow-down btn-arrow"></i>
+            </a>
+
+            <!-- Download Triggered Success Banner -->
+            <div id="download-alert">
+                <strong><i class="fa-solid fa-circle-check"></i> ডাউনলোড শুরু হয়েছে!</strong><br>
+                ফাইলটি সেভ হওয়ার পর নোটিফিকেশন থেকে ওপেন করে ইন্সটল করুন। কোনো সমস্যা হলে নিচের ৩টি সহজ ধাপ দেখুন 👇
+            </div>
+
+            <!-- Specs Grid -->
+            <div class="specs-grid">
+                <div class="spec-item"><i class="fa-solid fa-microchip"></i> <span id="ver-badge">ভার্সন 1.0.13</span></div>
+                <div class="spec-item"><i class="fa-solid fa-file-zipper"></i> সাইজ: মাত্র ১৪ MB</div>
+                <div class="spec-item"><i class="fa-solid fa-mobile-screen"></i> Android 8.0 - 15+</div>
+                <div class="spec-item"><i class="fa-solid fa-shield-halved"></i> ১০০% নিরাপদ ও ভাইরাস মুক্ত</div>
+            </div>
+
+            <!-- Alternate Mirror -->
+            <div class="mirror-wrap">
+                <span style="color: #94a3b8;"><i class="fa-solid fa-server" style="color: #00ff87; margin-right: 6px;"></i>ডাউনলোডে সমস্যা হলে বিকল্প সার্ভার:</span>
+                <a href="/uploads/apks/app-release.apk" class="mirror-btn" download="NXLY-Stream.apk">
+                    <i class="fa-solid fa-cloud-arrow-down"></i> Mirror 2 (বিকল্প ডাউনলোড)
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <!-- 3-Step Clear Visual Installation Guide -->
+    <section class="guide-container" id="steps-guide">
+        <div class="guide-title-box">
+            <div class="guide-label">EASY 3 STEPS INSTALLATION</div>
+            <h2 class="guide-title">কীভাবে অ্যাপটি ফোনে চালু করবেন?</h2>
+            <p class="guide-subtitle">মাত্র ৩টি সহজ ধাপে আপনার ফোনে অ্যাপটি ইন্সটল করে নিন</p>
+        </div>
+
+        <div class="steps-container">
+            <!-- Step 1 -->
+            <div class="step-box">
+                <div class="step-header">
+                    <div class="step-count">১</div>
+                    <i class="fa-solid fa-cloud-arrow-down step-icon"></i>
+                </div>
+                <h3 class="step-name">১. ডাউনলোড বাটনে চাপুন</h3>
+                <p class="step-desc">
+                    উপরের বড় সবুজ বাটনে চাপুন। ব্রাউজারে এপিকে ফাইলটি স্বয়ংক্রিয়ভাবে ডাউনলোড হওয়া শুরু করবে।
+                </p>
+                <div class="step-visual-mockup">
+                    <div class="mockup-alert">
+                        <i class="fa-solid fa-triangle-exclamation"></i> File might be harmful?
+                    </div>
+                    <div class="mockup-btn-highlight">
+                        👉 "Download anyway" চাপুন
+                    </div>
+                    <small style="color: #94a3b8; font-size: 11px;">(প্লেস্টোরের বাইরের ফাইলের ক্ষেত্রে গুগল এই সতর্কবার্তা দেয়, এটি সম্পূর্ণ নিরাপদ)</small>
+                </div>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="step-box">
+                <div class="step-header">
+                    <div class="step-count">২</div>
+                    <i class="fa-solid fa-folder-open step-icon"></i>
+                </div>
+                <h3 class="step-name">২. ফাইলটি ওপেন করুন</h3>
+                <p class="step-desc">
+                    ডাউনলোড সম্পন্ন হলে স্ক্রিনের উপর থেকে নোটিফিকেশন বার নামিয়ে ফাইলে চাপ দিন, অথবা ফোনের <strong>Downloads</strong> ফোল্ডারে যান।
+                </p>
+                <div class="step-visual-mockup">
+                    <div style="font-size: 12px; color: #cbd5e1; display: flex; align-items: center; justify-content: space-between;">
+                        <span><i class="fa-solid fa-file-arrow-down" style="color: #00ff87;"></i> NXLY-Stream.apk</span>
+                        <span style="color: #00ff87; font-weight: 700;">Completed</span>
+                    </div>
+                    <div class="mockup-btn-highlight" style="background: #334155;">
+                        👉 ফাইলে ট্যাপ করে "Open" করুন
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="step-box">
+                <div class="step-header">
+                    <div class="step-count">৩</div>
+                    <i class="fa-solid fa-circle-check step-icon" style="color: #00ff87;"></i>
+                </div>
+                <h3 class="step-name">৩. Install চাপুন</h3>
+                <p class="step-desc">
+                    ফোনে <strong>Install</strong> বাটন আসলে চাপ দিন। যদি পারমিশন চায়, তবে Settings এ গিয়ে <strong>"Allow from this source"</strong> অন করে দিন।
+                </p>
+                <div class="step-visual-mockup">
+                    <div style="font-size: 13px; color: #ffffff; text-align: center; font-weight: 600;">
+                        Do you want to install this app?
+                    </div>
+                    <div class="mockup-btn-install">
+                        👉 "Install" বাটনে চাপুন
+                    </div>
+                    <small style="color: #00ff87; font-size: 11px; text-align: center;">ব্যাস! ইনস্টল শেষ হলেই সব মুভি দেখতে পারবেন!</small>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section class="faq-section">
+        <div class="faq-card">
+            <h3 class="faq-card-title">
+                <i class="fa-solid fa-circle-question" style="color: var(--primary-glow);"></i>
+                সাধারণ প্রশ্নোত্তর (FAQ)
+            </h3>
+            
+            <div class="faq-row">
+                <div class="faq-question"><i class="fa-solid fa-chevron-right"></i> অ্যাপটি কি সম্পূর্ণ বিনামূল্যে?</div>
+                <div class="faq-answer">হ্যাঁ, কোনো সাবস্ক্রিপশন ফি বা টাকা ছাড়াই সমস্ত মুভি, ওয়েব সিরিজ এবং লাইভ খেলা সম্পূর্ণ ফ্রিতে দেখতে পারবেন।</div>
+            </div>
+
+            <div class="faq-row">
+                <div class="faq-question"><i class="fa-solid fa-chevron-right"></i> "App not installed" সমস্যা দেখালে কী করব?</div>
+                <div class="faq-answer">যদি ফোনে আগে থেকে কোনো পুরোনো আন-অফিসিয়াল ভার্সন থাকে, তবে প্রথমে সেটি আনইনস্টল (Uninstall) করে নিন। এরপর এই নতুন APK টি ইনস্টল করুন।</div>
+            </div>
+
+            <div class="faq-row">
+                <div class="faq-question"><i class="fa-solid fa-chevron-right"></i> Android 10, 11 বা 15 ফোনে কি চলবে?</div>
+                <div class="faq-answer">হ্যাঁ, এই ভার্সনে ইউনিভার্সাল SSL সিকিউরিটি ও অফলাইন সিডিএন ক্যাশিং রয়েছে, ফলে Android 8 থেকে 15 পর্যন্ত যেকোনো ফোনে স্মুথ চলবে।</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Sticky Mobile Bottom Bar -->
+    <div class="mobile-sticky-bar">
+        <a href="/uploads/apks/NXLY-Stream.apk" class="sticky-btn" id="sticky-dl-btn" download="NXLY-Stream.apk">
+            <i class="fa-brands fa-android"></i>
+            <span>ডাউনলোড করুন (APK • 14 MB)</span>
+            <i class="fa-solid fa-arrow-down"></i>
+        </a>
     </div>
 
+    <!-- Footer -->
+    <footer class="footer-wrap">
+        <p>&copy; 2026 Streamfit. সর্বস্বত্ব সংরক্ষিত। হাই-স্পিড স্ট্রিমিং ও বিনোদন প্ল্যাটফর্ম।</p>
+    </footer>
+
     <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            // Anti-bot Headless check
-            if (navigator.webdriver) {
-                document.getElementById("sliderTrack").style.display = "none";
-                const error = document.getElementById("errorMessage");
-                error.textContent = "Security block: Automated headless browser detected.";
-                error.style.display = "block";
-                return;
+        document.addEventListener("DOMContentLoaded", function() {
+            const primaryBtn = document.getElementById("primary-dl-btn");
+            const stickyBtn = document.getElementById("sticky-dl-btn");
+            const alertBox = document.getElementById("download-alert");
+            const verBadge = document.getElementById("ver-badge");
+            const dlTitleText = document.getElementById("dl-title-text");
+
+            function handleDownloadClick() {
+                if (alertBox) {
+                    alertBox.style.display = "block";
+                    // Scroll smoothly to installation guide so user understands next steps
+                    setTimeout(function() {
+                        const guide = document.getElementById("steps-guide");
+                        if (guide) {
+                            guide.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                    }, 1200);
+                }
             }
 
-            const track = document.getElementById("sliderTrack");
-            const handle = document.getElementById("sliderHandle");
-            const progress = document.getElementById("sliderProgress");
-            const text = document.getElementById("sliderText");
+            if (primaryBtn) primaryBtn.addEventListener("click", handleDownloadClick);
+            if (stickyBtn) stickyBtn.addEventListener("click", handleDownloadClick);
 
-            const iconWrapper = document.getElementById("iconWrapper");
-            const statusIcon = document.getElementById("statusIcon");
-            const verifyTitle = document.getElementById("verifyTitle");
-            const verifyDesc = document.getElementById("verifyDesc");
-
-            const statusContainer = document.getElementById("statusContainer");
-            const downloadContainer = document.getElementById("downloadContainer");
-            const downloadLink = document.getElementById("downloadLink");
-            const errorMessage = document.getElementById("errorMessage");
-
-            let isDragging = false;
-            let startX = 0;
-            let maxSlide = 0;
-            let currentX = 0;
-
-            const initSlider = () => {
-                maxSlide = track.clientWidth - handle.clientWidth - 8; // Adjust padding margins
-            };
-
-            window.addEventListener("resize", initSlider);
-            initSlider();
-
-            const onStart = (e) => {
-                if (maxSlide <= 0) initSlider();
-                isDragging = true;
-                startX = (e.pageX || (e.touches && e.touches[0].pageX)) - handle.offsetLeft;
-                handle.style.transition = "none";
-                progress.style.transition = "none";
-            };
-
-            const onMove = (e) => {
-                if (!isDragging) return;
-                const pageX = e.pageX || (e.touches && e.touches[0].pageX);
-                currentX = pageX - startX;
-
-                if (currentX < 0) currentX = 0;
-                if (currentX > maxSlide) currentX = maxSlide;
-
-                handle.style.left = (currentX + 4) + "px";
-                progress.style.width = (currentX + handle.clientWidth / 2) + "px";
-
-                // Fade text as handle moves
-                const opacity = 1 - (currentX / maxSlide);
-                text.style.opacity = opacity;
-            };
-
-            const onEnd = () => {
-                if (!isDragging) return;
-                isDragging = false;
-
-                if (currentX >= maxSlide * 0.95) {
-                    // Success!
-                    handle.style.transition = "all 0.3s ease";
-                    progress.style.transition = "all 0.3s ease";
-                    handle.style.left = (maxSlide + 4) + "px";
-                    progress.style.width = "100%";
-                    text.style.opacity = 0;
-                    
-                    onVerifySuccess();
-                } else {
-                    // Reset
-                    handle.style.transition = "all 0.3s ease";
-                    progress.style.transition = "all 0.3s ease";
-                    handle.style.left = "4px";
-                    progress.style.width = "0";
-                    text.style.transition = "opacity 0.3s ease";
-                    text.style.opacity = 1;
-                }
-            };
-
-            // Desktop events
-            handle.addEventListener("mousedown", onStart);
-            window.addEventListener("mousemove", onMove);
-            window.addEventListener("mouseup", onEnd);
-
-            // Mobile/Touch events
-            handle.addEventListener("touchstart", onStart, { passive: true });
-            window.addEventListener("touchmove", onMove, { passive: true });
-            window.addEventListener("touchend", onEnd);
-
-            async function onVerifySuccess() {
-                // Disable slider actions
-                handle.style.cursor = "default";
-                handle.removeEventListener("mousedown", onStart);
-                handle.removeEventListener("touchstart", onStart);
-
-                // Update UI state to Verified
-                iconWrapper.classList.add("success");
-                statusIcon.className = "fa-solid fa-circle-check verify-icon";
-                verifyTitle.textContent = "Verified Human";
-                verifyDesc.textContent = "Security verification completed successfully. Fetching app file now...";
-
-                track.style.display = "none";
-                statusContainer.style.display = "block";
-
-                // Fetch latest APK URL
-                try {
-                    const response = await fetch("/api/app/version");
-                    if (!response.ok) throw new Error("Server error: " + response.status);
-                    const result = await response.json();
-                    
-                    if (result && result.version && result.version.apkUrl) {
-                        const apkUrl = result.version.apkUrl;
-                        statusContainer.style.display = "none";
-                        
-                        // Populate download info
-                        downloadLink.href = apkUrl;
-                        downloadContainer.style.display = "block";
-
-                        // Trigger auto download
-                        const anchor = document.createElement("a");
-                        anchor.href = apkUrl;
-                        anchor.download = "NXLY-Stream.apk";
-                        document.body.appendChild(anchor);
-                        anchor.click();
-                        document.body.removeChild(anchor);
-                    } else {
-                        throw new Error("Invalid response format / No active release found.");
+            // Fetch dynamic version if available
+            fetch("/api/app/version")
+                .then(r => r.json())
+                .then(res => {
+                    if (res && res.version) {
+                        const ver = res.version.versionName || "1.0.13";
+                        const url = res.version.apkUrl || "/uploads/apks/NXLY-Stream.apk";
+                        if (verBadge) verBadge.textContent = "ভার্সন " + ver;
+                        if (dlTitleText) dlTitleText.textContent = "ডাউনলোড করুন (v" + ver + ")";
+                        if (primaryBtn) primaryBtn.href = url;
+                        if (stickyBtn) stickyBtn.href = url;
                     }
-                } catch (err) {
-                    console.error(err);
-                    statusContainer.style.display = "none";
-                    errorMessage.textContent = "Failed to load APK download link: " + err.message;
-                    errorMessage.style.display = "block";
-                }
-            }
+                })
+                .catch(function(e) {
+                    console.log("Version check:", e);
+                });
         });
     </script>
 </body>

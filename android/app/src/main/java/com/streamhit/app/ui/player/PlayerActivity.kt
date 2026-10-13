@@ -396,7 +396,10 @@ fun AdaptivePlayerScreen(
                 launch {
                     try {
                         val recs = repository.filterContent(page = 1, subjectType = d?.subjectType ?: 1)
-                        recommendations = recs.filter { it.subjectId != (d?.subjectId ?: subjectId) }
+                        recommendations = recs.filter { 
+                            it.subjectId != (d?.subjectId ?: subjectId) &&
+                            !com.streamhit.app.util.AdultContentFilter.isAdult(it.title, it.genres, it.detailPath)
+                        }
                     } catch (_: Exception) {}
                 }
             }
