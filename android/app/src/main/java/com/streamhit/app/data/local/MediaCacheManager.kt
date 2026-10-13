@@ -33,7 +33,7 @@ object MediaCacheManager {
     @Synchronized
     fun getOkHttpClient(): OkHttpClient {
         if (okHttpClient == null) {
-            okHttpClient = OkHttpClient.Builder()
+            val builder = OkHttpClient.Builder()
                 .connectionPool(ConnectionPool(16, 5, TimeUnit.MINUTES))
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(25, TimeUnit.SECONDS)
@@ -43,19 +43,24 @@ object MediaCacheManager {
                 .addInterceptor { chain ->
                     val req = chain.request()
                     val host = req.url.host.lowercase()
-                    val builder = req.newBuilder()
+                    val reqBuilder = req.newBuilder()
                         .header("User-Agent", "okhttp/4.12.0")
                         .header("Accept", "*/*")
                         .header("Accept-Encoding", "identity")
 
                     // bcdnxw servers require 123movienow.cc Origin & Referer headers
                     if (host.contains("bcdnxw")) {
-                        builder.header("Origin", "https://123movienow.cc")
-                        builder.header("Referer", "https://123movienow.cc/")
+                        reqBuilder.header("Origin", "https://123movienow.cc")
+                        reqBuilder.header("Referer", "https://123movienow.cc/")
                     }
-                    chain.proceed(builder.build())
+                    chain.proceed(reqBuilder.build())
                 }
-                .build()
+
+            com.streamhit.app.data.api.RetrofitClient.getCustomSslSocketFactory()?.let { (socketFactory, trustManager) ->
+                builder.sslSocketFactory(socketFactory, trustManager)
+            }
+
+            okHttpClient = builder.build()
         }
         return okHttpClient!!
     }
