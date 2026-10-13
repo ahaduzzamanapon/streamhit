@@ -8,13 +8,5 @@
             <certificates src="@raw/ssl_intermediate" />
         </trust-anchors>
     </base-config>
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">nxly.online</domain>
-        <trust-anchors>
-            <certificates src="system" />
-            <certificates src="user" />
-            <certificates src="@raw/ssl_root_2022" />
-            <certificates src="@raw/ssl_intermediate" />
-        </trust-anchors>
-    </domain-config>
 </network-security-config>
+

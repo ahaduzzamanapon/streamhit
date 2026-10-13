@@ -33,7 +33,7 @@ object MediaCacheManager {
     @Synchronized
     fun getOkHttpClient(): OkHttpClient {
         if (okHttpClient == null) {
-            val builder = OkHttpClient.Builder()
+            okHttpClient = OkHttpClient.Builder()
                 .connectionPool(ConnectionPool(16, 5, TimeUnit.MINUTES))
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(25, TimeUnit.SECONDS)
@@ -55,12 +55,7 @@ object MediaCacheManager {
                     }
                     chain.proceed(reqBuilder.build())
                 }
-
-            com.streamhit.app.data.api.RetrofitClient.getCustomSslSocketFactory()?.let { (socketFactory, trustManager) ->
-                builder.sslSocketFactory(socketFactory, trustManager)
-            }
-
-            okHttpClient = builder.build()
+                .build()
         }
         return okHttpClient!!
     }
