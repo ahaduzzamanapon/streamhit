@@ -67,7 +67,9 @@ fun PortraitVideoPlayerBox(
     onForward10: () -> Unit,
     onSeekTo: (Long) -> Unit,
     gestureDetector: GestureDetector,
-    isLiveStream: Boolean
+    isLiveStream: Boolean,
+    audioSyncOffsetMs: Long = 0L,
+    onOpenAudioSync: () -> Unit = {}
 ) {
     Box(
         modifier = Modifier
@@ -210,8 +212,18 @@ fun PortraitVideoPlayerBox(
                         )
                     }
 
-                    IconButton(onClick = onEnterPip, modifier = Modifier.size(30.dp)) {
-                        Icon(Icons.Default.PictureInPictureAlt, contentDescription = "PiP", tint = Color.White)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = onOpenAudioSync, modifier = Modifier.size(30.dp)) {
+                            Icon(
+                                imageVector = Icons.Default.GraphicEq,
+                                contentDescription = "Audio Sync",
+                                tint = if (audioSyncOffsetMs != 0L) AccentEmerald else Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        IconButton(onClick = onEnterPip, modifier = Modifier.size(30.dp)) {
+                            Icon(Icons.Default.PictureInPictureAlt, contentDescription = "PiP", tint = Color.White)
+                        }
                     }
                 }
 
@@ -422,6 +434,8 @@ fun PortraitMediaDetails(
     onSwitchQuality: (StreamResource) -> Unit,
     onOpenDownloadSheet: () -> Unit,
     onRecommendationClick: (SubjectSummary) -> Unit,
+    audioSyncOffsetMs: Long = 0L,
+    onOpenAudioSync: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -579,7 +593,7 @@ fun PortraitMediaDetails(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Action Buttons Row (Download & Share)
+            // Action Buttons Row (Download, Audio Sync & Share)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -589,12 +603,38 @@ fun PortraitMediaDetails(
                     colors = ButtonDefaults.buttonColors(containerColor = BgCard),
                     shape = RoundedCornerShape(8.dp),
                     border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
                     modifier = Modifier.weight(1f).height(36.dp)
                 ) {
-                    Icon(Icons.Default.Download, contentDescription = "Download", tint = AccentEmerald, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Download", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.Download, contentDescription = "Download", tint = AccentEmerald, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Download", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Button(
+                    onClick = onOpenAudioSync,
+                    colors = ButtonDefaults.buttonColors(containerColor = BgCard),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(
+                        1.dp,
+                        if (audioSyncOffsetMs != 0L) AccentEmerald else Color.White.copy(alpha = 0.1f)
+                    ),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                    modifier = Modifier.weight(1f).height(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.GraphicEq,
+                        contentDescription = "Audio Sync",
+                        tint = if (audioSyncOffsetMs != 0L) AccentEmerald else Color.White,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (audioSyncOffsetMs != 0L) "${if (audioSyncOffsetMs > 0) "+" else ""}${audioSyncOffsetMs}ms" else "Audio Sync",
+                        color = if (audioSyncOffsetMs != 0L) AccentEmerald else Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
 
                 Button(
@@ -609,12 +649,12 @@ fun PortraitMediaDetails(
                     colors = ButtonDefaults.buttonColors(containerColor = BgCard),
                     shape = RoundedCornerShape(8.dp),
                     border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
                     modifier = Modifier.weight(1f).height(36.dp)
                 ) {
-                    Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Share", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Share", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
 

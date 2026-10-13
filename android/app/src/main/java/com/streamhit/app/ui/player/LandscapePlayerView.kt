@@ -74,7 +74,9 @@ fun LandscapePlayerView(
     showBrightnessOverlay: Boolean,
     onVolumeAdjust: (Int) -> Unit,
     onBrightnessAdjust: (Int) -> Unit,
-    onResetOverlayToken: () -> Unit
+    onResetOverlayToken: () -> Unit,
+    audioSyncOffsetMs: Long = 0L,
+    onOpenAudioSync: () -> Unit = {}
 ) {
     var initialTouchX by remember { mutableFloatStateOf(0f) }
     var initialTouchY by remember { mutableFloatStateOf(0f) }
@@ -365,6 +367,14 @@ fun LandscapePlayerView(
                                         }
                                     }
                                 }
+                            }
+
+                            IconButton(onClick = onOpenAudioSync) {
+                                Icon(
+                                    imageVector = Icons.Default.GraphicEq,
+                                    contentDescription = "Audio Sync",
+                                    tint = if (audioSyncOffsetMs != 0L) AccentEmerald else Color.White
+                                )
                             }
 
                             IconButton(onClick = onToggleResizeMode) {

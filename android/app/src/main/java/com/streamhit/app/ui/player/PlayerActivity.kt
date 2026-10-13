@@ -210,6 +210,11 @@ fun AdaptivePlayerScreen(
     var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
     var loudnessEnhancer by remember { mutableStateOf<LoudnessEnhancer?>(null) }
 
+    // Audio Sync state
+    val audioSyncProcessor = remember { AudioSyncAudioProcessor() }
+    var audioSyncOffsetMs by remember { mutableLongStateOf(0L) }
+    var showAudioSyncDialog by remember { mutableStateOf(false) }
+
     // Controls visibility
     var showControls by remember { mutableStateOf(true) }
     var isLocked by remember { mutableStateOf(false) }
@@ -527,7 +532,10 @@ fun AdaptivePlayerScreen(
         var firstFrameRendered = false
         var rebufferCount = 0
 
-        val player = ExoPlayer.Builder(context)
+        val renderersFactory = CustomRenderersFactory(context, audioSyncProcessor)
+        audioSyncProcessor.setAudioOffsetMs(audioSyncOffsetMs)
+
+        val player = ExoPlayer.Builder(context, renderersFactory)
             .setMediaSourceFactory(mediaSourceFactory)
             .setLoadControl(loadControl)
             .setSeekParameters(SeekParameters.CLOSEST_SYNC)
@@ -872,7 +880,9 @@ fun AdaptivePlayerScreen(
                 showBrightnessOverlay = showBrightnessOverlay,
                 onVolumeAdjust = { step -> setVolumeBoosted(volumePercent + step) },
                 onBrightnessAdjust = { step -> setScreenBrightness(brightnessPercent + step) },
-                onResetOverlayToken = { overlayDismissToken = System.currentTimeMillis() }
+                onResetOverlayToken = { overlayDismissToken = System.currentTimeMillis() },
+                audioSyncOffsetMs = audioSyncOffsetMs,
+                onOpenAudioSync = { showAudioSyncDialog = true }
             )
         } else {
             val isLiveStream = subjectId.isBlank() && detailPath.isBlank()
@@ -915,7 +925,9 @@ fun AdaptivePlayerScreen(
                         exoPlayer?.seekTo(newPos)
                     },
                     gestureDetector = gestureDetector,
-                    isLiveStream = isLiveStream
+                    isLiveStream = isLiveStream,
+                    audioSyncOffsetMs = audioSyncOffsetMs,
+                    onOpenAudioSync = { showAudioSyncDialog = true }
                 )
 
                 PortraitMediaDetails(
@@ -950,9 +962,26 @@ fun AdaptivePlayerScreen(
                         context.startActivity(intent)
                         activity.finish()
                     },
+                    audioSyncOffsetMs = audioSyncOffsetMs,
+                    onOpenAudioSync = { showAudioSyncDialog = true },
                     modifier = Modifier.weight(1f)
                 )
             }
+        }
+
+        if (showAudioSyncDialog) {
+            AudioSyncDialog(
+                currentOffsetMs = audioSyncOffsetMs,
+                onOffsetChange = { newOffset ->
+                    audioSyncOffsetMs = newOffset
+                    audioSyncProcessor.setAudioOffsetMs(newOffset)
+                },
+                onReset = {
+                    audioSyncOffsetMs = 0L
+                    audioSyncProcessor.resetOffset()
+                },
+                onDismiss = { showAudioSyncDialog = false }
+            )
         }
     }
 }
