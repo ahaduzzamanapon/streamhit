@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -50,6 +51,7 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.upstream.DefaultAllocator
 import androidx.media3.ui.AspectRatioFrameLayout
 import coil.compose.AsyncImage
 import com.streamhit.app.data.local.MediaCacheManager
@@ -70,6 +72,19 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+
+fun resolveDirectPlayableUrl(url: String): String {
+    if (url.contains("source_url=")) {
+        try {
+            val uri = Uri.parse(url)
+            val source = uri.getQueryParameter("source_url")
+            if (!source.isNullOrBlank() && (source.startsWith("http://") || source.startsWith("https://"))) {
+                return source
+            }
+        } catch (_: Exception) {}
+    }
+    return url
+}
 
 class PlayerActivity : ComponentActivity() {
 
@@ -274,8 +289,9 @@ fun AdaptivePlayerScreen(
         currentServerIndex = index
         currentStreamUrl = s.url
         isBuffering = true
+        val directUrl = resolveDirectPlayableUrl(s.url)
         exoPlayer?.apply {
-            setMediaItem(MediaItem.fromUri(Uri.parse(s.url)))
+            setMediaItem(MediaItem.fromUri(Uri.parse(directUrl)))
             prepare()
             play()
         }
@@ -305,8 +321,9 @@ fun AdaptivePlayerScreen(
         currentServerIndex = 0
         currentStreamUrl = s.url
         isBuffering = true
+        val directUrl = resolveDirectPlayableUrl(s.url)
         exoPlayer?.apply {
-            setMediaItem(MediaItem.fromUri(Uri.parse(s.url)))
+            setMediaItem(MediaItem.fromUri(Uri.parse(directUrl)))
             prepare()
             play()
         }
@@ -462,9 +479,10 @@ fun AdaptivePlayerScreen(
         if (res.url.isNotBlank()) {
             isBuffering = true
             currentStreamUrl = res.url
+            val directUrl = resolveDirectPlayableUrl(res.url)
             val savedPos = exoPlayer?.currentPosition ?: 0L
             exoPlayer?.apply {
-                setMediaItem(MediaItem.fromUri(Uri.parse(res.url)), savedPos)
+                setMediaItem(MediaItem.fromUri(Uri.parse(directUrl)), savedPos)
                 prepare()
                 play()
             }
@@ -477,19 +495,25 @@ fun AdaptivePlayerScreen(
         if (currentStreamUrl.isBlank()) return@DisposableEffect onDispose {}
         isBuffering = true
 
+        val resolvedUrl = resolveDirectPlayableUrl(currentStreamUrl)
+        var triedProxyFallback = false
+
         val dataSourceFactory = MediaCacheManager.getDataSourceFactory(context)
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
             .setDataSourceFactory(dataSourceFactory)
 
+        val allocator = DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE)
         val loadControl = DefaultLoadControl.Builder()
+            .setAllocator(allocator)
             .setBufferDurationsMs(
-                2_500,  // minBufferMs (2.5s buffer before playback)
-                60_000, // maxBufferMs (60s max buffer cap)
-                1_000,  // bufferForPlaybackMs (1.0s buffer required to start playback)
-                2_000   // bufferForPlaybackAfterRebufferMs (2.0s buffer required after stall)
+                30_000,  // minBufferMs (Aggressive 30s continuous buffer: utilizes full network speed!)
+                120_000, // maxBufferMs (120s buffer cap)
+                500,     // bufferForPlaybackMs (Starts playback instantly with 0.5s buffer)
+                1_200    // bufferForPlaybackAfterRebufferMs (Fast rebuffer recovery)
             )
+            .setTargetBufferBytes(C.LENGTH_UNSET)
             .setPrioritizeTimeOverSizeThresholds(true)
-            .setBackBuffer(10_000, false)
+            .setBackBuffer(20_000, false)
             .build()
 
         val savedPos = if (initialStartPositionMs > 1000L) {
@@ -508,7 +532,7 @@ fun AdaptivePlayerScreen(
             .setLoadControl(loadControl)
             .setSeekParameters(SeekParameters.CLOSEST_SYNC)
             .build().apply {
-                val mediaItem = MediaItem.fromUri(Uri.parse(currentStreamUrl))
+                val mediaItem = MediaItem.fromUri(Uri.parse(resolvedUrl))
                 setMediaItem(mediaItem, initialStartMs)
                 prepare()
                 playWhenReady = true
@@ -578,6 +602,15 @@ fun AdaptivePlayerScreen(
                 isBuffering = false
                 val sanitizedMsg = error.localizedMessage ?: "Playback error"
                 android.util.Log.e("StreamHitPlayer", "Player error code=${error.errorCode}: $sanitizedMsg")
+                // Automatic fallback: if direct CDN failed and we haven't tried proxy yet:
+                if (resolvedUrl != currentStreamUrl && !triedProxyFallback) {
+                    triedProxyFallback = true
+                    android.util.Log.w("StreamHitPlayer", "Direct CDN stream failed. Falling back to proxy: $currentStreamUrl")
+                    player.setMediaItem(MediaItem.fromUri(Uri.parse(currentStreamUrl)), player.currentPosition)
+                    player.prepare()
+                    player.play()
+                    return
+                }
                 Toast.makeText(context, "Playback error: Try selecting another server", Toast.LENGTH_LONG).show()
             }
         }

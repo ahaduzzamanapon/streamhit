@@ -254,6 +254,7 @@ data class StreamResource(
     @SerializedName("resourceId") val resourceId: String = "",
     @SerializedName("resourceLink") val resourceLink: String = "",
     @SerializedName("url") val rawUrl: String? = null,
+    @SerializedName("proxyUrl") val proxyUrl: String? = null,
     @SerializedName("resolution") val resolution: Int? = 720,
     @SerializedName("size") val sizeRaw: Any? = null,
     @SerializedName("quality") val quality: String? = "HD",
@@ -261,7 +262,16 @@ data class StreamResource(
 ) {
     val url: String
         get() {
-            val link = if (resourceLink.isNotBlank()) resourceLink else (rawUrl ?: "")
+            var link = if (!rawUrl.isNullOrBlank()) rawUrl else resourceLink
+            if (link.contains("source_url=")) {
+                try {
+                    val uri = android.net.Uri.parse(link)
+                    val source = uri.getQueryParameter("source_url")
+                    if (!source.isNullOrBlank() && (source.startsWith("http://") || source.startsWith("https://"))) {
+                        link = source
+                    }
+                } catch (_: Exception) {}
+            }
             return when {
                 link.startsWith("http://") || link.startsWith("https://") -> link
                 link.startsWith("/") -> com.streamhit.app.data.api.RetrofitClient.BASE_URL.trimEnd('/') + link

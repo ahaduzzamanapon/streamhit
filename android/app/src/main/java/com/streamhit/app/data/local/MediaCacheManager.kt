@@ -6,11 +6,14 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
+import androidx.media3.datasource.okhttp.OkHttpDataSource
+import okhttp3.ConnectionPool
+import okhttp3.OkHttpClient
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 @OptIn(UnstableApi::class)
 object MediaCacheManager {
@@ -23,6 +26,39 @@ object MediaCacheManager {
 
     @Volatile
     private var cacheDataSourceFactory: DataSource.Factory? = null
+
+    @Volatile
+    private var okHttpClient: OkHttpClient? = null
+
+    @Synchronized
+    fun getOkHttpClient(): OkHttpClient {
+        if (okHttpClient == null) {
+            okHttpClient = OkHttpClient.Builder()
+                .connectionPool(ConnectionPool(16, 5, TimeUnit.MINUTES))
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(25, TimeUnit.SECONDS)
+                .retryOnConnectionFailure(true)
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .addInterceptor { chain ->
+                    val req = chain.request()
+                    val host = req.url.host.lowercase()
+                    val builder = req.newBuilder()
+                        .header("User-Agent", "okhttp/4.12.0")
+                        .header("Accept", "*/*")
+                        .header("Accept-Encoding", "identity")
+
+                    // bcdnxw servers require 123movienow.cc Origin & Referer headers
+                    if (host.contains("bcdnxw")) {
+                        builder.header("Origin", "https://123movienow.cc")
+                        builder.header("Referer", "https://123movienow.cc/")
+                    }
+                    chain.proceed(builder.build())
+                }
+                .build()
+        }
+        return okHttpClient!!
+    }
 
     @Synchronized
     fun getCache(context: Context): SimpleCache {
@@ -42,11 +78,7 @@ object MediaCacheManager {
     fun getDataSourceFactory(context: Context): DataSource.Factory {
         if (cacheDataSourceFactory == null) {
             val cache = getCache(context)
-            val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-                .setUserAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
-                .setAllowCrossProtocolRedirects(true)
-                .setConnectTimeoutMs(8000)
-                .setReadTimeoutMs(15000)
+            val httpDataSourceFactory = OkHttpDataSource.Factory(getOkHttpClient())
 
             val upstreamFactory = DefaultDataSource.Factory(context.applicationContext, httpDataSourceFactory)
 

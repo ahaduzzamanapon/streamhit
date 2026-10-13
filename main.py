@@ -2034,8 +2034,9 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
                         "resourceId": res_id,
                         "resolution": res_val,
                         "size": sz_val,
-                        "url": fetch_link,
-                        "resourceLink": fetch_link
+                        "url": url_val,
+                        "resourceLink": fetch_link,
+                        "proxyUrl": fetch_link
                     })
     except Exception as e:
         print(f"H5 download resource fetch error: {e}")
@@ -2082,8 +2083,9 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
                             "resourceId": str(d.get("id") or "0"),
                             "resolution": int(d.get("resolution") or 720),
                             "size": int(d.get("size") or 0),
-                            "url": fetch_link,
-                            "resourceLink": fetch_link
+                            "url": u,
+                            "resourceLink": fetch_link,
+                            "proxyUrl": fetch_link
                         })
                 if items:
                     break
@@ -2151,6 +2153,19 @@ CDN_CANDIDATE_HEADERS = [
     }
 ]
 
+_fetch_client = None
+
+def get_fetch_client():
+    global _fetch_client
+    if _fetch_client is None or _fetch_client.is_closed:
+        _fetch_client = httpx.AsyncClient(
+            trust_env=False,
+            timeout=httpx.Timeout(30.0, connect=10.0),
+            follow_redirects=True,
+            limits=httpx.Limits(max_keepalive_connections=100, max_connections=300, keepalive_expiry=30.0)
+        )
+    return _fetch_client
+
 @app.get("/fetch")
 async def handle_fetch(request: Request, source_url: str):
     if not source_url:
@@ -2162,11 +2177,20 @@ async def handle_fetch(request: Request, source_url: str):
         source_url += "&" + urllib.parse.urlencode(qp)
         
     range_header = request.headers.get("Range")
-    client = httpx.AsyncClient(trust_env=False, timeout=30.0, follow_redirects=True)
+    client = get_fetch_client()
     resp = None
     last_error_status = 502
 
-    for template in CDN_CANDIDATE_HEADERS:
+    # Prioritize candidate headers based on target CDN host
+    source_lower = source_url.lower()
+    if "bcdnxw" in source_lower:
+        sorted_templates = [CDN_CANDIDATE_HEADERS[1], CDN_CANDIDATE_HEADERS[2]] + [t for i, t in enumerate(CDN_CANDIDATE_HEADERS) if i not in (1, 2)]
+    elif "bcdn." in source_lower:
+        sorted_templates = [CDN_CANDIDATE_HEADERS[0]] + [t for i, t in enumerate(CDN_CANDIDATE_HEADERS) if i != 0]
+    else:
+        sorted_templates = CDN_CANDIDATE_HEADERS
+
+    for template in sorted_templates:
         headers_to_send = dict(template)
         if range_header:
             headers_to_send["Range"] = range_header
@@ -2184,7 +2208,6 @@ async def handle_fetch(request: Request, source_url: str):
             continue
 
     if not resp:
-        await client.aclose()
         raise HTTPException(status_code=last_error_status, detail=f"CDN stream unavailable or rate limited ({last_error_status})")
 
     response_headers = {
@@ -2204,11 +2227,10 @@ async def handle_fetch(request: Request, source_url: str):
     
     async def stream_generator():
         try:
-            async for chunk in resp.aiter_bytes(chunk_size=1024 * 64):
+            async for chunk in resp.aiter_bytes(chunk_size=1024 * 256):
                 yield chunk
         finally:
             await resp.aclose()
-            await client.aclose()
             
     return StreamingResponse(
         stream_generator(),

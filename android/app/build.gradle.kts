@@ -11,8 +11,8 @@ android {
         applicationId = "com.streamhit.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 10
-        versionName = "1.0.9"
+        versionCode = 11
+        versionName = "1.0.10"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -79,6 +79,7 @@ dependencies {
     implementation("androidx.media3:media3-ui:$media3Version")
     implementation("androidx.media3:media3-common:$media3Version")
     implementation("androidx.media3:media3-datasource:$media3Version")
+    implementation("androidx.media3:media3-datasource-okhttp:$media3Version")
     implementation("androidx.media3:media3-database:$media3Version")
 
     // Retrofit & OkHttp
