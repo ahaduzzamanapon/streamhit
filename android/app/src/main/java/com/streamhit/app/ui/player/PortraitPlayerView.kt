@@ -40,6 +40,7 @@ import androidx.media3.ui.PlayerView
 import com.streamhit.app.data.model.*
 import com.streamhit.app.ui.components.MediaCard
 import com.streamhit.app.ui.theme.*
+import kotlin.math.abs
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -71,6 +72,19 @@ fun PortraitVideoPlayerBox(
     audioSyncOffsetMs: Long = 0L,
     onOpenAudioSync: () -> Unit = {}
 ) {
+    var initialTouchX by remember { mutableFloatStateOf(0f) }
+    var initialTouchY by remember { mutableFloatStateOf(0f) }
+    var isHorizontalScrub by remember { mutableStateOf(false) }
+    var scrubStartPos by remember { mutableLongStateOf(0L) }
+    var showSeekOverlay by remember { mutableStateOf(false) }
+    var seekTargetTime by remember { mutableLongStateOf(0L) }
+    var seekDeltaText by remember { mutableStateOf("") }
+
+    val currentExoPlayer by rememberUpdatedState(exoPlayer)
+    val currentPlaybackSpeed by rememberUpdatedState(playbackSpeed)
+    val currentIsFastForwarding by rememberUpdatedState(isFastForwarding2x)
+    val currentTotalDuration by rememberUpdatedState(totalDuration)
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -91,24 +105,85 @@ fun PortraitVideoPlayerBox(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Touch & Gesture listener on portrait player (Supports 2X Hold, Taps, and Double Tap Seek)
+        // Touch & Gesture listener on portrait player (Supports 2X Hold, Taps, Swipe-to-Seek, and Double Tap Seek)
         AndroidView(
             factory = { ctx ->
-                View(ctx).apply {
-                    setOnTouchListener { _, event ->
-                        gestureDetector.onTouchEvent(event)
-                        if (event.action == MotionEvent.ACTION_UP || event.action == MotionEvent.ACTION_CANCEL) {
-                            if (isFastForwarding2x) {
-                                onFastForward2xChange(false)
-                                exoPlayer?.setPlaybackSpeed(playbackSpeed)
+                View(ctx)
+            },
+            update = { view ->
+                view.setOnTouchListener { _, event ->
+                    gestureDetector.onTouchEvent(event)
+
+                    val displayMetrics = view.context.resources.displayMetrics
+                    val widthPx = displayMetrics.widthPixels.toFloat()
+
+                    when (event.action) {
+                        MotionEvent.ACTION_DOWN -> {
+                            initialTouchX = event.x
+                            initialTouchY = event.y
+                            isHorizontalScrub = false
+                            scrubStartPos = currentExoPlayer?.currentPosition ?: 0L
+                        }
+                        MotionEvent.ACTION_MOVE -> {
+                            val deltaX = event.x - initialTouchX
+                            val deltaY = initialTouchY - event.y
+
+                            if (!isHorizontalScrub && abs(deltaX) > 40 && abs(deltaX) > abs(deltaY) * 1.3f) {
+                                isHorizontalScrub = true
+                            }
+
+                            if (isHorizontalScrub && widthPx > 0f) {
+                                val duration = if (currentTotalDuration > 0L) currentTotalDuration else (currentExoPlayer?.duration ?: 0L)
+                                val seekDeltaMs = ((deltaX / widthPx) * 90000f).toLong()
+                                val target = (scrubStartPos + seekDeltaMs).coerceIn(0L, if (duration > 0L) duration else Long.MAX_VALUE)
+                                seekTargetTime = target
+                                seekDeltaText = if (seekDeltaMs >= 0) "+${seekDeltaMs / 1000}s" else "${seekDeltaMs / 1000}s"
+                                showSeekOverlay = true
                             }
                         }
-                        true
+                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                            if (isHorizontalScrub && showSeekOverlay) {
+                                currentExoPlayer?.seekTo(seekTargetTime)
+                                onSeekTo(seekTargetTime)
+                                showSeekOverlay = false
+                                isHorizontalScrub = false
+                            }
+                            onFastForward2xChange(false)
+                            currentExoPlayer?.setPlaybackSpeed(currentPlaybackSpeed)
+                        }
                     }
+                    true
                 }
             },
             modifier = Modifier.fillMaxSize()
         )
+
+        // Scrub Seeking Overlay (Portrait)
+        if (showSeekOverlay) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(16.dp))
+                    .border(1.dp, AccentEmerald, RoundedCornerShape(16.dp))
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = seekDeltaText,
+                        color = AccentEmerald,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "${formatDuration(seekTargetTime)} / ${formatDuration(totalDuration)}",
+                        color = Color.White,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        }
 
         // 2X Speed Hold Indicator Badge (Portrait)
         if (isFastForwarding2x) {

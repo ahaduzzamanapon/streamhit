@@ -16,22 +16,46 @@ data class WatchHistoryItem(
     val subjectType: Int = 1,
     val seasonNum: Int = 1,
     val episodeNum: Int = 1,
+    val dubLanguage: String? = null,
+    val dubSubjectId: String? = null,
+    val dubDetailPath: String? = null,
+    val dubName: String? = null,
     val timestamp: Long = System.currentTimeMillis()
 ) {
     val progressPercent: Int
         get() = if (durationMs > 0) ((positionMs * 100) / durationMs).toInt().coerceIn(0, 100) else 0
 
     val episodeBadge: String
-        get() = if (subjectType == 2) "S${seasonNum} E${episodeNum}" else ""
+        get() {
+            val epStr = if (subjectType == 2) "S${seasonNum} E${episodeNum}" else ""
+            val dStr = dubBadge
+            return when {
+                epStr.isNotBlank() && dStr.isNotBlank() -> "$epStr • $dStr"
+                epStr.isNotBlank() -> epStr
+                dStr.isNotBlank() -> dStr
+                else -> ""
+            }
+        }
+
+    val dubBadge: String
+        get() {
+            val lang = dubLanguage?.ifBlank { null } ?: (dubName?.ifBlank { null } ?: "")
+            return if (lang.isNotBlank() && !lang.equals("original", ignoreCase = true)) lang else ""
+        }
 }
 
 object RecentHistoryManager {
     private const val PREF_NAME = "streamhit_recent_history"
+    private const val PREF_EPISODES = "streamhit_episode_progress"
     private const val KEY_HISTORY = "watch_history_list"
     private val gson = Gson()
 
     private fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+    }
+
+    private fun getEpisodePrefs(context: Context): SharedPreferences {
+        return context.getSharedPreferences(PREF_EPISODES, Context.MODE_PRIVATE)
     }
 
     @Synchronized
@@ -66,13 +90,31 @@ object RecentHistoryManager {
         durationMs: Long,
         subjectType: Int = 1,
         seasonNum: Int = 1,
-        episodeNum: Int = 1
+        episodeNum: Int = 1,
+        dubLanguage: String? = null,
+        dubSubjectId: String? = null,
+        dubDetailPath: String? = null,
+        dubName: String? = null
     ) {
         if (title.isBlank() && subjectId.isBlank() && detailPath.isBlank()) return
 
         try {
+            val safePos = positionMs.coerceAtLeast(0L)
+
+            // Save episode-level progress for Series
+            if (subjectType == 2) {
+                val epEditor = getEpisodePrefs(context).edit()
+                if (subjectId.isNotBlank()) {
+                    epEditor.putLong("${subjectId}_s${seasonNum}_e${episodeNum}", safePos)
+                }
+                if (detailPath.isNotBlank()) {
+                    epEditor.putLong("${detailPath}_s${seasonNum}_e${episodeNum}", safePos)
+                }
+                epEditor.apply()
+            }
+
             val list = getRecentHistory(context).toMutableList()
-            // Find any existing entry to preserve duration or metadata if incoming is empty/0
+            // Find any existing entry to preserve duration, metadata or dubbing if incoming is empty
             val existing = list.firstOrNull {
                 (subjectId.isNotBlank() && it.subjectId == subjectId) ||
                 (detailPath.isNotBlank() && it.detailPath == detailPath) ||
@@ -90,6 +132,10 @@ object RecentHistoryManager {
             val finalCover = coverUrl.ifBlank { existing?.coverUrl ?: "" }
             val finalTitle = title.ifBlank { existing?.title ?: "Watching" }
             val finalStream = streamUrl.ifBlank { existing?.streamUrl ?: "" }
+            val finalDubLang = dubLanguage?.ifBlank { null } ?: existing?.dubLanguage
+            val finalDubSubId = dubSubjectId?.ifBlank { null } ?: existing?.dubSubjectId
+            val finalDubPath = dubDetailPath?.ifBlank { null } ?: existing?.dubDetailPath
+            val finalDubName = dubName?.ifBlank { null } ?: existing?.dubName
 
             // Add updated/new entry at the top of history
             list.add(
@@ -100,11 +146,15 @@ object RecentHistoryManager {
                     title = finalTitle,
                     coverUrl = finalCover,
                     streamUrl = finalStream,
-                    positionMs = positionMs.coerceAtLeast(0L),
+                    positionMs = safePos,
                     durationMs = finalDuration,
                     subjectType = subjectType,
                     seasonNum = seasonNum,
                     episodeNum = episodeNum,
+                    dubLanguage = finalDubLang,
+                    dubSubjectId = finalDubSubId,
+                    dubDetailPath = finalDubPath,
+                    dubName = finalDubName,
                     timestamp = System.currentTimeMillis()
                 )
             )
@@ -119,14 +169,46 @@ object RecentHistoryManager {
     }
 
     @Synchronized
-    fun getSavedPosition(context: Context, streamUrl: String, subjectId: String, detailPath: String = ""): Long {
-        val list = getRecentHistory(context)
-        val item = list.firstOrNull {
-            (subjectId.isNotBlank() && it.subjectId == subjectId) ||
-            (detailPath.isNotBlank() && it.detailPath == detailPath) ||
-            (subjectId.isEmpty() && streamUrl.isNotBlank() && it.streamUrl == streamUrl)
+    fun getSavedPosition(
+        context: Context,
+        streamUrl: String = "",
+        subjectId: String = "",
+        detailPath: String = "",
+        seasonNum: Int = 1,
+        episodeNum: Int = 1,
+        subjectType: Int = 1
+    ): Long {
+        if (subjectType == 2) {
+            val epPrefs = getEpisodePrefs(context)
+            val key1 = "${subjectId}_s${seasonNum}_e${episodeNum}"
+            val key2 = "${detailPath}_s${seasonNum}_e${episodeNum}"
+            if (subjectId.isNotBlank() && epPrefs.contains(key1)) {
+                return epPrefs.getLong(key1, 0L)
+            }
+            if (detailPath.isNotBlank() && epPrefs.contains(key2)) {
+                return epPrefs.getLong(key2, 0L)
+            }
+            // Check if recent history entry is for THIS exact episode
+            val list = getRecentHistory(context)
+            val item = list.firstOrNull {
+                ((subjectId.isNotBlank() && it.subjectId == subjectId) || (detailPath.isNotBlank() && it.detailPath == detailPath)) &&
+                it.seasonNum == seasonNum && it.episodeNum == episodeNum
+            }
+            return item?.positionMs ?: 0L
+        } else {
+            val list = getRecentHistory(context)
+            val item = list.firstOrNull {
+                (subjectId.isNotBlank() && it.subjectId == subjectId) ||
+                (detailPath.isNotBlank() && it.detailPath == detailPath) ||
+                (subjectId.isEmpty() && streamUrl.isNotBlank() && it.streamUrl == streamUrl)
+            }
+            return item?.positionMs ?: 0L
         }
-        return item?.positionMs ?: 0L
+    }
+
+    @Synchronized
+    fun getSavedPosition(context: Context, streamUrl: String, subjectId: String, detailPath: String = ""): Long {
+        return getSavedPosition(context, streamUrl, subjectId, detailPath, 1, 1, 1)
     }
 
     @Synchronized
@@ -143,5 +225,6 @@ object RecentHistoryManager {
     @Synchronized
     fun clearHistory(context: Context) {
         getPrefs(context).edit().remove(KEY_HISTORY).apply()
+        getEpisodePrefs(context).edit().clear().apply()
     }
 }

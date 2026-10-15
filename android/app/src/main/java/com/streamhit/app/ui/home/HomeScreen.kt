@@ -147,7 +147,20 @@ fun HomeScreenShimmer(brush: Brush) {
 fun HomeScreen(
     repository: MovieRepository,
     onMediaClick: (detailPath: String, subjectId: String, subjectType: Int) -> Unit,
-    onPlayDirect: (streamUrl: String, title: String, subjectId: String, detailPath: String, coverUrl: String, seasonNum: Int, episodeNum: Int, startPositionMs: Long) -> Unit = { _, _, _, _, _, _, _, _ -> },
+    onPlayDirect: (
+        streamUrl: String,
+        title: String,
+        subjectId: String,
+        detailPath: String,
+        coverUrl: String,
+        seasonNum: Int,
+        episodeNum: Int,
+        startPositionMs: Long,
+        dubLanguage: String?,
+        dubSubjectId: String?,
+        dubDetailPath: String?,
+        dubName: String?
+    ) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _ -> },
     onNavigateToSearch: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -420,7 +433,11 @@ fun HomeScreen(
                                         item.coverUrl,
                                         item.seasonNum,
                                         item.episodeNum,
-                                        item.positionMs
+                                        item.positionMs,
+                                        item.dubLanguage,
+                                        item.dubSubjectId,
+                                        item.dubDetailPath,
+                                        item.dubName
                                     )
                                 }
                             )

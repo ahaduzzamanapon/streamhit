@@ -87,6 +87,12 @@ fun LandscapePlayerView(
     var seekTargetTime by remember { mutableLongStateOf(0L) }
     var seekDeltaText by remember { mutableStateOf("") }
 
+    val currentExoPlayer by rememberUpdatedState(exoPlayer)
+    val currentPlaybackSpeed by rememberUpdatedState(playbackSpeed)
+    val currentIsFastForwarding by rememberUpdatedState(isFastForwarding2x)
+    val currentTotalDuration by rememberUpdatedState(totalDuration)
+    val currentIsLocked by rememberUpdatedState(isLocked)
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -111,68 +117,69 @@ fun LandscapePlayerView(
         // Touch & Gesture Handler
         AndroidView(
             factory = { ctx ->
-                View(ctx).apply {
-                    setOnTouchListener { _, event ->
-                        gestureDetector.onTouchEvent(event)
-                        if (isLocked) return@setOnTouchListener true
+                View(ctx)
+            },
+            update = { view ->
+                view.setOnTouchListener { _, event ->
+                    gestureDetector.onTouchEvent(event)
+                    if (currentIsLocked) return@setOnTouchListener true
 
-                        val displayMetrics = context.resources.displayMetrics
-                        val widthPx = displayMetrics.widthPixels.toFloat()
-                        val heightPx = displayMetrics.heightPixels.toFloat()
+                    val displayMetrics = view.context.resources.displayMetrics
+                    val widthPx = displayMetrics.widthPixels.toFloat()
+                    val heightPx = displayMetrics.heightPixels.toFloat()
 
-                        when (event.action) {
-                            MotionEvent.ACTION_DOWN -> {
-                                initialTouchX = event.x
-                                initialTouchY = event.y
-                                isHorizontalScrub = false
-                                isVerticalSwipe = false
-                                scrubStartPos = exoPlayer?.currentPosition ?: 0L
-                            }
-                            MotionEvent.ACTION_MOVE -> {
-                                val deltaX = event.x - initialTouchX
-                                val deltaY = initialTouchY - event.y
+                    when (event.action) {
+                        MotionEvent.ACTION_DOWN -> {
+                            initialTouchX = event.x
+                            initialTouchY = event.y
+                            isHorizontalScrub = false
+                            isVerticalSwipe = false
+                            scrubStartPos = currentExoPlayer?.currentPosition ?: 0L
+                        }
+                        MotionEvent.ACTION_MOVE -> {
+                            val deltaX = event.x - initialTouchX
+                            val deltaY = initialTouchY - event.y
 
-                                if (!isHorizontalScrub && !isVerticalSwipe) {
-                                    if (abs(deltaX) > 40 && abs(deltaX) > abs(deltaY)) {
-                                        isHorizontalScrub = true
-                                    } else if (abs(deltaY) > 40) {
-                                        isVerticalSwipe = true
-                                    }
-                                }
-
-                                if (isHorizontalScrub && widthPx > 0f) {
-                                    val seekDeltaMs = ((deltaX / widthPx) * 90000f).toLong()
-                                    val target = (scrubStartPos + seekDeltaMs).coerceIn(0L, totalDuration.coerceAtLeast(1L))
-                                    seekTargetTime = target
-                                    seekDeltaText = if (seekDeltaMs >= 0) "+${seekDeltaMs / 1000}s" else "${seekDeltaMs / 1000}s"
-                                    showSeekOverlay = true
-                                } else if (isVerticalSwipe && heightPx > 0f) {
-                                    val step = ((deltaY / heightPx) * 120f).toInt()
-                                    if (initialTouchX > (widthPx / 2f)) {
-                                        onVolumeAdjust(step)
-                                        initialTouchY = event.y
-                                    } else {
-                                        onBrightnessAdjust(step)
-                                        initialTouchY = event.y
-                                    }
+                            if (!isHorizontalScrub && !isVerticalSwipe) {
+                                if (abs(deltaX) > 40 && abs(deltaX) > abs(deltaY)) {
+                                    isHorizontalScrub = true
+                                } else if (abs(deltaY) > 40) {
+                                    isVerticalSwipe = true
                                 }
                             }
-                            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                                if (isHorizontalScrub && showSeekOverlay) {
-                                    exoPlayer?.seekTo(seekTargetTime)
-                                    showSeekOverlay = false
+
+                            if (isHorizontalScrub && widthPx > 0f) {
+                                val duration = if (currentTotalDuration > 0L) currentTotalDuration else (currentExoPlayer?.duration ?: 0L)
+                                val seekDeltaMs = ((deltaX / widthPx) * 90000f).toLong()
+                                val target = (scrubStartPos + seekDeltaMs).coerceIn(0L, if (duration > 0L) duration else Long.MAX_VALUE)
+                                seekTargetTime = target
+                                seekDeltaText = if (seekDeltaMs >= 0) "+${seekDeltaMs / 1000}s" else "${seekDeltaMs / 1000}s"
+                                showSeekOverlay = true
+                            } else if (isVerticalSwipe && heightPx > 0f) {
+                                val step = ((deltaY / heightPx) * 120f).toInt()
+                                if (initialTouchX > (widthPx / 2f)) {
+                                    onVolumeAdjust(step)
+                                    initialTouchY = event.y
+                                } else {
+                                    onBrightnessAdjust(step)
+                                    initialTouchY = event.y
                                 }
-                                if (isFastForwarding2x) {
-                                    onFastForward2xChange(false)
-                                    exoPlayer?.setPlaybackSpeed(playbackSpeed)
-                                }
-                                onResetOverlayToken()
-                                isHorizontalScrub = false
-                                isVerticalSwipe = false
                             }
                         }
-                        true
+                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                            if (isHorizontalScrub && showSeekOverlay) {
+                                currentExoPlayer?.seekTo(seekTargetTime)
+                                onSeekTo(seekTargetTime)
+                                showSeekOverlay = false
+                            }
+                            onFastForward2xChange(false)
+                            currentExoPlayer?.setPlaybackSpeed(currentPlaybackSpeed)
+                            onResetOverlayToken()
+                            isHorizontalScrub = false
+                            isVerticalSwipe = false
+                        }
                     }
+                    true
                 }
             },
             modifier = Modifier.fillMaxSize()

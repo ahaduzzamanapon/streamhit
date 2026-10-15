@@ -111,6 +111,10 @@ class PlayerActivity : ComponentActivity() {
         val seasonNum = intent.getIntExtra("EXTRA_SEASON_NUM", 1).coerceAtLeast(1)
         val episodeNum = intent.getIntExtra("EXTRA_EPISODE_NUM", 1).coerceAtLeast(1)
         val startPositionMs = intent.getLongExtra("EXTRA_START_POSITION_MS", 0L)
+        val dubLanguage = intent.getStringExtra("EXTRA_DUB_LANGUAGE") ?: ""
+        val dubSubjectId = intent.getStringExtra("EXTRA_DUB_SUBJECT_ID") ?: ""
+        val dubDetailPath = intent.getStringExtra("EXTRA_DUB_DETAIL_PATH") ?: ""
+        val dubName = intent.getStringExtra("EXTRA_DUB_NAME") ?: ""
 
         setContent {
             StreamfitTheme {
@@ -123,6 +127,10 @@ class PlayerActivity : ComponentActivity() {
                     initialSeasonNum = seasonNum,
                     initialEpisodeNum = episodeNum,
                     initialStartPositionMs = startPositionMs,
+                    initialDubLanguage = dubLanguage,
+                    initialDubSubjectId = dubSubjectId,
+                    initialDubDetailPath = dubDetailPath,
+                    initialDubName = dubName,
                     onBack = { finish() },
                     onEnterPip = { enterPipMode() }
                 )
@@ -166,6 +174,10 @@ fun AdaptivePlayerScreen(
     initialSeasonNum: Int = 1,
     initialEpisodeNum: Int = 1,
     initialStartPositionMs: Long = 0L,
+    initialDubLanguage: String = "",
+    initialDubSubjectId: String = "",
+    initialDubDetailPath: String = "",
+    initialDubName: String = "",
     onBack: () -> Unit,
     onEnterPip: () -> Unit
 ) {
@@ -174,6 +186,9 @@ fun AdaptivePlayerScreen(
     val audioManager = remember { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
     val scope = rememberCoroutineScope()
     val repository = remember { MovieRepository() }
+
+    var targetStartPositionMs by remember { mutableStateOf<Long?>(if (initialStartPositionMs > 1000L) initialStartPositionMs else null) }
+    var pendingSeekMs by remember { mutableStateOf<Long?>(null) }
 
     // Orientation / Fullscreen state
     var isFullscreen by remember { mutableStateOf(false) }
@@ -376,16 +391,30 @@ fun AdaptivePlayerScreen(
 
                 val d = detailDeferred.await()
                 detail = d
+
+                // Restore user's preferred dubbing version (e.g. Hindi dub)
                 if (selectedDub == null) {
-                    selectedDub = d?.dubs?.firstOrNull { it.original == true } ?: d?.dubs?.firstOrNull()
+                    val history = RecentHistoryManager.getHistoryForSubject(context, subjectId, detailPath)
+                    val prefSubId = initialDubSubjectId.ifBlank { history?.dubSubjectId ?: "" }
+                    val prefLang = initialDubLanguage.ifBlank { history?.dubLanguage ?: history?.dubName ?: "" }
+
+                    val matchedDub = d?.dubs?.firstOrNull {
+                        (prefSubId.isNotBlank() && it.subjectId == prefSubId) ||
+                        (prefLang.isNotBlank() && (
+                            it.language.equals(prefLang, ignoreCase = true) ||
+                            it.name.equals(prefLang, ignoreCase = true) ||
+                            it.lanName.equals(prefLang, ignoreCase = true)
+                        ))
+                    }
+                    selectedDub = matchedDub ?: d?.dubs?.firstOrNull { it.original == true } ?: d?.dubs?.firstOrNull()
                 }
 
-                if (resources.isEmpty()) {
+                if (resources.isEmpty() || (selectedDub != null && selectedDub?.original != true && selectedDub?.subjectId?.isNotBlank() == true && selectedDub?.subjectId != subjectId)) {
                     val sId = selectedDub?.subjectId?.ifBlank { d?.subjectId?.ifEmpty { subjectId } } ?: subjectId
                     val dPath = selectedDub?.detailPath?.ifBlank { d?.detailPath?.ifEmpty { detailPath } } ?: detailPath
                     val dubRes = repository.getStreamingResources(sId, dPath, currentSeasonNum, currentEpisodeNum)
-                    resources = dubRes
-                    if (currentStreamUrl.isBlank()) {
+                    if (dubRes.isNotEmpty()) {
+                        resources = dubRes
                         val best = selectFastestResolution(dubRes)
                         if (best != null && best.url.isNotBlank()) {
                             currentStreamUrl = best.url
@@ -407,6 +436,45 @@ fun AdaptivePlayerScreen(
     }
 
     fun switchEpisode(season: Int, episode: Int) {
+        // 1. Save progress of current episode before changing episode indices
+        exoPlayer?.let { p ->
+            if (p.duration > 0L) {
+                RecentHistoryManager.saveProgress(
+                    context = context,
+                    subjectId = subjectId,
+                    detailPath = detailPath,
+                    title = currentVideoTitle,
+                    coverUrl = detail?.coverUrl ?: initialCoverUrl,
+                    streamUrl = currentStreamUrl,
+                    positionMs = p.currentPosition,
+                    durationMs = p.duration,
+                    subjectType = detail?.subjectType ?: 2,
+                    seasonNum = currentSeasonNum,
+                    episodeNum = currentEpisodeNum,
+                    dubLanguage = selectedDub?.language ?: selectedDub?.name,
+                    dubSubjectId = selectedDub?.subjectId,
+                    dubDetailPath = selectedDub?.detailPath,
+                    dubName = selectedDub?.name
+                )
+            }
+        }
+
+        // 2. Clear intent initial position so it doesn't contaminate new episode
+        targetStartPositionMs = null
+
+        // 3. Check if user previously watched THIS specific episode:
+        val savedForNewEp = RecentHistoryManager.getSavedPosition(
+            context = context,
+            streamUrl = "",
+            subjectId = subjectId,
+            detailPath = detailPath,
+            seasonNum = season,
+            episodeNum = episode,
+            subjectType = detail?.subjectType ?: 2
+        )
+        // If never watched, savedForNewEp is 0L -> starts cleanly from the beginning!
+        pendingSeekMs = if (savedForNewEp > 3000L) savedForNewEp else 0L
+
         currentSeasonNum = season
         currentEpisodeNum = episode
         isBuffering = true
@@ -417,14 +485,9 @@ fun AdaptivePlayerScreen(
             resources = resList
             val best = selectFastestResolution(resList)
             if (best != null && best.url.isNotBlank()) {
-                currentStreamUrl = best.url
                 val baseTitle = detail?.title ?: initialVideoTitle
                 currentVideoTitle = "$baseTitle S${season}E${episode}"
-                exoPlayer?.apply {
-                    setMediaItem(MediaItem.fromUri(Uri.parse(best.url)), 0L)
-                    prepare()
-                    play()
-                }
+                currentStreamUrl = best.url
             } else {
                 Toast.makeText(context, "Streaming link unavailable for Episode $episode.", Toast.LENGTH_SHORT).show()
                 isBuffering = false
@@ -433,8 +496,9 @@ fun AdaptivePlayerScreen(
     }
 
     fun switchDub(dub: DubInfo) {
-        selectedDub = dub
         val currentPos = exoPlayer?.currentPosition ?: 0L
+        pendingSeekMs = currentPos
+        selectedDub = dub
         isBuffering = true
         scope.launch {
             val sId = dub.subjectId.ifBlank { detail?.subjectId?.ifEmpty { subjectId } } ?: subjectId
@@ -444,11 +508,6 @@ fun AdaptivePlayerScreen(
             val best = selectFastestResolution(resList)
             if (best != null && best.url.isNotBlank()) {
                 currentStreamUrl = best.url
-                exoPlayer?.apply {
-                    setMediaItem(MediaItem.fromUri(Uri.parse(best.url)), currentPos)
-                    prepare()
-                    play()
-                }
                 Toast.makeText(context, "Audio: ${dub.name.ifBlank { dub.language }}", Toast.LENGTH_SHORT).show()
             } else {
                 Toast.makeText(context, "Stream unavailable for this audio track", Toast.LENGTH_SHORT).show()
@@ -485,15 +544,10 @@ fun AdaptivePlayerScreen(
 
     fun switchQuality(res: StreamResource) {
         if (res.url.isNotBlank()) {
+            val currentPos = exoPlayer?.currentPosition ?: 0L
+            pendingSeekMs = currentPos
             isBuffering = true
             currentStreamUrl = res.url
-            val directUrl = resolveDirectPlayableUrl(res.url)
-            val savedPos = exoPlayer?.currentPosition ?: 0L
-            exoPlayer?.apply {
-                setMediaItem(MediaItem.fromUri(Uri.parse(directUrl)), savedPos)
-                prepare()
-                play()
-            }
             Toast.makeText(context, "Playing ${res.displayResolution}", Toast.LENGTH_SHORT).show()
         }
     }
@@ -502,6 +556,11 @@ fun AdaptivePlayerScreen(
     DisposableEffect(currentStreamUrl) {
         if (currentStreamUrl.isBlank()) return@DisposableEffect onDispose {}
         isBuffering = true
+
+        val playingSeason = currentSeasonNum
+        val playingEpisode = currentEpisodeNum
+        val playingTitle = currentVideoTitle
+        val playingSubjectType = detail?.subjectType ?: 1
 
         val resolvedUrl = resolveDirectPlayableUrl(currentStreamUrl)
         var triedProxyFallback = false
@@ -524,12 +583,30 @@ fun AdaptivePlayerScreen(
             .setBackBuffer(20_000, false)
             .build()
 
-        val savedPos = if (initialStartPositionMs > 1000L) {
-            initialStartPositionMs
-        } else {
-            RecentHistoryManager.getSavedPosition(context, currentStreamUrl, subjectId)
+        val initialStartMs = when {
+            pendingSeekMs != null -> {
+                val p = pendingSeekMs!!
+                pendingSeekMs = null
+                p
+            }
+            targetStartPositionMs != null -> {
+                val p = targetStartPositionMs!!
+                targetStartPositionMs = null
+                p
+            }
+            else -> {
+                val pos = RecentHistoryManager.getSavedPosition(
+                    context = context,
+                    streamUrl = currentStreamUrl,
+                    subjectId = subjectId,
+                    detailPath = detailPath,
+                    seasonNum = playingSeason,
+                    episodeNum = playingEpisode,
+                    subjectType = playingSubjectType
+                )
+                if (pos > 3000L) pos else 0L
+            }
         }
-        val initialStartMs = if (savedPos > 3000L) savedPos else 0L
 
         val prepareStartTimeMs = System.currentTimeMillis()
         var firstFrameRendered = false
@@ -633,14 +710,18 @@ fun AdaptivePlayerScreen(
                     context = context,
                     subjectId = subjectId,
                     detailPath = detailPath,
-                    title = currentVideoTitle,
+                    title = playingTitle,
                     coverUrl = detail?.coverUrl ?: initialCoverUrl,
                     streamUrl = currentStreamUrl,
                     positionMs = player.currentPosition,
                     durationMs = player.duration,
-                    subjectType = detail?.subjectType ?: 1,
-                    seasonNum = currentSeasonNum,
-                    episodeNum = currentEpisodeNum
+                    subjectType = playingSubjectType,
+                    seasonNum = playingSeason,
+                    episodeNum = playingEpisode,
+                    dubLanguage = selectedDub?.language ?: selectedDub?.name,
+                    dubSubjectId = selectedDub?.subjectId,
+                    dubDetailPath = selectedDub?.detailPath,
+                    dubName = selectedDub?.name
                 )
             }
             player.removeListener(listener)
@@ -666,7 +747,11 @@ fun AdaptivePlayerScreen(
                         durationMs = p.duration,
                         subjectType = detail?.subjectType ?: 1,
                         seasonNum = currentSeasonNum,
-                        episodeNum = currentEpisodeNum
+                        episodeNum = currentEpisodeNum,
+                        dubLanguage = selectedDub?.language ?: selectedDub?.name,
+                        dubSubjectId = selectedDub?.subjectId,
+                        dubDetailPath = selectedDub?.detailPath,
+                        dubName = selectedDub?.name
                     )
                 }
             }
@@ -767,7 +852,11 @@ fun AdaptivePlayerScreen(
         }
     }
 
-    // Gesture detector definition
+    // Gesture detector definition with live references
+    val livePlayerRef = rememberUpdatedState(exoPlayer)
+    val liveLockedRef = rememberUpdatedState(isLocked)
+    val liveSpeedRef = rememberUpdatedState(playbackSpeed)
+
     val gestureDetector = remember {
         GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
@@ -776,18 +865,15 @@ fun AdaptivePlayerScreen(
             }
 
             override fun onDoubleTap(e: MotionEvent): Boolean {
-                if (isLocked) return true
+                if (liveLockedRef.value) return true
+                val p = livePlayerRef.value ?: return true
                 val width = context.resources.displayMetrics.widthPixels
                 if (e.x > width / 2) {
-                    exoPlayer?.let { p ->
-                        p.seekTo((p.currentPosition + 10000).coerceAtMost(p.duration))
-                    }
+                    p.seekTo((p.currentPosition + 10000).coerceAtMost(p.duration))
                     doubleTapFeedbackText = "+10 sec"
                     showDoubleTapFeedback = true
                 } else {
-                    exoPlayer?.let { p ->
-                        p.seekTo((p.currentPosition - 10000).coerceAtLeast(0))
-                    }
+                    p.seekTo((p.currentPosition - 10000).coerceAtLeast(0))
                     doubleTapFeedbackText = "-10 sec"
                     showDoubleTapFeedback = true
                 }
@@ -795,9 +881,9 @@ fun AdaptivePlayerScreen(
             }
 
             override fun onLongPress(e: MotionEvent) {
-                if (isLocked) return
+                if (liveLockedRef.value) return
                 isFastForwarding2x = true
-                exoPlayer?.setPlaybackSpeed(2.0f)
+                livePlayerRef.value?.setPlaybackSpeed(2.0f)
             }
         })
     }
@@ -837,7 +923,12 @@ fun AdaptivePlayerScreen(
                 bufferedAheadMs = bufferedAheadMs,
                 playbackSpeed = playbackSpeed,
                 isFastForwarding2x = isFastForwarding2x,
-                onFastForward2xChange = { isFastForwarding2x = it },
+                onFastForward2xChange = { fastForward ->
+                    isFastForwarding2x = fastForward
+                    if (!fastForward) {
+                        exoPlayer?.setPlaybackSpeed(playbackSpeed)
+                    }
+                },
                 showControls = showControls,
                 isLocked = isLocked,
                 onToggleLock = { isLocked = !isLocked },
@@ -907,7 +998,12 @@ fun AdaptivePlayerScreen(
                     bufferedPosition = bufferedPosition,
                     bufferedAheadMs = bufferedAheadMs,
                     isFastForwarding2x = isFastForwarding2x,
-                    onFastForward2xChange = { isFastForwarding2x = it },
+                    onFastForward2xChange = { fastForward ->
+                        isFastForwarding2x = fastForward
+                        if (!fastForward) {
+                            exoPlayer?.setPlaybackSpeed(playbackSpeed)
+                        }
+                    },
                     playbackSpeed = playbackSpeed,
                     hasNextEpisode = hasNextEpisode,
                     onPlayNextEpisode = { playNextEpisode() },

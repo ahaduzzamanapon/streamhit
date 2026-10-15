@@ -68,7 +68,7 @@ class MainActivity : ComponentActivity() {
             StreamfitTheme {
                 MainAppScreen(
                     repository = repository,
-                    onPlayVideo = { url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPositionMs ->
+                    onPlayVideo = { url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPositionMs, dubLanguage, dubSubjectId, dubDetailPath, dubName ->
                         val intent = Intent(this, PlayerActivity::class.java).apply {
                             putExtra("EXTRA_STREAM_URL", url)
                             putExtra("EXTRA_VIDEO_TITLE", title)
@@ -78,6 +78,10 @@ class MainActivity : ComponentActivity() {
                             putExtra("EXTRA_SEASON_NUM", seasonNum)
                             putExtra("EXTRA_EPISODE_NUM", episodeNum)
                             putExtra("EXTRA_START_POSITION_MS", startPositionMs)
+                            if (!dubLanguage.isNullOrBlank()) putExtra("EXTRA_DUB_LANGUAGE", dubLanguage)
+                            if (!dubSubjectId.isNullOrBlank()) putExtra("EXTRA_DUB_SUBJECT_ID", dubSubjectId)
+                            if (!dubDetailPath.isNullOrBlank()) putExtra("EXTRA_DUB_DETAIL_PATH", dubDetailPath)
+                            if (!dubName.isNullOrBlank()) putExtra("EXTRA_DUB_NAME", dubName)
                         }
                         startActivity(intent)
                     }
@@ -98,7 +102,7 @@ sealed class Screen(val title: String, val icon: ImageVector) {
 @Composable
 fun MainAppScreen(
     repository: MovieRepository,
-    onPlayVideo: (streamUrl: String, title: String, subjectId: String, detailPath: String, coverUrl: String, seasonNum: Int, episodeNum: Int, startPositionMs: Long) -> Unit
+    onPlayVideo: (streamUrl: String, title: String, subjectId: String, detailPath: String, coverUrl: String, seasonNum: Int, episodeNum: Int, startPositionMs: Long, dubLanguage: String?, dubSubjectId: String?, dubDetailPath: String?, dubName: String?) -> Unit
 ) {
     val context = LocalContext.current
     val activity = context as? ComponentActivity
@@ -285,8 +289,8 @@ fun MainAppScreen(
                     onBackClick = {
                         popDetails()
                     },
-                    onPlayClick = { url, title, cover, seasonNum, episodeNum, startPos ->
-                        onPlayVideo(url, title, activeSubjectId ?: "", activeDetailPath ?: "", cover, seasonNum, episodeNum, startPos)
+                    onPlayClick = { url, title, cover, seasonNum, episodeNum, startPos, dubLanguage, dubSubjectId, dubDetailPath, dubName ->
+                        onPlayVideo(url, title, activeSubjectId ?: "", activeDetailPath ?: "", cover, seasonNum, episodeNum, startPos, dubLanguage, dubSubjectId, dubDetailPath, dubName)
                     },
                     onNavigateToDownloads = {
                         activeDetailPath = null
@@ -302,8 +306,8 @@ fun MainAppScreen(
                         onMediaClick = { path, id, _ ->
                             navigateToDetails(path, id)
                         },
-                        onPlayDirect = { url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPos ->
-                            onPlayVideo(url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPos)
+                        onPlayDirect = { url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPos, dubLanguage, dubSubjectId, dubDetailPath, dubName ->
+                            onPlayVideo(url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPos, dubLanguage, dubSubjectId, dubDetailPath, dubName)
                         },
                         onNavigateToSearch = {
                             switchTab(Screen.Search)
@@ -311,7 +315,7 @@ fun MainAppScreen(
                     )
                     Screen.LiveTv -> LiveTvScreen(
                         onPlayStream = { url, title ->
-                            onPlayVideo(url, title, "", "", "", 1, 1, 0L)
+                            onPlayVideo(url, title, "", "", "", 1, 1, 0L, null, null, null, null)
                         }
                     )
                     Screen.Explore -> ExploreScreen(
@@ -323,7 +327,7 @@ fun MainAppScreen(
                     Screen.Downloads -> DownloadsScreen(
                         repository = repository,
                         onPlayOffline = { localUri, title ->
-                            onPlayVideo(localUri, title, "", "", "", 1, 1, 0L)
+                            onPlayVideo(localUri, title, "", "", "", 1, 1, 0L, null, null, null, null)
                         },
                         onNavigateToDetails = { path, id ->
                             navigateToDetails(path, id)

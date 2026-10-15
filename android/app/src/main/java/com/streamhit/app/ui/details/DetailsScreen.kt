@@ -39,7 +39,18 @@ fun DetailsScreen(
     detailPath: String,
     subjectId: String,
     onBackClick: () -> Unit,
-    onPlayClick: (streamUrl: String, title: String, coverUrl: String, seasonNum: Int, episodeNum: Int, startPositionMs: Long) -> Unit,
+    onPlayClick: (
+        streamUrl: String,
+        title: String,
+        coverUrl: String,
+        seasonNum: Int,
+        episodeNum: Int,
+        startPositionMs: Long,
+        dubLanguage: String?,
+        dubSubjectId: String?,
+        dubDetailPath: String?,
+        dubName: String?
+    ) -> Unit,
     onNavigateToDownloads: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -86,7 +97,16 @@ fun DetailsScreen(
 
             val d = dDeferred.await()
             detail = d
-            selectedDub = d?.dubs?.firstOrNull { it.original == true } ?: d?.dubs?.firstOrNull()
+
+            val matchedDub = if (history != null) {
+                d?.dubs?.firstOrNull { dub ->
+                    (!history.dubSubjectId.isNullOrBlank() && dub.subjectId == history.dubSubjectId) ||
+                    (!history.dubDetailPath.isNullOrBlank() && dub.detailPath == history.dubDetailPath) ||
+                    (!history.dubLanguage.isNullOrBlank() && dub.language.equals(history.dubLanguage, ignoreCase = true)) ||
+                    (!history.dubName.isNullOrBlank() && dub.name.equals(history.dubName, ignoreCase = true))
+                }
+            } else null
+            selectedDub = matchedDub ?: d?.dubs?.firstOrNull { it.original == true } ?: d?.dubs?.firstOrNull()
 
             if (history != null && d?.subjectType == 2) {
                 val sIdx = (history.seasonNum - 1).coerceAtLeast(0)
@@ -112,7 +132,18 @@ fun DetailsScreen(
         val epText = if (detail?.subjectType == 2) " - S${season}E${episode}" else ""
         val cover = detail?.coverUrl ?: ""
         if (res.url.isNotBlank()) {
-            onPlayClick(res.url, "$title$epText (${res.displayResolution})", cover, season, episode, startPos)
+            onPlayClick(
+                res.url,
+                "$title$epText (${res.displayResolution})",
+                cover,
+                season,
+                episode,
+                startPos,
+                selectedDub?.language ?: selectedDub?.name,
+                selectedDub?.subjectId,
+                selectedDub?.detailPath,
+                selectedDub?.name
+            )
         } else {
             Toast.makeText(context, "Streaming link unavailable for this server.", Toast.LENGTH_SHORT).show()
         }
@@ -510,12 +541,23 @@ fun DetailsScreen(
                     } else {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             resources.forEachIndexed { index, res ->
+                                val targetSeason = if (item.subjectType == 2) selectedSeasonIndex + 1 else 1
+                                val targetEpisode = if (item.subjectType == 2) selectedEpisodeNumber else 1
+                                val targetPos = com.streamhit.app.data.local.RecentHistoryManager.getSavedPosition(
+                                    context = context,
+                                    streamUrl = "",
+                                    subjectId = subjectId,
+                                    detailPath = detailPath,
+                                    seasonNum = targetSeason,
+                                    episodeNum = targetEpisode,
+                                    subjectType = item.subjectType
+                                )
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .background(BgCard, RoundedCornerShape(10.dp))
                                         .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(10.dp))
-                                        .clickable { playStream(res, 1, 1) }
+                                        .clickable { playStream(res, targetSeason, targetEpisode, targetPos) }
                                         .padding(12.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
@@ -673,7 +715,15 @@ fun DetailsScreen(
                                                 .height(36.dp)
                                                 .clickable {
                                                     selectedEpisodeNumber = ep.episodeNumber
-                                                    val epStartPos = if (savedHistory?.seasonNum == currentSeason.seasonNumber && savedHistory?.episodeNum == ep.episodeNumber) (savedHistory?.positionMs ?: 0L) else 0L
+                                                    val epStartPos = com.streamhit.app.data.local.RecentHistoryManager.getSavedPosition(
+                                                        context = context,
+                                                        streamUrl = "",
+                                                        subjectId = subjectId,
+                                                        detailPath = detailPath,
+                                                        seasonNum = currentSeason.seasonNumber,
+                                                        episodeNum = ep.episodeNumber,
+                                                        subjectType = 2
+                                                    )
                                                     playBestContent(currentSeason.seasonNumber, ep.episodeNumber, epStartPos)
                                                 }
                                         ) {
