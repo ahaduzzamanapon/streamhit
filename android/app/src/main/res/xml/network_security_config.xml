@@ -3,7 +3,6 @@
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
-            <certificates src="user" />
             <certificates src="@raw/ssl_root_2022" />
             <certificates src="@raw/ssl_intermediate" />
         </trust-anchors>
