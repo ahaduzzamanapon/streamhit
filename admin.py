@@ -306,11 +306,11 @@ async def admin_upload_apk(request: Request, file: UploadFile = File(...)):
 async def public_get_app_version():
     from main import get_db_pool
     default_version = {
-        "versionCode": 10,
-        "versionName": "1.0.9",
+        "versionCode": 15,
+        "versionName": "1.0.14",
         "apkUrl": "https://nxly.online/uploads/apks/NXLY-Stream.apk",
         "mustUpdate": False,
-        "releaseNotes": "Resolved PlayerActivity class verifier crash, modularized landscape/portrait controls, added mandatory lock screen for strict updates."
+        "releaseNotes": "Fix 2X hold-release speed, smooth swipe seek, series episode progress memory, and audio dubbing persistence."
     }
     pool = await get_db_pool()
     if not pool: return {"version": default_version}
