@@ -1339,6 +1339,32 @@ async def download_page(request: Request):
     host = request.headers.get("host", "")
     return serve_html("public/download.html", host=host)
 
+@app.get("/sitemap.xml")
+async def sitemap_endpoint():
+    path = os.path.join(base_dir, "public", "sitemap.xml")
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read()
+        return Response(content=content, media_type="application/xml", headers={"Cache-Control": "public, max-age=3600"})
+    raise HTTPException(status_code=404, detail="Sitemap not found")
+
+@app.get("/robots.txt")
+async def robots_endpoint():
+    path = os.path.join(base_dir, "public", "robots.txt")
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read()
+        return Response(content=content, media_type="text/plain", headers={"Cache-Control": "public, max-age=3600"})
+    raise HTTPException(status_code=404, detail="Robots not found")
+
+@app.get("/google{verification_code}.html")
+async def google_verification_endpoint(verification_code: str):
+    file_path = os.path.join(base_dir, "public", f"google{verification_code}.html")
+    if os.path.exists(file_path):
+        with open(file_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(content=f"google-site-verification: google{verification_code}.html")
+
 @app.get("/movie/{slug}", response_class=HTMLResponse)
 @app.get("/tv/{slug}", response_class=HTMLResponse)
 async def details(slug: str, request: Request):
