@@ -877,7 +877,64 @@ function renderExploreGrid(items, isAppend = false) {
     });
 }
 
+const ADULT_GENRES_SET = new Set([
+    'erotic', 'hot', 'adult', '18+', '18', 'ecchi', 'hentai', 'porn', 'pornography',
+    'sex', 'sensual', 'nudity', 'sexual', 'uncensored', 'nsfw', 'softcore', 'hardcore',
+    'smut', 'yaoi', 'yuri', 'mature'
+]);
+
+const ADULT_KEYWORDS_LIST = [
+    '18+', '18 +', 'r18', 'r-18', 'r30', 'r-30', 'nc-17', 'erotic', 'erotica', 'softcore', 'hardcore',
+    'porn', 'pornography', 'adult movie', 'adult series', 'adult film', 'adult animation',
+    'sensual', 'uncensored', 'nudity', 'sexual', 'masturbat', 'seduction', 'striptease',
+    'kaam sastra', 'charmsukh', 'palang tod', 'riti riwaj', 'kavita bhabhi', 'chull',
+    'hotspot', 'gandii baat', 'kama sutra', 'kamasutra', 'mastram', 'tandoor', 'rasikan',
+    'dani daniels', 'mia khalifa', 'eva elfie', 'kendra lust', 'johnny sins',
+    'lana rhoades', 'angela white', 'riley reid', 'leah gotti', 'sunny leone adult',
+    'ullu', 'kooku', 'primeshots', 'hunters', 'voovi', 'moodx', 'besharams',
+    'rabbit movies', 'neonx', 'hotx', 'feneo', 'jalva', 'boomx', 'big bang',
+    'natsuzuma', 'nikuen', 'shitsurakuen', 'anime edition', 'niku mesu', 'boin', 'mankitsu',
+    'overflow', 'boku no pico', 'kuroinu', 'futanari', 'ahegao', 'chikan', 'ero ',
+    'eroge', 'oppai', 'tentacle', 'savita bhabhi', 'boobs', 'tits', 'pussy', 'creampie',
+    'blowjob', 'gangbang', 'horny', 'xxx', 'seiso de bitch', 'mesu-tachi', 'succubus',
+    'sexfriend', 'stepmom', 'bhabhi', 'desi sex', 'desi porn'
+];
+
+function isAdultContent(item) {
+    if (!item) return false;
+    const title = String(item.title || '').toLowerCase();
+    const dpath = String(item.detailPath || item.detailUrl || '').toLowerCase();
+    const desc = String(item.description || item.content || '').toLowerCase();
+    const tags = String(item.tags || item.tagList || '').toLowerCase();
+    const cover = String(typeof item.cover === 'string' ? item.cover : (item.cover?.url || '')).toLowerCase();
+    
+    // Check genres
+    let genres = item.genre || [];
+    if (typeof genres === 'string') {
+        genres = genres.split(/[,/]/);
+    }
+    for (let g of genres) {
+        if (ADULT_GENRES_SET.has(String(g).trim().toLowerCase())) return true;
+    }
+
+    // Check classification
+    const cls = String(item.classification || item.ageRating || item.rating || '').trim().toLowerCase();
+    if (['18', '18+', 'r18', 'r-18', 'r30', 'nc-17', 'adult', 'x', 'xxx'].includes(cls)) return true;
+
+    // Check keywords in title, path, desc, tags, cover
+    const combined = `${title} ${dpath} ${desc} ${tags} ${cover}`;
+    for (let kw of ADULT_KEYWORDS_LIST) {
+        if (combined.includes(kw)) return true;
+    }
+    return false;
+}
+
 function createContentCard(item) {
+    if (isAdultContent(item)) {
+        const dummy = document.createElement("span");
+        dummy.style.display = "none";
+        return dummy;
+    }
     const card = document.createElement("a");
     card.className = "content-card";
     card.dataset.id = item.subjectId;
@@ -2611,8 +2668,13 @@ async function loadRecommendations(detail) {
     let firstGenre = "*";
     if (detail.genre) {
         const genres = Array.isArray(detail.genre) ? detail.genre : detail.genre.split(',');
-        if (genres.length > 0) {
-            firstGenre = genres[0].trim();
+        const clean = genres.map(g => g.trim()).filter(g => g && !ADULT_GENRES_SET.has(g.toLowerCase()));
+        if (clean.length > 0) {
+            if (clean[0].toLowerCase() === "anime") {
+                firstGenre = clean[1] || "Animation";
+            } else {
+                firstGenre = clean[0];
+            }
         }
     }
     const payload = {
@@ -2623,7 +2685,7 @@ async function loadRecommendations(detail) {
         sort: "Hottest",
         subjectType: detail.subjectType || 1,
         page: 1,
-        perPage: 6
+        perPage: 12
     };
 
     const result = await apiPost('/api/filter', payload);
@@ -2635,9 +2697,10 @@ async function loadRecommendations(detail) {
             ? raw.flatMap(sec => sec.subjects || [])
             : raw;
         
-        // Filter out current subject and deduplicate
+        // Filter out current subject, adult content, and deduplicate
         const seen = new Set();
         const filtered = subjects.filter(item => {
+            if (isAdultContent(item)) return false;
             const id = String(item.subjectId);
             if (id === String(detail.subjectId) || seen.has(id)) return false;
             seen.add(id);
@@ -2658,7 +2721,7 @@ async function loadRecommendations(detail) {
         homeResult.data.items.forEach(sec => {
             if (sec.subjects) subjects = subjects.concat(sec.subjects);
         });
-        const filtered = subjects.filter(item => String(item.subjectId) !== String(detail.subjectId)).slice(0, 6);
+        const filtered = subjects.filter(item => !isAdultContent(item) && String(item.subjectId) !== String(detail.subjectId)).slice(0, 6);
         filtered.forEach(item => {
             grid.appendChild(createContentCard(item));
         });

@@ -290,19 +290,25 @@ async def request_moviebox_mobile(endpoint: str, method: str = "GET", params: di
 
 ADULT_GENRES = {
     'erotic', 'hot', 'adult', '18+', '18', 'ecchi', 'hentai', 'porn', 'pornography',
-    'sex', 'sensual', 'nudity', 'sexual', 'uncensored', 'nsfw', 'softcore', 'hardcore'
+    'sex', 'sensual', 'nudity', 'sexual', 'uncensored', 'nsfw', 'softcore', 'hardcore',
+    'smut', 'yaoi', 'yuri', 'mature'
 }
 
 ADULT_KEYWORDS = [
-    '18+', '18 +', 'r18', 'r-18', 'nc-17', 'erotic', 'erotica', 'softcore', 'hardcore',
-    'porn', 'pornography', 'adult movie', 'adult series', 'adult film', 'sensual',
-    'uncensored', 'nudity', 'sexual', 'masturbat', 'seduction', 'striptease',
+    '18+', '18 +', 'r18', 'r-18', 'r30', 'r-30', 'nc-17', 'erotic', 'erotica', 'softcore', 'hardcore',
+    'porn', 'pornography', 'adult movie', 'adult series', 'adult film', 'adult animation',
+    'sensual', 'uncensored', 'nudity', 'sexual', 'masturbat', 'seduction', 'striptease',
     'kaam sastra', 'charmsukh', 'palang tod', 'riti riwaj', 'kavita bhabhi', 'chull',
     'hotspot', 'gandii baat', 'kama sutra', 'kamasutra', 'mastram', 'tandoor', 'rasikan',
     'dani daniels', 'mia khalifa', 'eva elfie', 'kendra lust', 'johnny sins',
     'lana rhoades', 'angela white', 'riley reid', 'leah gotti', 'sunny leone adult',
     'ullu', 'kooku', 'primeshots', 'hunters', 'voovi', 'moodx', 'besharams',
-    'rabbit movies', 'neonx', 'hotx', 'feneo', 'jalva', 'boomx', 'big bang'
+    'rabbit movies', 'neonx', 'hotx', 'feneo', 'jalva', 'boomx', 'big bang',
+    'natsuzuma', 'nikuen', 'shitsurakuen', 'anime edition', 'niku mesu', 'boin', 'mankitsu',
+    'overflow', 'boku no pico', 'kuroinu', 'futanari', 'ahegao', 'chikan', 'ero ',
+    'eroge', 'oppai', 'tentacle', 'savita bhabhi', 'boobs', 'tits', 'pussy', 'creampie',
+    'blowjob', 'gangbang', 'horny', 'xxx', 'seiso de bitch', 'mesu-tachi', 'succubus',
+    'sexfriend', 'stepmom', 'bhabhi', 'desi sex', 'desi porn'
 ]
 
 def is_adult_content(item: dict) -> bool:
@@ -322,14 +328,16 @@ def is_adult_content(item: dict) -> bool:
 
     # 2. Check content ratings
     rating = str(item.get("classification") or item.get("ageRating") or item.get("rating") or "").lower().strip()
-    if rating in ("18", "18+", "r18", "r-18", "nc-17", "adult", "x", "xxx"):
+    if rating in ("18", "18+", "r18", "r-18", "r30", "nc-17", "adult", "x", "xxx"):
         return True
 
-    # 3. Check title, description, content, detailPath
+    # 3. Check title, description, content, detailPath, tags, cover
     title = str(item.get("title") or "").lower()
     desc = str(item.get("description") or item.get("content") or "").lower()
     dpath = str(item.get("detailPath") or item.get("detailUrl") or "").lower()
-    combined = f"{title} {desc} {dpath}"
+    tags = str(item.get("tags") or item.get("tagList") or "").lower()
+    cover = str(item.get("cover") or "").lower()
+    combined = f"{title} {desc} {dpath} {tags} {cover}"
 
     for kw in ADULT_KEYWORDS:
         if kw in title or kw in dpath or re.search(r'\b' + re.escape(kw) + r'\b', combined):
@@ -1679,6 +1687,8 @@ async def api_filter(request: Request):
     # 4. If filter results are few and a specific filter was requested, supplement from Mobile search
     if len(filtered) < (page * per_page) and (genre != "ALL" or year != "ALL" or country != "ALL"):
         query = genre if genre != "ALL" else (year if year != "ALL" else country)
+        if str(query).lower() in ("anime", "hentai", "ecchi"):
+            query = "Animation"
         try:
             mob_res = await request_moviebox_mobile(
                 "/wefeed-mobile-bff/subject-api/search",
@@ -1689,7 +1699,7 @@ async def api_filter(request: Request):
             existing_ids = {str(m.get("subjectId")) for m in filtered}
             for it in raw_items:
                 sid = str(it.get("subjectId") or "")
-                if sid and sid not in existing_ids and it.get("subjectType", subject_type) == subject_type:
+                if sid and sid not in existing_ids and it.get("subjectType", subject_type) == subject_type and not is_adult_content(it):
                     existing_ids.add(sid)
                     title = it.get("title") or ""
                     sid_str = str(sid)
@@ -1703,6 +1713,9 @@ async def api_filter(request: Request):
                     filtered.append(it)
         except Exception as e:
             print(f"Error querying mobile search for filter: {e}")
+
+    # Remove any adult content from filtered results
+    filtered = [m for m in filtered if not is_adult_content(m)]
 
     # 5. Sort
     sort_upper = str(sort).upper()
