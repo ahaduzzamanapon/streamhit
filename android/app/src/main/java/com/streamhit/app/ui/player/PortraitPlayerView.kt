@@ -112,6 +112,16 @@ fun PortraitVideoPlayerBox(
             },
             update = { view ->
                 view.setOnTouchListener { _, event ->
+                    if (currentIsFastForwarding) {
+                        isHorizontalScrub = false
+                        showSeekOverlay = false
+                        if (event.action == MotionEvent.ACTION_UP || event.action == MotionEvent.ACTION_CANCEL) {
+                            onFastForward2xChange(false)
+                            currentExoPlayer?.setPlaybackSpeed(currentPlaybackSpeed)
+                        }
+                        return@setOnTouchListener true
+                    }
+
                     gestureDetector.onTouchEvent(event)
 
                     val displayMetrics = view.context.resources.displayMetrics

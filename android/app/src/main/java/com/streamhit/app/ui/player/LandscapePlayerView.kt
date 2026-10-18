@@ -121,8 +121,44 @@ fun LandscapePlayerView(
             },
             update = { view ->
                 view.setOnTouchListener { _, event ->
+                    if (currentIsLocked) {
+                        val displayMetrics = view.context.resources.displayMetrics
+                        val heightPx = displayMetrics.heightPixels.toFloat()
+                        val density = displayMetrics.density
+
+                        // Unlock button hit target at Alignment.CenterStart
+                        val unlockMinX = 0f
+                        val unlockMaxX = 100f * density
+                        val centerY = heightPx / 2f
+                        val unlockMinY = centerY - (50f * density)
+                        val unlockMaxY = centerY + (50f * density)
+
+                        val isOverUnlock = (event.x in unlockMinX..unlockMaxX) && (event.y in unlockMinY..unlockMaxY)
+
+                        if (event.action == MotionEvent.ACTION_UP) {
+                            if (showControls && isOverUnlock) {
+                                onToggleLock()
+                            } else {
+                                gestureDetector.onTouchEvent(event)
+                            }
+                        } else {
+                            gestureDetector.onTouchEvent(event)
+                        }
+                        return@setOnTouchListener true
+                    }
+
+                    if (currentIsFastForwarding) {
+                        isHorizontalScrub = false
+                        isVerticalSwipe = false
+                        showSeekOverlay = false
+                        if (event.action == MotionEvent.ACTION_UP || event.action == MotionEvent.ACTION_CANCEL) {
+                            onFastForward2xChange(false)
+                            currentExoPlayer?.setPlaybackSpeed(currentPlaybackSpeed)
+                        }
+                        return@setOnTouchListener true
+                    }
+
                     gestureDetector.onTouchEvent(event)
-                    if (currentIsLocked) return@setOnTouchListener true
 
                     val displayMetrics = view.context.resources.displayMetrics
                     val widthPx = displayMetrics.widthPixels.toFloat()

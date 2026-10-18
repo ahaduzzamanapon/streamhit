@@ -16,6 +16,48 @@ object AppAnalyticsManager {
     @Volatile
     var cachedDeviceId: String? = null
 
+    @Volatile
+    var currentWatchingTitle: String? = null
+
+    @Volatile
+    var currentWatchingDetailPath: String? = null
+
+    @Volatile
+    var isCurrentlyPlaying: Boolean = false
+
+    fun setWatching(title: String?, detailPath: String?, isPlaying: Boolean) {
+        currentWatchingTitle = title
+        currentWatchingDetailPath = detailPath
+        isCurrentlyPlaying = isPlaying
+    }
+
+    fun clearWatching() {
+        currentWatchingTitle = null
+        currentWatchingDetailPath = null
+        isCurrentlyPlaying = false
+    }
+
+    fun sendImmediateWatchUpdate(context: Context) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val dId = getDeviceId(context)
+                val model = getDeviceModel()
+                val os = getOsVersion()
+                val ver = getAppVersion()
+                val payload = mapOf(
+                    "device_id" to dId,
+                    "device_model" to model,
+                    "os_version" to os,
+                    "app_version" to ver,
+                    "current_watching" to (currentWatchingTitle ?: ""),
+                    "detail_path" to (currentWatchingDetailPath ?: ""),
+                    "is_watching" to (if (isCurrentlyPlaying) "1" else "0")
+                )
+                RetrofitClient.apiService.sendHeartbeat(payload)
+            } catch (_: Exception) {}
+        }
+    }
+
     fun getDeviceId(context: Context): String {
         cachedDeviceId?.let { return it }
         val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -54,12 +96,15 @@ object AppAnalyticsManager {
                         "device_id" to dId,
                         "device_model" to model,
                         "os_version" to os,
-                        "app_version" to ver
+                        "app_version" to ver,
+                        "current_watching" to (currentWatchingTitle ?: ""),
+                        "detail_path" to (currentWatchingDetailPath ?: ""),
+                        "is_watching" to (if (isCurrentlyPlaying) "1" else "0")
                     )
                     RetrofitClient.apiService.sendHeartbeat(payload)
                 } catch (_: Exception) {
                 }
-                delay(40_000L) // Pulse every 40 seconds
+                delay(30_000L) // Pulse every 30 seconds
             }
         }
     }

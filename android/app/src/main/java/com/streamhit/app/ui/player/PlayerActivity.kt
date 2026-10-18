@@ -54,6 +54,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.upstream.DefaultAllocator
 import androidx.media3.ui.AspectRatioFrameLayout
 import coil.compose.AsyncImage
+import com.streamhit.app.data.analytics.AppAnalyticsManager
 import com.streamhit.app.data.local.MediaCacheManager
 import com.streamhit.app.data.local.MediaDownloadManager
 import com.streamhit.app.data.local.RecentHistoryManager
@@ -190,20 +191,29 @@ fun AdaptivePlayerScreen(
     var targetStartPositionMs by remember { mutableStateOf<Long?>(if (initialStartPositionMs > 1000L) initialStartPositionMs else null) }
     var pendingSeekMs by remember { mutableStateOf<Long?>(null) }
 
-    // Orientation / Fullscreen state
+    // Orientation, Fullscreen, and Lock state
     var isFullscreen by remember { mutableStateOf(false) }
+    var isLocked by remember { mutableStateOf(false) }
 
-    // Handle system back button: return to portrait if in fullscreen
+    // Handle system back button: return to portrait if in fullscreen (unless locked)
     BackHandler(enabled = isFullscreen) {
-        isFullscreen = false
+        if (!isLocked) {
+            isFullscreen = false
+        } else {
+            Toast.makeText(context, "Screen is locked", Toast.LENGTH_SHORT).show()
+        }
     }
 
-    // React to fullscreen toggle
-    LaunchedEffect(isFullscreen) {
+    // React to fullscreen and lock toggle
+    LaunchedEffect(isFullscreen, isLocked) {
         val windowInsetsController = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
         windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         if (isFullscreen) {
-            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            if (isLocked) {
+                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LOCKED
+            } else {
+                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            }
             windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
         } else {
             activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
@@ -232,7 +242,6 @@ fun AdaptivePlayerScreen(
 
     // Controls visibility
     var showControls by remember { mutableStateOf(true) }
-    var isLocked by remember { mutableStateOf(false) }
 
     // Playback state
     var isPlaying by remember { mutableStateOf(true) }
@@ -357,6 +366,26 @@ fun AdaptivePlayerScreen(
             ?: resList.firstOrNull { it.resolution == 1080 }
             ?: resList.firstOrNull { it.resolution == 360 }
             ?: resList.firstOrNull()
+    }
+
+    // Report real-time watching telemetry to server
+    LaunchedEffect(currentVideoTitle, isPlaying, detailPath) {
+        val title = currentVideoTitle.ifBlank { detail?.title ?: initialVideoTitle }
+        if (title.isNotBlank()) {
+            AppAnalyticsManager.setWatching(
+                title = title,
+                detailPath = detailPath.ifBlank { detail?.detailPath ?: "" },
+                isPlaying = isPlaying
+            )
+            AppAnalyticsManager.sendImmediateWatchUpdate(context)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            AppAnalyticsManager.clearWatching()
+            AppAnalyticsManager.sendImmediateWatchUpdate(context)
+        }
     }
 
     LaunchedEffect(detailPath, subjectId) {
@@ -503,6 +532,26 @@ fun AdaptivePlayerScreen(
         scope.launch {
             val sId = dub.subjectId.ifBlank { detail?.subjectId?.ifEmpty { subjectId } } ?: subjectId
             val dPath = dub.detailPath.ifBlank { detail?.detailPath?.ifEmpty { detailPath } } ?: detailPath
+            try {
+                val newDetail = repository.getDetail(dPath, sId)
+                if (newDetail != null) {
+                    val mergedDubs = if (!newDetail.dubs.isNullOrEmpty()) newDetail.dubs else detail?.dubs
+                    detail = newDetail.copy(dubs = mergedDubs)
+                    val currentSeasons = newDetail.seasons ?: emptyList()
+                    if (currentSeasons.isNotEmpty()) {
+                        val curSeason = currentSeasons.firstOrNull { it.seasonNumber == currentSeasonNum }
+                            ?: currentSeasons.firstOrNull()
+                        if (curSeason != null) {
+                            currentSeasonNum = curSeason.seasonNumber
+                            val maxEp = curSeason.maxEp
+                            if (currentEpisodeNum > maxEp && maxEp > 0) {
+                                currentEpisodeNum = 1
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+
             val resList = repository.getStreamingResources(sId, dPath, currentSeasonNum, currentEpisodeNum)
             resources = resList
             val best = selectFastestResolution(resList)

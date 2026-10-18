@@ -718,3 +718,10 @@ async def get_app_users_admin(request: Request):
     from main import get_app_users_list
     return get_app_users_list()
 
+@router.post("/api/admin/clear-app-users")
+async def clear_app_users_admin(request: Request):
+    check_admin_auth(request)
+    from main import clear_all_app_installations
+    success = clear_all_app_installations()
+    return {"code": 0 if success else 500, "status": "ok" if success else "failed"}
+

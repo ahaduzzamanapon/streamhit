@@ -1170,17 +1170,20 @@
                 </div>
                 <div style="display: flex; gap: 12px; align-items: center;">
                     <button class="btn btn-secondary" onclick="fetchAppUsers()" style="padding: 10px 18px; font-size: 13px;">
-                        Refresh List
+                        🔄 Refresh List
+                    </button>
+                    <button class="btn" onclick="clearAppUsersData()" style="padding: 10px 18px; font-size: 13px; background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.35); font-weight: 700;">
+                        🗑️ Clear / Reset All Data
                     </button>
                 </div>
             </div>
 
             <!-- Stats Mini Bar -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-bottom: 24px;">
                 <div class="card" style="margin-bottom: 0; padding: 20px; background: rgba(16,185,129,0.06); border-color: rgba(16,185,129,0.25);">
                     <div style="font-size: 11px; color: #10B981; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Total Installations</div>
                     <div style="font-size: 32px; font-weight: 800; color: #fff; margin-top: 4px;" id="appUsersStatTotal">0</div>
-                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Unique devices registered</div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Registered devices</div>
                 </div>
 
                 <div class="card" style="margin-bottom: 0; padding: 20px; background: rgba(255,42,84,0.06); border-color: rgba(255,42,84,0.25);">
@@ -1188,13 +1191,21 @@
                         <span class="live-dot"></span> Live Active Now
                     </div>
                     <div style="font-size: 32px; font-weight: 800; color: #fff; margin-top: 4px;" id="appUsersStatLive">0</div>
-                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">In-app within last 5 minutes</div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Active in last 5 minutes</div>
                 </div>
 
                 <div class="card" style="margin-bottom: 0; padding: 20px; background: rgba(0,240,255,0.06); border-color: rgba(0,240,255,0.25);">
-                    <div style="font-size: 11px; color: var(--secondary-accent); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Active Today</div>
+                    <div style="font-size: 11px; color: #00F0FF; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+                        🎬 Watching Now
+                    </div>
+                    <div style="font-size: 32px; font-weight: 800; color: #fff; margin-top: 4px;" id="appUsersStatWatching">0</div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Currently streaming media</div>
+                </div>
+
+                <div class="card" style="margin-bottom: 0; padding: 20px; background: rgba(168,85,247,0.06); border-color: rgba(168,85,247,0.25);">
+                    <div style="font-size: 11px; color: #a855f7; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Active Today</div>
                     <div style="font-size: 32px; font-weight: 800; color: #fff; margin-top: 4px;" id="appUsersStatToday">0</div>
-                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Used app today</div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Unique active devices today</div>
                 </div>
             </div>
 
@@ -1202,7 +1213,7 @@
             <div class="card" style="padding: 16px 20px; margin-bottom: 16px;">
                 <div style="display: flex; gap: 14px; align-items: center; flex-wrap: wrap;">
                     <div style="flex: 1; min-width: 250px;">
-                        <input type="text" id="appUserSearch" oninput="filterAppUsersTable(this.value)" placeholder="Search by Device Model, IP, or App Version..." style="margin-bottom: 0; padding: 10px 14px; font-size: 13px;">
+                        <input type="text" id="appUserSearch" oninput="filterAppUsersTable(this.value)" placeholder="Search by Device Model, IP, Currently Watching, or Version..." style="margin-bottom: 0; padding: 10px 14px; font-size: 13px;">
                     </div>
                     <div style="color: var(--text-muted); font-size: 12px;" id="appUsersCountLabel">
                         Showing 0 users
@@ -1212,22 +1223,23 @@
 
             <!-- Users Table -->
             <div class="card" style="padding: 0; overflow-x: auto;">
-                <table style="width: 100%; border-collapse: collapse; min-width: 850px;">
+                <table style="width: 100%; border-collapse: collapse; min-width: 1050px;">
                     <thead>
                         <tr style="border-bottom: 1px solid var(--border-color); background: rgba(255,255,255,0.02); text-align: left;">
                             <th style="padding: 14px 16px; font-size: 12px; color: var(--text-muted); width: 45px;">#</th>
                             <th style="padding: 14px 16px; font-size: 12px; color: var(--text-muted); width: 110px;">Status</th>
-                            <th style="padding: 14px 16px; font-size: 12px; color: var(--text-muted);">Device Model</th>
-                            <th style="padding: 14px 16px; font-size: 12px; color: var(--text-muted); width: 130px;">Android OS</th>
-                            <th style="padding: 14px 16px; font-size: 12px; color: var(--text-muted); width: 110px;">App Version</th>
-                            <th style="padding: 14px 16px; font-size: 12px; color: var(--text-muted); width: 160px;">First Installed</th>
-                            <th style="padding: 14px 16px; font-size: 12px; color: var(--text-muted); width: 140px;">Last Active</th>
-                            <th style="padding: 14px 16px; font-size: 12px; color: var(--text-muted); width: 140px;">IP Address</th>
+                            <th style="padding: 14px 16px; font-size: 12px; color: var(--text-muted); width: 180px;">Device & OS</th>
+                            <th style="padding: 14px 16px; font-size: 12px; color: var(--text-muted);">Currently Watching</th>
+                            <th style="padding: 14px 16px; font-size: 12px; color: var(--text-muted); width: 135px;">Session Entry</th>
+                            <th style="padding: 14px 16px; font-size: 12px; color: var(--text-muted); width: 140px;">Last Active / Exit</th>
+                            <th style="padding: 14px 16px; font-size: 12px; color: var(--text-muted); width: 140px;">Daily Active</th>
+                            <th style="padding: 14px 16px; font-size: 12px; color: var(--text-muted); width: 130px;">First Installed</th>
+                            <th style="padding: 14px 16px; font-size: 12px; color: var(--text-muted); width: 140px;">IP & Version</th>
                         </tr>
                     </thead>
                     <tbody id="appUsersTableBody">
                         <tr>
-                            <td colspan="8" style="padding: 30px; text-align: center; color: var(--text-muted);">Loading app users...</td>
+                            <td colspan="9" style="padding: 30px; text-align: center; color: var(--text-muted);">Loading app users...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -1753,14 +1765,37 @@
                 const data = await res.json();
                 const totalEl = document.getElementById('appUsersStatTotal');
                 const liveEl = document.getElementById('appUsersStatLive');
+                const watchingEl = document.getElementById('appUsersStatWatching');
                 const todayEl = document.getElementById('appUsersStatToday');
                 if (totalEl) totalEl.textContent = data.total_installs || 0;
                 if (liveEl)  liveEl.textContent  = data.live_count || 0;
+                if (watchingEl) watchingEl.textContent = data.watching_count || 0;
                 if (todayEl) todayEl.textContent = data.today_count || 0;
                 
                 _allAppUsers = data.users || [];
                 renderAppUsersTable(_allAppUsers);
             } catch (_) {}
+        }
+
+        async function clearAppUsersData() {
+            if (!token) return;
+            const confirmed = confirm("Are you sure you want to delete all app install and activity tracking data from the live database?\n\nThis will give you a completely clean, fresh start with new tracking data.");
+            if (!confirmed) return;
+            try {
+                const res = await fetch('/api/admin/clear-app-users', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await res.json();
+                if (result.code === 0) {
+                    alert("App install and activity data successfully cleared! Fresh tracking is now active.");
+                    fetchAppUsers();
+                } else {
+                    alert("Failed to clear data: " + (result.message || "Unknown error"));
+                }
+            } catch (err) {
+                alert("Error clearing data: " + err);
+            }
         }
 
         function formatUserTime(ts) {
@@ -1774,6 +1809,22 @@
             return new Date(ts * 1000).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
         }
 
+        function formatClockTime(ts) {
+            if (!ts) return '–';
+            const d = new Date(ts * 1000);
+            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function formatDurationSec(sec) {
+            if (!sec || sec <= 0) return '0m';
+            if (sec < 60) return sec + 's';
+            const m = Math.floor(sec / 60);
+            if (m < 60) return m + 'm';
+            const h = Math.floor(m / 60);
+            const remM = m % 60;
+            return remM > 0 ? `${h}h ${remM}m` : `${h}h`;
+        }
+
         function renderAppUsersTable(users) {
             const tbody = document.getElementById('appUsersTableBody');
             if (!tbody) return;
@@ -1781,23 +1832,45 @@
             if (countLabel) countLabel.textContent = `Showing ${users.length} device(s)`;
             
             if (!users || users.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="8" style="padding: 32px; text-align: center; color: var(--text-muted);">No app installations recorded yet. Launch the Android app to register!</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" style="padding: 36px; text-align: center; color: var(--text-muted); font-size: 14px;">No app installations recorded yet. Launch the Android app to register and watch!</td></tr>`;
                 return;
             }
 
             tbody.innerHTML = users.map((u, i) => {
                 const isOnline = u.is_online;
-                const statusBadge = isOnline 
-                    ? `<span style="display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.3);"><span class="live-dot" style="width: 6px; height: 6px;"></span>Online</span>`
-                    : `<span style="display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.04); color: var(--text-muted); border: 1px solid rgba(255,255,255,0.08);">Offline</span>`;
+                const isWatching = u.is_watching;
+
+                let statusBadge = '';
+                if (isWatching) {
+                    statusBadge = `<span style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 20px; font-size: 11px; font-weight: 800; background: rgba(0,240,255,0.15); color: #00F0FF; border: 1px solid rgba(0,240,255,0.4);"><span class="live-dot" style="background:#00F0FF; width: 6px; height: 6px;"></span>Watching</span>`;
+                } else if (isOnline) {
+                    statusBadge = `<span style="display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.3);"><span class="live-dot" style="width: 6px; height: 6px;"></span>Online</span>`;
+                } else {
+                    statusBadge = `<span style="display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.04); color: var(--text-muted); border: 1px solid rgba(255,255,255,0.08);">Offline</span>`;
+                }
 
                 const firstDate = u.first_seen ? new Date(u.first_seen * 1000).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : '–';
-                const lastActiveStr = formatUserTime(u.last_seen);
+                const sessionEntryTime = u.session_start ? `${formatClockTime(u.session_start)} <span style="font-size: 10px; color: var(--text-muted);">(${formatUserTime(u.session_start)})</span>` : '–';
+                const lastActiveStr = isOnline 
+                    ? `<span style="color: #22c55e; font-weight: 700;">Active Now</span>` 
+                    : `${formatClockTime(u.last_seen)} <span style="font-size: 10px; color: var(--text-muted);">(${formatUserTime(u.last_seen)})</span>`;
+
+                const activeDurStr = formatDurationSec(u.daily_active_seconds);
                 const safeModel = (u.device_model || 'Android Device').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 const safeOs = (u.os_version || 'Android').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 const safeVer = (u.app_version || '1.0.7').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 const safeIp = (u.ip || '–').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 const safeId = (u.device_id || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const safeWatching = (u.current_watching || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+                const watchingHtml = safeWatching 
+                    ? `<div>
+                         <div style="font-weight: 700; color: #fff; line-height: 1.3;">🎬 ${safeWatching}</div>
+                         <div style="font-size: 11px; color: ${isWatching ? '#00F0FF' : 'var(--text-muted)'}; font-weight: 600; margin-top: 2px;">
+                           ${isWatching ? '▶ Playing Now' : '⏸ Paused / Stopped'}
+                         </div>
+                       </div>`
+                    : `<span style="color: var(--text-muted); font-size: 12px;">📱 Browsing App</span>`;
 
                 return `
                     <tr style="border-bottom: 1px solid var(--border-color); font-size: 13px;">
@@ -1805,13 +1878,22 @@
                         <td style="padding: 12px 16px;">${statusBadge}</td>
                         <td style="padding: 12px 16px; font-weight: 700; color: #fff;">
                             📱 ${safeModel}
+                            <div style="font-size: 11px; color: var(--text-muted); font-weight: 400;">${safeOs}</div>
                             <div style="font-size: 10px; color: var(--text-muted); font-weight: 400; font-family: monospace;">${safeId.substring(0, 16)}...</div>
                         </td>
-                        <td style="padding: 12px 16px; color: var(--text-muted);">${safeOs}</td>
-                        <td style="padding: 12px 16px;"><span style="background: rgba(0,240,255,0.08); color: var(--secondary-accent); border: 1px solid rgba(0,240,255,0.2); border-radius: 6px; padding: 2px 7px; font-size: 11px; font-weight: 700;">${safeVer}</span></td>
+                        <td style="padding: 12px 16px;">${watchingHtml}</td>
+                        <td style="padding: 12px 16px; color: var(--text-color); font-size: 12px;">${sessionEntryTime}</td>
+                        <td style="padding: 12px 16px; font-size: 12px;">${lastActiveStr}</td>
+                        <td style="padding: 12px 16px;">
+                            <span style="background: rgba(16,185,129,0.12); color: #10B981; border: 1px solid rgba(16,185,129,0.3); border-radius: 6px; padding: 3px 9px; font-weight: 800; font-size: 12px;">
+                                ⏱️ ${activeDurStr}
+                            </span>
+                        </td>
                         <td style="padding: 12px 16px; color: var(--text-muted); font-size: 12px;">${firstDate}</td>
-                        <td style="padding: 12px 16px; color: ${isOnline ? '#22c55e' : 'var(--text-color)'}; font-weight: ${isOnline ? '700' : '500'};">${lastActiveStr}</td>
-                        <td style="padding: 12px 16px; color: var(--text-muted); font-family: monospace; font-size: 12px;">${safeIp}</td>
+                        <td style="padding: 12px 16px;">
+                            <div style="font-family: monospace; font-size: 12px; color: var(--text-muted);">${safeIp}</div>
+                            <span style="background: rgba(0,240,255,0.08); color: var(--secondary-accent); border: 1px solid rgba(0,240,255,0.2); border-radius: 6px; padding: 1px 6px; font-size: 10px; font-weight: 700; display: inline-block; margin-top: 3px;">${safeVer}</span>
+                        </td>
                     </tr>
                 `;
             }).join('');
@@ -1825,6 +1907,7 @@
             }
             const filtered = _allAppUsers.filter(u => 
                 (u.device_model || '').toLowerCase().includes(query) ||
+                (u.current_watching || '').toLowerCase().includes(query) ||
                 (u.ip || '').toLowerCase().includes(query) ||
                 (u.os_version || '').toLowerCase().includes(query) ||
                 (u.app_version || '').toLowerCase().includes(query) ||

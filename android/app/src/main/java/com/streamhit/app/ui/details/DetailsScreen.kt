@@ -461,16 +461,35 @@ fun DetailsScreen(
                                             )
                                         },
                                         onClick = {
-                                            selectedDub = dub
+                                            val targetDub = dub
+                                            selectedDub = targetDub
                                             languageDropdownExpanded = false
-                                            val dubSid = dub.subjectId.ifBlank { subjectId }
-                                            val dubPath = dub.detailPath.ifBlank { detailPath }
+                                            val dubSid = targetDub.subjectId.ifBlank { subjectId }
+                                            val dubPath = targetDub.detailPath.ifBlank { detailPath }
                                             scope.launch {
                                                 isResourcesLoading = true
+                                                try {
+                                                    val newDetail = repository.getDetail(dubPath, dubSid)
+                                                    if (newDetail != null) {
+                                                        val mergedDubs = if (!newDetail.dubs.isNullOrEmpty()) newDetail.dubs else detail?.dubs
+                                                        detail = newDetail.copy(dubs = mergedDubs)
+                                                        val currentSeasons = newDetail.seasons ?: emptyList()
+                                                        if (currentSeasons.isNotEmpty()) {
+                                                            if (selectedSeasonIndex >= currentSeasons.size) {
+                                                                selectedSeasonIndex = 0
+                                                            }
+                                                            val curSeason = currentSeasons.getOrNull(selectedSeasonIndex)
+                                                            val maxEp = curSeason?.maxEp ?: curSeason?.episodes?.size ?: 1
+                                                            if (selectedEpisodeNumber > maxEp) {
+                                                                selectedEpisodeNumber = 1
+                                                            }
+                                                        }
+                                                    }
+                                                } catch (_: Exception) {}
                                                 val res = repository.getStreamingResources(dubSid, dubPath, selectedSeasonIndex + 1, selectedEpisodeNumber)
                                                 resources = res
                                                 isResourcesLoading = false
-                                                Toast.makeText(context, "Switched to ${dub.name}", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, "Switched to ${targetDub.name.ifBlank { targetDub.language }}", Toast.LENGTH_SHORT).show()
                                             }
                                         }
                                     )

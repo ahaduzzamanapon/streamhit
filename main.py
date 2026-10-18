@@ -877,6 +877,8 @@ try:
 except Exception:
     _ACTIVE_DB_PATH = os.path.join(base_dir, "active_users.db")
 
+import datetime
+
 _active_web_users = {}
 _active_app_users = {}
 _last_db_sync = {}
@@ -902,32 +904,135 @@ def _init_active_db():
                     os_version TEXT,
                     app_version TEXT,
                     first_seen REAL NOT NULL,
-                    last_seen REAL NOT NULL
+                    session_start REAL NOT NULL,
+                    last_seen REAL NOT NULL,
+                    daily_active_seconds REAL DEFAULT 0,
+                    today_date TEXT DEFAULT '',
+                    current_watching TEXT DEFAULT '',
+                    watching_detail_path TEXT DEFAULT '',
+                    is_watching INTEGER DEFAULT 0
                 )
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_installs_last_seen ON app_installations(last_seen)")
+            # Upgrade existing tables if columns are missing
+            for col, col_def in [
+                ("session_start", "REAL DEFAULT 0"),
+                ("daily_active_seconds", "REAL DEFAULT 0"),
+                ("today_date", "TEXT DEFAULT ''"),
+                ("current_watching", "TEXT DEFAULT ''"),
+                ("watching_detail_path", "TEXT DEFAULT ''"),
+                ("is_watching", "INTEGER DEFAULT 0")
+            ]:
+                try:
+                    conn.execute(f"ALTER TABLE app_installations ADD COLUMN {col} {col_def}")
+                except Exception:
+                    pass
     except Exception:
         pass
 
 _init_active_db()
 
-def record_app_device(device_id: str, ip: str = "", device_model: str = "Android Device", os_version: str = "Android", app_version: str = "1.0.7"):
+def clear_all_app_installations():
+    try:
+        with sqlite3.connect(_ACTIVE_DB_PATH, timeout=5) as conn:
+            conn.execute("DELETE FROM app_installations")
+            conn.execute("DELETE FROM active_sessions")
+        _active_app_users.clear()
+        _active_web_users.clear()
+        _last_db_sync.clear()
+        return True
+    except Exception as e:
+        print(f"Error clearing app installations: {e}")
+        return False
+
+def record_app_device(
+    device_id: str,
+    ip: str = "",
+    device_model: str = "Android Device",
+    os_version: str = "Android",
+    app_version: str = "1.0.7",
+    current_watching: str = "",
+    watching_detail_path: str = "",
+    is_watching: int = 0
+):
     if not device_id:
         return
     now = time.time()
+    today_str = datetime.datetime.fromtimestamp(now).strftime("%Y-%m-%d")
     _active_app_users[device_id] = now
     try:
         with sqlite3.connect(_ACTIVE_DB_PATH, timeout=2) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT first_seen, session_start, last_seen, daily_active_seconds, today_date,
+                       current_watching, watching_detail_path, is_watching
+                FROM app_installations WHERE device_id = ?
+            """, (device_id,))
+            row = cur.fetchone()
+
+            if not row:
+                first_seen = now
+                session_start = now
+                daily_active_seconds = 30.0
+                today_date = today_str
+                c_watching = current_watching
+                w_path = watching_detail_path
+                w_flag = is_watching
+            else:
+                first_seen = row["first_seen"] or now
+                prev_last_seen = row["last_seen"] or now
+                prev_session_start = row["session_start"] or now
+                prev_daily_sec = row["daily_active_seconds"] or 0.0
+                prev_today_date = row["today_date"] or ""
+
+                # New session if away for more than 5 minutes (300 seconds)
+                if (now - prev_last_seen) > 300:
+                    session_start = now
+                else:
+                    session_start = prev_session_start if prev_session_start > 0 else now
+
+                # Reset timer if new calendar day
+                if prev_today_date != today_str:
+                    daily_active_seconds = 30.0
+                    today_date = today_str
+                else:
+                    delta = min(max(0.0, now - prev_last_seen), 60.0)
+                    daily_active_seconds = prev_daily_sec + delta
+                    today_date = today_str
+
+                if current_watching != "":
+                    c_watching = current_watching
+                    w_path = watching_detail_path
+                    w_flag = is_watching
+                else:
+                    c_watching = row["current_watching"] or ""
+                    w_path = row["watching_detail_path"] or ""
+                    w_flag = row["is_watching"] or 0
+
             conn.execute("""
-                INSERT INTO app_installations (device_id, ip, device_model, os_version, app_version, first_seen, last_seen)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO app_installations (
+                    device_id, ip, device_model, os_version, app_version,
+                    first_seen, session_start, last_seen, daily_active_seconds, today_date,
+                    current_watching, watching_detail_path, is_watching
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(device_id) DO UPDATE SET
                     ip = excluded.ip,
                     device_model = CASE WHEN excluded.device_model != '' THEN excluded.device_model ELSE app_installations.device_model END,
                     os_version = CASE WHEN excluded.os_version != '' THEN excluded.os_version ELSE app_installations.os_version END,
                     app_version = CASE WHEN excluded.app_version != '' THEN excluded.app_version ELSE app_installations.app_version END,
-                    last_seen = excluded.last_seen
-            """, (device_id, ip, device_model, os_version, app_version, now, now))
+                    session_start = excluded.session_start,
+                    last_seen = excluded.last_seen,
+                    daily_active_seconds = excluded.daily_active_seconds,
+                    today_date = excluded.today_date,
+                    current_watching = excluded.current_watching,
+                    watching_detail_path = excluded.watching_detail_path,
+                    is_watching = excluded.is_watching
+            """, (
+                device_id, ip, device_model, os_version, app_version,
+                first_seen, session_start, now, daily_active_seconds, today_date,
+                c_watching, w_path, w_flag
+            ))
             conn.execute(
                 "INSERT OR REPLACE INTO active_sessions (user_id, user_type, last_seen) VALUES (?, ?, ?)",
                 (device_id, "app", now)
@@ -1046,6 +1151,7 @@ def get_app_users_list():
     users = []
     total_installs = 0
     live_count = 0
+    watching_count = 0
     today_count = 0
     try:
         with sqlite3.connect(_ACTIVE_DB_PATH, timeout=3) as conn:
@@ -1055,32 +1161,43 @@ def get_app_users_list():
             total_installs = cur.fetchone()["cnt"]
             cur.execute("SELECT COUNT(*) as cnt FROM app_installations WHERE last_seen >= ?", (cutoff,))
             live_count = cur.fetchone()["cnt"]
+            cur.execute("SELECT COUNT(*) as cnt FROM app_installations WHERE last_seen >= ? AND is_watching = 1", (cutoff,))
+            watching_count = cur.fetchone()["cnt"]
             cur.execute("SELECT COUNT(*) as cnt FROM app_installations WHERE last_seen >= ?", (today_start,))
             today_count = cur.fetchone()["cnt"]
 
             cur.execute("""
-                SELECT device_id, ip, device_model, os_version, app_version, first_seen, last_seen
+                SELECT device_id, ip, device_model, os_version, app_version,
+                       first_seen, session_start, last_seen, daily_active_seconds,
+                       current_watching, watching_detail_path, is_watching
                 FROM app_installations
                 ORDER BY last_seen DESC
-                LIMIT 200
+                LIMIT 300
             """)
             for row in cur.fetchall():
-                last = row["last_seen"]
+                last = row["last_seen"] or 0
+                is_online = (last >= cutoff)
                 users.append({
                     "device_id": row["device_id"],
                     "ip": row["ip"] or "",
                     "device_model": row["device_model"] or "Android Device",
                     "os_version": row["os_version"] or "Android",
                     "app_version": row["app_version"] or "1.0.7",
-                    "first_seen": row["first_seen"],
-                    "last_seen": row["last_seen"],
-                    "is_online": (last >= cutoff)
+                    "first_seen": row["first_seen"] or last,
+                    "session_start": row["session_start"] or last,
+                    "last_seen": last,
+                    "daily_active_seconds": int(row["daily_active_seconds"] or 0),
+                    "current_watching": row["current_watching"] or "",
+                    "watching_detail_path": row["watching_detail_path"] or "",
+                    "is_watching": (row["is_watching"] == 1 and is_online),
+                    "is_online": is_online
                 })
     except Exception:
         pass
     return {
         "total_installs": total_installs,
         "live_count": live_count,
+        "watching_count": watching_count,
         "today_count": today_count,
         "users": users
     }
@@ -1108,8 +1225,12 @@ async def api_app_heartbeat(request: Request):
     device_model = data.get("device_model") or request.headers.get("X-App-Model", "Android Device")
     os_version = data.get("os_version") or request.headers.get("X-App-OS", "Android")
     app_version = data.get("app_version") or request.headers.get("X-App-Version", "1.0.7")
+    current_watching = str(data.get("current_watching") or "").strip()
+    detail_path = str(data.get("detail_path") or "").strip()
+    is_watching_raw = str(data.get("is_watching") or "0").strip()
+    is_watching = 1 if is_watching_raw in ("1", "true", "True") else 0
 
-    record_app_device(device_id, client_ip, device_model, os_version, app_version)
+    record_app_device(device_id, client_ip, device_model, os_version, app_version, current_watching, detail_path, is_watching)
     record_active_user(request)
     return {"code": 0, "status": "ok", "t": int(now)}
 
