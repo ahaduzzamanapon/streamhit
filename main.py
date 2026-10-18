@@ -2331,8 +2331,55 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
         _resource_cache_time[cache_key] = now
     return res
  
+_translate_cache = {}
+
+@app.get("/api/translate")
+async def api_translate(text: str = "", target_lang: str = "en", source_lang: str = "auto"):
+    if not text:
+        return {"code": 0, "translated": ""}
+    cache_key = f"{source_lang}_{target_lang}_{text}"
+    if cache_key in _translate_cache:
+        return {"code": 0, "translated": _translate_cache[cache_key]}
+    
+    url = f"https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl={source_lang}&tl={target_lang}&q={urllib.parse.quote(text)}"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        resp_bytes = await asyncio.to_thread(lambda: urllib.request.urlopen(req, timeout=5).read())
+        res = json.loads(resp_bytes.decode("utf-8"))
+        translated_text = res[0][0] if isinstance(res, list) and res and isinstance(res[0], list) and res[0] else (res[0] if isinstance(res, list) and res else str(res))
+        _translate_cache[cache_key] = translated_text
+        return {"code": 0, "translated": translated_text}
+    except Exception as e:
+        return {"code": 0, "translated": text}
+
+@app.post("/api/translate-batch")
+async def api_translate_batch(payload: dict):
+    texts = payload.get("texts") or []
+    target_lang = payload.get("target_lang") or "en"
+    source_lang = payload.get("source_lang") or "auto"
+    results = []
+    for text in texts:
+        if not text:
+            results.append("")
+            continue
+        cache_key = f"{source_lang}_{target_lang}_{text}"
+        if cache_key in _translate_cache:
+            results.append(_translate_cache[cache_key])
+            continue
+        url = f"https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl={source_lang}&tl={target_lang}&q={urllib.parse.quote(text)}"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            resp_bytes = await asyncio.to_thread(lambda: urllib.request.urlopen(req, timeout=5).read())
+            res = json.loads(resp_bytes.decode("utf-8"))
+            translated_text = res[0][0] if isinstance(res, list) and res and isinstance(res[0], list) and res[0] else (res[0] if isinstance(res, list) and res else str(res))
+            _translate_cache[cache_key] = translated_text
+            results.append(translated_text)
+        except Exception:
+            results.append(text)
+    return {"code": 0, "translations": results}
+
 @app.get("/api/captions")
-async def api_captions(se: int = 1, ep: int = 1, detailPath: str = "", subjectId: str = ""):
+async def api_captions(se: int = 1, ep: int = 1, detailPath: str = "", subjectId: str = "", resourceId: str = ""):
     if not subjectId and detailPath:
         subjectId = await resolve_subject_id(detailPath, subjectId)
             
@@ -2341,14 +2388,30 @@ async def api_captions(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
         
     data = await _fetch_download_resources(subjectId, se, ep, detailPath)
     captions = data.get("captions") or []
+
+    if not captions:
+        try:
+            r_id = resourceId or subjectId
+            ext_res = await request_moviebox_mobile(
+                "/wefeed-mobile-bff/subject-api/get-ext-captions",
+                params={"subjectId": subjectId, "resourceId": r_id, "episode": ep}
+            )
+            if isinstance(ext_res, dict):
+                captions = ext_res.get("data", {}).get("extCaptions") or ext_res.get("data", {}).get("list") or []
+        except Exception:
+            pass
     
     formatted = []
+    seen_urls = set()
     for c in captions:
-        formatted.append({
-            "label": c.get("lanName") or c.get("lan", "English"),
-            "lang": c.get("lan", "en"),
-            "url": f"/api/proxy-subtitle?url={urllib.parse.quote(c.get('url', ''))}"
-        })
+        raw_u = c.get("url") or ""
+        if raw_u and raw_u not in seen_urls:
+            seen_urls.add(raw_u)
+            formatted.append({
+                "label": c.get("lanName") or c.get("lan", "English"),
+                "lang": c.get("lan", "en"),
+                "url": f"/api/proxy-subtitle?url={urllib.parse.quote(raw_u)}"
+            })
     return {"code": 0, "data": {"list": formatted}}
 
 CDN_CANDIDATE_HEADERS = [

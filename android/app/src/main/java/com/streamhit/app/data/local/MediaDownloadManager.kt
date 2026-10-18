@@ -17,6 +17,11 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import java.net.URLEncoder
+
 enum class DownloadStatus {
     PENDING,
     DOWNLOADING,
@@ -86,10 +91,15 @@ object MediaDownloadManager {
     private val downloadScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val activeJobs = ConcurrentHashMap<Long, Job>()
 
+    private val _downloadsFlow = MutableStateFlow<List<DownloadItem>>(emptyList())
+    val downloadsFlow: StateFlow<List<DownloadItem>> = _downloadsFlow.asStateFlow()
+
+    private var isInitialized = false
+
     private val okHttpClient by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(20, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
+            .connectTimeout(25, TimeUnit.SECONDS)
+            .readTimeout(90, TimeUnit.SECONDS)
             .followRedirects(true)
             .followSslRedirects(true)
             .build()
@@ -101,13 +111,18 @@ object MediaDownloadManager {
 
     @Synchronized
     fun getAllDownloads(context: Context): List<DownloadItem> {
-        return try {
+        val list = try {
             val json = getPrefs(context).getString(KEY_DOWNLOADS, null) ?: return emptyList()
             val type = object : TypeToken<List<DownloadItem>>() {}.type
             gson.fromJson<List<DownloadItem>>(json, type) ?: emptyList()
         } catch (e: Exception) {
             emptyList()
         }
+        if (!isInitialized) {
+            _downloadsFlow.value = list
+            isInitialized = true
+        }
+        return list
     }
 
     @Synchronized
@@ -115,29 +130,40 @@ object MediaDownloadManager {
         try {
             val json = gson.toJson(items)
             getPrefs(context).edit().putString(KEY_DOWNLOADS, json).apply()
+            _downloadsFlow.value = items.toList()
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
+    private var lastPrefSaveTimeMs = 0L
+
     @Synchronized
-    private fun updateItemProgress(context: Context, item: DownloadItem) {
-        val list = getAllDownloads(context).toMutableList()
+    private fun updateItemProgress(context: Context, item: DownloadItem, forcePersist: Boolean = false) {
+        val list = (_downloadsFlow.value.ifEmpty { getAllDownloads(context) }).toMutableList()
         val idx = list.indexOfFirst { it.downloadId == item.downloadId }
         if (idx >= 0) {
-            list[idx].downloadedBytes = item.downloadedBytes
-            list[idx].totalBytes = item.totalBytes
-            list[idx].status = item.status
-            saveDownloads(context, list)
+            list[idx] = list[idx].copy(
+                downloadedBytes = item.downloadedBytes,
+                totalBytes = item.totalBytes,
+                status = item.status
+            )
+            _downloadsFlow.value = list
+
+            val now = System.currentTimeMillis()
+            if (forcePersist || (now - lastPrefSaveTimeMs > 2500L) || item.status == DownloadStatus.COMPLETED || item.status == DownloadStatus.FAILED) {
+                lastPrefSaveTimeMs = now
+                saveDownloads(context, list)
+            }
         }
     }
 
     @Synchronized
     fun updateStatus(context: Context, downloadId: Long, status: DownloadStatus) {
-        val list = getAllDownloads(context).toMutableList()
+        val list = (_downloadsFlow.value.ifEmpty { getAllDownloads(context) }).toMutableList()
         val idx = list.indexOfFirst { it.downloadId == downloadId }
         if (idx >= 0) {
-            list[idx].status = status
+            list[idx] = list[idx].copy(status = status)
             saveDownloads(context, list)
         }
     }
@@ -167,7 +193,7 @@ object MediaDownloadManager {
             val cleanTitle = title.replace(Regex("[^a-zA-Z0-9.-]"), "_")
             val fileName = "${cleanTitle}_${quality}_${downloadId}.mp4"
 
-            // Store in app-internal dedicated directory (zero external gallery/device pollution)
+            // Store in app-internal dedicated directory
             val targetDir = File(context.filesDir, "in_app_downloads")
             if (!targetDir.exists()) {
                 targetDir.mkdirs()
@@ -191,7 +217,7 @@ object MediaDownloadManager {
                 addedTime = System.currentTimeMillis()
             )
 
-            val list = getAllDownloads(context).toMutableList()
+            val list = (_downloadsFlow.value.ifEmpty { getAllDownloads(context) }).toMutableList()
             if (isSeries) {
                 list.removeAll { it.subjectId == subjectId && it.seasonNum == seasonNum && it.episodeNum == episodeNum && it.quality == quality }
             } else {
@@ -214,41 +240,70 @@ object MediaDownloadManager {
             try {
                 var existingLength = if (targetFile.exists()) targetFile.length() else 0L
 
-                val requestBuilder = Request.Builder()
-                    .url(item.downloadUrl)
-                    .header("User-Agent", "okhttp/4.12.0")
-                    .header("Accept", "*/*")
+                val candidateHeaders = listOf(
+                    mapOf("Origin" to "https://123movienow.cc", "Referer" to "https://123movienow.cc/", "User-Agent" to "okhttp/4.12.0", "Accept" to "*/*"),
+                    mapOf("Origin" to "https://123movienow.cc", "Referer" to "https://123movienow.cc/", "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", "Accept" to "*/*"),
+                    mapOf("User-Agent" to "okhttp/4.12.0", "Accept" to "*/*")
+                )
 
-                if (existingLength > 0L) {
-                    requestBuilder.header("Range", "bytes=$existingLength-")
+                var response: okhttp3.Response? = null
+                var finalExistingLength = existingLength
+
+                // Tier 1: Try candidate headers on direct URL
+                for (hdrs in candidateHeaders) {
+                    try {
+                        val reqBuilder = Request.Builder().url(item.downloadUrl)
+                        hdrs.forEach { (k, v) -> reqBuilder.header(k, v) }
+                        if (finalExistingLength > 0L) {
+                            reqBuilder.header("Range", "bytes=$finalExistingLength-")
+                        }
+                        val candidateResp = okHttpClient.newCall(reqBuilder.build()).execute()
+                        if (candidateResp.isSuccessful || candidateResp.code == 206) {
+                            response = candidateResp
+                            break
+                        } else if (candidateResp.code == 416) {
+                            targetFile.delete()
+                            finalExistingLength = 0L
+                            candidateResp.close()
+                            val freshReq = Request.Builder().url(item.downloadUrl)
+                            hdrs.forEach { (k, v) -> freshReq.header(k, v) }
+                            val freshResp = okHttpClient.newCall(freshReq.build()).execute()
+                            if (freshResp.isSuccessful) {
+                                response = freshResp
+                                break
+                            } else {
+                                freshResp.close()
+                            }
+                        } else {
+                            candidateResp.close()
+                        }
+                    } catch (_: Exception) {}
                 }
 
-                val request = requestBuilder.build()
-                val response = okHttpClient.newCall(request).execute()
-
-                if (!response.isSuccessful && response.code != 206) {
-                    if (response.code == 416) {
-                        targetFile.delete()
-                        existingLength = 0L
-                        val freshReq = Request.Builder()
-                            .url(item.downloadUrl)
+                // Tier 2: Fallback to server streaming proxy /fetch?source_url=...
+                if (response == null && !item.downloadUrl.contains("/fetch?source_url=")) {
+                    try {
+                        val proxyUrl = "https://nxly.online/fetch?source_url=" + URLEncoder.encode(item.downloadUrl, "UTF-8")
+                        val reqBuilder = Request.Builder()
+                            .url(proxyUrl)
                             .header("User-Agent", "okhttp/4.12.0")
                             .header("Accept", "*/*")
-                            .build()
-                        val freshResp = okHttpClient.newCall(freshReq).execute()
-                        if (!freshResp.isSuccessful) {
-                            updateStatus(context, item.downloadId, DownloadStatus.FAILED)
-                            freshResp.close()
-                            return@launch
+                        if (finalExistingLength > 0L) {
+                            reqBuilder.header("Range", "bytes=$finalExistingLength-")
                         }
-                        writeStreamToFile(context, item, targetFile, freshResp, 0L)
-                    } else {
-                        updateStatus(context, item.downloadId, DownloadStatus.FAILED)
-                        response.close()
-                        return@launch
-                    }
+                        val proxyResp = okHttpClient.newCall(reqBuilder.build()).execute()
+                        if (proxyResp.isSuccessful || proxyResp.code == 206) {
+                            response = proxyResp
+                        } else {
+                            proxyResp.close()
+                        }
+                    } catch (_: Exception) {}
+                }
+
+                if (response != null && (response.isSuccessful || response.code == 206)) {
+                    writeStreamToFile(context, item, targetFile, response, finalExistingLength)
                 } else {
-                    writeStreamToFile(context, item, targetFile, response, existingLength)
+                    updateStatus(context, item.downloadId, DownloadStatus.FAILED)
                 }
             } catch (e: CancellationException) {
                 // Paused or cancelled
@@ -279,7 +334,7 @@ object MediaDownloadManager {
         item.totalBytes = total
         item.downloadedBytes = existingLength
         item.status = DownloadStatus.DOWNLOADING
-        updateItemProgress(context, item)
+        updateItemProgress(context, item, forcePersist = true)
 
         val buffer = ByteArray(32 * 1024)
         var bytesCopied = existingLength
@@ -296,9 +351,9 @@ object MediaDownloadManager {
                 item.downloadedBytes = bytesCopied
 
                 val now = System.currentTimeMillis()
-                if (now - lastUpdateMs >= 350L) {
+                if (now - lastUpdateMs >= 200L) {
                     lastUpdateMs = now
-                    updateItemProgress(context, item)
+                    updateItemProgress(context, item, forcePersist = false)
                 }
             }
             outputStream.flush()
@@ -307,7 +362,7 @@ object MediaDownloadManager {
                 item.status = DownloadStatus.COMPLETED
                 item.totalBytes = targetFile.length()
                 item.downloadedBytes = targetFile.length()
-                updateItemProgress(context, item)
+                updateItemProgress(context, item, forcePersist = true)
             } else {
                 updateStatus(context, item.downloadId, DownloadStatus.FAILED)
             }
@@ -320,13 +375,13 @@ object MediaDownloadManager {
 
     @Synchronized
     fun resumeDownload(context: Context, downloadId: Long) {
-        val items = getAllDownloads(context)
+        val items = _downloadsFlow.value.ifEmpty { getAllDownloads(context) }
         val target = items.firstOrNull { it.downloadId == downloadId } ?: return
         if (target.status == DownloadStatus.COMPLETED) return
 
         activeJobs[downloadId]?.cancel()
         target.status = DownloadStatus.DOWNLOADING
-        updateItemProgress(context, target)
+        updateItemProgress(context, target, forcePersist = true)
 
         val targetFile = File(target.localFilePath)
         executeDownload(context.applicationContext, target, targetFile)
@@ -341,7 +396,7 @@ object MediaDownloadManager {
 
     @Synchronized
     fun refreshDownloadStatuses(context: Context): List<DownloadItem> {
-        val items = getAllDownloads(context).toMutableList()
+        val items = (_downloadsFlow.value.ifEmpty { getAllDownloads(context) }).toMutableList()
         var changed = false
 
         for (item in items) {
@@ -361,6 +416,8 @@ object MediaDownloadManager {
 
         if (changed) {
             saveDownloads(context, items)
+        } else {
+            _downloadsFlow.value = items
         }
         return items
     }
@@ -371,7 +428,7 @@ object MediaDownloadManager {
             activeJobs[downloadId]?.cancel()
             activeJobs.remove(downloadId)
 
-            val items = getAllDownloads(context).toMutableList()
+            val items = (_downloadsFlow.value.ifEmpty { getAllDownloads(context) }).toMutableList()
             val target = items.firstOrNull { it.downloadId == downloadId }
             if (target != null) {
                 val file = File(target.localFilePath)

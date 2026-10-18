@@ -17,6 +17,7 @@ scratch_*.json
 .scraper_progress.json
 *.log
 *.db
+/*.apk
 
 # IDEs
 .vscode/

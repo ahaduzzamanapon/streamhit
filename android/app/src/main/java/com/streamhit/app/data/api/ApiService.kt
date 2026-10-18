@@ -50,6 +50,15 @@ interface ApiService {
     @GET("api/app/version")
     suspend fun getAppVersion(): Response<AppVersionResponse>
 
+    // Captions & Subtitles
+    @GET("api/captions")
+    suspend fun getCaptions(
+        @Query("subjectId") subjectId: String,
+        @Query("detailPath") detailPath: String = "",
+        @Query("se") season: Int = 1,
+        @Query("ep") episode: Int = 1
+    ): Response<CaptionsResponse>
+
     // Telemetry & Device Heartbeat
     @POST("api/app/heartbeat")
     suspend fun sendHeartbeat(@Body payload: Map<String, String>): Response<Map<String, Any>>

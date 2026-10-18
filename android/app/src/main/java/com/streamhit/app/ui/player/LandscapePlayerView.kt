@@ -76,7 +76,8 @@ fun LandscapePlayerView(
     onBrightnessAdjust: (Int) -> Unit,
     onResetOverlayToken: () -> Unit,
     audioSyncOffsetMs: Long = 0L,
-    onOpenAudioSync: () -> Unit = {}
+    onOpenAudioSync: () -> Unit = {},
+    onOpenTranslator: () -> Unit = {}
 ) {
     var initialTouchX by remember { mutableFloatStateOf(0f) }
     var initialTouchY by remember { mutableFloatStateOf(0f) }
@@ -410,6 +411,14 @@ fun LandscapePlayerView(
                                         }
                                     }
                                 }
+                            }
+
+                            IconButton(onClick = onOpenTranslator) {
+                                Icon(
+                                    imageVector = Icons.Default.RecordVoiceOver,
+                                    contentDescription = "AI Dubbing / Translator",
+                                    tint = if (com.streamhit.app.util.SubtitleTtsManager.isEnabled) AccentEmerald else Color.White
+                                )
                             }
 
                             IconButton(onClick = onOpenAudioSync) {

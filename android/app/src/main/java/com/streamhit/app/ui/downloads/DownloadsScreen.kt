@@ -42,7 +42,7 @@ fun DownloadsScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var downloadItems by remember { mutableStateOf<List<DownloadItem>>(emptyList()) }
+    val downloadItems by MediaDownloadManager.downloadsFlow.collectAsState()
     var availableStorage by remember { mutableStateOf("") }
     var recommendations by remember { mutableStateOf<List<SubjectSummary>>(emptyList()) }
     var selectedFilterIndex by remember { mutableStateOf(0) }
@@ -53,18 +53,20 @@ fun DownloadsScreen(
         selectedSeriesForDetail = null
     }
 
-    // Poll download progress every 2 seconds
     LaunchedEffect(Unit) {
         availableStorage = MediaDownloadManager.getAvailableStorageFormatted()
+        MediaDownloadManager.getAllDownloads(context)
+        MediaDownloadManager.refreshDownloadStatuses(context)
         try {
             val feed = repository.getHomeFeed()
             val allSubs = feed.flatMap { it.subjects ?: emptyList() }
             recommendations = allSubs.take(12)
         } catch (_: Exception) {}
 
+        // Periodic storage check
         while (true) {
-            downloadItems = MediaDownloadManager.refreshDownloadStatuses(context)
-            delay(2000)
+            delay(5000)
+            availableStorage = MediaDownloadManager.getAvailableStorageFormatted()
         }
     }
 
@@ -147,7 +149,7 @@ fun DownloadsScreen(
                         episodes.forEach { ep ->
                             MediaDownloadManager.deleteDownload(context, ep.downloadId)
                         }
-                        downloadItems = MediaDownloadManager.refreshDownloadStatuses(context)
+                        MediaDownloadManager.refreshDownloadStatuses(context)
                         selectedSeriesForDetail = null
                     }) {
                         Icon(
@@ -235,7 +237,7 @@ fun DownloadsScreen(
                         },
                         onDeleteClick = {
                             MediaDownloadManager.deleteDownload(context, ep.downloadId)
-                            downloadItems = MediaDownloadManager.refreshDownloadStatuses(context)
+                            MediaDownloadManager.refreshDownloadStatuses(context)
                             if (episodes.size <= 1) {
                                 selectedSeriesForDetail = null
                             }
@@ -322,7 +324,7 @@ fun DownloadsScreen(
                     }
                 }
 
-                items(downloadingList) { item ->
+                items(downloadingList, key = { it.downloadId }) { item ->
                     DownloadingItemCard(
                         item = item,
                         onPlayClick = {
@@ -330,7 +332,15 @@ fun DownloadsScreen(
                         },
                         onDeleteClick = {
                             MediaDownloadManager.deleteDownload(context, item.downloadId)
-                            downloadItems = MediaDownloadManager.refreshDownloadStatuses(context)
+                        },
+                        onPauseClick = {
+                            MediaDownloadManager.pauseDownload(context, item.downloadId)
+                        },
+                        onResumeClick = {
+                            MediaDownloadManager.resumeDownload(context, item.downloadId)
+                        },
+                        onRetryClick = {
+                            MediaDownloadManager.resumeDownload(context, item.downloadId)
                         }
                     )
                 }
@@ -445,7 +455,7 @@ fun DownloadsScreen(
                             },
                             onDeleteClick = {
                                 MediaDownloadManager.deleteDownload(context, item.downloadId)
-                                downloadItems = MediaDownloadManager.refreshDownloadStatuses(context)
+                                MediaDownloadManager.refreshDownloadStatuses(context)
                             }
                         )
                     }
@@ -721,7 +731,10 @@ fun DownloadedEpisodeItemCard(
 fun DownloadingItemCard(
     item: DownloadItem,
     onPlayClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    onPauseClick: () -> Unit = {},
+    onResumeClick: () -> Unit = {},
+    onRetryClick: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier
@@ -789,25 +802,73 @@ fun DownloadingItemCard(
                         .fillMaxWidth()
                         .height(4.dp)
                         .clip(RoundedCornerShape(2.dp)),
-                    color = AccentCyan,
+                    color = when (item.status) {
+                        DownloadStatus.FAILED -> Color(0xFFFF5252)
+                        DownloadStatus.PAUSED -> AccentGold
+                        DownloadStatus.COMPLETED -> AccentEmerald
+                        else -> AccentCyan
+                    },
                     trackColor = Color.White.copy(alpha = 0.1f)
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val statusText = when (item.status) {
+                        DownloadStatus.FAILED -> "Failed • Tap to retry"
+                        DownloadStatus.PAUSED -> "Paused • ${item.formattedSize}"
+                        DownloadStatus.COMPLETED -> "Completed"
+                        else -> "${item.formattedSize} • ${item.progressPercent}%"
+                    }
+                    val statusColor = when (item.status) {
+                        DownloadStatus.FAILED -> Color(0xFFFF5252)
+                        DownloadStatus.PAUSED -> AccentGold
+                        DownloadStatus.COMPLETED -> AccentEmerald
+                        else -> TextMuted
+                    }
                     Text(
-                        text = item.formattedSize,
-                        color = TextMuted,
-                        fontSize = 11.sp
-                    )
-                    Text(
-                        text = "${item.progressPercent}%",
-                        color = AccentGold,
+                        text = statusText,
+                        color = statusColor,
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = if (item.status == DownloadStatus.FAILED) FontWeight.Bold else FontWeight.Normal
                     )
+
+                    // Action Button (Retry / Pause / Resume)
+                    when (item.status) {
+                        DownloadStatus.FAILED -> {
+                            IconButton(onClick = onRetryClick, modifier = Modifier.size(20.dp)) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = "Retry",
+                                    tint = AccentEmerald,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        DownloadStatus.PAUSED -> {
+                            IconButton(onClick = onResumeClick, modifier = Modifier.size(20.dp)) {
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = "Resume",
+                                    tint = AccentCyan,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        DownloadStatus.DOWNLOADING -> {
+                            IconButton(onClick = onPauseClick, modifier = Modifier.size(20.dp)) {
+                                Icon(
+                                    imageVector = Icons.Default.Pause,
+                                    contentDescription = "Pause",
+                                    tint = TextMuted,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        else -> {}
+                    }
                 }
             }
 

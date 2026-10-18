@@ -87,6 +87,22 @@ class MovieRepository {
         }
     }
 
+    suspend fun getCaptions(
+        subjectId: String,
+        detailPath: String = "",
+        season: Int = 1,
+        episode: Int = 1
+    ): List<CaptionItem> {
+        return try {
+            val response = api.getCaptions(subjectId, detailPath, season, episode)
+            if (response.isSuccessful) {
+                response.body()?.data?.list ?: emptyList()
+            } else emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
     suspend fun search(query: String, page: Int = 1): List<SubjectSummary> {
         return try {
             val response = api.search(SearchRequest(keyword = query, page = page))

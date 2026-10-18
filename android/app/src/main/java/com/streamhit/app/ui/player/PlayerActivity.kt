@@ -104,6 +104,9 @@ class PlayerActivity : ComponentActivity() {
 
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
+        // Initialize Real-time AI Audio Translation TTS engine
+        com.streamhit.app.util.SubtitleTtsManager.init(this)
+
         val streamUrl = intent.getStringExtra("EXTRA_STREAM_URL") ?: ""
         val videoTitle = intent.getStringExtra("EXTRA_VIDEO_TITLE") ?: "Watching"
         val subjectId = intent.getStringExtra("EXTRA_SUBJECT_ID") ?: ""
@@ -155,8 +158,14 @@ class PlayerActivity : ComponentActivity() {
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        com.streamhit.app.util.SubtitleTtsManager.onPause()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        com.streamhit.app.util.SubtitleTtsManager.destroy(exoPlayer)
         loudnessEnhancer?.release()
         loudnessEnhancer = null
         exoPlayer?.release()
@@ -239,6 +248,22 @@ fun AdaptivePlayerScreen(
     val audioSyncProcessor = remember { AudioSyncAudioProcessor() }
     var audioSyncOffsetMs by remember { mutableLongStateOf(0L) }
     var showAudioSyncDialog by remember { mutableStateOf(false) }
+    var showTranslatorDialog by remember { mutableStateOf(false) }
+
+    // Load captions for AI Real-time Audio Translation
+    LaunchedEffect(subjectId, detailPath, currentSeasonNum, currentEpisodeNum) {
+        val sId = subjectId.ifBlank { detailPath }
+        if (sId.isNotBlank()) {
+            try {
+                val caps = repository.getCaptions(sId, detailPath, currentSeasonNum, currentEpisodeNum)
+                val bestCap = caps.firstOrNull { it.lang.equals("en", ignoreCase = true) || it.label.contains("English", ignoreCase = true) }
+                    ?: caps.firstOrNull()
+                if (bestCap != null && bestCap.url.isNotBlank()) {
+                    com.streamhit.app.util.SubtitleTtsManager.loadCaptionsFromUrl(bestCap.url)
+                }
+            } catch (_: Exception) {}
+        }
+    }
 
     // Controls visibility
     var showControls by remember { mutableStateOf(true) }
@@ -807,7 +832,7 @@ fun AdaptivePlayerScreen(
         }
     }
 
-    // Auto-update playback position and buffer stats
+    // Auto-update playback position, buffer stats, and AI Audio Translation sync
     LaunchedEffect(exoPlayer) {
         while (true) {
             exoPlayer?.let { p ->
@@ -826,8 +851,11 @@ fun AdaptivePlayerScreen(
                 } else if (p.playbackState == Player.STATE_READY && p.isPlaying) {
                     isBuffering = false
                 }
+
+                // Real-time AI Audio Translation synchronization
+                com.streamhit.app.util.SubtitleTtsManager.syncWithPlayback(pos, p)
             }
-            delay(400)
+            delay(150)
         }
     }
 
@@ -1025,7 +1053,8 @@ fun AdaptivePlayerScreen(
                 onBrightnessAdjust = { step -> setScreenBrightness(brightnessPercent + step) },
                 onResetOverlayToken = { overlayDismissToken = System.currentTimeMillis() },
                 audioSyncOffsetMs = audioSyncOffsetMs,
-                onOpenAudioSync = { showAudioSyncDialog = true }
+                onOpenAudioSync = { showAudioSyncDialog = true },
+                onOpenTranslator = { showTranslatorDialog = true }
             )
         } else {
             val isLiveStream = subjectId.isBlank() && detailPath.isBlank()
@@ -1112,6 +1141,7 @@ fun AdaptivePlayerScreen(
                     },
                     audioSyncOffsetMs = audioSyncOffsetMs,
                     onOpenAudioSync = { showAudioSyncDialog = true },
+                    onOpenTranslator = { showTranslatorDialog = true },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -1129,6 +1159,12 @@ fun AdaptivePlayerScreen(
                     audioSyncProcessor.resetOffset()
                 },
                 onDismiss = { showAudioSyncDialog = false }
+            )
+        }
+
+        if (showTranslatorDialog) {
+            TranslatorConfigDialog(
+                onDismiss = { showTranslatorDialog = false }
             )
         }
     }

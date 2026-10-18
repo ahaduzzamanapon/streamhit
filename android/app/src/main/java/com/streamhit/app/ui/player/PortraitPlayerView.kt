@@ -521,6 +521,7 @@ fun PortraitMediaDetails(
     onRecommendationClick: (SubjectSummary) -> Unit,
     audioSyncOffsetMs: Long = 0L,
     onOpenAudioSync: () -> Unit = {},
+    onOpenTranslator: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -678,22 +679,50 @@ fun PortraitMediaDetails(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Action Buttons Row (Download, Audio Sync & Share)
+            // Action Buttons Row (Download, AI Dub, Audio Sync & Share)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Button(
                     onClick = onOpenDownloadSheet,
                     colors = ButtonDefaults.buttonColors(containerColor = BgCard),
                     shape = RoundedCornerShape(8.dp),
                     border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
                     modifier = Modifier.weight(1f).height(36.dp)
                 ) {
-                    Icon(Icons.Default.Download, contentDescription = "Download", tint = AccentEmerald, modifier = Modifier.size(15.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Download", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.Download, contentDescription = "Download", tint = AccentEmerald, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text("Download", color = Color.White, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Button(
+                    onClick = onOpenTranslator,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (com.streamhit.app.util.SubtitleTtsManager.isEnabled) AccentEmerald.copy(alpha = 0.25f) else BgCard
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(
+                        1.dp,
+                        if (com.streamhit.app.util.SubtitleTtsManager.isEnabled) AccentEmerald else Color.White.copy(alpha = 0.1f)
+                    ),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
+                    modifier = Modifier.weight(1.05f).height(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.RecordVoiceOver,
+                        contentDescription = "AI Dub",
+                        tint = if (com.streamhit.app.util.SubtitleTtsManager.isEnabled) AccentEmerald else Color.White,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(
+                        text = if (com.streamhit.app.util.SubtitleTtsManager.isEnabled) "AI Dub: ${com.streamhit.app.util.SubtitleTtsManager.targetLanguage.uppercase()}" else "AI Dub",
+                        color = if (com.streamhit.app.util.SubtitleTtsManager.isEnabled) AccentEmerald else Color.White,
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
 
                 Button(
@@ -704,20 +733,20 @@ fun PortraitMediaDetails(
                         1.dp,
                         if (audioSyncOffsetMs != 0L) AccentEmerald else Color.White.copy(alpha = 0.1f)
                     ),
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
                     modifier = Modifier.weight(1f).height(36.dp)
                 ) {
                     Icon(
                         Icons.Default.GraphicEq,
                         contentDescription = "Audio Sync",
                         tint = if (audioSyncOffsetMs != 0L) AccentEmerald else Color.White,
-                        modifier = Modifier.size(15.dp)
+                        modifier = Modifier.size(14.dp)
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(3.dp))
                     Text(
                         text = if (audioSyncOffsetMs != 0L) "${if (audioSyncOffsetMs > 0) "+" else ""}${audioSyncOffsetMs}ms" else "Audio Sync",
                         color = if (audioSyncOffsetMs != 0L) AccentEmerald else Color.White,
-                        fontSize = 11.sp,
+                        fontSize = 10.5.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -734,12 +763,12 @@ fun PortraitMediaDetails(
                     colors = ButtonDefaults.buttonColors(containerColor = BgCard),
                     shape = RoundedCornerShape(8.dp),
                     border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
-                    modifier = Modifier.weight(1f).height(36.dp)
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
+                    modifier = Modifier.weight(0.9f).height(36.dp)
                 ) {
-                    Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(15.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Share", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text("Share", color = Color.White, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
                 }
             }
 

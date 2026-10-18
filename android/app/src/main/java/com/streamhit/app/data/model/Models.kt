@@ -390,3 +390,18 @@ data class AppVersionInfo(
     @SerializedName("mustUpdate") val mustUpdate: Boolean = false,
     @SerializedName("releaseNotes") val releaseNotes: String? = null
 )
+
+data class CaptionsResponse(
+    @SerializedName("code") val code: Int = 0,
+    @SerializedName("data") val data: CaptionsData? = null
+)
+
+data class CaptionsData(
+    @SerializedName("list") val list: List<CaptionItem> = emptyList()
+)
+
+data class CaptionItem(
+    @SerializedName("label") val label: String = "English",
+    @SerializedName("lang") val lang: String = "en",
+    @SerializedName("url") val url: String = ""
+)
