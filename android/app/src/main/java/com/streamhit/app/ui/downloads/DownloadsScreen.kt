@@ -37,7 +37,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun DownloadsScreen(
     repository: MovieRepository,
-    onPlayOffline: (localUri: String, title: String) -> Unit,
+    onPlayOffline: (item: DownloadItem) -> Unit,
     onNavigateToDetails: (detailPath: String, subjectId: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -233,7 +233,7 @@ fun DownloadsScreen(
                     DownloadedEpisodeItemCard(
                         item = ep,
                         onPlayClick = {
-                            onPlayOffline(ep.playUri, ep.title)
+                            onPlayOffline(ep)
                         },
                         onDeleteClick = {
                             MediaDownloadManager.deleteDownload(context, ep.downloadId)
@@ -328,7 +328,7 @@ fun DownloadsScreen(
                     DownloadingItemCard(
                         item = item,
                         onPlayClick = {
-                            onPlayOffline(item.playUri, item.title)
+                            onPlayOffline(item)
                         },
                         onDeleteClick = {
                             MediaDownloadManager.deleteDownload(context, item.downloadId)
@@ -451,7 +451,7 @@ fun DownloadsScreen(
                         DownloadedItemCard(
                             item = item,
                             onPlayClick = {
-                                onPlayOffline(item.playUri, item.title)
+                                onPlayOffline(item)
                             },
                             onDeleteClick = {
                                 MediaDownloadManager.deleteDownload(context, item.downloadId)

@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.streamhit.app.ui.theme.*
 import com.streamhit.app.util.SubtitleTtsManager
+import com.streamhit.app.util.VoiceGender
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,6 +33,7 @@ fun TranslatorConfigDialog(
     var selectedLang by remember { mutableStateOf(SubtitleTtsManager.targetLanguage) }
     var isEnabledLocal by remember { mutableStateOf(SubtitleTtsManager.isEnabled) }
     var selectedRate by remember { mutableFloatStateOf(SubtitleTtsManager.speechRate) }
+    var selectedGender by remember { mutableStateOf(SubtitleTtsManager.voiceGender) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -226,6 +228,46 @@ fun TranslatorConfigDialog(
                 }
             }
 
+            // Voice Gender (Male / Female) Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Voice Gender",
+                    color = TextPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        VoiceGender.FEMALE to "Female 👩",
+                        VoiceGender.MALE to "Male 👨"
+                    ).forEach { (gender, label) ->
+                        val isSelected = selectedGender == gender
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) AccentEmerald else Color.White.copy(alpha = 0.08f),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (isSelected) AccentEmerald else Color.White.copy(alpha = 0.12f)
+                            ),
+                            modifier = Modifier.clickable { selectedGender = gender }
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (isSelected) Color.Black else Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(14.dp))
 
             // Speech Rate Row
@@ -310,6 +352,7 @@ fun TranslatorConfigDialog(
             Button(
                 onClick = {
                     SubtitleTtsManager.setTargetLang(selectedLang)
+                    SubtitleTtsManager.setGender(selectedGender)
                     SubtitleTtsManager.setRate(selectedRate)
                     SubtitleTtsManager.toggleEnabled(isEnabledLocal)
                     onDismiss()

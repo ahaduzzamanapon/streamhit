@@ -119,6 +119,7 @@ class PlayerActivity : ComponentActivity() {
         val dubSubjectId = intent.getStringExtra("EXTRA_DUB_SUBJECT_ID") ?: ""
         val dubDetailPath = intent.getStringExtra("EXTRA_DUB_DETAIL_PATH") ?: ""
         val dubName = intent.getStringExtra("EXTRA_DUB_NAME") ?: ""
+        val isOffline = intent.getBooleanExtra("EXTRA_IS_OFFLINE", false)
 
         setContent {
             StreamfitTheme {
@@ -135,6 +136,7 @@ class PlayerActivity : ComponentActivity() {
                     initialDubSubjectId = dubSubjectId,
                     initialDubDetailPath = dubDetailPath,
                     initialDubName = dubName,
+                    initialIsOffline = isOffline,
                     onBack = { finish() },
                     onEnterPip = { enterPipMode() }
                 )
@@ -188,6 +190,7 @@ fun AdaptivePlayerScreen(
     initialDubSubjectId: String = "",
     initialDubDetailPath: String = "",
     initialDubName: String = "",
+    initialIsOffline: Boolean = false,
     onBack: () -> Unit,
     onEnterPip: () -> Unit
 ) {
@@ -1057,7 +1060,8 @@ fun AdaptivePlayerScreen(
                 onOpenTranslator = { showTranslatorDialog = true }
             )
         } else {
-            val isLiveStream = subjectId.isBlank() && detailPath.isBlank()
+            val isOffline = initialIsOffline || initialStreamUrl.startsWith("content://") || initialStreamUrl.startsWith("file://") || initialStreamUrl.startsWith("/")
+            val isLiveStream = !isOffline && (subjectId.isBlank() && detailPath.isBlank())
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1112,6 +1116,7 @@ fun AdaptivePlayerScreen(
                     detail = detail,
                     currentVideoTitle = currentVideoTitle,
                     isLiveStream = isLiveStream,
+                    isOffline = isOffline,
                     currentChannel = currentChannel,
                     activeServers = currentChannel?.activeServers ?: emptyList(),
                     currentServerIndex = currentServerIndex,

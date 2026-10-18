@@ -326,8 +326,19 @@ fun MainAppScreen(
                     )
                     Screen.Downloads -> DownloadsScreen(
                         repository = repository,
-                        onPlayOffline = { localUri, title ->
-                            onPlayVideo(localUri, title, "", "", "", 1, 1, 0L, null, null, null, null)
+                        onPlayOffline = { item ->
+                            val intent = Intent(context, PlayerActivity::class.java).apply {
+                                putExtra("EXTRA_STREAM_URL", item.playUri)
+                                putExtra("EXTRA_VIDEO_TITLE", item.title)
+                                putExtra("EXTRA_SUBJECT_ID", item.subjectId)
+                                putExtra("EXTRA_DETAIL_PATH", item.detailPath)
+                                putExtra("EXTRA_COVER_URL", item.coverUrl)
+                                putExtra("EXTRA_SEASON_NUM", item.seasonNum)
+                                putExtra("EXTRA_EPISODE_NUM", item.episodeNum)
+                                putExtra("EXTRA_START_POSITION_MS", 0L)
+                                putExtra("EXTRA_IS_OFFLINE", true)
+                            }
+                            context.startActivity(intent)
                         },
                         onNavigateToDetails = { path, id ->
                             navigateToDetails(path, id)

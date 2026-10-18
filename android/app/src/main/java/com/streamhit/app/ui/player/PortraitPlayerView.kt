@@ -373,7 +373,7 @@ fun PortraitVideoPlayerBox(
                         .align(Alignment.BottomCenter)
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
-                    if (isLiveStream || totalDuration <= 0L) {
+                    if (isLiveStream) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -503,6 +503,7 @@ fun PortraitMediaDetails(
     detail: SubjectDetail?,
     currentVideoTitle: String,
     isLiveStream: Boolean,
+    isOffline: Boolean = false,
     currentChannel: LiveTvChannel?,
     activeServers: List<StreamLinkItem>,
     currentServerIndex: Int,
@@ -543,7 +544,7 @@ fun PortraitMediaDetails(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        if (isLiveStream) {
+        if (isLiveStream && !isOffline) {
             // Live TV Details
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -670,10 +671,10 @@ fun PortraitMediaDetails(
 
                 Box(
                     modifier = Modifier
-                        .background(AccentCyan.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                        .background((if (isOffline) AccentEmerald else AccentCyan).copy(alpha = 0.15f), RoundedCornerShape(4.dp))
                         .padding(horizontal = 5.dp, vertical = 2.dp)
                 ) {
-                    Text(if (detail?.subjectType == 2) "TV Series" else "Movie", color = AccentCyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text(if (isOffline) "OFFLINE" else if (detail?.subjectType == 2) "TV Series" else "Movie", color = if (isOffline) AccentEmerald else AccentCyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -684,17 +685,19 @@ fun PortraitMediaDetails(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Button(
-                    onClick = onOpenDownloadSheet,
-                    colors = ButtonDefaults.buttonColors(containerColor = BgCard),
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
-                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
-                    modifier = Modifier.weight(1f).height(36.dp)
-                ) {
-                    Icon(Icons.Default.Download, contentDescription = "Download", tint = AccentEmerald, modifier = Modifier.size(14.dp))
-                    Spacer(modifier = Modifier.width(3.dp))
-                    Text("Download", color = Color.White, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                if (!isOffline) {
+                    Button(
+                        onClick = onOpenDownloadSheet,
+                        colors = ButtonDefaults.buttonColors(containerColor = BgCard),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
+                        modifier = Modifier.weight(1f).height(36.dp)
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = "Download", tint = AccentEmerald, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text("Download", color = Color.White, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
 
                 Button(
