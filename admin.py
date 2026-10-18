@@ -306,11 +306,11 @@ async def admin_upload_apk(request: Request, file: UploadFile = File(...)):
 async def public_get_app_version():
     from main import get_db_pool
     default_version = {
-        "versionCode": 17,
-        "versionName": "1.0.16",
+        "versionCode": 18,
+        "versionName": "1.0.17",
         "apkUrl": "https://nxly.online/uploads/apks/NXLY-Stream.apk",
         "mustUpdate": False,
-        "releaseNotes": "AI Real-time Audio Translator with Google TTS, in-app offline downloads manager with live progress, and enhanced dub sync."
+        "releaseNotes": "New Release: AI Audio Translator with Male/Female voice toggle, Google TTS studio fallback, in-app offline downloads manager, and video player enhancements!"
     }
     pool = await get_db_pool()
     if not pool: return {"version": default_version}

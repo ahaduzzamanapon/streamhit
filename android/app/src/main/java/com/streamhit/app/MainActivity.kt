@@ -184,13 +184,13 @@ fun MainAppScreen(
 
     // Check version update against backend admin panel
     LaunchedEffect(Unit) {
-        scope.launch {
+        try {
             val update = AppUpdateManager.checkForUpdate()
             if (update != null) {
                 updateInfo = update
                 showUpdateDialog = true
             }
-        }
+        } catch (_: Exception) {}
     }
 
     Scaffold(

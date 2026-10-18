@@ -709,7 +709,7 @@
         <!-- Live Release Badge -->
         <div class="live-badge">
             <span class="live-indicator"></span>
-            <span>অফিশিয়াল অ্যান্ড্রয়েড অ্যাপ • লেটেস্ট রিলিজ v1.0.15</span>
+            <span>অফিশিয়াল অ্যান্ড্রয়েড অ্যাপ • লেটেস্ট রিলিজ v1.0.17</span>
         </div>
 
         <h1 class="main-headline">
@@ -743,7 +743,7 @@
 
             <!-- Specs Grid -->
             <div class="specs-grid">
-                <div class="spec-item"><i class="fa-solid fa-microchip"></i> <span id="ver-badge">ভার্সন 1.0.15</span></div>
+                <div class="spec-item"><i class="fa-solid fa-microchip"></i> <span id="ver-badge">ভার্সন 1.0.17</span></div>
                 <div class="spec-item"><i class="fa-solid fa-file-zipper"></i> সাইজ: মাত্র ১৪ MB</div>
                 <div class="spec-item"><i class="fa-solid fa-mobile-screen"></i> Android 8.0 - 15+</div>
                 <div class="spec-item"><i class="fa-solid fa-shield-halved"></i> ১০০% নিরাপদ ও ভাইরাস মুক্ত</div>
@@ -901,7 +901,7 @@
                 .then(r => r.json())
                 .then(res => {
                     if (res && res.version) {
-                        const ver = res.version.versionName || "1.0.15";
+                        const ver = res.version.versionName || "1.0.17";
                         const url = res.version.apkUrl || "/uploads/apks/NXLY-Stream.apk";
                         if (verBadge) verBadge.textContent = "ভার্সন " + ver;
                         if (dlTitleText) dlTitleText.textContent = "ডাউনলোড করুন (v" + ver + ")";
