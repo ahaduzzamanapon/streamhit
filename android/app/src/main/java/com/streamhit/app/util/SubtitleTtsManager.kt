@@ -90,6 +90,10 @@ object SubtitleTtsManager {
 
     var speechRate by mutableFloatStateOf(1.05f)
 
+    // Dialogue Lead-Time (in ms): advances subtitle audio trigger ahead of video timestamp
+    // Default 480ms eliminates the start lag and matches actor mouth movement perfectly
+    var leadTimeMs by mutableLongStateOf(480L)
+
     var voiceGender by mutableStateOf(VoiceGender.FEMALE)
         private set
 
@@ -105,6 +109,41 @@ object SubtitleTtsManager {
     private var lastPositionMs = 0L
     private var isAudioDucked = false
 
+    private var appContext: Context? = null
+    private var lastSpeakingStartTime = 0L
+    private var lastEstimatedDurationMs = 0L
+    private var nextPendingCloudTts: (() -> Unit)? = null
+
+    private fun getCachedAudioFile(text: String, lang: String): java.io.File {
+        val dir = java.io.File(appContext?.cacheDir, "tts_audio_cache").apply { mkdirs() }
+        val hash = (lang + "_" + text.trim()).hashCode().toString()
+        return java.io.File(dir, "tts_$hash.mp3")
+    }
+
+    private fun prefetchCloudTtsAudio(text: String, lang: String) {
+        if (text.isBlank() || appContext == null) return
+        val cacheFile = getCachedAudioFile(text, lang)
+        if (cacheFile.exists() && cacheFile.length() > 0) return
+
+        scope.launch(Dispatchers.IO) {
+            try {
+                val encoded = URLEncoder.encode(text, "UTF-8")
+                val ttsUrl = "https://translate.google.com/translate_tts?ie=UTF-8&tl=$lang&client=tw-ob&q=$encoded"
+                val req = Request.Builder().url(ttsUrl).header("User-Agent", "Mozilla/5.0").build()
+                val resp = httpClient.newCall(req).execute()
+                if (resp.isSuccessful) {
+                    val bytes = resp.body?.bytes()
+                    resp.close()
+                    if (bytes != null && bytes.isNotEmpty()) {
+                        cacheFile.writeBytes(bytes)
+                    }
+                } else {
+                    resp.close()
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var pretranslateJob: Job? = null
 
@@ -116,6 +155,7 @@ object SubtitleTtsManager {
     }
 
     fun init(context: Context) {
+        appContext = context.applicationContext
         if (tts != null) return
 
         // Prefer Google TTS engine if installed for full Bengali & Hindi voice support
@@ -398,6 +438,7 @@ object SubtitleTtsManager {
                         if (t.isNotBlank() && t != needed[i].originalText) {
                             needed[i].translatedText = t
                             translationCache["${target}_${needed[i].originalText.trim()}"] = t
+                            prefetchCloudTtsAudio(t, target)
                         }
                     }
                     batchSuccess = true
@@ -437,6 +478,7 @@ object SubtitleTtsManager {
                 val extracted = extractTranslatedFromGoogleJson(str)
                 if (extracted.isNotBlank()) {
                     translationCache[cacheKey] = extracted
+                    prefetchCloudTtsAudio(extracted, target)
                     return extracted
                 }
             } else {
@@ -456,6 +498,7 @@ object SubtitleTtsManager {
                 val translated = obj.optString("translated", "")
                 if (translated.isNotBlank()) {
                     translationCache[cacheKey] = translated
+                    prefetchCloudTtsAudio(translated, target)
                     return translated
                 }
             } else {
@@ -490,9 +533,43 @@ object SubtitleTtsManager {
         }
     }
 
-    private fun speakCue(text: String, cueId: Int, exoPlayer: ExoPlayer) {
+    fun calculateOptimalSpeechRate(
+        text: String,
+        cue: SubtitleCue,
+        cuesList: List<SubtitleCue>
+    ): Float {
+        val words = text.trim().split("\\s+".toRegex()).filter { it.isNotBlank() }
+        val wordCount = words.size.coerceAtLeast(1)
+        val charCount = text.length
+
+        // Estimated speech duration in ms at 1.0x
+        // In Bengali & Hindi, standard conversational rate is ~290ms per word + 140ms base, or ~58ms per character
+        val estimatedDurationMs = (wordCount * 290L + 140L).coerceAtLeast(charCount * 58L)
+
+        val cueIdx = cuesList.indexOfFirst { it.id == cue.id }
+        val nextCue = if (cueIdx in 0 until cuesList.size - 1) cuesList[cueIdx + 1] else null
+        val availableTimeMs = if (nextCue != null && nextCue.startMs > cue.startMs) {
+            (nextCue.startMs - cue.startMs).coerceAtLeast(800L)
+        } else {
+            (cue.endMs - cue.startMs).coerceAtLeast(1000L)
+        }
+
+        val baseRate = speechRate.coerceAtLeast(0.95f)
+        if (estimatedDurationMs <= availableTimeMs) {
+            return baseRate
+        }
+
+        // Dialogue is longer than available time slot -> calculate speedup needed
+        val neededRatio = estimatedDurationMs.toFloat() / availableTimeMs.toFloat()
+        // Clamp to a natural, intelligible upper bound (1.60f)
+        return (baseRate * neededRatio).coerceIn(baseRate, 1.60f)
+    }
+
+    private fun speakCue(text: String, cue: SubtitleCue, exoPlayer: ExoPlayer) {
         if (text.isBlank()) return
         currentExoPlayerRef = exoPlayer
+
+        val optimalRate = calculateOptimalSpeechRate(text, cue, cues)
 
         // Auto-duck video volume to 20%
         exoPlayer.volume = 0.20f
@@ -502,55 +579,115 @@ object SubtitleTtsManager {
             val params = Bundle().apply {
                 putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
             }
-            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, "cue_$cueId")
+            tts?.setSpeechRate(optimalRate)
+
+            val isSpeaking = tts?.isSpeaking == true
+            val now = System.currentTimeMillis()
+            val elapsed = now - lastSpeakingStartTime
+            val remainingEstimate = (lastEstimatedDurationMs - elapsed).coerceAtLeast(0L)
+
+            // If previous dialogue is still speaking but has less than 850ms left:
+            // Use QUEUE_ADD so it finishes the last word cleanly instead of cutting off mid-word!
+            val queueMode = if (isSpeaking && remainingEstimate in 1..850L) {
+                TextToSpeech.QUEUE_ADD
+            } else {
+                TextToSpeech.QUEUE_FLUSH
+            }
+
+            lastSpeakingStartTime = now
+            val words = text.split("\\s+".toRegex()).count { it.isNotBlank() }
+            lastEstimatedDurationMs = ((words * 290L + 140L) / optimalRate).toLong()
+
+            tts?.speak(text, queueMode, params, "cue_${cue.id}")
         } else {
-            // Seamless Google Cloud TTS streaming fallback
-            speakWithCloudTts(text, targetLanguage, exoPlayer)
+            // Seamless Google Cloud TTS with disk caching, speed tuning, and finish protection
+            speakWithCloudTts(text, targetLanguage, optimalRate, exoPlayer)
         }
     }
 
-    private fun speakWithCloudTts(text: String, lang: String, exoPlayer: ExoPlayer) {
+    private fun speakWithCloudTts(text: String, lang: String, speed: Float, exoPlayer: ExoPlayer) {
         scope.launch(Dispatchers.Main) {
             try {
-                cloudPlayer?.stop()
-                cloudPlayer?.release()
-                cloudPlayer = null
+                val isPlaying = try { cloudPlayer?.isPlaying == true } catch (_: Exception) { false }
+                val currentPos = try { cloudPlayer?.currentPosition ?: 0 } catch (_: Exception) { 0 }
+                val totalDur = try { cloudPlayer?.duration ?: 0 } catch (_: Exception) { 0 }
+                val remainingMs = if (isPlaying && totalDur > currentPos) (totalDur - currentPos) else 0
 
-                val encoded = URLEncoder.encode(text, "UTF-8")
-                val ttsUrl = "https://translate.google.com/translate_tts?ie=UTF-8&tl=$lang&client=tw-ob&q=$encoded"
-
-                val mp = MediaPlayer().apply {
-                    setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                            .setUsage(AudioAttributes.USAGE_MEDIA)
-                            .build()
-                    )
-                    setDataSource(ttsUrl)
-                    setOnPreparedListener { player ->
-                        try {
-                            val targetPitch = if (voiceGender == VoiceGender.MALE) 0.82f else 1.18f
-                            player.playbackParams = player.playbackParams.setPitch(targetPitch)
-                        } catch (_: Exception) {}
-                        player.start()
+                // If current dialogue is almost done (remaining < 750ms), let it finish its sentence!
+                if (isPlaying && remainingMs in 1..750) {
+                    nextPendingCloudTts = {
+                        executeCloudPlayback(text, lang, speed, exoPlayer)
                     }
-                    setOnCompletionListener {
-                        it.release()
-                        if (cloudPlayer === it) cloudPlayer = null
-                        restoreVolume()
-                    }
-                    setOnErrorListener { it, _, _ ->
-                        it.release()
-                        if (cloudPlayer === it) cloudPlayer = null
-                        restoreVolume()
-                        true
-                    }
-                    prepareAsync()
+                    return@launch
                 }
-                cloudPlayer = mp
+
+                executeCloudPlayback(text, lang, speed, exoPlayer)
             } catch (_: Exception) {
                 restoreVolume()
             }
+        }
+    }
+
+    private fun executeCloudPlayback(text: String, lang: String, speed: Float, exoPlayer: ExoPlayer) {
+        try {
+            nextPendingCloudTts = null
+            cloudPlayer?.stop()
+            cloudPlayer?.release()
+            cloudPlayer = null
+
+            val cachedFile = getCachedAudioFile(text, lang)
+            val dataSource = if (cachedFile.exists() && cachedFile.length() > 0) {
+                cachedFile.absolutePath
+            } else {
+                val encoded = URLEncoder.encode(text, "UTF-8")
+                "https://translate.google.com/translate_tts?ie=UTF-8&tl=$lang&client=tw-ob&q=$encoded"
+            }
+
+            val mp = MediaPlayer().apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .build()
+                )
+                setDataSource(dataSource)
+                setOnPreparedListener { player ->
+                    try {
+                        val targetPitch = if (voiceGender == VoiceGender.MALE) 0.82f else 1.18f
+                        player.playbackParams = player.playbackParams
+                            .setPitch(targetPitch)
+                            .setSpeed(speed.coerceIn(0.85f, 1.65f))
+                    } catch (_: Exception) {}
+                    player.start()
+                }
+                setOnCompletionListener {
+                    it.release()
+                    if (cloudPlayer === it) cloudPlayer = null
+                    val pending = nextPendingCloudTts
+                    if (pending != null) {
+                        nextPendingCloudTts = null
+                        pending.invoke()
+                    } else {
+                        restoreVolume()
+                    }
+                }
+                setOnErrorListener { it, _, _ ->
+                    it.release()
+                    if (cloudPlayer === it) cloudPlayer = null
+                    val pending = nextPendingCloudTts
+                    if (pending != null) {
+                        nextPendingCloudTts = null
+                        pending.invoke()
+                    } else {
+                        restoreVolume()
+                    }
+                    true
+                }
+                prepareAsync()
+            }
+            cloudPlayer = mp
+        } catch (_: Exception) {
+            restoreVolume()
         }
     }
 
@@ -563,6 +700,7 @@ object SubtitleTtsManager {
         if (kotlin.math.abs(currentPositionMs - lastPositionMs) > 1800L) {
             tts?.stop()
             cloudPlayer?.stop()
+            nextPendingCloudTts = null
             lastSpokenCueId = -1
             if (isAudioDucked) {
                 exoPlayer.volume = 1.0f
@@ -574,8 +712,11 @@ object SubtitleTtsManager {
         }
         lastPositionMs = currentPositionMs
 
-        // Find active cue matching current timestamp
-        val activeCue = cues.firstOrNull { currentPositionMs >= it.startMs && currentPositionMs <= it.endMs }
+        // Advanced Lead-Time Match:
+        // Adding leadTimeMs (default 480ms) advances the trigger ahead of the video timestamp,
+        // eliminating the ~1s delay and aligning audio exactly as the actor begins talking!
+        val effectivePositionMs = currentPositionMs + leadTimeMs
+        val activeCue = cues.firstOrNull { effectivePositionMs >= it.startMs && currentPositionMs <= (it.endMs + 350L) }
 
         if (activeCue != null) {
             if (activeCue.id != lastSpokenCueId) {
@@ -598,7 +739,7 @@ object SubtitleTtsManager {
                                 activeCue.translatedText = trans
                                 withContext(Dispatchers.Main) {
                                     if (lastSpokenCueId == activeCue.id) {
-                                        speakCue(trans, activeCue.id, exoPlayer)
+                                        speakCue(trans, activeCue, exoPlayer)
                                     }
                                 }
                             }
@@ -608,7 +749,7 @@ object SubtitleTtsManager {
                 }
 
                 if (speechText.isNotBlank()) {
-                    speakCue(speechText, activeCue.id, exoPlayer)
+                    speakCue(speechText, activeCue, exoPlayer)
                 }
             }
         } else {
@@ -624,6 +765,7 @@ object SubtitleTtsManager {
     fun onPause() {
         tts?.stop()
         cloudPlayer?.stop()
+        nextPendingCloudTts = null
         restoreVolume()
     }
 
@@ -637,6 +779,7 @@ object SubtitleTtsManager {
         isTtsReady = false
 
         cloudPlayer?.stop()
+        nextPendingCloudTts = null
         try {
             cloudPlayer?.release()
         } catch (_: Exception) {}
@@ -709,9 +852,18 @@ object SubtitleTtsManager {
     }
 
     private fun sanitizeSubtitleText(text: String): String {
-        return text.replace(Regex("<[^>]*>"), "")
+        return text
+            // Strip HTML and font tags
+            .replace(Regex("<[^>]*>"), "")
             .replace(Regex("\\{[^}]*\\}"), "")
+            // Strip bracketed sound effects/meta tags, e.g. [Music], [Sighs], [Gunshot]
+            .replace(Regex("\\[[^\\]]*\\]"), "")
+            // Strip parenthesized sound effects/meta tags, e.g. (laughs), (groaning), (applause)
+            .replace(Regex("\\([^\\)]*\\)"), "")
+            // Strip speaker tags at start of sentence, e.g. "MAN:", "JOHN:", "OFFICER:"
+            .replace(Regex("^[A-Za-z0-9 _-]{2,16}:"), "")
             .replace("\n", " ")
+            .replace(Regex("\\s+"), " ")
             .trim()
     }
 

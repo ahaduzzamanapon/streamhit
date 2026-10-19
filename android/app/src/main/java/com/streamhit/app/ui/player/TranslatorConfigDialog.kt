@@ -34,6 +34,7 @@ fun TranslatorConfigDialog(
     var isEnabledLocal by remember { mutableStateOf(SubtitleTtsManager.isEnabled) }
     var selectedRate by remember { mutableFloatStateOf(SubtitleTtsManager.speechRate) }
     var selectedGender by remember { mutableStateOf(SubtitleTtsManager.voiceGender) }
+    var selectedLeadTime by remember { mutableLongStateOf(SubtitleTtsManager.leadTimeMs) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -305,6 +306,48 @@ fun TranslatorConfigDialog(
 
             Spacer(modifier = Modifier.height(14.dp))
 
+            // Dialogue Timing (Lead Time) Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = "Dialogue Sync (Lead Time)",
+                        color = TextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "Auto-tempo & anti-cut protection active ⚡",
+                        color = AccentEmerald,
+                        fontSize = 10.sp
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(300L to "0.3s", 480L to "0.5s (Best)", 700L to "0.7s").forEach { (lead, label) ->
+                        val isSelected = selectedLeadTime == lead
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = if (isSelected) AccentEmerald else Color.White.copy(alpha = 0.08f),
+                            modifier = Modifier.clickable { selectedLeadTime = lead }
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (isSelected) Color.Black else Color.White,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
             // Pre-translation Status Box
             if (SubtitleTtsManager.totalCuesCount > 0) {
                 Column(
@@ -354,6 +397,7 @@ fun TranslatorConfigDialog(
                     SubtitleTtsManager.setTargetLang(selectedLang)
                     SubtitleTtsManager.setGender(selectedGender)
                     SubtitleTtsManager.setRate(selectedRate)
+                    SubtitleTtsManager.leadTimeMs = selectedLeadTime
                     SubtitleTtsManager.toggleEnabled(isEnabledLocal)
                     onDismiss()
                 },
