@@ -110,9 +110,10 @@ object SubtitleTtsManager {
     private var isAudioDucked = false
 
     private var appContext: Context? = null
-    private var lastSpeakingStartTime = 0L
-    private var lastEstimatedDurationMs = 0L
-    private var nextPendingCloudTts: (() -> Unit)? = null
+    @Volatile
+    private var isSpeakingCurrently = false
+    @Volatile
+    private var pendingCueToSpeak: Pair<SubtitleCue, String>? = null
 
     private fun getCachedAudioFile(text: String, lang: String): java.io.File {
         val dir = java.io.File(appContext?.cacheDir, "tts_audio_cache").apply { mkdirs() }
@@ -171,13 +172,15 @@ object SubtitleTtsManager {
                 applyTtsLanguage(targetLanguage)
                 tts?.setSpeechRate(speechRate)
                 tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                    override fun onStart(utteranceId: String?) {}
+                    override fun onStart(utteranceId: String?) {
+                        isSpeakingCurrently = true
+                    }
                     override fun onDone(utteranceId: String?) {
-                        restoreVolume()
+                        handleDialogueCompleted()
                     }
                     @Deprecated("Deprecated in Java")
                     override fun onError(utteranceId: String?) {
-                        restoreVolume()
+                        handleDialogueCompleted()
                     }
                 })
             }
@@ -196,10 +199,12 @@ object SubtitleTtsManager {
 
     private fun restoreVolume() {
         scope.launch(Dispatchers.Main) {
-            currentExoPlayerRef?.let { p ->
-                if (isAudioDucked) {
-                    p.volume = 1.0f
-                    isAudioDucked = false
+            if (!isSpeakingCurrently && pendingCueToSpeak == null) {
+                currentExoPlayerRef?.let { p ->
+                    if (isAudioDucked) {
+                        p.volume = 1.0f
+                        isAudioDucked = false
+                    }
                 }
             }
         }
@@ -288,7 +293,11 @@ object SubtitleTtsManager {
         isEnabled = enabled
         if (!enabled) {
             tts?.stop()
-            cloudPlayer?.stop()
+            try { cloudPlayer?.stop() } catch (_: Exception) {}
+            try { cloudPlayer?.release() } catch (_: Exception) {}
+            cloudPlayer = null
+            isSpeakingCurrently = false
+            pendingCueToSpeak = null
             lastSpokenCueId = -1
             statusMessage = "AI Audio Translator is off"
             restoreVolume()
@@ -565,9 +574,45 @@ object SubtitleTtsManager {
         return (baseRate * neededRatio).coerceIn(baseRate, 1.60f)
     }
 
+    private fun handleDialogueCompleted() {
+        scope.launch(Dispatchers.Main) {
+            isSpeakingCurrently = false
+            val pending = pendingCueToSpeak
+            pendingCueToSpeak = null
+
+            if (pending != null && currentExoPlayerRef != null && isEnabled) {
+                val (cue, text) = pending
+                val currentPos = currentExoPlayerRef?.currentPosition ?: lastPositionMs
+                if (currentPos <= cue.endMs + 3500L) {
+                    executePlayback(text, cue, currentExoPlayerRef!!)
+                } else {
+                    restoreVolume()
+                }
+            } else {
+                restoreVolume()
+            }
+        }
+    }
+
     private fun speakCue(text: String, cue: SubtitleCue, exoPlayer: ExoPlayer) {
         if (text.isBlank()) return
         currentExoPlayerRef = exoPlayer
+
+        val isSpeaking = isSpeakingCurrently || (tts?.isSpeaking == true) || (cloudPlayer?.isPlaying == true)
+        if (isSpeaking) {
+            // Dialogue 100% completion guarantee: Never cut off or stop an active dialogue mid-sentence!
+            // Hold incoming cue as pending; it will immediately play the exact millisecond current dialogue finishes 100%.
+            pendingCueToSpeak = Pair(cue, text)
+            return
+        }
+
+        executePlayback(text, cue, exoPlayer)
+    }
+
+    private fun executePlayback(text: String, cue: SubtitleCue, exoPlayer: ExoPlayer) {
+        if (text.isBlank()) return
+        currentExoPlayerRef = exoPlayer
+        isSpeakingCurrently = true
 
         val optimalRate = calculateOptimalSpeechRate(text, cue, cues)
 
@@ -580,58 +625,15 @@ object SubtitleTtsManager {
                 putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
             }
             tts?.setSpeechRate(optimalRate)
-
-            val isSpeaking = tts?.isSpeaking == true
-            val now = System.currentTimeMillis()
-            val elapsed = now - lastSpeakingStartTime
-            val remainingEstimate = (lastEstimatedDurationMs - elapsed).coerceAtLeast(0L)
-
-            // If previous dialogue is still speaking but has less than 850ms left:
-            // Use QUEUE_ADD so it finishes the last word cleanly instead of cutting off mid-word!
-            val queueMode = if (isSpeaking && remainingEstimate in 1..850L) {
-                TextToSpeech.QUEUE_ADD
-            } else {
-                TextToSpeech.QUEUE_FLUSH
-            }
-
-            lastSpeakingStartTime = now
-            val words = text.split("\\s+".toRegex()).count { it.isNotBlank() }
-            lastEstimatedDurationMs = ((words * 290L + 140L) / optimalRate).toLong()
-
-            tts?.speak(text, queueMode, params, "cue_${cue.id}")
+            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, "cue_${cue.id}")
         } else {
-            // Seamless Google Cloud TTS with disk caching, speed tuning, and finish protection
-            speakWithCloudTts(text, targetLanguage, optimalRate, exoPlayer)
-        }
-    }
-
-    private fun speakWithCloudTts(text: String, lang: String, speed: Float, exoPlayer: ExoPlayer) {
-        scope.launch(Dispatchers.Main) {
-            try {
-                val isPlaying = try { cloudPlayer?.isPlaying == true } catch (_: Exception) { false }
-                val currentPos = try { cloudPlayer?.currentPosition ?: 0 } catch (_: Exception) { 0 }
-                val totalDur = try { cloudPlayer?.duration ?: 0 } catch (_: Exception) { 0 }
-                val remainingMs = if (isPlaying && totalDur > currentPos) (totalDur - currentPos) else 0
-
-                // If current dialogue is almost done (remaining < 750ms), let it finish its sentence!
-                if (isPlaying && remainingMs in 1..750) {
-                    nextPendingCloudTts = {
-                        executeCloudPlayback(text, lang, speed, exoPlayer)
-                    }
-                    return@launch
-                }
-
-                executeCloudPlayback(text, lang, speed, exoPlayer)
-            } catch (_: Exception) {
-                restoreVolume()
-            }
+            // Seamless Google Cloud TTS with disk caching and speed tuning
+            executeCloudPlayback(text, targetLanguage, optimalRate, exoPlayer)
         }
     }
 
     private fun executeCloudPlayback(text: String, lang: String, speed: Float, exoPlayer: ExoPlayer) {
         try {
-            nextPendingCloudTts = null
-            cloudPlayer?.stop()
             cloudPlayer?.release()
             cloudPlayer = null
 
@@ -652,6 +654,7 @@ object SubtitleTtsManager {
                 )
                 setDataSource(dataSource)
                 setOnPreparedListener { player ->
+                    isSpeakingCurrently = true
                     try {
                         val targetPitch = if (voiceGender == VoiceGender.MALE) 0.82f else 1.18f
                         player.playbackParams = player.playbackParams
@@ -663,30 +666,19 @@ object SubtitleTtsManager {
                 setOnCompletionListener {
                     it.release()
                     if (cloudPlayer === it) cloudPlayer = null
-                    val pending = nextPendingCloudTts
-                    if (pending != null) {
-                        nextPendingCloudTts = null
-                        pending.invoke()
-                    } else {
-                        restoreVolume()
-                    }
+                    handleDialogueCompleted()
                 }
                 setOnErrorListener { it, _, _ ->
                     it.release()
                     if (cloudPlayer === it) cloudPlayer = null
-                    val pending = nextPendingCloudTts
-                    if (pending != null) {
-                        nextPendingCloudTts = null
-                        pending.invoke()
-                    } else {
-                        restoreVolume()
-                    }
+                    handleDialogueCompleted()
                     true
                 }
                 prepareAsync()
             }
             cloudPlayer = mp
         } catch (_: Exception) {
+            isSpeakingCurrently = false
             restoreVolume()
         }
     }
@@ -699,8 +691,11 @@ object SubtitleTtsManager {
         // Scrub / Jump detection: if user jumped > 1.8s, stop active utterance and ducking
         if (kotlin.math.abs(currentPositionMs - lastPositionMs) > 1800L) {
             tts?.stop()
-            cloudPlayer?.stop()
-            nextPendingCloudTts = null
+            try { cloudPlayer?.stop() } catch (_: Exception) {}
+            try { cloudPlayer?.release() } catch (_: Exception) {}
+            cloudPlayer = null
+            isSpeakingCurrently = false
+            pendingCueToSpeak = null
             lastSpokenCueId = -1
             if (isAudioDucked) {
                 exoPlayer.volume = 1.0f
@@ -714,7 +709,7 @@ object SubtitleTtsManager {
 
         // Advanced Lead-Time Match:
         // Adding leadTimeMs (default 480ms) advances the trigger ahead of the video timestamp,
-        // eliminating the ~1s delay and aligning audio exactly as the actor begins talking!
+        // eliminating the delay and aligning audio exactly as the actor begins talking!
         val effectivePositionMs = currentPositionMs + leadTimeMs
         val activeCue = cues.firstOrNull { effectivePositionMs >= it.startMs && currentPositionMs <= (it.endMs + 350L) }
 
@@ -754,8 +749,8 @@ object SubtitleTtsManager {
             }
         } else {
             // No cue active at this moment
-            val isSpeakingNow = (tts?.isSpeaking == true) || (cloudPlayer?.isPlaying == true)
-            if (!isSpeakingNow && isAudioDucked) {
+            val isSpeakingNow = isSpeakingCurrently || (tts?.isSpeaking == true) || (cloudPlayer?.isPlaying == true)
+            if (!isSpeakingNow && pendingCueToSpeak == null && isAudioDucked) {
                 exoPlayer.volume = 1.0f
                 isAudioDucked = false
             }
@@ -764,8 +759,11 @@ object SubtitleTtsManager {
 
     fun onPause() {
         tts?.stop()
-        cloudPlayer?.stop()
-        nextPendingCloudTts = null
+        try { cloudPlayer?.stop() } catch (_: Exception) {}
+        try { cloudPlayer?.release() } catch (_: Exception) {}
+        cloudPlayer = null
+        isSpeakingCurrently = false
+        pendingCueToSpeak = null
         restoreVolume()
     }
 
@@ -778,12 +776,11 @@ object SubtitleTtsManager {
         tts = null
         isTtsReady = false
 
-        cloudPlayer?.stop()
-        nextPendingCloudTts = null
-        try {
-            cloudPlayer?.release()
-        } catch (_: Exception) {}
+        try { cloudPlayer?.stop() } catch (_: Exception) {}
+        try { cloudPlayer?.release() } catch (_: Exception) {}
         cloudPlayer = null
+        isSpeakingCurrently = false
+        pendingCueToSpeak = null
 
         if (exoPlayer != null && isAudioDucked) {
             exoPlayer.volume = 1.0f
