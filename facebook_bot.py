@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import random
 import asyncio
 import httpx
 import urllib.parse
@@ -140,11 +141,71 @@ async def upload_reel_to_facebook(
         reel_url = f"https://www.facebook.com/reel/{video_id}"
         print(f"[FacebookBot] Reel published successfully: {reel_url}")
 
-        # Phase 4: Wait 6s for processing and post 1st Comment
+        # Phase 4: Copyright Verification & Instant Auto-Delete Guard
+        print(f"[FacebookBot] Verifying copyright compliance for Reel {video_id}...")
+        has_copyright_violation = False
+        copyright_reason = ""
+
+        for check_idx in range(4):
+            await asyncio.sleep(6)
+            try:
+                status_url = f"https://graph.facebook.com/v19.0/{video_id}?fields=id,status,copyright_check_status&access_token={page_token}"
+                s_resp = await client.get(status_url)
+                s_data = s_resp.json()
+                if "error" in s_data:
+                    err_msg = s_data["error"].get("message", "")
+                    if "does not exist" in err_msg or "cannot be loaded" in err_msg or "blocked" in err_msg.lower():
+                        has_copyright_violation = True
+                        copyright_reason = f"Blocked/Restricted by Meta: {err_msg}"
+                        break
+                    continue
+                
+                status_obj = s_data.get("status", {})
+                cp_check = status_obj.get("copyright_check_status") or s_data.get("copyright_check_status") or {}
+                pub_phase = status_obj.get("publishing_phase", {})
+
+                if cp_check.get("matches_found") is True:
+                    has_copyright_violation = True
+                    copyright_reason = "Rights Manager detected copyrighted audio/video"
+                    break
+                
+                if pub_phase.get("publish_status") in ("blocked", "rejected", "restricted", "copyright_violation"):
+                    has_copyright_violation = True
+                    copyright_reason = f"Publishing rejected: {pub_phase.get('publish_status')}"
+                    break
+
+                if cp_check.get("status") == "complete" and cp_check.get("matches_found") is False:
+                    print(f"[FacebookBot] Copyright check passed for {video_id} (0 matches)")
+                    break
+            except Exception as se:
+                print(f"[FacebookBot] Copyright check note ({check_idx+1}): {se}")
+
+        if has_copyright_violation:
+            print(f"[FacebookBot] ⚠️ COPYRIGHT DETECTED for {video_id} ({copyright_reason})!")
+            print(f"[FacebookBot] 🗑️ AUTO-DELETING REEL {video_id} IMMEDIATELY FROM FACEBOOK...")
+            try:
+                del_url = f"https://graph.facebook.com/v19.0/{video_id}?access_token={page_token}"
+                del_resp = await client.delete(del_url)
+                print(f"[FacebookBot] Deleted from FB: {del_resp.text}")
+            except Exception as de:
+                print(f"[FacebookBot] Delete call exception: {de}")
+            
+            # Clean up local video file
+            if os.path.exists(video_path):
+                try: os.remove(video_path)
+                except Exception: pass
+
+            return {
+                "success": False,
+                "error": f"Copyright detected ({copyright_reason}). Reel was automatically deleted from Facebook to protect the Page.",
+                "video_id": video_id,
+                "copyright_blocked": True
+            }
+
+        # Phase 5: Wait and post 1st Comment with watch & download links
         comment_id = None
         if comment_text:
-            print("[FacebookBot] Waiting 6 seconds before posting auto-comment...")
-            await asyncio.sleep(6)
+            print("[FacebookBot] Posting auto-comment with links...")
             try:
                 comment_url = f"https://graph.facebook.com/v19.0/{video_id}/comments"
                 c_resp = await client.post(comment_url, data={
@@ -186,14 +247,20 @@ async def publish_existing_reel(
     movie_url = f"https://nxly.online/watch?id={subject_id}" if subject_id else "https://nxly.online"
     comment_text = template.replace("{movie_url}", movie_url).replace("{title}", title or "this title")
 
-    final_caption = caption or f"🔥 {title or 'Trending Cinema'} • Watch Full HD on NXLY Stream 🍿\n\n#nxlystream #reels #viral #trending #shorts"
+    raw_caption = caption or f"🔥 {title or 'Trending Cinema'} • Watch Full HD on NXLY Stream 🍿\n\n💬 Full Movie Link is in the 1st Comment! 👇\n\n#nxlystream #reels #viral #trending #shorts"
+    # Ensure no external URLs in post caption to avoid Facebook reach throttling
+    import re
+    clean_caption = re.sub(r'https?://\S+', '', raw_caption).strip()
 
     res = await upload_reel_to_facebook(
         video_path=video_path,
-        caption=final_caption,
+        caption=clean_caption,
         comment_text=comment_text
     )
     if res.get("success"):
+        reel_url = res.get("reel_url")
+        if reel_url:
+            await share_reel_to_groups(reel_url, title or filename, movie_url)
         save_fb_history({
             "title": title or filename,
             "video_id": res.get("video_id"),
@@ -298,15 +365,20 @@ async def trigger_auto_trending_reel(custom_title: Optional[str] = None, custom_
         title=target_title,
         part_num=1,
         total_parts=1,
-        top_text_custom=f"🔥 {target_title} 🍿",
-        bottom_text_custom="👇 FULL MOVIE LINK IN 1ST COMMENT 👇",
+        top_text_custom="PART 1",
+        bottom_text_custom="FULL MOVIE LINK IN 1ST COMMENT",
         output_path=overlay_path
     )
 
-    # Cut 60 seconds starting from 300s (5:00 min) where action usually peaks
-    start_seconds = 300
-    duration_seconds = 60
-    print(f"[FacebookBot] Rendering 60s clip for '{target_title}'...")
+    # Cut 2 minutes (120 seconds) from the exciting MIDDLE of the film (30-50m for movies, 12-22m for series)
+    is_tv = (selected_subject.get("subject_type") == 2) if selected_subject else False
+    if is_tv:
+        start_seconds = random.randint(720, 1320)
+    else:
+        start_seconds = random.randint(1800, 3000)
+    duration_seconds = 120
+    min_label = f"{start_seconds // 60}:{start_seconds % 60:02d}"
+    print(f"[FacebookBot] Rendering 2-minute (120s) clip from the MIDDLE of '{target_title}' starting at {min_label} ({start_seconds}s)...")
 
     success = await reel_generator.render_single_reel_part(
         stream_url=stream_url,
@@ -324,16 +396,17 @@ async def trigger_auto_trending_reel(custom_title: Optional[str] = None, custom_
     if not success or not os.path.exists(output_path):
         return {"success": False, "error": "FFmpeg Reel generation failed"}
 
-    # Prepare Caption & Comment
-    watch_url = f"https://nxly.online/watch?id={subject_id}" if subject_id else "https://nxly.online"
+    # Prepare Caption: NO external links in post caption (keeps FB reach high)
     caption = (
         f"🔥 {target_title} 🎬🍿\n"
         f"━━━━━━━━━━━━━━━━━━\n"
-        f"🍿 Watch Full in 1080p HD: 👉 {watch_url}\n"
-        f"📲 Free Android App Download: 👉 https://nxly.online/download\n\n"
+        f"💬 Full Movie / Series link is in the 1st Comment! 👇\n"
+        f"📲 Watch free in 1080p Full HD on NXLY Stream App!\n\n"
         f"#reels #shorts #viral #movies #trending #nxly #{slug.lower()}"
     )
 
+    # Prepare Comment: Contains ALL the links
+    watch_url = f"https://nxly.online/watch?id={subject_id}" if subject_id else "https://nxly.online"
     cfg = load_fb_config()
     comment_tpl = cfg.get("auto_comment_template", "🍿 Watch Full in 1080p HD on NXLY:\n👉 {movie_url}\n\n📲 Download Official App:\n👉 https://nxly.online/download")
     comment_msg = comment_tpl.replace("{movie_url}", watch_url).replace("{title}", target_title)
@@ -345,15 +418,22 @@ async def trigger_auto_trending_reel(custom_title: Optional[str] = None, custom_
         comment_text=comment_msg
     )
 
+    group_results = []
     if upload_res.get("success"):
         cfg["last_post_time"] = timestamp
         save_fb_config(cfg)
+
+        # Share to configured Facebook groups and post comment
+        reel_url = upload_res.get("reel_url")
+        if reel_url:
+            group_results = await share_reel_to_groups(reel_url, target_title, watch_url)
 
         history_entry = {
             "title": target_title,
             "video_id": upload_res.get("video_id"),
             "reel_url": upload_res.get("reel_url"),
             "comment_id": upload_res.get("comment_id"),
+            "groups_shared": len([g for g in group_results if g.get("success")]),
             "file_size_mb": round(os.path.getsize(output_path) / (1024 * 1024), 2),
             "created_at": time.strftime("%Y-%m-%d %H:%M:%S")
         }
@@ -363,8 +443,81 @@ async def trigger_auto_trending_reel(custom_title: Optional[str] = None, custom_
         "success": upload_res.get("success", False),
         "title": target_title,
         "reel_url": upload_res.get("reel_url"),
+        "comment_id": upload_res.get("comment_id"),
+        "groups_shared": group_results,
         "error": upload_res.get("error")
     }
+
+async def share_reel_to_groups(reel_url: str, title: str, watch_url: str) -> list:
+    """
+    Shares reel to configured target Facebook groups and posts comment on each group post.
+    """
+    cfg = load_fb_config()
+    groups = cfg.get("target_groups", [])
+    if not groups:
+        return []
+    
+    page_token = cfg.get("page_token", "")
+    user_token = cfg.get("user_token", "")
+    token_to_use = page_token or user_token
+    results = []
+    
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        for grp_id in groups:
+            grp_id = str(grp_id).strip()
+            if not grp_id: continue
+            try:
+                # 1. Post to group feed
+                feed_url = f"https://graph.facebook.com/v19.0/{grp_id}/feed"
+                post_resp = await client.post(feed_url, data={
+                    "message": f"🔥 {title} • New Viral Reel 🍿\n👉 Watch Reel: {reel_url}",
+                    "link": reel_url,
+                    "access_token": token_to_use
+                })
+                post_data = post_resp.json()
+                post_id = post_data.get("id")
+                
+                # 2. Comment in the group post with links
+                comment_id = None
+                if post_id:
+                    c_resp = await client.post(f"https://graph.facebook.com/v19.0/{post_id}/comments", data={
+                        "message": f"🍿 Full Movie Link: 👉 {watch_url}\n📲 Free Official App: https://nxly.online/download",
+                        "access_token": token_to_use
+                    })
+                    comment_id = c_resp.json().get("id")
+                    
+                results.append({"group_id": grp_id, "success": bool(post_id), "post_id": post_id, "comment_id": comment_id, "error": post_data.get("error")})
+            except Exception as ge:
+                results.append({"group_id": grp_id, "success": False, "error": str(ge)})
+    return results
+
+async def cleanup_copyrighted_videos():
+    """
+    Scans recent page videos for any copyright matches or enforcements,
+    and immediately deletes them to protect the Facebook Page from strikes.
+    """
+    try:
+        cfg = load_fb_config()
+        page_id = cfg.get("page_id", DEFAULT_PAGE_ID)
+        page_token = cfg.get("page_token", DEFAULT_PAGE_TOKEN)
+        if not page_token:
+            return
+        
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            url = f"https://graph.facebook.com/v19.0/{page_id}/videos?fields=id,title,status&limit=10&access_token={page_token}"
+            r = await client.get(url)
+            data = r.json()
+            for v in data.get("data", []):
+                vid = v.get("id")
+                st = v.get("status", {})
+                cp = st.get("copyright_check_status", {})
+                pub = st.get("publishing_phase", {})
+                if cp.get("matches_found") is True or pub.get("publish_status") in ("blocked", "rejected"):
+                    print(f"[FacebookBot] Background Guard: Auto-deleting claimed video {vid}...")
+                    del_res = await client.delete(f"https://graph.facebook.com/v19.0/{vid}?access_token={page_token}")
+                    print(f"[FacebookBot] Background Guard delete response for {vid}: {del_res.text}")
+    except Exception as e:
+        print(f"[FacebookBot] Error in background copyright scan: {e}")
 
 # Background auto-pilot scheduler loop
 async def fb_auto_pilot_loop():
@@ -373,6 +526,10 @@ async def fb_auto_pilot_loop():
         try:
             await asyncio.sleep(120) # check every 2 mins
             cfg = load_fb_config()
+            
+            # Periodically scan and clean up any newly claimed videos
+            await cleanup_copyrighted_videos()
+
             if not cfg.get("auto_pilot_enabled", False):
                 continue
 

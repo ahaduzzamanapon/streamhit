@@ -65,14 +65,16 @@ def get_font(size: int, bold: bool = True):
     if not HAS_PIL or ImageFont is None:
         return None
     font_paths = [
+        os.path.join(BASE_DIR, "fonts", "bold.ttf" if bold else "regular.ttf"),
+        "/home/lcsyxfen/nxly.online/fonts/bold.ttf" if bold else "/home/lcsyxfen/nxly.online/fonts/regular.ttf",
+        "/home/lcsyxfen/streamhit.lc-synergy.ltd/fonts/bold.ttf" if bold else "/home/lcsyxfen/streamhit.lc-synergy.ltd/fonts/regular.ttf",
+        "/usr/share/fonts/google-droid/DroidSans-Bold.ttf" if bold else "/usr/share/fonts/google-droid/DroidSans.ttf",
+        "/usr/share/fonts/dejavu/DejaVuSansMono-Bold.ttf" if bold else "/usr/share/fonts/dejavu/DejaVuSansMono.ttf",
         "C:/Windows/Fonts/arialbd.ttf" if bold else "C:/Windows/Fonts/arial.ttf",
         "C:/Windows/Fonts/segoeuib.ttf" if bold else "C:/Windows/Fonts/segoeui.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf" if bold else "/usr/share/fonts/truetype/freefont/FreeSans.ttf"
     ]
     for p in font_paths:
-        if os.path.exists(p):
+        if p and os.path.exists(p):
             try:
                 return ImageFont.truetype(p, size)
             except Exception:
@@ -117,8 +119,9 @@ def generate_overlay_image(
     output_path: str = ""
 ) -> str:
     """
-    Generates a crisp 1080x1920 transparent PNG with sleek glassmorphic
+    Generates a high-impact, crisp 1080x1920 transparent PNG with bold
     top & bottom banners tailored for Reels / TikTok / Shorts.
+    Uses large, readable TrueType fonts with high contrast and zero emoji glitches.
     """
     if not output_path:
         output_path = os.path.join(REELS_DIR, f"overlay_p{part_num}_{int(time.time()*1000)}.png")
@@ -132,58 +135,75 @@ def generate_overlay_image(
     draw = ImageDraw.Draw(img)
 
     clean_title = (title or "FEATURED MOVIE").upper().strip()
-    if len(clean_title) > 38:
-        clean_title = clean_title[:35] + "..."
+    # Strip any emojis/non-ascii to avoid box □ glyph artifacts
+    clean_title = re.sub(r'[^\x00-\x7F]+', '', clean_title).strip()
+    if len(clean_title) > 32:
+        clean_title = clean_title[:29] + "..."
 
     # ── TOP BANNER ──────────────────────────────────────────────────────────
-    # Container box: Y: 100 to 320
-    draw.rounded_rectangle([50, 90, 1030, 310], radius=28, fill=(14, 18, 28, 235), outline=(0, 198, 255, 210), width=4)
+    # Container box: Y: 60 to 360 (Height 300px)
+    draw.rounded_rectangle([40, 60, 1040, 360], radius=32, fill=(10, 14, 24, 245), outline=(0, 210, 255, 240), width=6)
 
-    # Calculate optimal font size for title
-    font_size = 46 if len(clean_title) < 24 else (38 if len(clean_title) < 32 else 32)
+    # Large bold title font (72px down to 48px depending on length)
+    font_size = 72 if len(clean_title) < 20 else (60 if len(clean_title) < 28 else 48)
     font_title = get_font(font_size, bold=True)
     t_box = draw.textbbox((0, 0), clean_title, font=font_title)
     t_width = t_box[2] - t_box[0]
-    draw.text(((1080 - t_width) // 2, 130), clean_title, fill=(255, 255, 255), font=font_title)
+    t_x = (1080 - t_width) // 2
+    # Crisp drop shadow
+    draw.text((t_x + 4, 105 + 4), clean_title, fill=(0, 0, 0, 230), font=font_title)
+    draw.text((t_x, 105), clean_title, fill=(255, 255, 255), font=font_title)
 
-    # Part badge
+    # Part badge (clean text without missing emoji glyphs)
     if top_text_custom:
         part_text = top_text_custom.replace("{title}", clean_title).replace("{part_num}", str(part_num)).replace("{total_parts}", str(total_parts))
+        part_text = re.sub(r'[^\x00-\x7F]+', '', part_text).strip()
     else:
-        part_text = f"🎬 PART {part_num} 🍿" if total_parts <= 1 else f"🎬 PART {part_num} / {total_parts} 🍿"
+        part_text = f"PART {part_num}" if total_parts <= 1 else f"PART {part_num} / {total_parts}"
     
-    font_part = get_font(34, bold=True)
+    font_part = get_font(52, bold=True)
     p_box = draw.textbbox((0, 0), part_text, font=font_part)
     p_width = p_box[2] - p_box[0]
     p_height = p_box[3] - p_box[1]
     
-    badge_x1 = max(70, (1080 - p_width) // 2 - 28)
-    badge_x2 = min(1010, badge_x1 + p_width + 56)
-    draw.rounded_rectangle([badge_x1, 215, badge_x2, 280], radius=18, fill=(255, 42, 84, 245), outline=(255, 100, 120, 200), width=2)
-    draw.text(((1080 - p_width) // 2, 230), part_text, fill=(255, 255, 255), font=font_part)
+    badge_w = max(360, p_width + 80)
+    badge_x1 = max(60, (1080 - badge_w) // 2)
+    badge_x2 = min(1020, badge_x1 + badge_w)
+    badge_y1 = 225
+    badge_y2 = 315
+    draw.rounded_rectangle([badge_x1, badge_y1, badge_x2, badge_y2], radius=24, fill=(255, 38, 78, 255), outline=(255, 130, 155, 240), width=4)
+    
+    p_x = (1080 - p_width) // 2
+    p_y = badge_y1 + (badge_y2 - badge_y1 - p_height) // 2 - 3
+    draw.text((p_x + 2, p_y + 2), part_text, fill=(0, 0, 0, 180), font=font_part)
+    draw.text((p_x, p_y), part_text, fill=(255, 255, 255), font=font_part)
 
     # ── BOTTOM BANNER ───────────────────────────────────────────────────────
-    # Container box: Y: 1610 to 1830
-    draw.rounded_rectangle([50, 1610, 1030, 1830], radius=28, fill=(14, 18, 28, 235), outline=(255, 42, 84, 210), width=4)
+    # Container box: Y: 1560 to 1860 (Height 300px)
+    draw.rounded_rectangle([40, 1560, 1040, 1860], radius=32, fill=(10, 14, 24, 245), outline=(255, 42, 84, 240), width=6)
 
-    # Bottom line 1: Call to Action (Yellow gold / bright)
+    # Line 1: Call to Action (Big Bold Golden Yellow)
     if bottom_text_custom:
         b1_text = bottom_text_custom.replace("{title}", clean_title).replace("{part_num}", str(part_num))
-        b2_text = "📲 Watch Full HD on NXLY Stream App"
+        b1_text = re.sub(r'[^\x00-\x7F]+', '', b1_text).strip()
     else:
-        b1_text = "👇 FULL MOVIE LINK IN 1ST COMMENT 👇"
-        b2_text = "📲 Watch in Full HD on NXLY Stream App"
+        b1_text = "FULL MOVIE LINK IN 1ST COMMENT"
+    b2_text = "Watch Free in 1080p HD on NXLY App"
 
-    font_b1 = get_font(40, bold=True)
+    font_b1 = get_font(54, bold=True)
     b1_box = draw.textbbox((0, 0), b1_text, font=font_b1)
     b1_w = b1_box[2] - b1_box[0]
-    draw.text(((1080 - b1_w) // 2, 1650), b1_text, fill=(255, 225, 40), font=font_b1)
+    b1_x = (1080 - b1_w) // 2
+    draw.text((b1_x + 3, 1615 + 3), b1_text, fill=(0, 0, 0, 220), font=font_b1)
+    draw.text((b1_x, 1615), b1_text, fill=(255, 225, 40), font=font_b1)
 
-    # Bottom line 2: App Branding (Electric Cyan)
-    font_b2 = get_font(34, bold=True)
+    # Line 2: App Branding (Electric Cyan)
+    font_b2 = get_font(42, bold=True)
     b2_box = draw.textbbox((0, 0), b2_text, font=font_b2)
     b2_w = b2_box[2] - b2_box[0]
-    draw.text(((1080 - b2_w) // 2, 1735), b2_text, fill=(0, 240, 255), font=font_b2)
+    b2_x = (1080 - b2_w) // 2
+    draw.text((b2_x + 3, 1725 + 3), b2_text, fill=(0, 0, 0, 220), font=font_b2)
+    draw.text((b2_x, 1725), b2_text, fill=(0, 240, 255), font=font_b2)
 
     if not output_path:
         output_path = os.path.join(REELS_DIR, f"overlay_p{part_num}_{int(time.time()*1000)}.png")
@@ -258,41 +278,51 @@ async def render_single_reel_part(
     applies 9:16 layout with ambient blurred background + crisp center foreground,
     anti-copyright color/speed/audio EQ nudges, and top/bottom overlay banner.
     """
+    clean_url = stream_url.strip()
+    if "source_url=" in clean_url:
+        import urllib.parse
+        clean_url = urllib.parse.unquote(clean_url.split("source_url=")[-1])
+    elif clean_url.startswith("/fetch"):
+        clean_url = "https://nxly.online" + clean_url
+
     if anti_copyright:
-        # Anti-copyright:
-        # 1. Video tempo 1.03x (breaks visual frame hash matching)
-        # 2. Contrast/saturation tweak (+4% contrast, +6% saturation)
-        # 3. Audio tempo 1.03x + subtle EQ cut at 1000Hz (breaks acoustic fingerprint)
         filter_complex = (
-            "[0:v]scale=360:640:force_original_aspect_ratio=increase,crop=360:640,boxblur=8:1,scale=1080:1920,eq=brightness=-0.12:contrast=1.08,setpts=PTS/1.03[bg];"
-            "[0:v]scale=1040:-2:flags=fast_bilinear,eq=contrast=1.04:saturation=1.06,setpts=PTS/1.03[fg];"
+            "[0:v]scale=360:640:force_original_aspect_ratio=increase,crop=360:640,boxblur=10:1,scale=1080:1920,eq=brightness=-0.15:contrast=1.08,setpts=PTS/1.03[bg];"
+            "[0:v]crop=trunc(in_w*0.94/2)*2:trunc(in_h*0.94/2)*2,scale=1080:-2:flags=bicubic,eq=contrast=1.07:brightness=0.01:saturation=1.12,noise=alls=4:allf=t+u,setpts=PTS/1.03[fg];"
             "[bg][fg]overlay=(W-w)/2:(H-h)/2[merged];"
             "[merged][1:v]overlay=0:0[vfinal];"
-            "[0:a]atempo=1.03,equalizer=f=1000:t=q:w=1:g=-1[afinal]"
+            "[0:a]asetrate=44100*1.045,atempo=1.03/1.045,highpass=f=80,lowpass=f=12500,equalizer=f=1000:t=q:w=1.5:g=1.5,aecho=0.8:0.9:25:0.12[afinal]"
         )
         map_args = ["-map", "[vfinal]", "-map", "[afinal]"]
     else:
         filter_complex = (
             "[0:v]scale=360:640:force_original_aspect_ratio=increase,crop=360:640,boxblur=8:1,scale=1080:1920,eq=brightness=-0.10[bg];"
-            "[0:v]scale=1040:-2:flags=fast_bilinear[fg];"
+            "[0:v]scale=1080:-2:flags=bicubic[fg];"
             "[bg][fg]overlay=(W-w)/2:(H-h)/2[merged];"
             "[merged][1:v]overlay=0:0[vfinal]"
         )
         map_args = ["-map", "[vfinal]", "-map", "0:a?"]
 
+    headers_str = "User-Agent: okhttp/4.12.0\r\nReferer: https://123movienow.cc/\r\n"
     cmd = [
         get_ffmpeg_path(), "-y", "-nostdin",
+        "-headers", headers_str,
+        "-reconnect", "1",
+        "-reconnect_streamed", "1",
+        "-reconnect_delay_max", "5",
         "-ss", str(start_seconds),
         "-t", str(duration_seconds),
-        "-i", stream_url,
+        "-i", clean_url,
         "-loop", "1", "-t", str(duration_seconds), "-i", overlay_png_path,
         "-filter_complex", filter_complex,
         *map_args,
         "-c:v", "libx264",
-        "-preset", "ultrafast",
-        "-crf", "23",
+        "-preset", "veryfast",
+        "-crf", "22",
         "-c:a", "aac",
         "-b:a", "128k",
+        "-ac", "2",
+        "-ar", "44100",
         "-t", str(duration_seconds),
         "-movflags", "+faststart",
         output_mp4_path
@@ -308,6 +338,33 @@ async def render_single_reel_part(
     if res.returncode != 0:
         err_msg = res.stderr[-800:] if res.stderr else "Unknown error"
         print(f"[ReelEngine] FFmpeg error: {err_msg}")
+        # Try fallback without audio filter in case audio stream was missing/corrupt
+        if anti_copyright and "afinal" in err_msg:
+            print("[ReelEngine] Retrying with fallback audio filter...")
+            fallback_fc = (
+                "[0:v]scale=360:640:force_original_aspect_ratio=increase,crop=360:640,boxblur=10:1,scale=1080:1920,eq=brightness=-0.15:contrast=1.08[bg];"
+                "[0:v]crop=trunc(in_w*0.94/2)*2:trunc(in_h*0.94/2)*2,scale=1080:-2:flags=bicubic,eq=contrast=1.06:saturation=1.10[fg];"
+                "[bg][fg]overlay=(W-w)/2:(H-h)/2[merged];"
+                "[merged][1:v]overlay=0:0[vfinal]"
+            )
+            fallback_cmd = [
+                get_ffmpeg_path(), "-y", "-nostdin",
+                "-headers", headers_str,
+                "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
+                "-ss", str(start_seconds),
+                "-t", str(duration_seconds),
+                "-i", clean_url,
+                "-loop", "1", "-t", str(duration_seconds), "-i", overlay_png_path,
+                "-filter_complex", fallback_fc,
+                "-map", "[vfinal]", "-map", "0:a?",
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
+                "-c:a", "aac", "-b:a", "128k",
+                "-t", str(duration_seconds), "-movflags", "+faststart",
+                output_mp4_path
+            ]
+            fallback_res = await asyncio.to_thread(lambda: subprocess.run(fallback_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True))
+            if fallback_res.returncode == 0 and os.path.exists(output_mp4_path) and os.path.getsize(output_mp4_path) > 1000:
+                return True
         return False
         
     return os.path.exists(output_mp4_path) and os.path.getsize(output_mp4_path) > 1000
