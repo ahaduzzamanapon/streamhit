@@ -5,23 +5,71 @@ import time
 import uuid
 import asyncio
 import subprocess
+import sys
 from typing import Dict, Any, List, Optional
-from PIL import Image, ImageDraw, ImageFont
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 REELS_DIR = os.path.join(BASE_DIR, "public", "reels")
 HISTORY_FILE = os.path.join(REELS_DIR, "reels_history.json")
 
-os.makedirs(REELS_DIR, exist_ok=True)
+try:
+    os.makedirs(REELS_DIR, exist_ok=True)
+except Exception:
+    pass
 
 # In-memory job tracker
 active_reel_jobs: Dict[str, Dict[str, Any]] = {}
 
+try:
+    from PIL import Image, ImageDraw, ImageFont
+    HAS_PIL = True
+except ImportError:
+    Image = None
+    ImageDraw = None
+    ImageFont = None
+    HAS_PIL = False
+
+def ensure_pil():
+    global Image, ImageDraw, ImageFont, HAS_PIL
+    if HAS_PIL:
+        return True
+    try:
+        subprocess.run([sys.executable, "-m", "pip", "install", "Pillow", "--quiet"], check=True, timeout=60)
+        from PIL import Image as _Img, ImageDraw as _IDraw, ImageFont as _IFont
+        Image = _Img
+        ImageDraw = _IDraw
+        ImageFont = _IFont
+        HAS_PIL = True
+        return True
+    except Exception as e:
+        print(f"[ReelEngine] Notice: Pillow not available ({e})")
+        return False
+
+def _create_fallback_transparent_png(output_path: str):
+    import zlib, struct
+    width, height = 1080, 1920
+    raw_scanline = b'\x00' + (b'\x00\x00\x00\x00' * width)
+    raw_data = raw_scanline * height
+    compressed = zlib.compress(raw_data)
+    
+    png = bytearray(b'\x89PNG\r\n\x1a\n')
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
+    png += struct.pack(">I", 13) + b'IHDR' + ihdr + struct.pack(">I", zlib.crc32(b'IHDR' + ihdr))
+    png += struct.pack(">I", len(compressed)) + b'IDAT' + compressed + struct.pack(">I", zlib.crc32(b'IDAT' + compressed))
+    png += struct.pack(">I", 0) + b'IEND' + struct.pack(">I", zlib.crc32(b'IEND'))
+    
+    with open(output_path, "wb") as f:
+        f.write(png)
+
 def get_font(size: int, bold: bool = True):
+    if not HAS_PIL or ImageFont is None:
+        return None
     font_paths = [
         "C:/Windows/Fonts/arialbd.ttf" if bold else "C:/Windows/Fonts/arial.ttf",
         "C:/Windows/Fonts/segoeuib.ttf" if bold else "C:/Windows/Fonts/segoeui.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf" if bold else "/usr/share/fonts/truetype/freefont/FreeSans.ttf"
     ]
     for p in font_paths:
         if os.path.exists(p):
@@ -29,7 +77,10 @@ def get_font(size: int, bold: bool = True):
                 return ImageFont.truetype(p, size)
             except Exception:
                 pass
-    return ImageFont.load_default()
+    try:
+        return ImageFont.load_default()
+    except Exception:
+        return None
 
 def parse_time_to_seconds(time_val) -> int:
     if isinstance(time_val, (int, float)):
@@ -69,6 +120,14 @@ def generate_overlay_image(
     Generates a crisp 1080x1920 transparent PNG with sleek glassmorphic
     top & bottom banners tailored for Reels / TikTok / Shorts.
     """
+    if not output_path:
+        output_path = os.path.join(REELS_DIR, f"overlay_p{part_num}_{int(time.time()*1000)}.png")
+
+    ensure_pil()
+    if not HAS_PIL or Image is None or ImageDraw is None:
+        _create_fallback_transparent_png(output_path)
+        return output_path
+
     img = Image.new("RGBA", (1080, 1920), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 

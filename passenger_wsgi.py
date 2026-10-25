@@ -4,7 +4,13 @@ import os
 import sys
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
-error_log = os.path.join(base_dir, "scratch/passenger_error.log")
+scratch_dir = os.path.join(base_dir, "scratch")
+try:
+    os.makedirs(scratch_dir, exist_ok=True)
+except Exception:
+    pass
+
+error_log = os.path.join(scratch_dir, "passenger_error.log")
 
 try:
     from a2wsgi import ASGIMiddleware
@@ -39,7 +45,11 @@ try:
         f.write("Passenger WSGI loaded application wrapper successfully!\n")
 except Exception as e:
     import traceback
-    with open(error_log, "a") as f:
-        f.write(f"Passenger WSGI Import/Startup Error: {e}\n")
-        f.write(traceback.format_exc() + "\n")
+    err_txt = f"Passenger WSGI Import/Startup Error: {e}\n{traceback.format_exc()}\n"
+    sys.stderr.write(err_txt)
+    try:
+        with open(error_log, "a") as f:
+            f.write(err_txt)
+    except Exception:
+        pass
     raise

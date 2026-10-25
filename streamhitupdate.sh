@@ -15,6 +15,10 @@ echo "[1/4] Pulling latest code from origin main..."
 git fetch origin
 git reset --hard origin/main
 
+# 1.5 Ensure all Python dependencies are installed
+echo "Checking Python dependencies..."
+"$PYTHON_BIN" -m pip install -r requirements.txt --quiet || true
+
 # 2. Reset error logs & trigger Passenger reload
 echo "[2/4] Resetting error logs & triggering Passenger reload..."
 if [ -f "stderr.log" ]; then

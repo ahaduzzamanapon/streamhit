@@ -727,7 +727,21 @@ async def clear_app_users_admin(request: Request):
     return {"code": 0 if success else 500, "status": "ok" if success else "failed"}
 
 # ── Reels / Shorts Creator Endpoints ──────────────────────────────────────────
-import reel_generator
+reel_generator = None
+try:
+    import reel_generator
+except Exception as _rg_err:
+    print(f"[Admin] Notice: reel_generator lazy load: {_rg_err}")
+
+def _get_reel_generator():
+    global reel_generator
+    if reel_generator is None:
+        try:
+            import reel_generator as rg
+            reel_generator = rg
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Reel engine error: {e}")
+    return reel_generator
 
 @router.get("/api/admin/reels/seasons")
 async def admin_reels_seasons(request: Request, detailPath: str = "", subjectId: str = ""):
@@ -799,7 +813,8 @@ async def admin_reels_start(request: Request, data: dict):
     if part_duration < 10 or part_duration > 600:
         raise HTTPException(status_code=400, detail="Part duration must be between 10s and 600s")
         
-    job_id = reel_generator.start_reel_job(
+    rg = _get_reel_generator()
+    job_id = rg.start_reel_job(
         title=title,
         stream_url=stream_url,
         start_time_str=start_time,
@@ -820,7 +835,8 @@ async def admin_reels_start(request: Request, data: dict):
 @router.get("/api/admin/reels/job-status")
 async def admin_reels_job_status(request: Request, job_id: str):
     check_admin_auth(request)
-    job = reel_generator.active_reel_jobs.get(job_id)
+    rg = _get_reel_generator()
+    job = rg.active_reel_jobs.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found or expired")
     return {
@@ -831,7 +847,8 @@ async def admin_reels_job_status(request: Request, job_id: str):
 @router.get("/api/admin/reels/history")
 async def admin_reels_history(request: Request):
     check_admin_auth(request)
-    history = reel_generator.load_reels_history()
+    rg = _get_reel_generator()
+    history = rg.load_reels_history()
     return {
         "code": 0,
         "list": history
@@ -842,7 +859,8 @@ async def admin_reels_delete(request: Request, filename: str):
     check_admin_auth(request)
     if not filename:
         raise HTTPException(status_code=400, detail="Filename is required")
-    success = reel_generator.delete_reel_file(filename)
+    rg = _get_reel_generator()
+    success = rg.delete_reel_file(filename)
     return {
         "code": 0 if success else 404,
         "status": "deleted" if success else "file not found"
