@@ -45,6 +45,7 @@ jobs:
                   echo "Copying latest files to $appdir..."
                   cp -f ~/streamhit.lc-synergy.ltd/main.py "$appdir/" 2>/dev/null || true
                   cp -f ~/streamhit.lc-synergy.ltd/admin.py "$appdir/" 2>/dev/null || true
+                  cp -f ~/streamhit.lc-synergy.ltd/reel_generator.py "$appdir/" 2>/dev/null || true
                   mkdir -p "$appdir/public"
                   cp -rf ~/streamhit.lc-synergy.ltd/public/* "$appdir/public/" 2>/dev/null || true
                 fi
