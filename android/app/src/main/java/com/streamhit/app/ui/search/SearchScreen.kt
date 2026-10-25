@@ -1,12 +1,17 @@
 package com.streamhit.app.ui.search
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -14,21 +19,26 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.streamhit.app.R
 import com.streamhit.app.data.local.RecentSearchManager
 import com.streamhit.app.data.model.SubjectSummary
 import com.streamhit.app.data.repository.MovieRepository
-import com.streamhit.app.ui.components.AppBrandHeader
+import com.streamhit.app.ui.components.AppShareDialog
 import com.streamhit.app.ui.components.MediaCard
 import com.streamhit.app.ui.theme.*
 import kotlinx.coroutines.delay
@@ -44,6 +54,7 @@ fun SearchScreen(
     var results by remember { mutableStateOf<List<SubjectSummary>>(emptyList()) }
     var recentItems by remember { mutableStateOf<List<SubjectSummary>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
+    var showShareDialog by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
 
     // Load recent clicked search items
@@ -69,61 +80,107 @@ fun SearchScreen(
             .fillMaxSize()
             .background(BgDark)
     ) {
-        AppBrandHeader(
-            tagText = "SEARCH",
-            tagColor = AccentEmerald,
-            showSearchAction = false,
-            showShareAction = true
-        )
-
-        // Search Input Field
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 8.dp)
-                .background(BgCard, RoundedCornerShape(12.dp))
-                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
-                .padding(horizontal = 12.dp)
+        // Compact Cinema Header with Integrated Live Search Input & Share
+        Surface(
+            color = Color(0xFF070B14).copy(alpha = 0.98f),
+            border = BorderStroke(0.8.dp, Color.White.copy(alpha = 0.05f)),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            TextField(
-                value = query,
-                onValueChange = { query = it },
-                placeholder = { Text("Search movies, shows, anime...", color = TextMuted, fontSize = 13.5.sp) },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Search",
-                        tint = AccentEmerald
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Left: Logo
+                Box(
+                    modifier = Modifier
+                        .size(26.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color.White)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.app_logo),
+                        contentDescription = "NXLY",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize()
                     )
-                },
-                trailingIcon = {
-                    if (query.isNotEmpty()) {
-                        IconButton(onClick = { 
-                            query = ""
-                            recentItems = RecentSearchManager.getRecentItems(context)
-                        }) {
-                            Icon(
-                                imageVector = Icons.Default.Clear,
-                                contentDescription = "Clear",
-                                tint = TextMuted
-                            )
+                }
+
+                // Center: Search Input Bar (fills width)
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color.White.copy(alpha = 0.08f),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(34.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = AccentEmerald,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        BasicTextField(
+                            value = query,
+                            onValueChange = { query = it },
+                            singleLine = true,
+                            textStyle = androidx.compose.ui.text.TextStyle(
+                                color = Color.White,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Medium
+                            ),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                            modifier = Modifier.weight(1f),
+                            decorationBox = { innerTextField ->
+                                if (query.isEmpty()) {
+                                    Text("Search movies, shows, anime...", color = TextMuted, fontSize = 12.sp)
+                                }
+                                innerTextField()
+                            }
+                        )
+                        if (query.isNotEmpty()) {
+                            IconButton(
+                                onClick = {
+                                    query = ""
+                                    recentItems = RecentSearchManager.getRecentItems(context)
+                                },
+                                modifier = Modifier.size(18.dp)
+                            ) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear", tint = TextMuted, modifier = Modifier.size(13.dp))
+                            }
                         }
                     }
-                },
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    disabledContainerColor = Color.Transparent,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary
-                ),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
+                }
+
+                // Right: Share Button
+                Surface(
+                    shape = CircleShape,
+                    color = AccentEmerald.copy(alpha = 0.12f),
+                    border = BorderStroke(1.dp, AccentEmerald.copy(alpha = 0.35f)),
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clickable { showShareDialog = true }
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Share",
+                            tint = AccentEmerald,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+            }
         }
 
         // Search Results or Recent Searches
@@ -261,5 +318,9 @@ fun SearchScreen(
                 }
             }
         }
+    }
+
+    if (showShareDialog) {
+        AppShareDialog(onDismiss = { showShareDialog = false })
     }
 }

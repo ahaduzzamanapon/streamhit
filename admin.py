@@ -121,10 +121,14 @@ async def admin_search_subjects(q: str, request: Request):
             for r in rows:
                 items.append({
                     "subjectId": r["subject_id"],
+                    "subject_id": r["subject_id"],
                     "title": r["title"],
                     "coverUrl": r["cover"],
+                    "cover": r["cover"],
                     "detailPath": r["detail_path"],
-                    "subjectType": r["subject_type"]
+                    "detail_path": r["detail_path"],
+                    "subjectType": r["subject_type"],
+                    "subject_type": r["subject_type"]
                 })
             return {"list": items}
 
@@ -865,5 +869,201 @@ async def admin_reels_delete(request: Request, filename: str):
         "code": 0 if success else 404,
         "status": "deleted" if success else "file not found"
     }
+
+# ==========================================================================
+# FIREBASE CLOUD MESSAGING (FCM) PUSH NOTIFICATION SYSTEM
+# ==========================================================================
+_fcm_access_token = None
+_fcm_token_expiry = 0
+
+async def _get_fcm_oauth_token() -> str:
+    global _fcm_access_token, _fcm_token_expiry
+    now = int(time.time())
+    if _fcm_access_token and (now < _fcm_token_expiry - 120):
+        return _fcm_access_token
+
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    sa_path = os.path.join(base_dir, "firebase-service-account.json")
+    env_json = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON")
+    sa = None
+    if env_json:
+        try:
+            sa = json.loads(env_json)
+        except Exception:
+            sa = None
+    if not sa:
+        if os.path.exists(sa_path):
+            with open(sa_path, "r", encoding="utf-8") as f:
+                sa = json.load(f)
+        else:
+            raise HTTPException(status_code=500, detail="firebase-service-account.json not configured on server")
+
+    import jwt
+    payload = {
+        "iss": sa["client_email"],
+        "sub": sa["client_email"],
+        "aud": sa["token_uri"],
+        "iat": now,
+        "exp": now + 3600,
+        "scope": "https://www.googleapis.com/auth/firebase.messaging"
+    }
+    signed_jwt = jwt.encode(payload, sa["private_key"], algorithm="RS256")
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(
+            sa["token_uri"],
+            data={
+                "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+                "assertion": signed_jwt
+            }
+        )
+        if resp.status_code != 200:
+            raise HTTPException(status_code=500, detail=f"Failed to authenticate with Firebase: {resp.text}")
+        token_data = resp.json()
+        _fcm_access_token = token_data.get("access_token")
+        _fcm_token_expiry = now + int(token_data.get("expires_in", 3600))
+        return _fcm_access_token
+
+@router.get("/api/admin/push/stats")
+async def admin_push_stats(request: Request):
+    check_admin_auth(request)
+    from main import get_db_pool
+    pool = await get_db_pool()
+    if not pool:
+        return {"code": 0, "total_devices": 0}
+
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute("SELECT COUNT(*) FROM fcm_tokens")
+            row = await cur.fetchone()
+            total_devices = row[0] if row else 0
+
+    return {
+        "code": 0,
+        "total_devices": total_devices
+    }
+
+@router.post("/api/admin/push/send")
+async def admin_push_send(data: dict, request: Request):
+    check_admin_auth(request)
+    title = str(data.get("title") or "").strip()
+    body = str(data.get("body") or data.get("message") or "").strip()
+    image = str(data.get("image") or data.get("cover") or "").strip()
+    detail_path = str(data.get("detail_path") or data.get("detailPath") or "").strip()
+    subject_id = str(data.get("subject_id") or data.get("subjectId") or "").strip()
+    subject_type = int(data.get("subject_type") or data.get("subjectType") or 1)
+
+    if not title or not body:
+        raise HTTPException(status_code=400, detail="Title and message body are required")
+
+    from main import get_db_pool
+    pool = await get_db_pool()
+    if not pool:
+        raise HTTPException(status_code=500, detail="Database pool not available")
+
+    # 1. Save in database notifications table for the in-app bell
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute("""
+                INSERT INTO notifications (title, message, subject_id)
+                VALUES (%s, %s, %s)
+            """, (title, body, subject_id))
+
+            # 2. Fetch all registered FCM tokens
+            await cur.execute("SELECT token FROM fcm_tokens")
+            rows = await cur.fetchall()
+            tokens = [r[0] for r in rows if r and r[0]]
+
+    if not tokens:
+        return {
+            "code": 0,
+            "success": True,
+            "message": "Notification saved, but no Android devices are currently registered.",
+            "sent_count": 0,
+            "total_devices": 0
+        }
+
+    # 3. Obtain OAuth2 access token for FCM v1 REST API
+    access_token = await _get_fcm_oauth_token()
+    project_id = "nxly-3797c"
+    fcm_endpoint = f"https://fcm.googleapis.com/v1/projects/{project_id}/messages:send"
+
+    deep_link_url = f"https://nxly.online/movie/{detail_path}" if detail_path else ""
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+
+    sent_count = 0
+    failed_tokens = []
+
+    async with httpx.AsyncClient(timeout=12.0) as client:
+        # Send concurrently in chunks of 50
+        chunk_size = 50
+        for i in range(0, len(tokens), chunk_size):
+            chunk = tokens[i:i + chunk_size]
+            tasks = []
+            for t in chunk:
+                msg = {
+                    "message": {
+                        "token": t,
+                        "notification": {
+                            "title": title,
+                            "body": body
+                        },
+                        "data": {
+                            "title": title,
+                            "body": body,
+                            "image": image,
+                            "detail_path": detail_path,
+                            "subject_id": subject_id,
+                            "subject_type": str(subject_type),
+                            "url": deep_link_url
+                        },
+                        "android": {
+                            "priority": "high",
+                            "notification": {
+                                "channel_id": "nxly_notifications",
+                                "sound": "default"
+                            }
+                        }
+                    }
+                }
+                if image:
+                    msg["message"]["notification"]["image"] = image
+                    msg["message"]["android"]["notification"]["image"] = image
+
+                tasks.append(client.post(fcm_endpoint, json=msg, headers=headers))
+
+            responses = await asyncio.gather(*tasks, return_exceptions=True)
+            for t, resp in zip(chunk, responses):
+                if isinstance(resp, httpx.Response):
+                    if resp.status_code == 200:
+                        sent_count += 1
+                    elif resp.status_code in (404, 400):
+                        # Token expired or app uninstalled
+                        failed_tokens.append(t)
+                else:
+                    pass
+
+    # Clean up any stale/unregistered tokens
+    if failed_tokens:
+        try:
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    format_strings = ','.join(['%s'] * len(failed_tokens))
+                    await cur.execute(f"DELETE FROM fcm_tokens WHERE token IN ({format_strings})", tuple(failed_tokens))
+        except Exception:
+            pass
+
+    return {
+        "code": 0,
+        "success": True,
+        "sent_count": sent_count,
+        "total_devices": len(tokens),
+        "message": f"Push notification successfully sent to {sent_count} device(s)!"
+    }
+
 
 

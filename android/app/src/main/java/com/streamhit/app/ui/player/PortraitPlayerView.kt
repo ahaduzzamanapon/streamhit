@@ -822,8 +822,8 @@ fun PortraitMediaDetails(
 
             // Audio Dub Dropdown & Season Dropdown
             val dubs = detail?.dubs ?: emptyList()
-            val seasons = detail?.seasons ?: emptyList()
-            if (dubs.isNotEmpty() || seasons.isNotEmpty()) {
+            val validSeasons = detail?.seasons?.filter { it.episodes.isNotEmpty() } ?: emptyList()
+            if (dubs.isNotEmpty() || validSeasons.isNotEmpty()) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -845,7 +845,7 @@ fun PortraitMediaDetails(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = selectedDub?.name ?: "Original Audio",
+                                        text = selectedDub?.name?.ifBlank { selectedDub?.language } ?: "Original Audio",
                                         color = TextPrimary,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
@@ -862,12 +862,14 @@ fun PortraitMediaDetails(
                                 modifier = Modifier.background(BgCard)
                             ) {
                                 dubs.forEach { dub ->
+                                    val isDubActive = (selectedDub?.subjectId?.isNotBlank() == true && selectedDub?.subjectId == dub.subjectId) ||
+                                                      (selectedDub == dub)
                                     DropdownMenuItem(
                                         text = {
                                             Text(
                                                 text = dub.name.ifBlank { dub.language },
-                                                color = if (selectedDub == dub) AccentEmerald else TextPrimary,
-                                                fontWeight = if (selectedDub == dub) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isDubActive) AccentEmerald else TextPrimary,
+                                                fontWeight = if (isDubActive) FontWeight.Bold else FontWeight.Normal,
                                                 fontSize = 12.sp
                                             )
                                         },
@@ -881,7 +883,7 @@ fun PortraitMediaDetails(
                         }
                     }
 
-                    if (seasons.isNotEmpty()) {
+                    if (validSeasons.isNotEmpty()) {
                         var seasonDropdownOpen by remember { mutableStateOf(false) }
                         Box(modifier = Modifier.weight(1f)) {
                             Surface(
@@ -912,7 +914,7 @@ fun PortraitMediaDetails(
                                 onDismissRequest = { seasonDropdownOpen = false },
                                 modifier = Modifier.background(BgCard)
                             ) {
-                                seasons.forEach { s ->
+                                validSeasons.forEach { s ->
                                     DropdownMenuItem(
                                         text = {
                                             Text(
@@ -924,7 +926,8 @@ fun PortraitMediaDetails(
                                         },
                                         onClick = {
                                             seasonDropdownOpen = false
-                                            onSwitchEpisode(s.seasonNumber, 1)
+                                            val firstEp = s.episodes.firstOrNull()?.episodeNumber ?: 1
+                                            onSwitchEpisode(s.seasonNumber, firstEp)
                                         }
                                     )
                                 }
@@ -936,7 +939,7 @@ fun PortraitMediaDetails(
             }
 
             // Compact Episodes Grid
-            val activeSeason = detail?.seasons?.firstOrNull { it.seasonNumber == currentSeasonNum } ?: detail?.seasons?.firstOrNull()
+            val activeSeason = validSeasons.firstOrNull { it.seasonNumber == currentSeasonNum } ?: validSeasons.firstOrNull()
             val episodes = activeSeason?.episodes ?: emptyList()
 
             if (episodes.isNotEmpty()) {

@@ -224,24 +224,19 @@ fun DetailsScreen(
         return
     }
 
-    Column(modifier = modifier.fillMaxSize().background(BgDark)) {
-        AppBrandHeader(
-            showBackButton = true,
-            onBackClick = onBackClick,
-            showShareAction = true,
-            tagText = if (item.subjectType == 2) "SERIES" else "MOVIE"
-        )
-        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 60.dp)
-            ) {
-            // Backdrop Header
+    val validDetailSeasons = item.seasons?.filter { it.episodes.isNotEmpty() } ?: emptyList()
+
+    Box(modifier = modifier.fillMaxSize().background(BgDark)) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 60.dp)
+        ) {
+            // Edge-to-Edge Backdrop Header (Pure Netflix/Apple TV Cinema Style)
             item {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(300.dp)
+                        .height(340.dp)
                 ) {
                     AsyncImage(
                         model = item.coverUrl,
@@ -483,7 +478,7 @@ fun DetailsScreen(
                                             selectedDub = targetDub
                                             languageDropdownExpanded = false
                                             val dubSid = targetDub.subjectId.ifBlank { subjectId }
-                                            val dubPath = targetDub.detailPath.ifBlank { detailPath }
+                                            val dubPath = targetDub.detailPath.ifBlank { if (dubSid == subjectId) detailPath else "" }
                                             scope.launch {
                                                 isResourcesLoading = true
                                                 try {
@@ -491,20 +486,22 @@ fun DetailsScreen(
                                                     if (newDetail != null) {
                                                         val mergedDubs = if (!newDetail.dubs.isNullOrEmpty()) newDetail.dubs else detail?.dubs
                                                         detail = newDetail.copy(dubs = mergedDubs)
-                                                        val currentSeasons = newDetail.seasons ?: emptyList()
+                                                        val currentSeasons = newDetail.seasons?.filter { it.episodes.isNotEmpty() } ?: emptyList()
                                                         if (currentSeasons.isNotEmpty()) {
                                                             if (selectedSeasonIndex >= currentSeasons.size) {
                                                                 selectedSeasonIndex = 0
                                                             }
-                                                            val curSeason = currentSeasons.getOrNull(selectedSeasonIndex)
-                                                            val maxEp = curSeason?.maxEp ?: curSeason?.episodes?.size ?: 1
-                                                            if (selectedEpisodeNumber > maxEp) {
-                                                                selectedEpisodeNumber = 1
+                                                            val curSeason = currentSeasons.getOrNull(selectedSeasonIndex) ?: currentSeasons.first()
+                                                            if (curSeason.episodes.none { it.episodeNumber == selectedEpisodeNumber }) {
+                                                                selectedEpisodeNumber = curSeason.episodes.firstOrNull()?.episodeNumber ?: 1
                                                             }
                                                         }
                                                     }
                                                 } catch (_: Exception) {}
-                                                val res = repository.getStreamingResources(dubSid, dubPath, selectedSeasonIndex + 1, selectedEpisodeNumber)
+                                                val activeSeason = detail?.seasons?.filter { it.episodes.isNotEmpty() }?.getOrNull(selectedSeasonIndex)
+                                                val curSeasonNum = activeSeason?.seasonNumber ?: (selectedSeasonIndex + 1)
+                                                val targetPath = detail?.detailPath?.ifBlank { dubPath } ?: dubPath
+                                                val res = repository.getStreamingResources(dubSid, targetPath, curSeasonNum, selectedEpisodeNumber)
                                                 resources = res
                                                 isResourcesLoading = false
                                                 Toast.makeText(context, "Switched to ${targetDub.name.ifBlank { targetDub.language }}", Toast.LENGTH_SHORT).show()
@@ -578,7 +575,8 @@ fun DetailsScreen(
                     } else {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             resources.forEachIndexed { index, res ->
-                                val targetSeason = if (item.subjectType == 2) selectedSeasonIndex + 1 else 1
+                                val curS = validDetailSeasons.getOrNull(selectedSeasonIndex) ?: validDetailSeasons.firstOrNull()
+                                val targetSeason = if (item.subjectType == 2) (curS?.seasonNumber ?: (selectedSeasonIndex + 1)) else 1
                                 val targetEpisode = if (item.subjectType == 2) selectedEpisodeNumber else 1
                                 val targetPos = com.streamhit.app.data.local.RecentHistoryManager.getSavedPosition(
                                     context = context,
@@ -655,12 +653,12 @@ fun DetailsScreen(
             }
 
             // TV Series Seasons & Episodes Selector (MovieBox / Screenshot 1 Style)
-            if (item.subjectType == 2 && !item.seasons.isNullOrEmpty()) {
-                val seasons = item.seasons
-                val currentSeason = seasons.getOrNull(selectedSeasonIndex) ?: seasons.first()
-                val episodes = currentSeason.episodes
-
+            if (item.subjectType == 2 && validDetailSeasons.isNotEmpty()) {
                 item {
+                    val seasons = validDetailSeasons
+                    val currentSeason = seasons.getOrNull(selectedSeasonIndex) ?: seasons.first()
+                    val episodes = currentSeason.episodes
+
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -710,12 +708,13 @@ fun DetailsScreen(
                                                 onClick = {
                                                     selectedSeasonIndex = idx
                                                     seasonDropdownExpanded = false
-                                                    selectedEpisodeNumber = 1
+                                                    val firstEp = s.episodes.firstOrNull()?.episodeNumber ?: 1
+                                                    selectedEpisodeNumber = firstEp
                                                     scope.launch {
                                                         isResourcesLoading = true
                                                         val sid = selectedDub?.subjectId?.ifBlank { subjectId } ?: subjectId
-                                                        val path = selectedDub?.detailPath?.ifBlank { detailPath } ?: detailPath
-                                                        resources = repository.getStreamingResources(sid, path, s.seasonNumber, 1)
+                                                        val path = detail?.detailPath?.ifBlank { selectedDub?.detailPath?.ifBlank { detailPath } } ?: detailPath
+                                                        resources = repository.getStreamingResources(sid, path, s.seasonNumber, firstEp)
                                                         isResourcesLoading = false
                                                     }
                                                 }
@@ -912,9 +911,69 @@ fun DetailsScreen(
             }
         }
 
+        // Floating Frosted Glass Action Bar (Cinema Style)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = 14.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = Color.Black.copy(alpha = 0.55f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                modifier = Modifier
+                    .size(36.dp)
+                    .clickable(onClick = onBackClick)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = Color.Black.copy(alpha = 0.50f),
+                border = androidx.compose.foundation.BorderStroke(0.8.dp, Color.White.copy(alpha = 0.15f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text("NXLY", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Black)
+                    Text("STREAM", color = AccentEmerald, fontSize = 12.sp, fontWeight = FontWeight.Black)
+                }
+            }
+
+            Surface(
+                shape = CircleShape,
+                color = Color.Black.copy(alpha = 0.55f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, AccentEmerald.copy(alpha = 0.40f)),
+                modifier = Modifier
+                    .size(36.dp)
+                    .clickable { showAppShareDialog = true }
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = "Share",
+                        tint = AccentEmerald,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
+            }
+        }
+
         if (showAppShareDialog) {
             AppShareDialog(onDismiss = { showAppShareDialog = false })
         }
     }
-}
 }

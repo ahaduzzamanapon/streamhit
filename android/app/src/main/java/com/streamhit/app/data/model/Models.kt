@@ -204,7 +204,18 @@ data class SeasonInfo(
     val episodes: List<EpisodeInfo>
         get() {
             if (!episodesRaw.isNullOrEmpty()) return episodesRaw
-            val count = maxEp.coerceAtLeast(1)
+            if (!allEpRaw.isNullOrBlank()) {
+                val parsed = allEpRaw.split(",")
+                    .mapNotNull { it.trim().toIntOrNull() }
+                    .filter { it > 0 }
+                if (parsed.isNotEmpty()) {
+                    return parsed.map { epNum ->
+                        EpisodeInfo(episodeNumberRaw = epNum, title = "Episode $epNum")
+                    }
+                }
+            }
+            val count = maxEpRaw ?: episodeCountRaw ?: (episodesRaw?.size ?: 0)
+            if (count <= 0) return emptyList()
             return (1..count).map { epNum ->
                 EpisodeInfo(episodeNumberRaw = epNum, title = "Episode $epNum")
             }

@@ -1,9 +1,12 @@
 package com.streamhit.app.ui.livetv
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -23,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -191,60 +195,103 @@ fun LiveTvScreen(
             .fillMaxSize()
             .background(BgDark)
     ) {
-        AppBrandHeader(
-            tagText = "LIVE TV",
-            tagColor = Color(0xFFFF334B),
-            showSearchAction = false,
-            showShareAction = true
-        )
-
-        // Search & Header
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 8.dp)
+        // Compact Cinema Live TV Header
+        Surface(
+            color = Color(0xFF070B14).copy(alpha = 0.98f),
+            border = BorderStroke(0.8.dp, Color.White.copy(alpha = 0.05f)),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Surface(
-                shape = RoundedCornerShape(24.dp),
-                color = Color.White.copy(alpha = 0.08f),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
-                modifier = Modifier.fillMaxWidth()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 14.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                // Left: Logo & Live TV Badge
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Search",
-                        tint = TextMuted,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    androidx.compose.foundation.text.BasicTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        singleLine = true,
-                        textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 13.sp),
-                        modifier = Modifier.weight(1f),
-                        decorationBox = { innerTextField ->
-                            if (searchQuery.isEmpty()) {
-                                Text("Search Live TV channels...", color = TextMuted, fontSize = 13.sp)
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color.White)
+                    ) {
+                        Image(
+                            painter = painterResource(id = com.streamhit.app.R.drawable.app_logo),
+                            contentDescription = "NXLY",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "NXLY",
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.5.sp
+                        )
+                        Text(
+                            text = " LIVE TV",
+                            color = Color(0xFFFF334B),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                }
+
+                // Right: Compact Search Capsule
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color.White.copy(alpha = 0.08f),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
+                    modifier = Modifier.width(160.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = Color(0xFFFF334B),
+                            modifier = Modifier.size(13.dp)
+                        )
+                        androidx.compose.foundation.text.BasicTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            singleLine = true,
+                            textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 11.5.sp),
+                            modifier = Modifier.weight(1f),
+                            decorationBox = { innerTextField ->
+                                if (searchQuery.isEmpty()) {
+                                    Text("Search TV...", color = TextMuted, fontSize = 11.5.sp)
+                                }
+                                innerTextField()
                             }
-                            innerTextField()
-                        }
-                    )
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(20.dp)) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear", tint = TextMuted, modifier = Modifier.size(16.dp))
+                        )
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(16.dp)) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear", tint = TextMuted, modifier = Modifier.size(12.dp))
+                            }
                         }
                     }
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.height(10.dp))
+        // Category Filter Row (Directly below compact header)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 6.dp)
+        ) {
 
             // Category Filter Pills
             LazyRow(
@@ -351,10 +398,21 @@ fun LiveChannelCard(
     channel: LiveTvChannel,
     onClick: () -> Unit
 ) {
+    val infiniteTransition = rememberInfiniteTransition(label = "livePulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 0.85f,
+        targetValue = 1.35f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseScale"
+    )
+
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = BgCard),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+        border = BorderStroke(0.8.dp, Color.White.copy(alpha = 0.08f)),
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
@@ -370,7 +428,7 @@ fun LiveChannelCard(
                 modifier = Modifier
                     .size(54.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Color.Black.copy(alpha = 0.4f)),
+                    .background(Color.Black.copy(alpha = 0.45f)),
                 contentAlignment = Alignment.Center
             ) {
                 if (channel.logo.isNotBlank()) {
@@ -391,13 +449,28 @@ fun LiveChannelCard(
                     )
                 }
 
-                // Live Dot
+                // Pulsating Red Live Dot
                 Box(
                     modifier = Modifier
-                        .size(8.dp)
-                        .background(AccentEmerald, CircleShape)
+                        .padding(3.dp)
                         .align(Alignment.TopEnd)
-                )
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .graphicsLayer {
+                                scaleX = pulseScale
+                                scaleY = pulseScale
+                            }
+                            .background(Color(0xFFFF2A54).copy(alpha = 0.45f), CircleShape)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .align(Alignment.Center)
+                            .background(Color(0xFFFF2A54), CircleShape)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -406,7 +479,7 @@ fun LiveChannelCard(
             Text(
                 text = channel.name,
                 color = Color.White,
-                fontSize = 11.sp,
+                fontSize = 11.5.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -419,22 +492,23 @@ fun LiveChannelCard(
             val serverCount = channel.activeServers.size
             if (serverCount > 1) {
                 Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = AccentEmerald.copy(alpha = 0.15f)
+                    shape = RoundedCornerShape(6.dp),
+                    color = AccentEmerald.copy(alpha = 0.15f),
+                    border = BorderStroke(0.5.dp, AccentEmerald.copy(alpha = 0.40f))
                 ) {
                     Text(
                         text = "$serverCount Servers",
                         color = AccentEmerald,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                     )
                 }
             } else {
                 Text(
                     text = channel.category,
                     color = TextMuted,
-                    fontSize = 9.sp,
+                    fontSize = 9.5.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

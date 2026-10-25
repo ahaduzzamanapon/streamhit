@@ -10,10 +10,9 @@ async def update_version(must_update_flag: int = 0):
             async with pool.acquire() as conn:
                 async with conn.cursor() as cur:
                     await cur.execute("""
-                        INSERT INTO app_versions (id, version_code, version_name, apk_url, must_update, release_notes)
-                        VALUES (1, 20, '1.0.19', 'https://nxly.online/uploads/apks/NXLY-Stream.apk', %s, 'AI Audio Translator: 100% dialogue completion guarantee (no premature dialogue cutoffs), zero-lag lead-time sync, and smart speech queueing.')
+                        INSERT INTO app_versions (version_code, version_name, apk_url, must_update, release_notes)
+                        VALUES (20, '1.0.19', 'https://nxly.online/uploads/apks/NXLY-Stream.apk', %s, 'UI Luxury Upgrade, Dub-specific episodes filter, Deep Linking & Firebase Push Notifications.')
                         ON DUPLICATE KEY UPDATE
-                            version_code = VALUES(version_code),
                             version_name = VALUES(version_name),
                             apk_url = VALUES(apk_url),
                             must_update = VALUES(must_update),

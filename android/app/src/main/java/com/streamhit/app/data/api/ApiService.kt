@@ -62,4 +62,8 @@ interface ApiService {
     // Telemetry & Device Heartbeat
     @POST("api/app/heartbeat")
     suspend fun sendHeartbeat(@Body payload: Map<String, String>): Response<Map<String, Any>>
+
+    // FCM Push Notification Token Registration
+    @POST("api/fcm/register")
+    suspend fun registerFcmToken(@Body payload: Map<String, String>): Response<Map<String, Any>>
 }

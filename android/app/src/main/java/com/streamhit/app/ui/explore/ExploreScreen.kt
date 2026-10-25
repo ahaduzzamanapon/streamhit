@@ -1,5 +1,7 @@
 package com.streamhit.app.ui.explore
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -9,12 +11,15 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -22,22 +27,23 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.streamhit.app.R
 import com.streamhit.app.data.model.SubjectSummary
 import com.streamhit.app.data.repository.MovieRepository
+import com.streamhit.app.ui.components.AppShareDialog
 import com.streamhit.app.ui.components.MediaCard
-import com.streamhit.app.ui.components.AppBrandHeader
-import com.streamhit.app.ui.theme.AccentEmerald
-import com.streamhit.app.ui.theme.AccentCyan
-import com.streamhit.app.ui.theme.BgCard
-import com.streamhit.app.ui.theme.BgDark
-import com.streamhit.app.ui.theme.TextMuted
-import com.streamhit.app.ui.theme.TextPrimary
+import com.streamhit.app.ui.theme.*
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,6 +57,7 @@ fun ExploreScreen(
     var searchQuery by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<SubjectSummary>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
+    var showShareDialog by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
 
     var selectedType by remember { mutableStateOf(initialSubjectType) }
@@ -103,60 +110,126 @@ fun ExploreScreen(
             .fillMaxSize()
             .background(BgDark)
     ) {
-        AppBrandHeader(
-            tagText = "EXPLORE",
-            tagColor = AccentCyan,
-            showSearchAction = false,
-            showShareAction = true
-        )
-
-        // Search Input Bar at top of Explore tab
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp)
-                .background(BgCard, RoundedCornerShape(12.dp))
-                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
-                .padding(horizontal = 8.dp)
+        // Compact Cinema Explore Header (Logo + Brand + Integrated Search + Share)
+        Surface(
+            color = Color(0xFF070B14).copy(alpha = 0.98f),
+            border = BorderStroke(0.8.dp, Color.White.copy(alpha = 0.05f)),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            TextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = { Text("Search in explore...", color = TextMuted, fontSize = 13.sp) },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Search",
-                        tint = AccentEmerald,
-                        modifier = Modifier.size(20.dp)
-                    )
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 14.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Left: Logo & Explore Title
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color.White)
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.app_logo),
+                            contentDescription = "NXLY",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "NXLY",
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.5.sp
+                        )
+                        Text(
+                            text = " EXPLORE",
+                            color = AccentCyan,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                }
+
+                // Right: Compact Search Pill Input & Share
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color.White.copy(alpha = 0.08f),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
+                        modifier = Modifier
+                            .width(135.dp)
+                            .height(30.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Icon(
-                                imageVector = Icons.Default.Clear,
-                                contentDescription = "Clear",
-                                tint = TextMuted,
-                                modifier = Modifier.size(18.dp)
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search",
+                                tint = AccentCyan,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            BasicTextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                singleLine = true,
+                                textStyle = androidx.compose.ui.text.TextStyle(
+                                    color = Color.White,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                                modifier = Modifier.weight(1f),
+                                decorationBox = { innerTextField ->
+                                    if (searchQuery.isEmpty()) {
+                                        Text("Filter...", color = TextMuted, fontSize = 11.sp)
+                                    }
+                                    innerTextField()
+                                }
+                            )
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(16.dp)) {
+                                    Icon(Icons.Default.Clear, contentDescription = "Clear", tint = TextMuted, modifier = Modifier.size(12.dp))
+                                }
+                            }
+                        }
+                    }
+
+                    Surface(
+                        shape = CircleShape,
+                        color = AccentEmerald.copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, AccentEmerald.copy(alpha = 0.35f)),
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clickable { showShareDialog = true }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Share",
+                                tint = AccentEmerald,
+                                modifier = Modifier.size(14.dp)
                             )
                         }
                     }
-                },
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    disabledContainerColor = Color.Transparent,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary
-                ),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
-                modifier = Modifier.fillMaxWidth()
-            )
+                }
+            }
         }
 
         if (searchQuery.isNotBlank()) {
@@ -204,80 +277,81 @@ fun ExploreScreen(
             }
         } else {
             // Normal Explore Mode
-            // Type selector tabs (Movies vs TV Series)
-            Row(
+            // Cinema Segmented Type Switch
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = Color.White.copy(alpha = 0.05f),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp)
-                    .background(BgCard, RoundedCornerShape(10.dp))
-                    .padding(4.dp)
+                    .padding(horizontal = 14.dp, vertical = 6.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(
-                            if (selectedType == 1) AccentEmerald else Color.Transparent,
-                            RoundedCornerShape(8.dp)
-                        )
-                        .clickable { selectedType = 1 }
-                        .padding(vertical = 8.dp),
-                    contentAlignment = Alignment.Center
+                Row(
+                    modifier = Modifier.padding(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text(
-                        text = "Movies",
-                        color = if (selectedType == 1) Color.Black else TextMuted,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
-                    )
-                }
+                    val movieSelected = selectedType == 1
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(9.dp))
+                            .background(
+                                if (movieSelected) Brush.horizontalGradient(listOf(AccentEmerald, AccentCyan)) else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
+                            )
+                            .clickable { selectedType = 1 }
+                            .padding(vertical = 7.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "🎬 Movies",
+                            color = if (movieSelected) Color.Black else TextMuted,
+                            fontWeight = if (movieSelected) FontWeight.Black else FontWeight.SemiBold,
+                            fontSize = 12.5.sp
+                        )
+                    }
 
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(
-                            if (selectedType == 2) AccentEmerald else Color.Transparent,
-                            RoundedCornerShape(8.dp)
+                    val tvSelected = selectedType == 2
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(9.dp))
+                            .background(
+                                if (tvSelected) Brush.horizontalGradient(listOf(AccentEmerald, AccentCyan)) else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
+                            )
+                            .clickable { selectedType = 2 }
+                            .padding(vertical = 7.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "📺 TV Series",
+                            color = if (tvSelected) Color.Black else TextMuted,
+                            fontWeight = if (tvSelected) FontWeight.Black else FontWeight.SemiBold,
+                            fontSize = 12.5.sp
                         )
-                        .clickable { selectedType = 2 }
-                        .padding(vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "TV Series",
-                        color = if (selectedType == 2) Color.Black else TextMuted,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
-                    )
+                    }
                 }
             }
 
             // Horizontal Genre Chips
             LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(vertical = 8.dp)
+                contentPadding = PaddingValues(horizontal = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(vertical = 6.dp)
             ) {
                 items(genres) { genre ->
                     val isSelected = selectedGenre == genre
-                    Box(
-                        modifier = Modifier
-                            .background(
-                                if (isSelected) AccentEmerald.copy(alpha = 0.2f) else BgCard,
-                                RoundedCornerShape(20.dp)
-                            )
-                            .border(
-                                1.dp,
-                                if (isSelected) AccentEmerald else Color.White.copy(alpha = 0.08f),
-                                RoundedCornerShape(20.dp)
-                            )
-                            .clickable { selectedGenre = genre }
-                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = if (isSelected) AccentEmerald.copy(alpha = 0.20f) else Color.White.copy(alpha = 0.04f),
+                        border = BorderStroke(1.dp, if (isSelected) AccentEmerald else Color.White.copy(alpha = 0.09f)),
+                        modifier = Modifier.clickable { selectedGenre = genre }
                     ) {
                         Text(
                             text = genre,
-                            color = if (isSelected) AccentEmerald else TextPrimary,
-                            fontSize = 12.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            color = if (isSelected) AccentEmerald else TextSecondary,
+                            fontSize = 11.5.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp)
                         )
                     }
                 }
@@ -287,6 +361,7 @@ fun ExploreScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .clipToBounds()
                     .nestedScroll(pullRefreshState.nestedScrollConnection)
             ) {
                 if (isLoading) {
@@ -301,7 +376,7 @@ fun ExploreScreen(
                 } else {
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(3),
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 80.dp),
+                        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 90.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                         modifier = Modifier.fillMaxSize()
@@ -318,13 +393,19 @@ fun ExploreScreen(
                     }
                 }
 
-                PullToRefreshContainer(
-                    state = pullRefreshState,
-                    modifier = Modifier.align(Alignment.TopCenter),
-                    containerColor = BgCard,
-                    contentColor = AccentEmerald
-                )
+                if (pullRefreshState.isRefreshing || pullRefreshState.verticalOffset > 0.5f) {
+                    PullToRefreshContainer(
+                        state = pullRefreshState,
+                        modifier = Modifier.align(Alignment.TopCenter),
+                        containerColor = Color(0xFF0F172A),
+                        contentColor = AccentEmerald
+                    )
+                }
             }
         }
+    }
+
+    if (showShareDialog) {
+        AppShareDialog(onDismiss = { showShareDialog = false })
     }
 }

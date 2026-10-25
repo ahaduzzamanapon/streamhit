@@ -1,6 +1,8 @@
 package com.streamhit.app.ui.downloads
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,17 +22,19 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.streamhit.app.R
 import com.streamhit.app.data.local.DownloadItem
 import com.streamhit.app.data.local.DownloadStatus
 import com.streamhit.app.data.local.MediaDownloadManager
 import com.streamhit.app.data.model.SubjectSummary
 import com.streamhit.app.data.repository.MovieRepository
-import com.streamhit.app.ui.components.AppBrandHeader
+import com.streamhit.app.ui.components.AppShareDialog
 import com.streamhit.app.ui.components.MediaCard
 import com.streamhit.app.ui.theme.*
 import kotlinx.coroutines.delay
@@ -48,6 +52,7 @@ fun DownloadsScreen(
     var recommendations by remember { mutableStateOf<List<SubjectSummary>>(emptyList()) }
     var selectedFilterIndex by remember { mutableStateOf(0) }
     var selectedSeriesForDetail by remember { mutableStateOf<String?>(null) }
+    var showShareDialog by remember { mutableStateOf(false) }
 
     // Intercept back button when inside a Series Download Detail view
     BackHandler(enabled = selectedSeriesForDetail != null) {
@@ -254,63 +259,115 @@ fun DownloadsScreen(
                 .fillMaxSize()
                 .background(BgDark)
         ) {
-            AppBrandHeader(
-                tagText = "OFFLINE",
-                tagColor = AccentEmerald,
-                showSearchAction = false,
-                showShareAction = true
-            )
-
-            LazyColumn(
+        // Compact Cinema Downloads Header
+        Surface(
+            color = Color(0xFF070B14).copy(alpha = 0.98f),
+            border = BorderStroke(0.8.dp, Color.White.copy(alpha = 0.05f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(BgDark),
-                contentPadding = PaddingValues(bottom = 90.dp)
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 14.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-            // Top Header
-            item {
+                // Left: Logo & OFFLINE Title
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = "Downloads",
-                        color = Color.White,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    // Transfer Button Pill
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = Color.White.copy(alpha = 0.08f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, AccentCyan.copy(alpha = 0.4f)),
-                        modifier = Modifier.clickable { /* Transfer info / action */ }
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color.White)
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        Image(
+                            painter = painterResource(id = R.drawable.app_logo),
+                            contentDescription = "NXLY",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "NXLY",
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.5.sp
+                        )
+                        Text(
+                            text = " OFFLINE",
+                            color = AccentEmerald,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                }
+
+                // Right: Storage Available Pill & Share
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (availableStorage.isNotBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = Color.White.copy(alpha = 0.08f),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f))
                         ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.SdStorage,
+                                    contentDescription = "Storage",
+                                    tint = AccentEmerald,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Text(
+                                    text = availableStorage,
+                                    color = TextSecondary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+
+                    Surface(
+                        shape = CircleShape,
+                        color = AccentEmerald.copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, AccentEmerald.copy(alpha = 0.35f)),
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clickable { showShareDialog = true }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                imageVector = Icons.Default.Sync,
-                                contentDescription = "Transfer",
-                                tint = AccentCyan,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "Transfer",
-                                color = AccentCyan,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Share",
+                                tint = AccentEmerald,
+                                modifier = Modifier.size(14.dp)
                             )
                         }
                     }
                 }
             }
+        }
+
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(BgDark),
+            contentPadding = PaddingValues(bottom = 90.dp)
+        ) {
 
             // Section: Downloading (Active tasks)
             if (downloadingList.isNotEmpty()) {
@@ -397,16 +454,17 @@ fun DownloadsScreen(
                         filters.forEachIndexed { index, title ->
                             val isSelected = selectedFilterIndex == index
                             Surface(
-                                shape = RoundedCornerShape(16.dp),
-                                color = if (isSelected) Color.White else Color.White.copy(alpha = 0.08f),
+                                shape = RoundedCornerShape(14.dp),
+                                color = if (isSelected) AccentEmerald.copy(alpha = 0.20f) else Color.White.copy(alpha = 0.04f),
+                                border = BorderStroke(1.dp, if (isSelected) AccentEmerald else Color.White.copy(alpha = 0.09f)),
                                 modifier = Modifier.clickable { selectedFilterIndex = index }
                             ) {
                                 Text(
                                     text = title,
-                                    color = if (isSelected) Color.Black else TextSecondary,
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                                    color = if (isSelected) AccentEmerald else TextSecondary,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
                                 )
                             }
                         }
@@ -567,6 +625,10 @@ fun DownloadsScreen(
                 }
             }
         }
+    }
+
+    if (showShareDialog) {
+        AppShareDialog(onDismiss = { showShareDialog = false })
     }
 }
 }

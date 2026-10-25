@@ -2,10 +2,12 @@ package com.streamhit.app.ui.home
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -305,12 +307,107 @@ fun HomeScreen(
             .fillMaxSize()
             .background(BgDark)
     ) {
-        AppBrandHeader(
-            tagText = "FREE HD",
-            tagColor = AccentEmerald,
-            showSearchAction = false,
-            showShareAction = true
-        )
+        // Ultra-compact Luxury Cinema Header (Brand + Search Capsule + Share)
+        Surface(
+            color = Color(0xFF070B14).copy(alpha = 0.98f),
+            border = androidx.compose.foundation.BorderStroke(0.8.dp, Color.White.copy(alpha = 0.05f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 14.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Left: Logo & Gradient Typography
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color.White)
+                    ) {
+                        Image(
+                            painter = painterResource(id = com.streamhit.app.R.drawable.app_logo),
+                            contentDescription = "NXLY",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "NXLY",
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.5.sp
+                        )
+                        Text(
+                            text = " STREAM",
+                            color = AccentEmerald,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                }
+
+                // Right: Integrated Search Capsule & Share
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color.White.copy(alpha = 0.08f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
+                        modifier = Modifier.clickable { onNavigateToSearch() }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search",
+                                tint = AccentCyan,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Text(
+                                text = "Search...",
+                                color = TextMuted,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = CircleShape,
+                        color = AccentEmerald.copy(alpha = 0.12f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AccentEmerald.copy(alpha = 0.35f)),
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clickable { showShareDialog = true }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Share",
+                                tint = AccentEmerald,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
 
         Box(
             modifier = Modifier
@@ -324,102 +421,40 @@ fun HomeScreen(
                     .background(BgDark),
                 contentPadding = PaddingValues(bottom = 90.dp)
             ) {
-        // Top Search Bar Header (MovieBox Pro style)
+        // Category Filter Row (Directly below header - saves massive space)
         item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 6.dp)
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
             ) {
-                // Search Pill Row
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = Color.White.copy(alpha = 0.06f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onNavigateToSearch() }
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                itemsIndexed(categories) { index, cat ->
+                    val isSelected = selectedCategoryIndex == index
+                    val bgColor by animateColorAsState(
+                        targetValue = if (isSelected) AccentEmerald.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.04f),
+                        label = "catBg"
+                    )
+                    val borderColor by animateColorAsState(
+                        targetValue = if (isSelected) AccentEmerald else Color.White.copy(alpha = 0.10f),
+                        label = "catBorder"
+                    )
+                    val textColor by animateColorAsState(
+                        targetValue = if (isSelected) AccentEmerald else TextSecondary,
+                        label = "catText"
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = bgColor,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
+                        modifier = Modifier.clickable { selectedCategoryIndex = index }
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = "Search",
-                                tint = TextMuted,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Search movies, series, anime...",
-                                color = TextMuted,
-                                fontSize = 12.5.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-
-                        // Green Search Action Button
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = AccentEmerald,
-                            modifier = Modifier.clickable { onNavigateToSearch() }
-                        ) {
-                            Text(
-                                text = "Search",
-                                color = Color.Black,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Animated Category Filter Pills
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    contentPadding = PaddingValues(horizontal = 1.dp)
-                ) {
-                    itemsIndexed(categories) { index, cat ->
-                        val isSelected = selectedCategoryIndex == index
-                        val bgColor by animateColorAsState(
-                            targetValue = if (isSelected) AccentEmerald.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.04f),
-                            label = "catBg"
+                        Text(
+                            text = cat,
+                            color = textColor,
+                            fontSize = 11.5.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 4.5.dp)
                         )
-                        val borderColor by animateColorAsState(
-                            targetValue = if (isSelected) AccentEmerald else Color.White.copy(alpha = 0.10f),
-                            label = "catBorder"
-                        )
-                        val textColor by animateColorAsState(
-                            targetValue = if (isSelected) AccentEmerald else TextSecondary,
-                            label = "catText"
-                        )
-
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = bgColor,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
-                            modifier = Modifier.clickable { selectedCategoryIndex = index }
-                        ) {
-                            Text(
-                                text = cat,
-                                color = textColor,
-                                fontSize = 11.5.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                modifier = Modifier.padding(horizontal = 11.dp, vertical = 4.5.dp)
-                            )
-                        }
                     }
                 }
             }
@@ -484,11 +519,20 @@ fun HomeScreen(
             item {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = Color.White.copy(alpha = 0.05f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, AccentEmerald.copy(alpha = 0.25f)),
+                    color = Color(0xFF0F1524),
+                    border = androidx.compose.foundation.BorderStroke(
+                        0.8.dp,
+                        Brush.horizontalGradient(
+                            listOf(
+                                AccentEmerald.copy(alpha = 0.45f),
+                                AccentCyan.copy(alpha = 0.45f),
+                                Color.White.copy(alpha = 0.05f)
+                            )
+                        )
+                    ),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
                         .clickable { showShareDialog = true }
                 ) {
                     Row(
@@ -499,41 +543,49 @@ fun HomeScreen(
                             modifier = Modifier
                                 .size(40.dp)
                                 .clip(CircleShape)
-                                .background(AccentEmerald.copy(alpha = 0.18f)),
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(AccentEmerald.copy(alpha = 0.25f), AccentCyan.copy(alpha = 0.15f))
+                                    )
+                                )
+                                .border(1.dp, AccentEmerald.copy(alpha = 0.35f), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Share,
                                 contentDescription = null,
                                 tint = AccentEmerald,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Enjoying NXLY Stream?",
+                                text = "Invite Friends & Stream Free",
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.5.sp
                             )
                             Text(
-                                text = "Share with friends to stream free movies together! 🍿",
+                                text = "Share NXLY with family & friends! 🍿",
                                 color = TextSecondary,
                                 fontSize = 11.sp
                             )
                         }
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = AccentEmerald,
-                            modifier = Modifier.clickable { showShareDialog = true }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(
+                                    Brush.horizontalGradient(listOf(AccentEmerald, AccentCyan))
+                                )
+                                .clickable { showShareDialog = true }
+                                .padding(horizontal = 14.dp, vertical = 6.dp)
                         ) {
                             Text(
                                 text = "Share",
                                 color = Color.Black,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.5.sp,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                fontWeight = FontWeight.Black,
+                                fontSize = 11.5.sp
                             )
                         }
                     }
@@ -610,10 +662,11 @@ fun ContinueWatchingCard(
 ) {
     Card(
         modifier = Modifier
-            .width(145.dp)
+            .width(150.dp)
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(containerColor = BgCard)
+        shape = RoundedCornerShape(14.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF101422))
     ) {
         Column {
             Box(
@@ -653,16 +706,21 @@ fun ContinueWatchingCard(
                     }
                 }
 
-                // Green Progress Line at bottom of thumbnail
-                LinearProgressIndicator(
-                    progress = { item.progressPercent / 100f },
+                // Gradient Progress Line at bottom of thumbnail
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(3.dp)
-                        .align(Alignment.BottomCenter),
-                    color = AccentEmerald,
-                    trackColor = Color.White.copy(alpha = 0.2f)
-                )
+                        .height(3.5.dp)
+                        .align(Alignment.BottomCenter)
+                        .background(Color.White.copy(alpha = 0.15f))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(fraction = (item.progressPercent / 100f).coerceIn(0f, 1f))
+                            .background(Brush.horizontalGradient(listOf(AccentEmerald, AccentCyan)))
+                    )
+                }
             }
 
             Column(modifier = Modifier.padding(8.dp)) {
@@ -682,7 +740,7 @@ fun ContinueWatchingCard(
                 ) {
                     Text(
                         text = if (item.subjectType == 2) item.episodeBadge.ifBlank { "Series" } else "Movie",
-                        color = AccentEmerald,
+                        color = AccentCyan,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
                     )

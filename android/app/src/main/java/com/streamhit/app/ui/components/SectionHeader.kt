@@ -11,9 +11,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.streamhit.app.ui.theme.AccentCyan
 import com.streamhit.app.ui.theme.AccentEmerald
 import com.streamhit.app.ui.theme.TextMuted
 import com.streamhit.app.ui.theme.TextPrimary
@@ -27,24 +29,28 @@ fun SectionHeader(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 7.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // Glowing pill marker
+            // Glowing cinema pill marker
             Box(
                 modifier = Modifier
-                    .width(4.dp)
+                    .width(3.5.dp)
                     .height(18.dp)
-                    .background(AccentEmerald, RoundedCornerShape(2.dp))
+                    .background(
+                        Brush.verticalGradient(listOf(AccentCyan, AccentEmerald)),
+                        RoundedCornerShape(2.dp)
+                    )
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = title,
                 color = TextPrimary,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold
+                fontSize = 17.5.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.2.sp
             )
         }
 

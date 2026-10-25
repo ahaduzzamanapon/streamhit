@@ -65,10 +65,10 @@ fun MediaCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(2f / 2.85f)
-                .clip(RoundedCornerShape(10.dp))
+                .aspectRatio(2f / 2.9f)
+                .clip(RoundedCornerShape(12.dp))
                 .background(BgCard)
-                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                .border(0.8.dp, Color.White.copy(alpha = 0.09f), RoundedCornerShape(12.dp))
         ) {
             AsyncImage(
                 model = item.coverUrl,
@@ -86,7 +86,7 @@ fun MediaCard(
                             listOf(
                                 Color.Transparent,
                                 Color.Transparent,
-                                Color.Black.copy(alpha = 0.75f)
+                                Color.Black.copy(alpha = 0.80f)
                             )
                         )
                     )
@@ -105,14 +105,17 @@ fun MediaCard(
                     modifier = Modifier
                         .padding(5.dp)
                         .align(Alignment.TopStart)
-                        .background(AccentEmerald.copy(alpha = 0.9f), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                        .background(
+                            Brush.horizontalGradient(listOf(AccentEmerald, AccentCyan)),
+                            RoundedCornerShape(5.dp)
+                        )
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
                         text = lang,
                         color = Color.Black,
                         fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Black
                     )
                 }
             }
@@ -122,9 +125,9 @@ fun MediaCard(
                 modifier = Modifier
                     .padding(5.dp)
                     .align(Alignment.BottomEnd)
-                    .background(Color.Black.copy(alpha = 0.75f), RoundedCornerShape(4.dp))
-                    .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                    .background(Color.Black.copy(alpha = 0.78f), RoundedCornerShape(6.dp))
+                    .border(0.5.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 5.dp, vertical = 2.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
@@ -133,7 +136,7 @@ fun MediaCard(
                         tint = AccentGold,
                         modifier = Modifier.size(10.dp)
                     )
-                    Spacer(modifier = Modifier.width(2.dp))
+                    Spacer(modifier = Modifier.width(3.dp))
                     Text(
                         text = item.imdbRatingValue ?: "7.5",
                         color = Color.White,
@@ -147,17 +150,17 @@ fun MediaCard(
             if (rankNumber != null) {
                 Text(
                     text = "$rankNumber",
-                    color = Color.White.copy(alpha = 0.9f),
-                    fontSize = 36.sp,
+                    color = Color.White.copy(alpha = 0.95f),
+                    fontSize = 38.sp,
                     fontWeight = FontWeight.Black,
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .offset(x = 4.dp, y = 2.dp)
+                        .offset(x = 5.dp, y = 3.dp)
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(5.dp))
 
         // Title
         Text(

@@ -477,9 +477,31 @@ fun AdaptivePlayerScreen(
                     selectedDub = matchedDub ?: d?.dubs?.firstOrNull { it.original == true } ?: d?.dubs?.firstOrNull()
                 }
 
+                // If a specific dub was selected (e.g. Hindi dub) whose subjectId differs from main subject:
+                if (selectedDub != null && selectedDub?.subjectId?.isNotBlank() == true && selectedDub?.subjectId != d?.subjectId) {
+                    val dubSid = selectedDub?.subjectId ?: ""
+                    val dubDPath = selectedDub?.detailPath?.ifBlank { if (dubSid == subjectId) detailPath else "" } ?: ""
+                    try {
+                        val dubDetail = repository.getDetail(dubDPath, dubSid)
+                        if (dubDetail != null) {
+                            val mergedDubs = if (!dubDetail.dubs.isNullOrEmpty()) dubDetail.dubs else d?.dubs
+                            detail = dubDetail.copy(dubs = mergedDubs)
+                            val validSeasons = dubDetail.seasons?.filter { it.episodes.isNotEmpty() } ?: emptyList()
+                            if (validSeasons.isNotEmpty()) {
+                                val curSeason = validSeasons.firstOrNull { it.seasonNumber == currentSeasonNum }
+                                    ?: validSeasons.first()
+                                currentSeasonNum = curSeason.seasonNumber
+                                if (curSeason.episodes.none { it.episodeNumber == currentEpisodeNum }) {
+                                    currentEpisodeNum = curSeason.episodes.firstOrNull()?.episodeNumber ?: 1
+                                }
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+
                 if (resources.isEmpty() || (selectedDub != null && selectedDub?.original != true && selectedDub?.subjectId?.isNotBlank() == true && selectedDub?.subjectId != subjectId)) {
-                    val sId = selectedDub?.subjectId?.ifBlank { d?.subjectId?.ifEmpty { subjectId } } ?: subjectId
-                    val dPath = selectedDub?.detailPath?.ifBlank { d?.detailPath?.ifEmpty { detailPath } } ?: detailPath
+                    val sId = selectedDub?.subjectId?.ifBlank { detail?.subjectId?.ifEmpty { subjectId } } ?: subjectId
+                    val dPath = detail?.detailPath?.ifBlank { selectedDub?.detailPath?.ifBlank { detailPath } } ?: detailPath
                     val dubRes = repository.getStreamingResources(sId, dPath, currentSeasonNum, currentEpisodeNum)
                     if (dubRes.isNotEmpty()) {
                         resources = dubRes
@@ -570,35 +592,35 @@ fun AdaptivePlayerScreen(
         isBuffering = true
         scope.launch {
             val sId = dub.subjectId.ifBlank { detail?.subjectId?.ifEmpty { subjectId } } ?: subjectId
-            val dPath = dub.detailPath.ifBlank { detail?.detailPath?.ifEmpty { detailPath } } ?: detailPath
+            val dPath = dub.detailPath.ifBlank { if (sId == subjectId) detailPath else "" }
             try {
                 val newDetail = repository.getDetail(dPath, sId)
                 if (newDetail != null) {
                     val mergedDubs = if (!newDetail.dubs.isNullOrEmpty()) newDetail.dubs else detail?.dubs
                     detail = newDetail.copy(dubs = mergedDubs)
-                    val currentSeasons = newDetail.seasons ?: emptyList()
-                    if (currentSeasons.isNotEmpty()) {
-                        val curSeason = currentSeasons.firstOrNull { it.seasonNumber == currentSeasonNum }
-                            ?: currentSeasons.firstOrNull()
-                        if (curSeason != null) {
-                            currentSeasonNum = curSeason.seasonNumber
-                            val maxEp = curSeason.maxEp
-                            if (currentEpisodeNum > maxEp && maxEp > 0) {
-                                currentEpisodeNum = 1
-                            }
+                    val validSeasons = newDetail.seasons?.filter { it.episodes.isNotEmpty() } ?: emptyList()
+                    if (validSeasons.isNotEmpty()) {
+                        val curSeason = validSeasons.firstOrNull { it.seasonNumber == currentSeasonNum }
+                            ?: validSeasons.first()
+                        currentSeasonNum = curSeason.seasonNumber
+                        if (curSeason.episodes.none { it.episodeNumber == currentEpisodeNum }) {
+                            currentEpisodeNum = curSeason.episodes.firstOrNull()?.episodeNumber ?: 1
                         }
                     }
                 }
             } catch (_: Exception) {}
 
-            val resList = repository.getStreamingResources(sId, dPath, currentSeasonNum, currentEpisodeNum)
+            val targetPath = detail?.detailPath?.ifBlank { dPath } ?: dPath
+            val resList = repository.getStreamingResources(sId, targetPath, currentSeasonNum, currentEpisodeNum)
             resources = resList
             val best = selectFastestResolution(resList)
             if (best != null && best.url.isNotBlank()) {
+                val baseTitle = detail?.title ?: initialVideoTitle
+                currentVideoTitle = "$baseTitle S${currentSeasonNum}E${currentEpisodeNum}"
                 currentStreamUrl = best.url
                 Toast.makeText(context, "Audio: ${dub.name.ifBlank { dub.language }}", Toast.LENGTH_SHORT).show()
             } else {
-                Toast.makeText(context, "Stream unavailable for this audio track", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Stream unavailable for Episode $currentEpisodeNum in ${dub.name.ifBlank { dub.language }}", Toast.LENGTH_SHORT).show()
                 isBuffering = false
             }
         }
@@ -607,25 +629,30 @@ fun AdaptivePlayerScreen(
     val hasNextEpisode = remember(detail, currentSeasonNum, currentEpisodeNum) {
         if (detail?.subjectType != 2) false
         else {
-            val s = detail?.seasons?.firstOrNull { it.seasonNumber == currentSeasonNum }
-            val maxEp = s?.episodes?.maxOfOrNull { it.episodeNumber } ?: 0
-            if (currentEpisodeNum < maxEp) true
+            val validSeasons = detail?.seasons?.filter { it.episodes.isNotEmpty() } ?: emptyList()
+            val s = validSeasons.firstOrNull { it.seasonNumber == currentSeasonNum }
+            val epList = s?.episodes?.map { it.episodeNumber } ?: emptyList()
+            val curIdx = epList.indexOf(currentEpisodeNum)
+            if (curIdx >= 0 && curIdx + 1 < epList.size) true
             else {
-                val nextS = detail?.seasons?.firstOrNull { it.seasonNumber == currentSeasonNum + 1 }
-                nextS != null && (nextS.episodes?.isNotEmpty() == true)
+                val nextS = validSeasons.firstOrNull { it.seasonNumber > currentSeasonNum }
+                nextS != null && nextS.episodes.isNotEmpty()
             }
         }
     }
 
     fun playNextEpisode() {
-        val s = detail?.seasons?.firstOrNull { it.seasonNumber == currentSeasonNum }
-        val maxEp = s?.episodes?.maxOfOrNull { it.episodeNumber } ?: 0
-        if (currentEpisodeNum < maxEp) {
-            switchEpisode(currentSeasonNum, currentEpisodeNum + 1)
+        val validSeasons = detail?.seasons?.filter { it.episodes.isNotEmpty() } ?: emptyList()
+        val s = validSeasons.firstOrNull { it.seasonNumber == currentSeasonNum }
+        val epList = s?.episodes?.map { it.episodeNumber } ?: emptyList()
+        val curIdx = epList.indexOf(currentEpisodeNum)
+        if (curIdx >= 0 && curIdx + 1 < epList.size) {
+            switchEpisode(currentSeasonNum, epList[curIdx + 1])
         } else {
-            val nextS = detail?.seasons?.firstOrNull { it.seasonNumber == currentSeasonNum + 1 }
-            if (nextS != null && (nextS.episodes?.isNotEmpty() == true)) {
-                switchEpisode(currentSeasonNum + 1, 1)
+            val nextS = validSeasons.firstOrNull { it.seasonNumber > currentSeasonNum }
+            if (nextS != null && nextS.episodes.isNotEmpty()) {
+                val nextEp = nextS.episodes.first().episodeNumber
+                switchEpisode(nextS.seasonNumber, nextEp)
             }
         }
     }

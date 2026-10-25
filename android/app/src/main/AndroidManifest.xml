@@ -5,6 +5,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <queries>
         <intent>
@@ -26,13 +27,45 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:theme="@style/Theme.Streamfit"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Deep link handling: https://nxly.online/movie/*, /series/*, /tv/*, /detail/* -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="nxly.online" android:pathPrefix="/movie/" />
+                <data android:scheme="http" android:host="nxly.online" android:pathPrefix="/movie/" />
+                <data android:scheme="https" android:host="nxly.online" android:pathPrefix="/series/" />
+                <data android:scheme="http" android:host="nxly.online" android:pathPrefix="/series/" />
+                <data android:scheme="https" android:host="nxly.online" android:pathPrefix="/tv/" />
+                <data android:scheme="http" android:host="nxly.online" android:pathPrefix="/tv/" />
+                <data android:scheme="https" android:host="nxly.online" android:pathPrefix="/detail/" />
+                <data android:scheme="http" android:host="nxly.online" android:pathPrefix="/detail/" />
+            </intent-filter>
+
+            <!-- Custom scheme: nxly://movie/*, nxly://series/*, nxly://tv/* -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="nxly" />
+            </intent-filter>
         </activity>
+
+        <service
+            android:name=".service.AppFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
 
         <activity
             android:name=".ui.player.PlayerActivity"

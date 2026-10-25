@@ -70,8 +70,8 @@
 
         /* Container Layout */
         .wrapper {
-            max-width: 1200px;
-            width: 100%;
+            max-width: 1440px;
+            width: 95%;
             margin: 0 auto;
             padding: 24px;
             flex-grow: 1;
@@ -134,8 +134,9 @@
         /* Tabs Interface */
         .tab-buttons {
             display: flex;
-            gap: 12px;
+            gap: 10px;
             margin-bottom: 24px;
+            flex-wrap: wrap;
         }
 
         .tab-btn {
@@ -984,22 +985,27 @@
         <div id="panel-notifications" class="tab-panel">
             <div class="grid-2">
                 <div>
-                    <h2>Send Push Notification Alert</h2>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                        <h2>Send Push Notification Alert</h2>
+                        <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 20px; padding: 4px 12px; font-size: 12px; color: #10B981; font-weight: 600;">
+                            📱 Registered Devices: <span id="fcmDeviceCount">...</span>
+                        </div>
+                    </div>
                     <div class="card">
                         <form id="notificationForm" onsubmit="handleSendNotification(event)">
                             <div class="form-group">
                                 <label for="notiTitle">Notification Title</label>
-                                <input type="text" id="notiTitle" required placeholder="e.g. New Blockbuster Uploaded!">
+                                <input type="text" id="notiTitle" required placeholder="e.g. 🎬 New Release: VisionQuest [Hindi]!">
                             </div>
                             <div class="form-group">
                                 <label for="notiMessage">Message text</label>
-                                <textarea id="notiMessage" required rows="3" placeholder="e.g. Watch Batman vs Superman in HD now on Streamfit!"></textarea>
+                                <textarea id="notiMessage" required rows="3" placeholder="e.g. Watch now in full 1080p HD on NXLY Stream!"></textarea>
                             </div>
                             
                             <!-- Search & Attach Subject for deep link -->
                             <div class="form-group" style="position: relative;">
-                                <label>Deep Link Media (Optional)</label>
-                                <input type="text" id="notiSearchInput" oninput="handleSubjectSearch(this, 'noti')" placeholder="Search movie/TV show to deep link...">
+                                <label>Select Movie or TV Series (For Poster & Deep Link)</label>
+                                <input type="text" id="notiSearchInput" oninput="handleSubjectSearch(this, 'noti')" placeholder="Search movie/TV show to auto-fill & deep link...">
                                 <div id="notiSearchResults" class="search-results"></div>
                             </div>
 
@@ -1012,9 +1018,12 @@
                                 </div>
                                 <span class="remove-attach-btn" onclick="removeAttachedSubject()">&times;</span>
                                 <input type="hidden" id="attachedSubjectId" value="">
+                                <input type="hidden" id="attachedDetailPath" value="">
+                                <input type="hidden" id="attachedSubjectType" value="1">
+                                <input type="hidden" id="attachedCoverUrl" value="">
                             </div>
 
-                            <button type="submit" class="btn" style="width: 100%;">Broadcast Notification</button>
+                            <button type="submit" id="btnSendPush" class="btn" style="width: 100%; margin-top: 14px;">🚀 Broadcast Firebase Notification</button>
                         </form>
                     </div>
                 </div>
@@ -1702,6 +1711,8 @@
                 fetchAppUsers();
             } else if (tab === 'reels') {
                 fetchReelsHistory();
+            } else if (tab === 'notifications') {
+                fetchPushStats();
             }
         }
 
@@ -1799,20 +1810,50 @@
                 document.getElementById('bannerFormArea').style.display = 'block';
             } else {
                 document.getElementById('notiSearchResults').style.display = 'none';
-                document.getElementById('notiSearchInput').value = '';
+                document.getElementById('notiSearchInput').value = item.title;
                 
                 // Show preview
                 document.getElementById('attachedSubjectPreview').style.display = 'flex';
                 document.getElementById('attachedCover').src = item.coverUrl || 'default-cover.png';
                 document.getElementById('attachedTitle').textContent = item.title;
-                document.getElementById('attachedMeta').textContent = `Subject ID: ${item.subjectId} | ${item.subjectType == 2 ? 'TV Show' : 'Movie'}`;
+                document.getElementById('attachedMeta').textContent = `Subject ID: ${item.subjectId} | ${item.subjectType == 2 ? 'TV Series' : 'Movie'} | Path: ${item.detailPath}`;
                 document.getElementById('attachedSubjectId').value = item.subjectId;
+                document.getElementById('attachedDetailPath').value = item.detailPath || '';
+                document.getElementById('attachedSubjectType').value = item.subjectType || 1;
+                document.getElementById('attachedCoverUrl').value = item.coverUrl || '';
+
+                // Auto-fill Title and Message if empty
+                const titleField = document.getElementById('notiTitle');
+                const msgField = document.getElementById('notiMessage');
+                if (!titleField.value) {
+                    titleField.value = `🎬 Now Streaming: ${item.title}`;
+                }
+                if (!msgField.value) {
+                    msgField.value = `Watch ${item.title} now in Full HD with high-speed streaming on NXLY!`;
+                }
             }
         }
 
         function removeAttachedSubject() {
             document.getElementById('attachedSubjectPreview').style.display = 'none';
             document.getElementById('attachedSubjectId').value = '';
+            document.getElementById('attachedDetailPath').value = '';
+            document.getElementById('attachedSubjectType').value = '1';
+            document.getElementById('attachedCoverUrl').value = '';
+            document.getElementById('notiSearchInput').value = '';
+        }
+
+        async function fetchPushStats() {
+            try {
+                const res = await fetch('/api/admin/push/stats', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    const el = document.getElementById('fcmDeviceCount');
+                    if (el) el.textContent = `${data.total_devices || 0} Devices`;
+                }
+            } catch (_) {}
         }
 
         async function saveCustomBanner() {
@@ -1867,30 +1908,50 @@
         // --- NOTIFICATIONS TAB LOGIC ---
         async function handleSendNotification(e) {
             e.preventDefault();
+            const btn = document.getElementById('btnSendPush');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '⏳ Broadcasting to Firebase...';
+
             const title = document.getElementById('notiTitle').value;
             const message = document.getElementById('notiMessage').value;
-            const subjectId = document.getElementById('attachedSubjectId').value || null;
+            const subjectId = document.getElementById('attachedSubjectId').value || '';
+            const detailPath = document.getElementById('attachedDetailPath').value || '';
+            const subjectType = document.getElementById('attachedSubjectType').value || 1;
+            const coverUrl = document.getElementById('attachedCoverUrl').value || '';
 
             try {
-                const res = await fetch('/api/admin/notifications', {
+                const res = await fetch('/api/admin/push/send', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
-                    body: JSON.stringify({ title, message, subjectId })
+                    body: JSON.stringify({
+                        title: title,
+                        body: message,
+                        image: coverUrl,
+                        detail_path: detailPath,
+                        subject_id: subjectId,
+                        subject_type: subjectType
+                    })
                 });
                 
-                if (res.ok) {
-                    showToast('Notification sent successfully!');
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    showToast(data.message || 'Push notification broadcasted!');
                     document.getElementById('notificationForm').reset();
                     removeAttachedSubject();
                     fetchNotificationHistory();
+                    fetchPushStats();
                 } else {
-                    showToast('Failed to send notification.', false);
+                    showToast(data.detail || data.message || 'Failed to send notification.', false);
                 }
-            } catch (_) {
-                showToast('Failed to send notification.', false);
+            } catch (err) {
+                showToast('Failed to send push notification: ' + err.message, false);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
             }
         }
 

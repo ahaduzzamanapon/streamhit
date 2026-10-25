@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "927065447241",
+    "project_id": "nxly-3797c",
+    "storage_bucket": "nxly-3797c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:927065447241:android:537481a6902e7758a6d898",
+        "android_client_info": {
+          "package_name": "com.streamhit.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAXT7lrCo8XPrUCA0CNqNpa3IGEHsHXkcE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

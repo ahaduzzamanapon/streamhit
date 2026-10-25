@@ -39,6 +39,7 @@ GATEWAY_SECRET_ONLINE = "76iRl07s0xSN9jqmEWAt79EBJZulIQIsV64FZr2O"
 DEFAULT_GUEST_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjcwNjU5NDg0MTAyMTM4MTYyMzIsInV0cCI6MSwiZXhwIjoxNzkxNzMyMjMzLCJpYXQiOjE3ODM5NTU5MzN9.7iyEzTj4vWAbOF0oXwNnZ0p3Nc1QaO6K9eMiGFyVfGs"
 
 _slug_to_id = {}
+_id_to_slug = {}
 _banners_cache = None
 _banners_cache_time = 0
 
@@ -1239,6 +1240,35 @@ async def api_ping(request: Request):
     record_active_user(request)
     return {"status": "ok", "t": int(time.time())}
 
+@app.post("/api/fcm/register")
+async def register_fcm_token(request: Request):
+    try:
+        data = await request.json()
+        token = str(data.get("token") or "").strip()
+        device_id = str(data.get("device_id") or "").strip()
+        model = str(data.get("model") or "").strip()
+        os_ver = str(data.get("os") or "").strip()
+
+        if not token:
+            return JSONResponse(status_code=400, content={"code": 400, "message": "Token is required"})
+
+        pool = await get_db_pool()
+        if pool:
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute("""
+                        INSERT INTO fcm_tokens (token, device_id, model, os)
+                        VALUES (%s, %s, %s, %s)
+                        ON DUPLICATE KEY UPDATE
+                            device_id = VALUES(device_id),
+                            model = VALUES(model),
+                            os = VALUES(os),
+                            updated_at = CURRENT_TIMESTAMP
+                    """, (token, device_id, model, os_ver))
+        return {"code": 200, "message": "FCM Token registered successfully"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"code": 500, "message": str(e)})
+
 import admin
 app.include_router(admin.router)
 
@@ -1343,6 +1373,45 @@ async def resolve_subject_id(detail_path: str = "", subject_id: str = "") -> str
     except Exception as e:
         print(f"Error resolving slug '{detail_path}': {e}")
 
+    return ""
+
+async def resolve_detail_path(subject_id: str = "", detail_path: str = "") -> str:
+    if detail_path:
+        return detail_path.strip()
+    if not subject_id:
+        return ""
+    sid = str(subject_id).strip()
+    if sid in _id_to_slug:
+        return _id_to_slug[sid]
+    # Check MySQL subjects table if DB pool ready
+    try:
+        pool = await get_db_pool()
+        if pool:
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute("SELECT detail_path FROM subjects WHERE subject_id = %s LIMIT 1", (sid,))
+                    row = await cur.fetchone()
+                    if row and row[0]:
+                        slug = str(row[0]).strip()
+                        _id_to_slug[sid] = slug
+                        _slug_to_id[slug] = sid
+                        return slug
+    except Exception:
+        pass
+    # Check mobile API
+    try:
+        mob_res = await request_moviebox_mobile("/wefeed-mobile-bff/subject-api/get", params={"subjectId": sid})
+        mob_data = mob_res.get("data") or {}
+        subj = mob_data.get("subject") or mob_data
+        if subj and isinstance(subj, dict):
+            d_url = subj.get("detailUrl")
+            if d_url:
+                slug = d_url.rstrip("/").split("/")[-1]
+                _id_to_slug[sid] = slug
+                _slug_to_id[slug] = sid
+                return slug
+    except Exception:
+        pass
     return ""
 
 def get_brand_config(host: str = "") -> dict:
@@ -2044,15 +2113,23 @@ async def api_detail(detailPath: str = "", subjectId: str = ""):
             data = await _make_request(url)
             if "data" in data and "subject" in data["data"] and data["data"]["subject"]:
                 subj = data["data"]["subject"]
-                if subj.get("subjectType") == 1:
-                    subj["seasons"] = []
-                    subj["seNum"] = 0
+                # If subjectId was explicitly requested and differs from H5 result, it's a dub switch; resolve by subjectId below
+                if subjectId and str(subj.get("subjectId")) != str(subjectId):
+                    pass
                 else:
-                    if "resource" in data["data"]:
-                        subj["seasons"] = data["data"]["resource"].get("seasons", [])
-                        subj["seNum"] = len(subj["seasons"])
-                data["data"] = subj
-                return data
+                    if subj.get("subjectType") == 1:
+                        subj["seasons"] = []
+                        subj["seNum"] = 0
+                    else:
+                        if "resource" in data["data"]:
+                            subj["seasons"] = data["data"]["resource"].get("seasons", [])
+                            subj["seNum"] = len(subj["seasons"])
+                    data["data"] = subj
+                    sid = str(subj.get("subjectId") or "")
+                    if sid:
+                        _slug_to_id[detailPath] = sid
+                        _id_to_slug[sid] = detailPath
+                    return data
         except Exception:
             pass
 
@@ -2069,7 +2146,9 @@ async def api_detail(detailPath: str = "", subjectId: str = ""):
                 if d_url:
                     official_slug = d_url.rstrip("/").split("/")[-1]
                     _slug_to_id[official_slug] = sid
-                    _slug_to_id[detailPath] = sid
+                    _id_to_slug[sid] = official_slug
+                    if detailPath:
+                        _slug_to_id[detailPath] = sid
                     # Try H5 with official slug
                     try:
                         h5_res = await _make_request(f"{API_BASE}/wefeed-h5api-bff/detail?detailPath={official_slug}")
@@ -2088,7 +2167,7 @@ async def api_detail(detailPath: str = "", subjectId: str = ""):
                     except Exception:
                         pass
                 if not subj.get("detailPath"):
-                    subj["detailPath"] = detailPath
+                    subj["detailPath"] = _id_to_slug.get(sid, detailPath)
                 if subj.get("subjectType") == 1:
                     subj["seasons"] = []
                     subj["seNum"] = 0
@@ -2135,13 +2214,16 @@ async def api_season(detailPath: str = "", subjectId: str = ""):
             url = f"{API_BASE}/wefeed-h5api-bff/detail?detailPath={detailPath}"
             data = await _make_request(url)
             subj = data.get("data", {}).get("subject") or {}
-            if subj.get("subjectType") == 1:
-                return {"code": 0, "data": {"seasons": []}}
-            seasons = []
-            if "data" in data and "resource" in data["data"]:
-                seasons = data["data"]["resource"].get("seasons", [])
-                if seasons:
-                    return {"code": 0, "data": {"seasons": seasons}}
+            if subjectId and subj.get("subjectId") and str(subj.get("subjectId")) != str(subjectId):
+                pass
+            else:
+                if subj.get("subjectType") == 1:
+                    return {"code": 0, "data": {"seasons": []}}
+                seasons = []
+                if "data" in data and "resource" in data["data"]:
+                    seasons = data["data"]["resource"].get("seasons", [])
+                    if seasons:
+                        return {"code": 0, "data": {"seasons": seasons}}
         except Exception:
             pass
 
@@ -2240,6 +2322,9 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
             
     if not subjectId:
         return {"code": 0, "data": {"list": []}}
+
+    if not detailPath and subjectId:
+        detailPath = await resolve_detail_path(subjectId, detailPath)
 
     cache_key = f"{subjectId}_{se}_{ep}_{detailPath}"
     now = time.time()

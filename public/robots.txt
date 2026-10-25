@@ -1,22 +1,7 @@
 User-agent: *
-Allow: /$
-Allow: /download
-Allow: /download.html
-Allow: /app
-Allow: /uploads/apks/
-Allow: /style.css
-Allow: /favicon.svg
-Allow: /favicon-nxly.svg
-Allow: /nxly-logo.svg
-Allow: /default-cover.png
+Allow: /
 Disallow: /api/
 Disallow: /admin
-Disallow: /movie/
-Disallow: /movies
-Disallow: /tv/
-Disallow: /tv
-Disallow: /watch/
-Disallow: /details
 Disallow: /fetch
 
 Sitemap: https://nxly.online/sitemap.xml
