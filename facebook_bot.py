@@ -326,75 +326,94 @@ async def trigger_auto_trending_reel(custom_title: Optional[str] = None, custom_
         if not items:
             return {"success": False, "error": "No media subjects available for reels generation"}
 
-        # Select an item that hasn't been posted recently
+        # Select candidates that haven't been posted recently
         history = load_fb_history()
         posted_titles = {h.get("title") for h in history}
         candidates = [it for it in items if it["title"] not in posted_titles]
-        selected_subject = candidates[0] if candidates else items[0]
+        if not candidates:
+            candidates = items
 
-        target_title = selected_subject["title"]
-        subject_id = selected_subject["subject_id"]
-        detail_path = selected_subject["detail_path"]
+    success = False
+    output_path = ""
+    target_title = ""
+    subject_id = ""
 
-        # Resolve streaming resource URL
-        res_data = await main.api_resource(se=1, ep=1, detailPath=detail_path, subjectId=subject_id)
-        res_list = res_data.get("data", {}).get("list", [])
+    # Try candidates until one renders successfully
+    for candidate in candidates[:6]:
+        target_title = candidate["title"]
+        subject_id = candidate.get("subject_id", "")
+        detail_path = candidate.get("detail_path", "")
+
+        try:
+            res_data = await main.api_resource(se=1, ep=1, detailPath=detail_path, subjectId=subject_id)
+            res_list = res_data.get("data", {}).get("list", [])
+        except Exception as re_err:
+            print(f"[FacebookBot] Stream fetch error for {target_title}: {re_err}")
+            continue
+
         if not res_list:
-            return {"success": False, "error": f"No playable streams found for '{target_title}'"}
+            continue
 
-        raw_link = res_list[0].get("url") or res_list[0].get("resourceLink") or ""
-        if "source_url=" in raw_link:
-            import urllib.parse
-            stream_url = urllib.parse.unquote(raw_link.split("source_url=")[-1])
+        stream_candidates = []
+        for r_item in res_list:
+            u = r_item.get("url") or r_item.get("resourceLink") or ""
+            if "source_url=" in u:
+                import urllib.parse
+                u = urllib.parse.unquote(u.split("source_url=")[-1])
+            if u and u not in stream_candidates:
+                stream_candidates.append(u)
+
+        if not stream_candidates:
+            continue
+
+        slug = "".join(c for c in target_title if c.isalnum() or c in (" ", "_")).strip().replace(" ", "_")[:25]
+        timestamp = int(time.time())
+        output_filename = f"fb_reel_{slug}_{timestamp}.mp4"
+        output_path = os.path.join(reel_generator.REELS_DIR, output_filename)
+
+        overlay_filename = f"fb_overlay_{slug}_{timestamp}.png"
+        overlay_path = os.path.join(reel_generator.REELS_DIR, overlay_filename)
+        reel_generator.generate_overlay_image(
+            title=target_title,
+            part_num=1,
+            total_parts=1,
+            top_text_custom="PART 1",
+            bottom_text_custom="FULL MOVIE LINK IN 1ST COMMENT",
+            output_path=overlay_path
+        )
+
+        is_tv = (candidate.get("subject_type") == 2)
+        if is_tv:
+            start_seconds = random.randint(720, 1320)
         else:
-            stream_url = raw_link
+            start_seconds = random.randint(1800, 3000)
+        duration_seconds = 120
+        min_label = f"{start_seconds // 60}:{start_seconds % 60:02d}"
+        print(f"[FacebookBot] Attempting 2-minute (120s) reel for '{target_title}' starting at {min_label} ({start_seconds}s)...")
 
-        if not stream_url:
-            return {"success": False, "error": f"Invalid stream url for '{target_title}'"}
+        for s_url in stream_candidates:
+            print(f"[FacebookBot] Slicing from stream: {s_url[:80]}...")
+            success = await reel_generator.render_single_reel_part(
+                stream_url=s_url,
+                start_seconds=start_seconds,
+                duration_seconds=duration_seconds,
+                overlay_png_path=overlay_path,
+                output_mp4_path=output_path,
+                anti_copyright=True
+            )
+            if success and os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+                print(f"[FacebookBot] Successfully rendered 2m reel with stream: {s_url[:60]}")
+                break
 
-    # Generate 60s Reel Video
-    slug = "".join(c for c in target_title if c.isalnum() or c in (" ", "_")).strip().replace(" ", "_")[:25]
-    timestamp = int(time.time())
-    output_filename = f"fb_reel_{slug}_{timestamp}.mp4"
-    output_path = os.path.join(reel_generator.REELS_DIR, output_filename)
+        if os.path.exists(overlay_path):
+            try: os.remove(overlay_path)
+            except Exception: pass
 
-    # Create viral overlay banner
-    overlay_filename = f"fb_overlay_{slug}_{timestamp}.png"
-    overlay_path = os.path.join(reel_generator.REELS_DIR, overlay_filename)
-    reel_generator.generate_overlay_image(
-        title=target_title,
-        part_num=1,
-        total_parts=1,
-        top_text_custom="PART 1",
-        bottom_text_custom="FULL MOVIE LINK IN 1ST COMMENT",
-        output_path=overlay_path
-    )
-
-    # Cut 2 minutes (120 seconds) from the exciting MIDDLE of the film (30-50m for movies, 12-22m for series)
-    is_tv = (selected_subject.get("subject_type") == 2) if selected_subject else False
-    if is_tv:
-        start_seconds = random.randint(720, 1320)
-    else:
-        start_seconds = random.randint(1800, 3000)
-    duration_seconds = 120
-    min_label = f"{start_seconds // 60}:{start_seconds % 60:02d}"
-    print(f"[FacebookBot] Rendering 2-minute (120s) clip from the MIDDLE of '{target_title}' starting at {min_label} ({start_seconds}s)...")
-
-    success = await reel_generator.render_single_reel_part(
-        stream_url=stream_url,
-        start_seconds=start_seconds,
-        duration_seconds=duration_seconds,
-        overlay_png_path=overlay_path,
-        output_mp4_path=output_path,
-        anti_copyright=True
-    )
-
-    if os.path.exists(overlay_path):
-        try: os.remove(overlay_path)
-        except Exception: pass
+        if success:
+            break
 
     if not success or not os.path.exists(output_path):
-        return {"success": False, "error": "FFmpeg Reel generation failed"}
+        return {"success": False, "error": "FFmpeg Reel generation failed for all candidates"}
 
     # Prepare Caption: NO external links in post caption (keeps FB reach high)
     caption = (
