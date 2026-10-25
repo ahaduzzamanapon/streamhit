@@ -4309,4 +4309,13 @@ setTimeout(() => {
     } catch (_) {}
 }, 30000);
 
+// Load Global App Update Notice Modal
+(function() {
+    if (window.location.pathname.startsWith("/admin")) return;
+    const s = document.createElement("script");
+    s.src = "/app-update-notice.js?v=1.0";
+    s.async = true;
+    document.head.appendChild(s);
+})();
+
 

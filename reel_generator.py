@@ -225,6 +225,26 @@ def save_reels_history(history: List[Dict[str, Any]]):
     except Exception as e:
         print(f"Error saving reels history: {e}")
 
+def get_ffmpeg_path() -> str:
+    try:
+        import imageio_ffmpeg
+        p = imageio_ffmpeg.get_ffmpeg_exe()
+        if p and os.path.exists(p):
+            return p
+    except Exception:
+        pass
+    home = os.path.expanduser("~")
+    for candidate in [
+        os.path.join(home, "bin", "ffmpeg"),
+        os.path.join(home, ".local", "bin", "ffmpeg"),
+        "/usr/local/bin/ffmpeg",
+        "/usr/bin/ffmpeg",
+        "ffmpeg"
+    ]:
+        if os.path.exists(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    return "ffmpeg"
+
 async def render_single_reel_part(
     stream_url: str,
     start_seconds: int,
@@ -261,7 +281,7 @@ async def render_single_reel_part(
         map_args = ["-map", "[vfinal]", "-map", "0:a?"]
 
     cmd = [
-        "ffmpeg", "-y", "-nostdin",
+        get_ffmpeg_path(), "-y", "-nostdin",
         "-ss", str(start_seconds),
         "-t", str(duration_seconds),
         "-i", stream_url,
