@@ -866,6 +866,11 @@ async def run_sitemap_generator_background():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     asyncio.create_task(run_sitemap_generator_background())
+    try:
+        import facebook_bot
+        asyncio.create_task(facebook_bot.fb_auto_pilot_loop())
+    except Exception as fe:
+        print(f"[FacebookBot] Daemon initialization notice: {fe}")
     yield
     await http_client.aclose()
     global db_pool

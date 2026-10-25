@@ -30,3 +30,6 @@ android/build/
 android/app/build/
 android/local.properties
 firebase-service-account.json
+facebook_config.json
+scratch/
+remote_fix.py

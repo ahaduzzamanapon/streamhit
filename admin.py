@@ -1066,5 +1066,97 @@ async def admin_push_send(data: dict, request: Request):
         "message": f"Push notification successfully sent to {sent_count} device(s)!"
     }
 
+# ==========================================================================
+# FACEBOOK REELS & AUTO-PILOT AUTOMATION ENDPOINTS
+# ==========================================================================
+@router.get("/api/admin/facebook/config")
+async def admin_facebook_get_config(request: Request):
+    check_admin_auth(request)
+    import facebook_bot
+    cfg = facebook_bot.load_fb_config()
+    raw_token = cfg.get("page_token", "")
+    masked_token = (raw_token[:8] + "..." + raw_token[-8:]) if len(raw_token) > 16 else raw_token
+    conn_info = await facebook_bot.verify_facebook_connection(cfg.get("page_id", ""), raw_token)
+    return {
+        "code": 0,
+        "config": {
+            "page_id": cfg.get("page_id", ""),
+            "page_name": conn_info.get("name") or cfg.get("page_name", "NXLY"),
+            "masked_token": masked_token,
+            "auto_pilot_enabled": cfg.get("auto_pilot_enabled", True),
+            "post_interval_hours": cfg.get("post_interval_hours", 6),
+            "last_post_time": cfg.get("last_post_time", 0),
+            "auto_comment_template": cfg.get("auto_comment_template", "")
+        },
+        "connection": conn_info
+    }
+
+@router.post("/api/admin/facebook/config")
+async def admin_facebook_save_config(data: dict, request: Request):
+    check_admin_auth(request)
+    import facebook_bot
+    cfg = facebook_bot.load_fb_config()
+    if "page_id" in data and data["page_id"]:
+        cfg["page_id"] = str(data["page_id"]).strip()
+    if "page_token" in data and data["page_token"] and "..." not in data["page_token"]:
+        cfg["page_token"] = str(data["page_token"]).strip()
+    if "auto_pilot_enabled" in data:
+        cfg["auto_pilot_enabled"] = bool(data["auto_pilot_enabled"])
+    if "post_interval_hours" in data:
+        cfg["post_interval_hours"] = max(1, int(data["post_interval_hours"]))
+    if "auto_comment_template" in data:
+        cfg["auto_comment_template"] = str(data["auto_comment_template"])
+
+    facebook_bot.save_fb_config(cfg)
+    return {"code": 0, "message": "Facebook configuration saved successfully!"}
+
+@router.post("/api/admin/facebook/trigger")
+async def admin_facebook_trigger(request: Request):
+    check_admin_auth(request)
+    import facebook_bot
+    res = await facebook_bot.trigger_auto_trending_reel()
+    if not res.get("success"):
+        raise HTTPException(status_code=500, detail=res.get("error", "Reel creation or upload failed"))
+    return {
+        "code": 0,
+        "success": True,
+        "message": f"Successfully created and posted Reel for '{res.get('title')}' on Facebook!",
+        "reel_url": res.get("reel_url")
+    }
+
+@router.get("/api/admin/facebook/history")
+async def admin_facebook_history(request: Request):
+    check_admin_auth(request)
+    import facebook_bot
+    history = facebook_bot.load_fb_history()
+    return {"code": 0, "history": history}
+
+@router.post("/api/admin/facebook/publish-reel")
+async def admin_facebook_publish_reel(data: dict, request: Request):
+    check_admin_auth(request)
+    import facebook_bot
+    filename = data.get("filename")
+    if not filename:
+        raise HTTPException(status_code=400, detail="Missing reel filename")
+    caption = data.get("caption", "")
+    title = data.get("title", "")
+    subject_id = data.get("subject_id", "")
+    res = await facebook_bot.publish_existing_reel(
+        filename=filename,
+        caption=caption,
+        title=title,
+        subject_id=subject_id
+    )
+    if not res.get("success"):
+        raise HTTPException(status_code=500, detail=res.get("error", "Failed to publish reel to Facebook"))
+    return {
+        "code": 0,
+        "success": True,
+        "message": "Reel successfully published to Facebook Page NXLY!",
+        "reel_url": res.get("reel_url"),
+        "video_id": res.get("video_id")
+    }
+
+
 
 

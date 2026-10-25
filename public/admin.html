@@ -1060,6 +1060,7 @@
             <button onclick="switchTab('tv')" id="btn-tv" class="tab-btn"><span>📺</span> Live TV Channels</button>
             <button onclick="switchTab('app-users')" id="btn-app-users" class="tab-btn"><span>👥</span> Users & Installs</button>
             <button onclick="switchTab('reels')" id="btn-reels" class="tab-btn tab-btn-reels"><span>🎬</span> Create Reels</button>
+            <button onclick="switchTab('facebook')" id="btn-facebook" class="tab-btn" style="border-color: rgba(24, 119, 242, 0.4);"><span style="color: #1877F2; font-weight: 800;">f</span> Facebook Bot</button>
         </div>
 
         <!-- ── Live Active Users Bar ── -->
@@ -1569,7 +1570,11 @@
                         Convert movies and TV episodes into viral 9:16 vertical reels with automated 1-minute sequential part slicing, anti-copyright evasion & social post captions.
                     </p>
                 </div>
-                <div style="display: flex; gap: 10px;">
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(24, 119, 242, 0.12); border: 1px solid rgba(24, 119, 242, 0.3); border-radius: 8px; padding: 6px 12px; font-size: 13px; color: #60a5fa;">
+                        <span style="background: #1877F2; color: #fff; border-radius: 50%; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900;">f</span>
+                        Page: <strong>NXLY</strong> (Auto-Pilot Ready)
+                    </div>
                     <button type="button" onclick="fetchReelsHistory()" class="btn-preset" style="padding: 8px 16px; border-color: rgba(0,240,255,0.3); color: #00F0FF;">
                         🔄 Refresh History
                     </button>
@@ -1768,6 +1773,81 @@
                 </div>
             </div>
         </div>
+
+        <!-- ── Facebook Auto-Pilot Panel ── -->
+        <div id="panel-facebook" class="tab-panel">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+                <div>
+                    <h2 style="margin-bottom: 6px;"><span style="color:#1877F2;">f</span> Facebook Auto-Pilot Bot</h2>
+                    <p style="color: var(--text-muted); font-size: 14px;">
+                        Automatically cuts viral anti-copyright 60s reels from trending movies & series and publishes them directly to your Facebook Page with first comment link back to NXLY.
+                    </p>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" onclick="triggerInstantFacebookPost()" id="btnInstantFbTrigger" class="btn-preset" style="padding: 10px 20px; background: #1877F2; color: #fff; border-color: #1877F2; font-weight: 700; box-shadow: 0 4px 15px rgba(24,119,242,0.4);">
+                        🚀 Post Trending Reel Now
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <!-- Left: Connection & Settings -->
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <div class="card">
+                        <h3 style="font-size: 16px; margin-bottom: 16px; color: #fff; display: flex; align-items: center; gap: 8px;">
+                            <span style="color: #1877F2; font-size: 20px; font-weight: 900;">f</span> Connected Facebook Page
+                        </h3>
+                        <div id="fbPageStatusBox" style="background: rgba(24, 119, 242, 0.08); border: 1px solid rgba(24, 119, 242, 0.25); border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 16px;">
+                            <div style="width: 50px; height: 50px; border-radius: 50%; background: #1877F2; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 900;">
+                                f
+                            </div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: 700; font-size: 17px; color: #fff;" id="fbPageName">NXLY</div>
+                                <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;">Page ID: <span id="fbPageId" style="font-family: monospace; color: #60a5fa;">1367186939808744</span></div>
+                                <div style="font-size: 12px; color: #22c55e; margin-top: 4px; display: flex; align-items: center; gap: 5px;">
+                                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #22c55e;"></span>
+                                    Reels Publishing Permission Active
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3 style="font-size: 16px; margin-bottom: 16px; color: #fff;">⚙️ Auto-Pilot Schedule Settings</h3>
+                        <div class="form-group">
+                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                <input type="checkbox" id="fbAutoPilotToggle" style="width: 18px; height: 18px; accent-color: #1877F2;">
+                                <span style="font-weight: 600; font-size: 14px; color: #fff;">Enable Automatic Reels Publishing</span>
+                            </label>
+                            <p style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">When enabled, server will automatically pick top trending cinema and post every interval.</p>
+                        </div>
+                        <div class="form-group">
+                            <label>Post Interval (Hours)</label>
+                            <input type="number" id="fbPostInterval" min="1" max="48" value="6" style="width: 120px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Auto-Comment Template (First Comment on Reel)</label>
+                            <textarea id="fbCommentTemplate" rows="4" style="font-family: monospace; font-size: 13px;"></textarea>
+                            <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Available tags: <code>{movie_url}</code>, <code>{title}</code></p>
+                        </div>
+                        <button type="button" onclick="saveFacebookConfig()" class="btn-preset" style="background: var(--gradient); color: #fff; padding: 10px 24px; font-weight: 700;">
+                            💾 Save Settings
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Right: Recent Posts History -->
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h3 style="font-size: 16px; color: #fff; margin-bottom: 0;">📋 Published Facebook Reels</h3>
+                        <button type="button" onclick="fetchFacebookHistory()" class="btn-preset" style="padding: 4px 10px; font-size: 12px;">🔄 Refresh</button>
+                    </div>
+                    <div id="fbPostsList" style="display: flex; flex-direction: column; gap: 12px; max-height: 550px; overflow-y: auto;">
+                        <div style="text-align: center; padding: 30px; color: var(--text-muted);">No reels posted to Facebook yet.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Toast Notification element -->
@@ -1871,6 +1951,7 @@
             fetchLiveTvChannels();
             fetchAppUsers();
             fetchReelsHistory();
+            fetchFacebookConfig();
             populateSportStreamLinks([]);
             populateTvStreamLinks([]);
             startLiveUsersPoll();
@@ -1893,6 +1974,9 @@
                 fetchReelsHistory();
             } else if (tab === 'notifications') {
                 fetchPushStats();
+            } else if (tab === 'facebook') {
+                fetchFacebookConfig();
+                fetchFacebookHistory();
             }
         }
 
@@ -3372,6 +3456,9 @@
                         <a href="${reel.video_url}" download="${reel.filename}" class="btn-preset" style="color: #22c55e; border-color: rgba(34, 197, 94, 0.3);">
                             ⬇️ Download MP4
                         </a>
+                        <button type="button" class="btn-preset" style="color: #fff; background: #1877F2; border-color: #1877F2; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;" onclick="publishReelToFacebook('${reel.filename}', '${encodeURIComponent(reel.title_suggestion || reel.title || '')}', '${encodeURIComponent(reel.caption || '')}', this)">
+                            <span style="font-weight: 900; font-family: sans-serif;">f</span> Post on Facebook
+                        </button>
                         <button type="button" class="btn-preset btn-preset-danger" onclick="deleteReelItem('${reel.filename}', this)">
                             🗑️ Delete
                         </button>
@@ -3434,6 +3521,48 @@
             }
         }
 
+        async function publishReelToFacebook(filename, encodedTitle, encodedCaption, btnElement) {
+            const title = decodeURIComponent(encodedTitle);
+            const caption = decodeURIComponent(encodedCaption);
+
+            const origHtml = btnElement.innerHTML;
+            btnElement.disabled = true;
+            btnElement.innerHTML = '⏳ Uploading to FB...';
+            btnElement.style.opacity = '0.7';
+
+            try {
+                const res = await fetch('/api/admin/facebook/publish-reel', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        filename: filename,
+                        title: title,
+                        caption: caption
+                    })
+                });
+
+                const data = await res.json();
+                if (res.status !== 200 || data.code !== 0) {
+                    throw new Error(data.detail || data.message || 'Facebook upload failed');
+                }
+
+                showToast('🎉 Reel successfully posted to Facebook Page (NXLY)!');
+                btnElement.innerHTML = `✓ Live on FB! <a href="${data.reel_url}" target="_blank" style="color:#fff; text-decoration:underline; font-weight:700; margin-left:4px;">View ↗</a>`;
+                btnElement.style.background = '#22c55e';
+                btnElement.style.borderColor = '#22c55e';
+                btnElement.style.opacity = '1';
+                btnElement.disabled = false;
+            } catch (e) {
+                showToast(e.message, false);
+                btnElement.disabled = false;
+                btnElement.innerHTML = origHtml;
+                btnElement.style.opacity = '1';
+            }
+        }
+
         function copyReelText(encodedText, btnElement, successMsg = 'Copied! ✓') {
             const decoded = decodeURIComponent(encodedText);
             navigator.clipboard.writeText(decoded).then(() => {
@@ -3452,6 +3581,133 @@
             }).catch(() => {
                 showToast('Could not copy to clipboard', false);
             });
+        }
+
+        // ── FACEBOOK AUTO-PILOT LOGIC ──
+        async function fetchFacebookConfig() {
+            try {
+                const res = await fetch('/api/admin/facebook/config', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (data.code === 0 && data.config) {
+                    const cfg = data.config;
+                    const nameEl = document.getElementById('fbPageName');
+                    if (nameEl) nameEl.innerText = cfg.page_name || 'NXLY';
+                    const idEl = document.getElementById('fbPageId');
+                    if (idEl) idEl.innerText = cfg.page_id || '1367186939808744';
+                    const toggleEl = document.getElementById('fbAutoPilotToggle');
+                    if (toggleEl) toggleEl.checked = !!cfg.auto_pilot_enabled;
+                    const intervalEl = document.getElementById('fbPostInterval');
+                    if (intervalEl) intervalEl.value = cfg.post_interval_hours || 6;
+                    const commentEl = document.getElementById('fbCommentTemplate');
+                    if (commentEl) commentEl.value = cfg.auto_comment_template || '';
+                }
+            } catch (e) {
+                console.error("Error loading facebook config:", e);
+            }
+        }
+
+        async function saveFacebookConfig() {
+            const enabled = document.getElementById('fbAutoPilotToggle').checked;
+            const interval = parseInt(document.getElementById('fbPostInterval').value || 6);
+            const template = document.getElementById('fbCommentTemplate').value;
+
+            try {
+                const res = await fetch('/api/admin/facebook/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        auto_pilot_enabled: enabled,
+                        post_interval_hours: interval,
+                        auto_comment_template: template
+                    })
+                });
+                const data = await res.json();
+                if (data.code === 0) {
+                    showToast('✓ Facebook configuration saved successfully!');
+                } else {
+                    showToast(data.message || 'Save failed', false);
+                }
+            } catch (e) {
+                showToast('Error saving settings', false);
+            }
+        }
+
+        async function triggerInstantFacebookPost() {
+            const btn = document.getElementById('btnInstantFbTrigger');
+            const orig = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Slicing Trending Reel & Publishing to FB...';
+
+            try {
+                const res = await fetch('/api/admin/facebook/trigger', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                const data = await res.json();
+                if (res.status !== 200 || data.code !== 0) {
+                    throw new Error(data.detail || data.message || 'Trigger failed');
+                }
+
+                showToast('🎉 Trending Reel created & posted on Facebook!');
+                btn.innerHTML = `✓ Reel Live! <a href="${data.reel_url}" target="_blank" style="color:#fff; text-decoration:underline; margin-left:6px;">View on FB ↗</a>`;
+                fetchFacebookHistory();
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = orig;
+                }, 8000);
+            } catch (e) {
+                showToast(e.message, false);
+                btn.disabled = false;
+                btn.innerHTML = orig;
+            }
+        }
+
+        async function fetchFacebookHistory() {
+            const listEl = document.getElementById('fbPostsList');
+            if (!listEl) return;
+
+            try {
+                const res = await fetch('/api/admin/facebook/history', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                const history = data.history || [];
+                listEl.innerHTML = '';
+
+                if (history.length === 0) {
+                    listEl.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--text-muted); font-size: 13px;">No reels posted to Facebook yet.</div>';
+                    return;
+                }
+
+                history.forEach(item => {
+                    const dateStr = item.timestamp ? new Date(item.timestamp * 1000).toLocaleString() : 'Just now';
+                    const div = document.createElement('div');
+                    div.style = 'background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px;';
+                    div.innerHTML = `
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="font-weight: 700; font-size: 14px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                🎬 ${item.title || 'Trending Reel'}
+                            </div>
+                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">
+                                📅 ${dateStr} • ID: <span style="font-family: monospace;">${item.video_id || 'N/A'}</span>
+                            </div>
+                        </div>
+                        <a href="${item.reel_url || '#'}" target="_blank" class="btn-preset" style="padding: 6px 12px; font-size: 12px; color: #1877F2; border-color: rgba(24,119,242,0.4); text-decoration: none; white-space: nowrap;">
+                            View on FB ↗
+                        </a>
+                    `;
+                    listEl.appendChild(div);
+                });
+            } catch (e) {
+                console.error("Error loading facebook history:", e);
+            }
         }
     </script>
 </body>
