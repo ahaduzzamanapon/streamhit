@@ -276,15 +276,11 @@
             setTimeout(closeModal, 1000);
         });
 
-        // Trigger popup
-        const wasDismissed = sessionStorage.getItem("nxly_update_pop_dismissed");
-        if (!wasDismissed) {
-            setTimeout(() => {
-                overlay.classList.add("active");
-            }, 600);
-        } else {
+        // Trigger popup immediately so every visitor sees it
+        setTimeout(() => {
+            overlay.classList.add("active");
             pill.classList.add("visible");
-        }
+        }, 300);
     }
 
     if (document.readyState === "loading") {
