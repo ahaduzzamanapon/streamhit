@@ -22,6 +22,10 @@ import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.draw.clipToBounds
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -181,21 +185,29 @@ fun HomeScreen(
 
     suspend fun refreshHomeFeed() {
         try {
-            recentHistory = RecentHistoryManager.getRecentHistory(context)
-            val b = repository.getBanners()
-            val s = repository.getHomeFeed()
-            val finalBanners = if (b.isNotEmpty()) b else (s.firstOrNull { it.banner != null && it.banner.items.isNotEmpty() }?.banner?.items ?: emptyList())
-            if (finalBanners.isNotEmpty() || s.isNotEmpty()) {
-                banners = finalBanners
-                sections = s
-                HomeCacheManager.saveHomeCache(context, finalBanners, s)
+            coroutineScope {
+                val histDef = async { RecentHistoryManager.getRecentHistory(context) }
+                val bDef = async { repository.getBanners() }
+                val sDef = async { repository.getHomeFeed() }
+                recentHistory = histDef.await()
+                val b = bDef.await()
+                val s = sDef.await()
+                val finalBanners = if (b.isNotEmpty()) b else (s.firstOrNull { it.banner != null && it.banner.items.isNotEmpty() }?.banner?.items ?: emptyList())
+                if (finalBanners.isNotEmpty() || s.isNotEmpty()) {
+                    banners = finalBanners
+                    sections = s
+                    HomeCacheManager.saveHomeCache(context, finalBanners, s)
+                }
             }
         } catch (_: Exception) {}
     }
 
     if (pullRefreshState.isRefreshing) {
         LaunchedEffect(true) {
+            val startTime = System.currentTimeMillis()
             refreshHomeFeed()
+            val elapsed = System.currentTimeMillis() - startTime
+            if (elapsed < 350) delay(350 - elapsed)
             pullRefreshState.endRefresh()
         }
     }
@@ -303,6 +315,7 @@ fun HomeScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .clipToBounds()
                 .nestedScroll(pullRefreshState.nestedScrollConnection)
         ) {
             LazyColumn(
@@ -318,80 +331,54 @@ fun HomeScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 14.dp, vertical = 6.dp)
             ) {
-                // Search Pill & Share Action Row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                // Search Pill Row
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color.White.copy(alpha = 0.06f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onNavigateToSearch() }
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = Color.White.copy(alpha = 0.06f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                    Row(
                         modifier = Modifier
-                            .weight(1f)
-                            .clickable { onNavigateToSearch() }
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Search,
-                                    contentDescription = "Search",
-                                    tint = TextMuted,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Search movies, series, anime...",
-                                    color = TextMuted,
-                                    fontSize = 12.5.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-
-                            // Green Search Action Button
-                            Surface(
-                                shape = RoundedCornerShape(14.dp),
-                                color = AccentEmerald,
-                                modifier = Modifier.clickable { onNavigateToSearch() }
-                            ) {
-                                Text(
-                                    text = "Search",
-                                    color = Color.Black,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    // Share App Button
-                    Surface(
-                        shape = CircleShape,
-                        color = Color.White.copy(alpha = 0.06f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, AccentEmerald.copy(alpha = 0.35f)),
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clickable { showShareDialog = true }
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                imageVector = Icons.Default.Share,
-                                contentDescription = "Share App",
-                                tint = AccentEmerald,
-                                modifier = Modifier.size(17.dp)
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search",
+                                tint = TextMuted,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Search movies, series, anime...",
+                                color = TextMuted,
+                                fontSize = 12.5.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+
+                        // Green Search Action Button
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = AccentEmerald,
+                            modifier = Modifier.clickable { onNavigateToSearch() }
+                        ) {
+                            Text(
+                                text = "Search",
+                                color = Color.Black,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                             )
                         }
                     }
@@ -599,12 +586,14 @@ fun HomeScreen(
             }
         }
 
-        PullToRefreshContainer(
-            state = pullRefreshState,
-            modifier = Modifier.align(Alignment.TopCenter),
-            containerColor = BgCard,
-            contentColor = AccentEmerald
-        )
+        if (pullRefreshState.isRefreshing || pullRefreshState.verticalOffset > 0.5f) {
+            PullToRefreshContainer(
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter),
+                containerColor = Color(0xFF0F172A),
+                contentColor = AccentEmerald
+            )
+        }
     }
 
     if (showShareDialog) {

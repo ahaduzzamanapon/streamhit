@@ -17,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -276,6 +277,7 @@ fun LiveTvScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .clipToBounds()
                 .nestedScroll(pullRefreshState.nestedScrollConnection)
         ) {
             when {
@@ -332,12 +334,14 @@ fun LiveTvScreen(
                 }
             }
 
-            PullToRefreshContainer(
-                state = pullRefreshState,
-                modifier = Modifier.align(Alignment.TopCenter),
-                containerColor = BgCard,
-                contentColor = AccentEmerald
-            )
+            if (pullRefreshState.isRefreshing || pullRefreshState.verticalOffset > 0.5f) {
+                PullToRefreshContainer(
+                    state = pullRefreshState,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    containerColor = Color(0xFF0F172A),
+                    contentColor = AccentEmerald
+                )
+            }
         }
     }
 }

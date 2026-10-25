@@ -359,7 +359,7 @@ fun WatchLockShareDialog(
 }
 
 /**
- * Prominent "Share This App With Friends" banner card below player & details.
+ * Prominent & responsive "Share This App With Friends" banner card below player & details.
  */
 @Composable
 fun ShareAppBannerCard(
@@ -367,11 +367,11 @@ fun ShareAppBannerCard(
     onShareClick: () -> Unit
 ) {
     Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = Color(0xFF0F1728),
+        shape = RoundedCornerShape(14.dp),
+        color = Color(0xFF0D1424),
         border = androidx.compose.foundation.BorderStroke(
-            1.2.dp,
-            Brush.linearGradient(listOf(Color(0xFF00C6FF).copy(alpha = 0.5f), Color(0xFF0164FF).copy(alpha = 0.25f)))
+            1.dp,
+            Brush.linearGradient(listOf(Color(0xFF00C6FF).copy(alpha = 0.45f), Color(0xFF0164FF).copy(alpha = 0.20f)))
         ),
         modifier = modifier
             .fillMaxWidth()
@@ -380,19 +380,19 @@ fun ShareAppBannerCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.weight(1f)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .size(38.dp)
+                        .clip(CircleShape)
                         .background(
                             Brush.linearGradient(listOf(Color(0xFF00C6FF), Color(0xFF0164FF)))
                         ),
@@ -402,37 +402,24 @@ fun ShareAppBannerCard(
                         imageVector = Icons.Default.Share,
                         contentDescription = "Share",
                         tint = Color.Black,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(19.dp)
                     )
                 }
 
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "বন্ধুদের সাথে অ্যাপটি শেয়ার করুন",
-                            color = Color.White,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = Color(0xFF00C6FF).copy(alpha = 0.18f)
-                        ) {
-                            Text(
-                                text = "🎁 FREE HD",
-                                color = Color(0xFF00C6FF),
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Black,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                            )
-                        }
-                    }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "বন্ধুদের সাথে অ্যাপটি শেয়ার করুন",
+                        color = Color.White,
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "বন্ধুদের অ্যাপ শেয়ার করে দিন ও একসাথে উপভোগ করুন",
-                        color = Color(0xFFB0C4DE),
-                        fontSize = 11.5.sp,
+                        text = "বন্ধুদের সাথে শেয়ার করে ফ্রি দেখা উপভোগ করুন 🍿",
+                        color = Color(0xFF8FA3BF),
+                        fontSize = 11.sp,
                         maxLines = 1,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
@@ -442,21 +429,17 @@ fun ShareAppBannerCard(
             Spacer(modifier = Modifier.width(8.dp))
 
             Surface(
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(20.dp),
                 color = Color(0xFF00C6FF),
-                modifier = Modifier.height(34.dp)
+                modifier = Modifier.clickable(onClick = onShareClick)
             ) {
-                Box(
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Share",
-                        color = Color.Black,
-                        fontSize = 12.5.sp,
-                        fontWeight = FontWeight.Black
-                    )
-                }
+                Text(
+                    text = "Share",
+                    color = Color.Black,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                )
             }
         }
     }
