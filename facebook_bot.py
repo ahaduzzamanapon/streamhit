@@ -366,6 +366,9 @@ async def trigger_auto_trending_reel(custom_title: Optional[str] = None, custom_
         if not stream_candidates:
             continue
 
+        # Prioritize reliable H.264 streams over rate-limited H.265 CDN streams
+        stream_candidates.sort(key=lambda u: (1 if "h265" in u.lower() else 0, 0 if "vegamovies" in u.lower() else 1))
+
         slug = "".join(c for c in target_title if c.isalnum() or c in (" ", "_")).strip().replace(" ", "_")[:25]
         timestamp = int(time.time())
         output_filename = f"fb_reel_{slug}_{timestamp}.mp4"

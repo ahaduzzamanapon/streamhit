@@ -785,9 +785,12 @@ async def admin_reels_stream_url(request: Request, subjectId: str = "", detailPa
             if not best_url:
                 best_url = clean_link
                 
-    # Sort resolutions descending
-    resolutions.sort(key=lambda x: x["resolution"], reverse=True)
-    if resolutions:
+    # Prioritize 1080p and 720p H.264 streams which avoid 429 rate limits on CDN
+    h264_links = [r for r in resolutions if "h265" not in r["url"].lower()]
+    if h264_links:
+        h264_links.sort(key=lambda x: (x["resolution"] == 1080, x["resolution"] == 720, x["resolution"]), reverse=True)
+        best_url = h264_links[0]["url"]
+    elif resolutions:
         best_url = resolutions[0]["url"]
         
     return {
