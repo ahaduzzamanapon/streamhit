@@ -17,8 +17,53 @@ try:
 except Exception:
     pass
 
-# In-memory job tracker
+JOBS_FILE = os.path.join(REELS_DIR, "reels_jobs.json")
+
+# In-memory and persistent job tracker
 active_reel_jobs: Dict[str, Dict[str, Any]] = {}
+
+def load_jobs_state() -> Dict[str, Dict[str, Any]]:
+    if not os.path.exists(JOBS_FILE):
+        return {}
+    try:
+        with open(JOBS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def save_job_state(job_id: str, job_data: Dict[str, Any]):
+    global active_reel_jobs
+    active_reel_jobs[job_id] = job_data
+    try:
+        all_jobs = load_jobs_state()
+        all_jobs[job_id] = dict(job_data)
+        if len(all_jobs) > 25:
+            sorted_keys = sorted(all_jobs.keys(), key=lambda k: all_jobs[k].get("created_at", 0), reverse=True)
+            all_jobs = {k: all_jobs[k] for k in sorted_keys[:25]}
+        with open(JOBS_FILE, "w", encoding="utf-8") as f:
+            json.dump(all_jobs, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"Error saving job state {job_id}: {e}")
+
+def get_job_state(job_id: str) -> Optional[Dict[str, Any]]:
+    if job_id in active_reel_jobs:
+        return active_reel_jobs[job_id]
+    all_jobs = load_jobs_state()
+    return all_jobs.get(job_id)
+
+def get_latest_or_active_job() -> Optional[Dict[str, Any]]:
+    # Check in-memory first for active
+    for j in active_reel_jobs.values():
+        if j.get("status") in ("processing", "pending"):
+            return j
+    all_jobs = load_jobs_state()
+    for j in all_jobs.values():
+        if j.get("status") in ("processing", "pending"):
+            return j
+    if all_jobs:
+        sorted_jobs = sorted(all_jobs.values(), key=lambda x: x.get("created_at", 0), reverse=True)
+        return sorted_jobs[0]
+    return None
 
 try:
     from PIL import Image, ImageDraw, ImageFont
@@ -392,6 +437,7 @@ async def execute_batch_reel_job(
     job["status"] = "processing"
     job["progress"] = 5
     job["current_step"] = "Preparing Reel templates & filters..."
+    save_job_state(job_id, job)
 
     slug = re.sub(r"[^a-zA-Z0-9]+", "_", title.strip())[:30].strip("_")
     timestamp = int(time.time())
@@ -406,6 +452,7 @@ async def execute_batch_reel_job(
             job["current_part"] = current_part_number
             job["current_step"] = f"Rendering Part {current_part_number} of {start_part_num + num_parts - 1} (Starting at {part_time_formatted})..."
             job["progress"] = int(10 + (idx / num_parts) * 80)
+            save_job_state(job_id, job)
 
             # 1. Create transparent banner overlay PNG
             overlay_filename = f"overlay_{slug}_p{current_part_number}_{timestamp}.png"
@@ -462,11 +509,13 @@ async def execute_batch_reel_job(
 
             completed_reels.append(part_data)
             job["results"] = completed_reels
+            save_job_state(job_id, job)
 
         # Job complete
         job["status"] = "completed"
         job["progress"] = 100
         job["current_step"] = f"All {num_parts} parts generated successfully!"
+        save_job_state(job_id, job)
 
         # Save to persistent history
         existing_history = load_reels_history()
@@ -478,6 +527,7 @@ async def execute_batch_reel_job(
         job["status"] = "failed"
         job["error"] = str(e)
         job["current_step"] = f"Failed: {str(e)}"
+        save_job_state(job_id, job)
 
 def start_reel_job(
     title: str,
@@ -491,7 +541,7 @@ def start_reel_job(
     anti_copyright: bool = True
 ) -> str:
     job_id = f"reel_job_{int(time.time()*1000)}"
-    active_reel_jobs[job_id] = {
+    init_job = {
         "job_id": job_id,
         "title": title,
         "status": "pending",
@@ -503,6 +553,7 @@ def start_reel_job(
         "error": None,
         "created_at": time.time()
     }
+    save_job_state(job_id, init_job)
 
     asyncio.create_task(
         execute_batch_reel_job(

@@ -840,11 +840,21 @@ async def admin_reels_start(request: Request, data: dict):
         "message": f"Started generating {num_parts} reel(s) for '{title}'"
     }
 
+@router.get("/api/admin/reels/active-job")
+async def admin_reels_active_job(request: Request):
+    check_admin_auth(request)
+    rg = _get_reel_generator()
+    job = rg.get_latest_or_active_job()
+    return {
+        "code": 0,
+        "job": job
+    }
+
 @router.get("/api/admin/reels/job-status")
 async def admin_reels_job_status(request: Request, job_id: str):
     check_admin_auth(request)
     rg = _get_reel_generator()
-    job = rg.active_reel_jobs.get(job_id)
+    job = rg.get_job_state(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found or expired")
     return {
@@ -1086,6 +1096,7 @@ async def admin_facebook_get_config(request: Request):
             "page_id": cfg.get("page_id", ""),
             "page_name": conn_info.get("name") or cfg.get("page_name", "NXLY"),
             "masked_token": masked_token,
+            "app_id": cfg.get("app_id", ""),
             "auto_pilot_enabled": cfg.get("auto_pilot_enabled", True),
             "post_interval_hours": cfg.get("post_interval_hours", 6),
             "last_post_time": cfg.get("last_post_time", 0),
@@ -1159,6 +1170,28 @@ async def admin_facebook_publish_reel(data: dict, request: Request):
         "reel_url": res.get("reel_url"),
         "video_id": res.get("video_id")
     }
+
+@router.post("/api/admin/facebook/exchange-token")
+async def admin_facebook_exchange_token(data: dict, request: Request):
+    check_admin_auth(request)
+    import facebook_bot
+    app_id = data.get("app_id", "").strip()
+    app_secret = data.get("app_secret", "").strip()
+    short_token = data.get("token", "").strip()
+    page_id = data.get("page_id", "").strip()
+
+    if not app_id or not app_secret or not short_token:
+        raise HTTPException(status_code=400, detail="App ID, App Secret, and Access Token are required")
+
+    res = await facebook_bot.exchange_for_permanent_page_token(
+        app_id=app_id,
+        app_secret=app_secret,
+        user_or_page_token=short_token,
+        page_id=page_id
+    )
+    if not res.get("success"):
+        raise HTTPException(status_code=400, detail=res.get("error", "Token exchange failed"))
+    return {"code": 0, "success": True, "message": res.get("message"), "token_preview": res.get("token_preview")}
 
 
 

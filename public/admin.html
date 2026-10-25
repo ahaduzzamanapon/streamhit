@@ -1740,6 +1740,10 @@
                         <div id="reelsJobStep" style="font-size: 12px; color: var(--text-muted);">
                             Initializing video slicer...
                         </div>
+                        <div style="margin-top: 12px; padding: 10px 14px; background: rgba(0, 240, 255, 0.08); border: 1px solid rgba(0, 240, 255, 0.2); border-radius: 8px; font-size: 11px; color: #00F0FF; display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 16px;">⚡</span>
+                            <span><strong>Continuous Background Engine:</strong> This process runs directly on the server. You can safely reload the page or close your browser at any time — the generation will keep running and the finished reels will appear right here when you return.</span>
+                        </div>
                     </div>
 
                     <!-- Current Batch Results -->
@@ -1794,22 +1798,62 @@
                 <!-- Left: Connection & Settings -->
                 <div style="display: flex; flex-direction: column; gap: 20px;">
                     <div class="card">
-                        <h3 style="font-size: 16px; margin-bottom: 16px; color: #fff; display: flex; align-items: center; gap: 8px;">
-                            <span style="color: #1877F2; font-size: 20px; font-weight: 900;">f</span> Connected Facebook Page
-                        </h3>
-                        <div id="fbPageStatusBox" style="background: rgba(24, 119, 242, 0.08); border: 1px solid rgba(24, 119, 242, 0.25); border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 16px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                            <h3 style="font-size: 16px; color: #fff; margin-bottom: 0; display: flex; align-items: center; gap: 8px;">
+                                <span style="color: #1877F2; font-size: 20px; font-weight: 900;">f</span> Connected Facebook Page
+                            </h3>
+                            <span id="fbTokenHealthBadge" style="font-size: 11px; padding: 4px 10px; border-radius: 6px; font-weight: 700; background: rgba(34, 197, 94, 0.15); color: #22c55e;">Checking...</span>
+                        </div>
+                        <div id="fbPageStatusBox" style="background: rgba(24, 119, 242, 0.08); border: 1px solid rgba(24, 119, 242, 0.25); border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
                             <div style="width: 50px; height: 50px; border-radius: 50%; background: #1877F2; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 900;">
                                 f
                             </div>
                             <div style="flex: 1;">
                                 <div style="font-weight: 700; font-size: 17px; color: #fff;" id="fbPageName">NXLY</div>
                                 <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;">Page ID: <span id="fbPageId" style="font-family: monospace; color: #60a5fa;">1367186939808744</span></div>
-                                <div style="font-size: 12px; color: #22c55e; margin-top: 4px; display: flex; align-items: center; gap: 5px;">
+                                <div id="fbPageSubStatus" style="font-size: 12px; color: #22c55e; margin-top: 4px; display: flex; align-items: center; gap: 5px;">
                                     <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #22c55e;"></span>
-                                    Reels Publishing Permission Active
+                                    Checking connection...
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Direct Page Access Token Input -->
+                        <div class="form-group" style="margin-bottom: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <label style="margin-bottom: 0;">Page Access Token</label>
+                                <a href="https://developers.facebook.com/tools/explorer/" target="_blank" style="color: #00F0FF; font-size: 11px; text-decoration: none;">Get from Explorer ↗</a>
+                            </div>
+                            <input type="password" id="fbPageTokenInput" placeholder="Paste Page Access Token (starts with EAA...)" style="font-family: monospace; font-size: 12px;">
+                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Must have: <code>publish_video</code>, <code>pages_manage_posts</code>, <code>pages_manage_engagement</code></div>
+                        </div>
+                    </div>
+
+                    <!-- Permanent Token (Never-Expiring) Generator Box -->
+                    <div class="card" style="border: 1px solid rgba(0, 240, 255, 0.35); background: rgba(0, 240, 255, 0.03);">
+                        <h3 style="font-size: 15px; margin-bottom: 10px; color: #00F0FF; display: flex; align-items: center; gap: 8px;">
+                            <span>🔑</span> Generate Never-Expiring Token (Permanent)
+                        </h3>
+                        <p style="font-size: 12px; color: var(--text-muted); line-height: 1.4; margin-bottom: 12px;">
+                            Explorer tokens expire in 1-2 hours. Enter your Meta <strong>App ID</strong> & <strong>App Secret</strong> with your short token to exchange it into a <strong>Permanent Page Token that NEVER expires</strong>.
+                        </p>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                            <div>
+                                <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">App ID</label>
+                                <input type="text" id="fbExchangeAppId" placeholder="e.g. 1184937299..." style="font-size: 12px; margin-bottom: 0;">
+                            </div>
+                            <div>
+                                <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">App Secret</label>
+                                <input type="password" id="fbExchangeAppSecret" placeholder="App Secret from Meta" style="font-size: 12px; margin-bottom: 0;">
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Short-Lived User or Page Token</label>
+                            <input type="text" id="fbExchangeShortToken" placeholder="Paste short-lived token from Graph API Explorer..." style="font-size: 12px; margin-bottom: 0;">
+                        </div>
+                        <button type="button" onclick="exchangePermanentToken()" id="btnExchangeToken" class="btn-preset" style="background: linear-gradient(135deg, #00F0FF, #1877F2); color: #000; font-weight: 800; padding: 10px 18px; width: 100%;">
+                            ⚡ Convert & Activate Permanent Token
+                        </button>
                     </div>
 
                     <div class="card">
@@ -1951,6 +1995,7 @@
             fetchLiveTvChannels();
             fetchAppUsers();
             fetchReelsHistory();
+            checkAndResumeBackgroundReelJob();
             fetchFacebookConfig();
             populateSportStreamLinks([]);
             populateTvStreamLinks([]);
@@ -1972,6 +2017,7 @@
                 fetchAppUsers();
             } else if (tab === 'reels') {
                 fetchReelsHistory();
+                checkAndResumeBackgroundReelJob();
             } else if (tab === 'notifications') {
                 fetchPushStats();
             } else if (tab === 'facebook') {
@@ -3360,6 +3406,7 @@
 
                 showToast(`Started generating ${numParts} Reel(s)!`);
                 activeReelJobId = data.job_id;
+                try { localStorage.setItem('streamhit_active_reel_job', data.job_id); } catch(_) {}
                 startPollingReelJob(data.job_id);
             } catch (err) {
                 showToast(err.message, false);
@@ -3371,6 +3418,8 @@
 
         function startPollingReelJob(jobId) {
             if (activeReelPollTimer) clearInterval(activeReelPollTimer);
+            const card = document.getElementById('reelsJobCard');
+            if (card) card.style.display = 'block';
 
             activeReelPollTimer = setInterval(async () => {
                 try {
@@ -3394,22 +3443,65 @@
                             activeReelPollTimer = null;
                             showToast(`🎉 All ${job.total_parts} Reels created successfully!`);
                             const btn = document.getElementById('reelsGenerateBtn');
-                            btn.disabled = false;
-                            btn.innerHTML = '🚀 Generate Reels (Anti-Copyright)';
+                            if (btn) {
+                                btn.disabled = false;
+                                btn.innerHTML = '🚀 Generate Reels (Anti-Copyright)';
+                            }
                             fetchReelsHistory();
                         } else if (job.status === 'failed') {
                             clearInterval(activeReelPollTimer);
                             activeReelPollTimer = null;
                             showToast(`Reel creation failed: ${job.error || 'FFmpeg error'}`, false);
                             const btn = document.getElementById('reelsGenerateBtn');
-                            btn.disabled = false;
-                            btn.innerHTML = '🚀 Generate Reels (Anti-Copyright)';
+                            if (btn) {
+                                btn.disabled = false;
+                                btn.innerHTML = '🚀 Generate Reels (Anti-Copyright)';
+                            }
                         }
                     }
                 } catch (e) {
                     console.error("Error polling reel job:", e);
                 }
             }, 2500);
+        }
+
+        async function checkAndResumeBackgroundReelJob() {
+            try {
+                const res = await fetch('/api/admin/reels/active-job', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (data.code === 0 && data.job) {
+                    const job = data.job;
+                    const card = document.getElementById('reelsJobCard');
+                    if (job.status === 'processing' || job.status === 'pending') {
+                        if (card) card.style.display = 'block';
+                        const btn = document.getElementById('reelsGenerateBtn');
+                        if (btn) {
+                            btn.disabled = true;
+                            btn.innerHTML = '⏳ Running in Background on Server...';
+                        }
+                        const progressFill = document.getElementById('reelsJobProgressFill');
+                        if (progressFill) progressFill.style.width = `${job.progress || 10}%`;
+                        const percentEl = document.getElementById('reelsJobPercent');
+                        if (percentEl) percentEl.innerText = `${job.progress || 10}%`;
+                        const stepEl = document.getElementById('reelsJobStep');
+                        if (stepEl) stepEl.innerText = job.current_step || 'Processing in background...';
+
+                        if (job.results && job.results.length > 0) {
+                            renderBatchResults(job.results);
+                        }
+                        startPollingReelJob(job.job_id);
+                    } else if (job.status === 'completed' && job.results && job.results.length > 0) {
+                        const resultsContainer = document.getElementById('reelsResultsList');
+                        if (resultsContainer && resultsContainer.children.length === 0) {
+                            renderBatchResults(job.results);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Error checking background reel job:", e);
+            }
         }
 
         function renderBatchResults(reels) {
@@ -3592,6 +3684,7 @@
                 const data = await res.json();
                 if (data.code === 0 && data.config) {
                     const cfg = data.config;
+                    const conn = data.connection || {};
                     const nameEl = document.getElementById('fbPageName');
                     if (nameEl) nameEl.innerText = cfg.page_name || 'NXLY';
                     const idEl = document.getElementById('fbPageId');
@@ -3602,6 +3695,41 @@
                     if (intervalEl) intervalEl.value = cfg.post_interval_hours || 6;
                     const commentEl = document.getElementById('fbCommentTemplate');
                     if (commentEl) commentEl.value = cfg.auto_comment_template || '';
+
+                    if (cfg.app_id) {
+                        const appIdEl = document.getElementById('fbExchangeAppId');
+                        if (appIdEl && !appIdEl.value) appIdEl.value = cfg.app_id;
+                    }
+
+                    const tokenInput = document.getElementById('fbPageTokenInput');
+                    if (tokenInput && !tokenInput.value && cfg.masked_token) {
+                        tokenInput.placeholder = `Active Saved Token: ${cfg.masked_token}`;
+                    }
+
+                    const healthBadge = document.getElementById('fbTokenHealthBadge');
+                    const subStatus = document.getElementById('fbPageSubStatus');
+
+                    if (conn.success) {
+                        if (healthBadge) {
+                            healthBadge.innerText = '✓ Connection Active';
+                            healthBadge.style.background = 'rgba(34, 197, 94, 0.15)';
+                            healthBadge.style.color = '#22c55e';
+                        }
+                        if (subStatus) {
+                            subStatus.innerHTML = '<span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #22c55e;"></span> Connected & Ready for Reels';
+                            subStatus.style.color = '#22c55e';
+                        }
+                    } else {
+                        if (healthBadge) {
+                            healthBadge.innerText = '⚠️ Token Expired / Invalid';
+                            healthBadge.style.background = 'rgba(239, 68, 68, 0.15)';
+                            healthBadge.style.color = '#ef4444';
+                        }
+                        if (subStatus) {
+                            subStatus.innerHTML = `<span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ef4444;"></span> ${conn.error || 'Token expired. Convert or update token below.'}`;
+                            subStatus.style.color = '#ef4444';
+                        }
+                    }
                 }
             } catch (e) {
                 console.error("Error loading facebook config:", e);
@@ -3612,28 +3740,90 @@
             const enabled = document.getElementById('fbAutoPilotToggle').checked;
             const interval = parseInt(document.getElementById('fbPostInterval').value || 6);
             const template = document.getElementById('fbCommentTemplate').value;
+            const pageToken = document.getElementById('fbPageTokenInput').value.trim();
 
             try {
+                const payload = {
+                    auto_pilot_enabled: enabled,
+                    post_interval_hours: interval,
+                    auto_comment_template: template
+                };
+                if (pageToken && !pageToken.includes('...')) {
+                    payload.page_token = pageToken;
+                }
+
                 const res = await fetch('/api/admin/facebook/config', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
-                    body: JSON.stringify({
-                        auto_pilot_enabled: enabled,
-                        post_interval_hours: interval,
-                        auto_comment_template: template
-                    })
+                    body: JSON.stringify(payload)
                 });
                 const data = await res.json();
                 if (data.code === 0) {
                     showToast('✓ Facebook configuration saved successfully!');
+                    fetchFacebookConfig();
                 } else {
                     showToast(data.message || 'Save failed', false);
                 }
             } catch (e) {
                 showToast('Error saving settings', false);
+            }
+        }
+
+        async function exchangePermanentToken() {
+            const appId = document.getElementById('fbExchangeAppId').value.trim();
+            const appSecret = document.getElementById('fbExchangeAppSecret').value.trim();
+            const shortToken = document.getElementById('fbExchangeShortToken').value.trim();
+            const pageId = (document.getElementById('fbPageId').innerText || '').trim();
+
+            if (!appId || !appSecret || !shortToken) {
+                showToast('Please enter App ID, App Secret, and Access Token', false);
+                return;
+            }
+
+            const btn = document.getElementById('btnExchangeToken');
+            const origHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Converting via Meta Graph API...';
+
+            try {
+                const res = await fetch('/api/admin/facebook/exchange-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        app_id: appId,
+                        app_secret: appSecret,
+                        token: shortToken,
+                        page_id: pageId
+                    })
+                });
+
+                const data = await res.json();
+                if (res.status !== 200 || data.code !== 0) {
+                    throw new Error(data.detail || data.message || 'Token exchange failed');
+                }
+
+                showToast('🎉 Never-Expiring Permanent Token activated!');
+                document.getElementById('fbExchangeShortToken').value = '';
+                if (data.token_preview) {
+                    const tokenInput = document.getElementById('fbPageTokenInput');
+                    if (tokenInput) tokenInput.value = data.token_preview;
+                }
+                await fetchFacebookConfig();
+                btn.innerHTML = '✓ Permanent Token Active!';
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                }, 4000);
+            } catch (e) {
+                showToast(e.message, false);
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
             }
         }
 

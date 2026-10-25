@@ -74,6 +74,66 @@ async def verify_facebook_connection(page_id: str, page_token: str) -> Dict[str,
             "picture": data.get("picture", {}).get("data", {}).get("url")
         }
 
+async def exchange_for_permanent_page_token(
+    app_id: str,
+    app_secret: str,
+    user_or_page_token: str,
+    page_id: str = ""
+) -> Dict[str, Any]:
+    """
+    Exchanges a short-lived token using App ID and App Secret into a
+    Permanent (Never-Expiring) Page Access Token via Meta Graph API.
+    """
+    cfg = load_fb_config()
+    target_page_id = page_id.strip() or cfg.get("page_id", DEFAULT_PAGE_ID)
+
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        # Step 1: Exchange for long-lived user token (valid 60 days)
+        exchange_url = "https://graph.facebook.com/v19.0/oauth/access_token"
+        params = {
+            "grant_type": "fb_exchange_token",
+            "client_id": app_id.strip(),
+            "client_secret": app_secret.strip(),
+            "fb_exchange_token": user_or_page_token.strip()
+        }
+        resp = await client.get(exchange_url, params=params)
+        data = resp.json()
+        if "error" in data:
+            return {"success": False, "error": data["error"].get("message", "Token exchange failed")}
+
+        long_lived_user_token = data.get("access_token")
+        if not long_lived_user_token:
+            return {"success": False, "error": "Could not obtain long-lived token from Meta"}
+
+        # Step 2: Fetch permanent Page Access Token using the long-lived user token
+        page_url = f"https://graph.facebook.com/v19.0/{target_page_id}"
+        p_resp = await client.get(page_url, params={
+            "fields": "access_token,name",
+            "access_token": long_lived_user_token
+        })
+        p_data = p_resp.json()
+        if "error" in p_data:
+            return {"success": False, "error": p_data["error"].get("message", "Page token fetch failed")}
+
+        permanent_page_token = p_data.get("access_token")
+        if not permanent_page_token:
+            return {"success": False, "error": f"No page token returned for Page ID {target_page_id}. Ensure you are an Admin of this Page."}
+
+        # Save to config automatically
+        cfg["page_token"] = permanent_page_token
+        cfg["app_id"] = app_id.strip()
+        cfg["app_secret"] = app_secret.strip()
+        cfg["page_id"] = target_page_id
+        cfg["page_name"] = p_data.get("name", "NXLY")
+        save_fb_config(cfg)
+
+        return {
+            "success": True,
+            "message": f"Successfully generated & saved Permanent Never-Expiring Page Token for '{p_data.get('name')}'!",
+            "page_name": p_data.get("name"),
+            "token_preview": permanent_page_token[:15] + "..." + permanent_page_token[-10:]
+        }
+
 async def upload_reel_to_facebook(
     video_path: str,
     caption: str,
