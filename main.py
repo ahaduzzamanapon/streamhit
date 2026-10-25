@@ -734,6 +734,17 @@ async def init_db():
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
                 await cur.execute("""
+                    CREATE TABLE IF NOT EXISTS fcm_tokens (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        token VARCHAR(191) NOT NULL UNIQUE,
+                        device_id VARCHAR(100),
+                        model VARCHAR(100),
+                        os VARCHAR(50),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                await cur.execute("""
                     CREATE TABLE IF NOT EXISTS app_versions (
                         version_code INT PRIMARY KEY,
                         version_name VARCHAR(50) NOT NULL,

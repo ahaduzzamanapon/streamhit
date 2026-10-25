@@ -296,6 +296,7 @@ fun MainAppScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             if (activeDetailPath == null && !(showUpdateDialog && updateInfo?.mustUpdate == true)) {
                 // Ultra-luxury Frosted Glass Bottom Navigation Bar
@@ -409,7 +410,7 @@ fun MainAppScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(bottom = paddingValues.calculateBottomPadding())
         ) {
             if (activeDetailPath != null) {
                 DetailsScreen(
