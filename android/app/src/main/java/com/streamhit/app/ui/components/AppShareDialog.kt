@@ -218,3 +218,247 @@ fun AppShareDialog(
         }
     }
 }
+
+/**
+ * Mandatory 20-minute watch lock dialog.
+ * Has only ONE button: Share to Continue. Absolutely NO cancel button.
+ * Dialog cannot be dismissed by back button or clicking outside.
+ */
+@Composable
+fun WatchLockShareDialog(
+    movieTitle: String,
+    onShareSuccess: () -> Unit
+) {
+    val context = LocalContext.current
+    Dialog(
+        onDismissRequest = { /* Cannot dismiss without sharing */ },
+        properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(26.dp),
+            color = Color(0xFF0F1728),
+            border = androidx.compose.foundation.BorderStroke(
+                1.5.dp,
+                Brush.linearGradient(listOf(Color(0xFF00C6FF), Color(0xFF0164FF)))
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Official NXLY Logo badge
+                Box(
+                    modifier = Modifier
+                        .size(68.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color.White)
+                        .border(
+                            1.5.dp,
+                            Brush.linearGradient(listOf(Color(0xFF00C6FF), Color(0xFF0164FF))),
+                            RoundedCornerShape(18.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(id = com.streamhit.app.R.drawable.app_logo),
+                        contentDescription = "NXLY Stream Logo",
+                        modifier = Modifier.size(54.dp),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                Text(
+                    text = "মুভিটি কি ভালো লাগছে? 🍿",
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Black,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Text(
+                    text = "২০ মিনিট ফ্রি দেখা সম্পন্ন হয়েছে! বাকি অংশ সম্পূর্ণ ফ্রিতে দেখতে বন্ধুদের সাথে অ্যাপটি শেয়ার করুন।",
+                    color = Color(0xFFB0C4DE),
+                    fontSize = 13.5.sp,
+                    lineHeight = 20.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                // Highlights Pill Row
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFF131B2E),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 10.dp, horizontal = 14.dp),
+                        horizontalArrangement = Arrangement.SpaceAround,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("✨ ফুল HD", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("•", color = Color(0xFF00C6FF))
+                        Text("⚡ বাফারিং ছাড়া", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("•", color = Color(0xFF00C6FF))
+                        Text("🎁 ১০০% ফ্রি", color = Color(0xFF00C6FF), fontSize = 12.sp, fontWeight = FontWeight.Black)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // SINGLE BUTTON - NO CANCEL BUTTON
+                Button(
+                    onClick = {
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, "NXLY Stream - Free Movies & TV Shows")
+                            val text = "🔥 $movieTitle এবং হাজারো HD মুভি ও সিরিজ সম্পূর্ণ ফ্রিতে দেখুন NXLY Stream অ্যাপে!\n\nএখনই ডাউনলোড করুন: $APP_SHARE_URL"
+                            putExtra(Intent.EXTRA_TEXT, text)
+                        }
+                        context.startActivity(Intent.createChooser(shareIntent, "বন্ধুদের সাথে শেয়ার করুন"))
+                        onShareSuccess()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF00C6FF)
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = null,
+                        tint = Color.Black,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "বন্ধুদের শেয়ার করে দেখা চালিয়ে যান 🚀",
+                        color = Color.Black,
+                        fontSize = 14.5.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Prominent "Share This App With Friends" banner card below player & details.
+ */
+@Composable
+fun ShareAppBannerCard(
+    modifier: Modifier = Modifier,
+    onShareClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFF0F1728),
+        border = androidx.compose.foundation.BorderStroke(
+            1.2.dp,
+            Brush.linearGradient(listOf(Color(0xFF00C6FF).copy(alpha = 0.5f), Color(0xFF0164FF).copy(alpha = 0.25f)))
+        ),
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onShareClick)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            Brush.linearGradient(listOf(Color(0xFF00C6FF), Color(0xFF0164FF)))
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = "Share",
+                        tint = Color.Black,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "বন্ধুদের সাথে অ্যাপটি শেয়ার করুন",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = Color(0xFF00C6FF).copy(alpha = 0.18f)
+                        ) {
+                            Text(
+                                text = "🎁 FREE HD",
+                                color = Color(0xFF00C6FF),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Black,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "বন্ধুদের অ্যাপ শেয়ার করে দিন ও একসাথে উপভোগ করুন",
+                        color = Color(0xFFB0C4DE),
+                        fontSize = 11.5.sp,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = Color(0xFF00C6FF),
+                modifier = Modifier.height(34.dp)
+            ) {
+                Box(
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Share",
+                        color = Color.Black,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
+            }
+        }
+    }
+}
+

@@ -19,12 +19,12 @@ class LiveTvRepository {
         .readTimeout(20, TimeUnit.SECONDS)
         .build()
 
-    suspend fun getChannels(context: Context): List<LiveTvChannel> = withContext(Dispatchers.IO) {
+    suspend fun getChannels(context: Context, forceRefresh: Boolean = false): List<LiveTvChannel> = withContext(Dispatchers.IO) {
         val cached = LiveTvCacheManager.getCachedChannels(context)
         val isExpired = LiveTvCacheManager.isCacheExpired(context)
 
-        // If cache is fresh and not empty, return cached directly
-        if (!isExpired && cached.isNotEmpty()) {
+        // If cache is fresh and not empty (and not a forced refresh), return cached directly
+        if (!forceRefresh && !isExpired && cached.isNotEmpty()) {
             return@withContext cached
         }
 

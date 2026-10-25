@@ -711,6 +711,131 @@
             color: var(--text-muted);
             margin-top: 2px;
         }
+
+        /* ── Reels Slicer & Preview Styles ── */
+        .reel-item-card {
+            background: rgba(20, 22, 32, 0.7);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 16px;
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+            transition: all 0.25s ease;
+        }
+
+        .reel-item-card:hover {
+            border-color: rgba(0, 240, 255, 0.4);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        .reel-video-wrapper {
+            width: 140px;
+            min-width: 140px;
+            aspect-ratio: 9/16;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #000;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+            position: relative;
+        }
+
+        .reel-video-wrapper video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .reel-content-wrapper {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .reel-badge-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .reel-part-badge {
+            background: linear-gradient(135deg, #FF2A54, #FF5E3A);
+            color: #fff;
+            font-weight: 800;
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            letter-spacing: 0.5px;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .reel-time-badge {
+            background: rgba(0, 240, 255, 0.1);
+            color: #00F0FF;
+            border: 1px solid rgba(0, 240, 255, 0.25);
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 8px;
+            font-family: monospace;
+        }
+
+        .reel-caption-box {
+            background: rgba(9, 10, 15, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 12px;
+            color: var(--text-muted);
+            white-space: pre-wrap;
+            max-height: 85px;
+            overflow-y: auto;
+            line-height: 1.4;
+            font-family: sans-serif;
+        }
+
+        .btn-preset {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 6px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-preset:hover {
+            background: rgba(0, 240, 255, 0.15);
+            border-color: #00F0FF;
+            color: #fff;
+        }
+
+        .btn-preset-primary {
+            background: rgba(0, 240, 255, 0.12);
+            border-color: rgba(0, 240, 255, 0.4);
+            color: #00F0FF;
+        }
+
+        .btn-preset-primary:hover {
+            background: #00F0FF;
+            color: #090A0F;
+        }
+
+        .btn-preset-danger:hover {
+            background: rgba(255, 42, 84, 0.2);
+            border-color: #FF2A54;
+            color: #FF2A54;
+        }
     </style>
 </head>
 <body>
@@ -754,6 +879,7 @@
             <button onclick="switchTab('sports')" id="btn-sports" class="tab-btn">Live Sports</button>
             <button onclick="switchTab('tv')" id="btn-tv" class="tab-btn">Live TV Channels</button>
             <button onclick="switchTab('app-users')" id="btn-app-users" class="tab-btn">App Users & Installs</button>
+            <button onclick="switchTab('reels')" id="btn-reels" class="tab-btn" style="border-color: rgba(0, 240, 255, 0.4); color: #00F0FF;">🎬 Create Reels</button>
         </div>
 
         <!-- ── Live Active Users Bar ── -->
@@ -1245,6 +1371,215 @@
                 </table>
             </div>
         </div>
+
+        <!-- ── Reels & Shorts Creator Panel ── -->
+        <div id="panel-reels" class="tab-panel">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+                <div>
+                    <h2 style="margin-bottom: 6px;"><span style="color:#00F0FF;">🎬</span> Reels & Shorts Creator</h2>
+                    <p style="color: var(--text-muted); font-size: 14px;">
+                        Convert movies and TV episodes into viral 9:16 vertical reels with automated 1-minute sequential part slicing, anti-copyright evasion & social post captions.
+                    </p>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" onclick="fetchReelsHistory()" class="btn-preset" style="padding: 8px 16px; border-color: rgba(0,240,255,0.3); color: #00F0FF;">
+                        🔄 Refresh History
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <!-- Left: Configuration Form -->
+                <div>
+                    <!-- Step 1: Select Movie or Series -->
+                    <div class="card" style="position: relative;">
+                        <h3 style="font-size: 16px; margin-bottom: 16px; color: #fff; display: flex; align-items: center; gap: 8px;">
+                            <span style="background: var(--gradient); color: #fff; border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800;">1</span>
+                            Select Movie or Series
+                        </h3>
+
+                        <div class="form-group" style="position: relative;">
+                            <label>Search Title</label>
+                            <input type="text" id="reelsSearchInput" oninput="handleReelsSearch(this)" placeholder="e.g. Spider-Man, Money Heist, Pushpa..." autocomplete="off">
+                            <div id="reelsSearchResults" class="search-results" style="max-height: 280px;"></div>
+                        </div>
+
+                        <!-- Selected Title Preview Card -->
+                        <div id="reelsSelectedCard" style="display: none; background: rgba(0, 240, 255, 0.05); border: 1px solid rgba(0, 240, 255, 0.2); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+                            <div style="display: flex; gap: 14px; align-items: center;">
+                                <img id="reelsSelectedCover" src="" style="width: 48px; height: 68px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color);" alt="Cover">
+                                <div style="flex: 1; min-width: 0;">
+                                    <div id="reelsSelectedTitle" style="font-weight: 700; font-size: 15px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></div>
+                                    <div id="reelsSelectedMeta" style="font-size: 12px; color: var(--text-muted); margin-top: 4px;"></div>
+                                    <input type="hidden" id="reelsSubjectId">
+                                    <input type="hidden" id="reelsDetailPath">
+                                    <input type="hidden" id="reelsSubjectType">
+                                </div>
+                                <button type="button" onclick="clearSelectedReelSubject()" class="logout-btn" style="padding: 4px 10px; font-size: 11px;">Change</button>
+                            </div>
+                        </div>
+
+                        <!-- TV Series Season & Episode Selector (hidden if movie) -->
+                        <div id="reelsSeriesRow" style="display: none; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label>Season</label>
+                                <select id="reelsSeasonSelect" onchange="onReelSeasonChange()">
+                                    <option value="1">Season 1</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label>Episode</label>
+                                <select id="reelsEpisodeSelect" onchange="fetchReelsStreamUrl()">
+                                    <option value="1">Episode 1</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Video Source URL Input -->
+                        <div class="form-group">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <label style="margin-bottom: 0;">Direct Stream / Video URL</label>
+                                <span id="reelsStreamStatus" style="font-size: 11px; color: var(--secondary-accent);">Auto-resolves on selection</span>
+                            </div>
+                            <input type="text" id="reelsStreamUrl" placeholder="Direct MP4 or stream link (auto-filled or paste custom)">
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Timestamp & Split Settings -->
+                    <div class="card">
+                        <h3 style="font-size: 16px; margin-bottom: 16px; color: #fff; display: flex; align-items: center; gap: 8px;">
+                            <span style="background: var(--gradient); color: #fff; border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800;">2</span>
+                            Cut Position & Part Breakdown
+                        </h3>
+
+                        <div class="form-group">
+                            <label>Starting Timestamp (Where the Reel begins)</label>
+                            <input type="text" id="reelsStartTime" value="00:00" placeholder="00:00 or 15:30 or 01:20:00" style="font-family: monospace; font-size: 16px; letter-spacing: 1px;">
+                            <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;">
+                                <span style="font-size: 11px; color: var(--text-muted); align-self: center;">Quick Presets:</span>
+                                <button type="button" class="btn-preset" onclick="setReelStartTime('00:00')">00:00</button>
+                                <button type="button" class="btn-preset" onclick="setReelStartTime('05:00')">05:00</button>
+                                <button type="button" class="btn-preset" onclick="setReelStartTime('15:00')">15:00</button>
+                                <button type="button" class="btn-preset" onclick="setReelStartTime('30:00')">30:00</button>
+                                <button type="button" class="btn-preset" onclick="setReelStartTime('45:00')">45:00</button>
+                                <button type="button" class="btn-preset" onclick="setReelStartTime('01:00:00')">01:00:00</button>
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px;">
+                            <div class="form-group">
+                                <label>Duration per Part</label>
+                                <select id="reelsDurationSelect">
+                                    <option value="60" selected>60 sec (1 Min)</option>
+                                    <option value="30">30 sec</option>
+                                    <option value="45">45 sec</option>
+                                    <option value="90">90 sec (1.5 Min)</option>
+                                    <option value="120">120 sec (2 Min)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Number of Reels</label>
+                                <select id="reelsNumParts">
+                                    <option value="1">1 Reel (Part 1)</option>
+                                    <option value="2">2 Reels (Parts 1-2)</option>
+                                    <option value="3" selected>3 Reels (Parts 1-3)</option>
+                                    <option value="5">5 Reels (Parts 1-5)</option>
+                                    <option value="10">10 Reels (Parts 1-10)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Starting Part #</label>
+                                <input type="number" id="reelsStartPartNum" value="1" min="1" max="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Overlays & Anti-Copyright Evasion -->
+                    <div class="card">
+                        <h3 style="font-size: 16px; margin-bottom: 16px; color: #fff; display: flex; align-items: center; gap: 8px;">
+                            <span style="background: var(--gradient); color: #fff; border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800;">3</span>
+                            Text Banners & Anti-Copyright Engine
+                        </h3>
+
+                        <div class="form-group">
+                            <label>Top Banner Text Template</label>
+                            <input type="text" id="reelsTopText" placeholder="🎬 {title} • PART {part_num} 🍿" value="🎬 {title} • PART {part_num} 🍿">
+                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Placeholders: <code>{title}</code>, <code>{part_num}</code>, <code>{total_parts}</code></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Bottom Banner Text (Call to Action)</label>
+                            <input type="text" id="reelsBottomText" placeholder="👇 FULL MOVIE LINK IN 1ST COMMENT 👇" value="👇 FULL MOVIE LINK IN 1ST COMMENT 👇">
+                        </div>
+
+                        <div style="background: rgba(0, 240, 255, 0.05); border: 1px solid rgba(0, 240, 255, 0.2); border-radius: 12px; padding: 14px; margin-bottom: 20px;">
+                            <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; margin-bottom: 0;">
+                                <input type="checkbox" id="reelsAntiCopyright" checked style="margin-top: 4px; accent-color: var(--secondary-accent);">
+                                <div>
+                                    <span style="font-weight: 700; color: #00F0FF; font-size: 13px;">🛡️ Anti-Copyright Content ID Bypass (Active)</span>
+                                    <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px; line-height: 1.4;">
+                                        Applies 9:16 vertical blurred ambient background, centered video scaling, subtle color saturation nudge, +3% timecode shift & audio EQ acoustic frequency modulation so automated copyright bots cannot match the file hash.
+                                    </p>
+                                </div>
+                            </label>
+                        </div>
+
+                        <button type="button" id="reelsGenerateBtn" onclick="startGeneratingReels()" class="btn" style="width: 100%; font-size: 16px; padding: 16px; font-weight: 800; letter-spacing: 0.5px; box-shadow: 0 4px 20px var(--accent-glow);">
+                            🚀 Generate Reels (Anti-Copyright)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Right: Live Progress & Output Results -->
+                <div>
+                    <!-- Active Job Card -->
+                    <div id="reelsJobCard" class="card" style="display: none; border-color: rgba(0, 240, 255, 0.4); background: rgba(0, 240, 255, 0.04);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div class="live-dot" style="background: #00F0FF; box-shadow: 0 0 10px #00F0FF;"></div>
+                                <span style="font-weight: 700; font-size: 14px; color: #fff;">Processing Reels in Background...</span>
+                            </div>
+                            <span id="reelsJobPercent" style="font-weight: 800; font-size: 16px; color: #00F0FF;">0%</span>
+                        </div>
+                        <div class="progress-bar-bg" style="height: 10px; margin-bottom: 10px; background: rgba(255,255,255,0.08);">
+                            <div id="reelsJobProgressFill" class="progress-bar-fill" style="width: 0%; background: linear-gradient(90deg, #00F0FF, #FF2A54);"></div>
+                        </div>
+                        <div id="reelsJobStep" style="font-size: 12px; color: var(--text-muted);">
+                            Initializing video slicer...
+                        </div>
+                    </div>
+
+                    <!-- Current Batch Results -->
+                    <div id="reelsResultsCard" class="card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                            <h3 style="font-size: 18px; color: #fff; margin-bottom: 0;">Generated Reel Clips</h3>
+                            <span id="reelsBatchCountBadge" class="history-item-badge" style="display: none;">0 Parts Ready</span>
+                        </div>
+                        <div id="reelsResultsList">
+                            <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
+                                <div style="font-size: 40px; margin-bottom: 10px;">🎬</div>
+                                <p style="font-size: 14px;">No reels generated yet in this session.</p>
+                                <p style="font-size: 12px; margin-top: 6px;">Select a movie or series on the left and click Generate to start slicing 1-minute parts!</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom: Persistent Reels History -->
+            <div class="card" style="margin-top: 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <h3 style="font-size: 18px; color: #fff; margin-bottom: 4px;">📚 Previously Created Reels Library</h3>
+                        <p style="font-size: 12px; color: var(--text-muted);">All reels saved on server with direct copyable titles and captions</p>
+                    </div>
+                    <span id="reelsHistoryCount" style="font-size: 12px; color: var(--text-muted);">0 saved reels</span>
+                </div>
+                <div id="reelsHistoryList" style="display: flex; flex-direction: column; gap: 14px;">
+                    <div style="text-align: center; padding: 30px; color: var(--text-muted);">Loading reels history...</div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Toast Notification element -->
@@ -1346,6 +1681,7 @@
             fetchLiveSports();
             fetchLiveTvChannels();
             fetchAppUsers();
+            fetchReelsHistory();
             populateSportStreamLinks([]);
             populateTvStreamLinks([]);
             startLiveUsersPoll();
@@ -1364,6 +1700,8 @@
 
             if (tab === 'app-users') {
                 fetchAppUsers();
+            } else if (tab === 'reels') {
+                fetchReelsHistory();
             }
         }
 
@@ -2447,6 +2785,431 @@
                 btn.innerText = originalText;
                 btn.disabled = false;
             }
+        }
+
+        // ── REELS & SHORTS CREATOR LOGIC ──
+        let reelsSearchDebounce = null;
+        let activeReelJobId = null;
+        let activeReelPollTimer = null;
+        let currentReelsSeasonsData = [];
+
+        function handleReelsSearch(input) {
+            clearTimeout(reelsSearchDebounce);
+            const query = input.value.trim();
+            const resultsBox = document.getElementById('reelsSearchResults');
+
+            if (!query) {
+                resultsBox.style.display = 'none';
+                return;
+            }
+
+            reelsSearchDebounce = setTimeout(async () => {
+                try {
+                    const res = await fetch(`/api/admin/subjects/search?q=${encodeURIComponent(query)}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+                    resultsBox.innerHTML = '';
+                    
+                    if (!data.list || data.list.length === 0) {
+                        resultsBox.innerHTML = '<div style="padding: 12px; color: var(--text-muted); font-size: 13px;">No movies or series found.</div>';
+                        resultsBox.style.display = 'block';
+                        return;
+                    }
+
+                    data.list.forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'search-item';
+                        div.innerHTML = `
+                            <img src="${item.cover || 'default-cover.png'}" onerror="this.src='default-cover.png'">
+                            <div class="search-item-info">
+                                <div class="search-item-title">${item.title}</div>
+                                <div class="search-item-meta">${item.subject_type == 2 ? '📺 TV Series' : '🎬 Movie'} | ID: ${item.subject_id}</div>
+                            </div>
+                        `;
+                        div.onclick = () => selectReelSubject(item);
+                        resultsBox.appendChild(div);
+                    });
+                    resultsBox.style.display = 'block';
+                } catch (e) {
+                    console.error("Search error:", e);
+                }
+            }, 300);
+        }
+
+        async function selectReelSubject(item) {
+            document.getElementById('reelsSearchResults').style.display = 'none';
+            document.getElementById('reelsSearchInput').value = item.title;
+
+            document.getElementById('reelsSubjectId').value = item.subject_id;
+            document.getElementById('reelsDetailPath').value = item.detail_path || '';
+            document.getElementById('reelsSubjectType').value = item.subject_type || 1;
+
+            document.getElementById('reelsSelectedTitle').innerText = item.title;
+            document.getElementById('reelsSelectedMeta').innerText = `${item.subject_type == 2 ? '📺 TV Series' : '🎬 Movie'} • ID: ${item.subject_id}`;
+            document.getElementById('reelsSelectedCover').src = item.cover || 'default-cover.png';
+            document.getElementById('reelsSelectedCard').style.display = 'block';
+
+            // Auto-fill top banner text
+            document.getElementById('reelsTopText').value = `🎬 ${item.title} • PART {part_num} 🍿`;
+
+            if (item.subject_type == 2) {
+                // TV Series
+                document.getElementById('reelsSeriesRow').style.display = 'grid';
+                await loadReelsSeasons(item.detail_path || '', item.subject_id);
+            } else {
+                // Movie
+                document.getElementById('reelsSeriesRow').style.display = 'none';
+                await fetchReelsStreamUrl();
+            }
+        }
+
+        function clearSelectedReelSubject() {
+            document.getElementById('reelsSelectedCard').style.display = 'none';
+            document.getElementById('reelsSeriesRow').style.display = 'none';
+            document.getElementById('reelsSubjectId').value = '';
+            document.getElementById('reelsDetailPath').value = '';
+            document.getElementById('reelsSubjectType').value = '';
+            document.getElementById('reelsSearchInput').value = '';
+            document.getElementById('reelsStreamUrl').value = '';
+            document.getElementById('reelsStreamStatus').innerText = 'Auto-resolves on selection';
+        }
+
+        async function loadReelsSeasons(detailPath, subjectId) {
+            const seasonSelect = document.getElementById('reelsSeasonSelect');
+            const epSelect = document.getElementById('reelsEpisodeSelect');
+            seasonSelect.innerHTML = '<option value="">Loading seasons...</option>';
+            epSelect.innerHTML = '<option value="1">Ep 1</option>';
+
+            try {
+                const res = await fetch(`/api/admin/reels/seasons?detailPath=${encodeURIComponent(detailPath)}&subjectId=${encodeURIComponent(subjectId)}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                const seasons = data.data?.seasons || [];
+                currentReelsSeasonsData = seasons;
+
+                seasonSelect.innerHTML = '';
+                if (seasons.length === 0) {
+                    seasonSelect.innerHTML = '<option value="1">Season 1</option>';
+                    populateReelsEpisodes(1);
+                } else {
+                    seasons.forEach((s, idx) => {
+                        const opt = document.createElement('option');
+                        opt.value = s.se || (idx + 1);
+                        opt.innerText = `Season ${s.se || (idx + 1)}`;
+                        seasonSelect.appendChild(opt);
+                    });
+                    populateReelsEpisodes(seasonSelect.value || 1);
+                }
+            } catch (e) {
+                console.error("Error loading seasons:", e);
+                seasonSelect.innerHTML = '<option value="1">Season 1</option>';
+                populateReelsEpisodes(1);
+            }
+
+            await fetchReelsStreamUrl();
+        }
+
+        function populateReelsEpisodes(seasonNum) {
+            const epSelect = document.getElementById('reelsEpisodeSelect');
+            epSelect.innerHTML = '';
+            
+            let maxEp = 1;
+            const foundSeason = currentReelsSeasonsData.find(s => String(s.se) === String(seasonNum));
+            if (foundSeason) {
+                maxEp = parseInt(foundSeason.maxEp || 1);
+                if (foundSeason.allEp) {
+                    const epList = String(foundSeason.allEp).split(',');
+                    if (epList.length > 0) maxEp = Math.max(maxEp, epList.length);
+                }
+            }
+
+            for (let i = 1; i <= Math.max(1, maxEp); i++) {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.innerText = `Episode ${i}`;
+                epSelect.appendChild(opt);
+            }
+        }
+
+        async function onReelSeasonChange() {
+            const seasonNum = document.getElementById('reelsSeasonSelect').value;
+            populateReelsEpisodes(seasonNum);
+            await fetchReelsStreamUrl();
+        }
+
+        async function fetchReelsStreamUrl() {
+            const subjectId = document.getElementById('reelsSubjectId').value;
+            const detailPath = document.getElementById('reelsDetailPath').value;
+            const subjectType = document.getElementById('reelsSubjectType').value;
+            const se = document.getElementById('reelsSeasonSelect').value || 1;
+            const ep = document.getElementById('reelsEpisodeSelect').value || 1;
+            const statusEl = document.getElementById('reelsStreamStatus');
+            const streamInput = document.getElementById('reelsStreamUrl');
+
+            if (!subjectId && !detailPath) return;
+
+            statusEl.innerText = '⚡ Resolving 1080p/720p CDN stream...';
+            statusEl.style.color = 'var(--secondary-accent)';
+
+            try {
+                const res = await fetch(`/api/admin/reels/stream-url?subjectId=${encodeURIComponent(subjectId)}&detailPath=${encodeURIComponent(detailPath)}&se=${se}&ep=${ep}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (data.code === 0 && data.best_url) {
+                    streamInput.value = data.best_url;
+                    const resBadge = data.resolutions && data.resolutions[0] ? `(${data.resolutions[0].resolution}p)` : '';
+                    statusEl.innerText = `✓ Ready ${resBadge}`;
+                    statusEl.style.color = '#22c55e';
+                } else {
+                    statusEl.innerText = '⚠️ Auto-resolve failed. Please paste direct stream URL.';
+                    statusEl.style.color = '#FF5E3A';
+                }
+            } catch (e) {
+                console.error("Error resolving stream url:", e);
+                statusEl.innerText = '⚠️ Resolution error. Please paste direct stream URL.';
+                statusEl.style.color = '#FF5E3A';
+            }
+        }
+
+        function setReelStartTime(timeStr) {
+            document.getElementById('reelsStartTime').value = timeStr;
+        }
+
+        async function startGeneratingReels() {
+            const title = document.getElementById('reelsSelectedTitle').innerText.trim() || document.getElementById('reelsSearchInput').value.trim();
+            const streamUrl = document.getElementById('reelsStreamUrl').value.trim();
+            const startTime = document.getElementById('reelsStartTime').value.trim() || '00:00';
+            const duration = parseInt(document.getElementById('reelsDurationSelect').value || 60);
+            const numParts = parseInt(document.getElementById('reelsNumParts').value || 1);
+            const startPartNum = parseInt(document.getElementById('reelsStartPartNum').value || 1);
+            const topText = document.getElementById('reelsTopText').value.trim();
+            const bottomText = document.getElementById('reelsBottomText').value.trim();
+            const antiCopyright = document.getElementById('reelsAntiCopyright').checked;
+
+            if (!title) {
+                showToast('Please select or enter a Movie or Series title', false);
+                return;
+            }
+            if (!streamUrl) {
+                showToast('Please provide a direct playable video/stream URL', false);
+                return;
+            }
+
+            const btn = document.getElementById('reelsGenerateBtn');
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Slicing Video & Evading Copyright...';
+
+            document.getElementById('reelsJobCard').style.display = 'block';
+            document.getElementById('reelsJobProgressFill').style.width = '5%';
+            document.getElementById('reelsJobPercent').innerText = '5%';
+            document.getElementById('reelsJobStep').innerText = 'Contacting background reel engine...';
+
+            try {
+                const res = await fetch('/api/admin/reels/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        title: title,
+                        stream_url: streamUrl,
+                        start_time: startTime,
+                        part_duration: duration,
+                        num_parts: numParts,
+                        start_part_num: startPartNum,
+                        top_text: topText,
+                        bottom_text: bottomText,
+                        anti_copyright: antiCopyright
+                    })
+                });
+
+                const data = await res.json();
+                if (res.status !== 200 || data.code !== 0) {
+                    throw new Error(data.detail || data.message || 'Failed to start reel job');
+                }
+
+                showToast(`Started generating ${numParts} Reel(s)!`);
+                activeReelJobId = data.job_id;
+                startPollingReelJob(data.job_id);
+            } catch (err) {
+                showToast(err.message, false);
+                btn.disabled = false;
+                btn.innerHTML = '🚀 Generate Reels (Anti-Copyright)';
+                document.getElementById('reelsJobCard').style.display = 'none';
+            }
+        }
+
+        function startPollingReelJob(jobId) {
+            if (activeReelPollTimer) clearInterval(activeReelPollTimer);
+
+            activeReelPollTimer = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/admin/reels/job-status?job_id=${encodeURIComponent(jobId)}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+                    if (data.code === 0 && data.job) {
+                        const job = data.job;
+                        document.getElementById('reelsJobProgressFill').style.width = `${job.progress}%`;
+                        document.getElementById('reelsJobPercent').innerText = `${job.progress}%`;
+                        document.getElementById('reelsJobStep').innerText = job.current_step || 'Processing...';
+
+                        // If parts are being produced, show them in real time
+                        if (job.results && job.results.length > 0) {
+                            renderBatchResults(job.results);
+                        }
+
+                        if (job.status === 'completed') {
+                            clearInterval(activeReelPollTimer);
+                            activeReelPollTimer = null;
+                            showToast(`🎉 All ${job.total_parts} Reels created successfully!`);
+                            const btn = document.getElementById('reelsGenerateBtn');
+                            btn.disabled = false;
+                            btn.innerHTML = '🚀 Generate Reels (Anti-Copyright)';
+                            fetchReelsHistory();
+                        } else if (job.status === 'failed') {
+                            clearInterval(activeReelPollTimer);
+                            activeReelPollTimer = null;
+                            showToast(`Reel creation failed: ${job.error || 'FFmpeg error'}`, false);
+                            const btn = document.getElementById('reelsGenerateBtn');
+                            btn.disabled = false;
+                            btn.innerHTML = '🚀 Generate Reels (Anti-Copyright)';
+                        }
+                    }
+                } catch (e) {
+                    console.error("Error polling reel job:", e);
+                }
+            }, 2500);
+        }
+
+        function renderBatchResults(reels) {
+            const container = document.getElementById('reelsResultsList');
+            const badge = document.getElementById('reelsBatchCountBadge');
+            badge.style.display = 'inline-block';
+            badge.innerText = `${reels.length} Part(s) Ready`;
+
+            container.innerHTML = '';
+            reels.forEach(r => {
+                container.appendChild(createReelCardElement(r, true));
+            });
+        }
+
+        function createReelCardElement(reel, isCurrentBatch = false) {
+            const card = document.createElement('div');
+            card.className = 'reel-item-card';
+
+            card.innerHTML = `
+                <div class="reel-video-wrapper">
+                    <video src="${reel.video_url}" controls playsinline preload="metadata"></video>
+                </div>
+                <div class="reel-content-wrapper">
+                    <div class="reel-badge-row">
+                        <span class="reel-part-badge">PART ${reel.part_number}</span>
+                        <span class="reel-time-badge">⏱️ Starts: ${reel.start_time}</span>
+                        <span class="reel-time-badge">⏳ ${reel.duration_seconds}s</span>
+                        <span class="reel-time-badge">💾 ${reel.file_size_mb} MB</span>
+                    </div>
+
+                    <div style="font-weight: 700; font-size: 15px; color: #fff; margin-top: 4px;">
+                        ${reel.title_suggestion || reel.title}
+                    </div>
+
+                    <div class="reel-caption-box">${reel.caption}</div>
+
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px;">
+                        <button type="button" class="btn-preset btn-preset-primary" onclick="copyReelText('${encodeURIComponent(reel.title_suggestion)}', this, 'Title Copied! ✓')">
+                            📋 Copy Title
+                        </button>
+                        <button type="button" class="btn-preset btn-preset-primary" onclick="copyReelText('${encodeURIComponent(reel.caption)}', this, 'Caption Copied! ✓')">
+                            📋 Copy Post Caption
+                        </button>
+                        <a href="${reel.video_url}" download="${reel.filename}" class="btn-preset" style="color: #22c55e; border-color: rgba(34, 197, 94, 0.3);">
+                            ⬇️ Download MP4
+                        </a>
+                        <button type="button" class="btn-preset btn-preset-danger" onclick="deleteReelItem('${reel.filename}', this)">
+                            🗑️ Delete
+                        </button>
+                    </div>
+                </div>
+            `;
+            return card;
+        }
+
+        async function fetchReelsHistory() {
+            const container = document.getElementById('reelsHistoryList');
+            const countEl = document.getElementById('reelsHistoryCount');
+            if (!container) return;
+
+            try {
+                const res = await fetch('/api/admin/reels/history', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                const list = data.list || [];
+
+                countEl.innerText = `${list.length} saved reels`;
+                container.innerHTML = '';
+
+                if (list.length === 0) {
+                    container.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--text-muted); font-size: 13px;">No previously created reels found.</div>';
+                    return;
+                }
+
+                list.forEach(r => {
+                    container.appendChild(createReelCardElement(r, false));
+                });
+            } catch (e) {
+                console.error("Error loading reels history:", e);
+                container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted);">Failed to load history.</div>';
+            }
+        }
+
+        async function deleteReelItem(filename, btnElement) {
+            if (!confirm(`Are you sure you want to delete this reel file: ${filename}?`)) {
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/admin/reels/delete?filename=${encodeURIComponent(filename)}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (data.code === 0) {
+                    showToast('Reel deleted successfully');
+                    const card = btnElement.closest('.reel-item-card');
+                    if (card) card.remove();
+                    fetchReelsHistory();
+                } else {
+                    showToast(data.detail || 'Delete failed', false);
+                }
+            } catch (e) {
+                showToast('Error deleting reel', false);
+            }
+        }
+
+        function copyReelText(encodedText, btnElement, successMsg = 'Copied! ✓') {
+            const decoded = decodeURIComponent(encodedText);
+            navigator.clipboard.writeText(decoded).then(() => {
+                const orig = btnElement.innerHTML;
+                btnElement.innerHTML = `✓ ${successMsg}`;
+                btnElement.style.background = '#22c55e';
+                btnElement.style.color = '#000';
+                btnElement.style.borderColor = '#22c55e';
+                showToast(successMsg);
+                setTimeout(() => {
+                    btnElement.innerHTML = orig;
+                    btnElement.style.background = '';
+                    btnElement.style.color = '';
+                    btnElement.style.borderColor = '';
+                }, 2000);
+            }).catch(() => {
+                showToast('Could not copy to clipboard', false);
+            });
         }
     </script>
 </body>

@@ -17,7 +17,11 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import com.streamhit.app.ui.components.AppShareDialog
+import com.streamhit.app.ui.components.AppBrandHeader
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -143,6 +147,7 @@ fun HomeScreenShimmer(brush: Brush) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     repository: MovieRepository,
@@ -171,6 +176,29 @@ fun HomeScreen(
     var isLoading by remember { mutableStateOf(true) }
     var selectedCategoryIndex by remember { mutableStateOf(0) }
     var showShareDialog by remember { mutableStateOf(false) }
+
+    val pullRefreshState = rememberPullToRefreshState()
+
+    suspend fun refreshHomeFeed() {
+        try {
+            recentHistory = RecentHistoryManager.getRecentHistory(context)
+            val b = repository.getBanners()
+            val s = repository.getHomeFeed()
+            val finalBanners = if (b.isNotEmpty()) b else (s.firstOrNull { it.banner != null && it.banner.items.isNotEmpty() }?.banner?.items ?: emptyList())
+            if (finalBanners.isNotEmpty() || s.isNotEmpty()) {
+                banners = finalBanners
+                sections = s
+                HomeCacheManager.saveHomeCache(context, finalBanners, s)
+            }
+        } catch (_: Exception) {}
+    }
+
+    if (pullRefreshState.isRefreshing) {
+        LaunchedEffect(true) {
+            refreshHomeFeed()
+            pullRefreshState.endRefresh()
+        }
+    }
 
     // Live refresh when returning to HomeScreen from PlayerActivity
     val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
@@ -260,12 +288,29 @@ fun HomeScreen(
         }
     }
 
-    LazyColumn(
+    Column(
         modifier = modifier
             .fillMaxSize()
-            .background(BgDark),
-        contentPadding = PaddingValues(bottom = 90.dp)
+            .background(BgDark)
     ) {
+        AppBrandHeader(
+            tagText = "FREE HD",
+            tagColor = AccentEmerald,
+            showSearchAction = false,
+            showShareAction = true
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .nestedScroll(pullRefreshState.nestedScrollConnection)
+        ) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(BgDark),
+                contentPadding = PaddingValues(bottom = 90.dp)
+            ) {
         // Top Search Bar Header (MovieBox Pro style)
         item {
             Column(
@@ -551,12 +596,21 @@ fun HomeScreen(
                     )
                 }
             }
+            }
         }
+
+        PullToRefreshContainer(
+            state = pullRefreshState,
+            modifier = Modifier.align(Alignment.TopCenter),
+            containerColor = BgCard,
+            contentColor = AccentEmerald
+        )
     }
 
     if (showShareDialog) {
         AppShareDialog(onDismiss = { showShareDialog = false })
     }
+}
 }
 
 @Composable

@@ -67,6 +67,8 @@ import com.streamhit.app.data.repository.LiveTvRepository
 import com.streamhit.app.data.repository.MovieRepository
 import com.streamhit.app.ui.details.DownloadQualityBottomSheet
 import com.streamhit.app.ui.details.SeriesDownloadBottomSheet
+import com.streamhit.app.ui.components.WatchLockShareDialog
+import com.streamhit.app.ui.components.AppShareDialog
 import com.streamhit.app.ui.theme.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -252,6 +254,15 @@ fun AdaptivePlayerScreen(
     var audioSyncOffsetMs by remember { mutableLongStateOf(0L) }
     var showAudioSyncDialog by remember { mutableStateOf(false) }
     var showTranslatorDialog by remember { mutableStateOf(false) }
+
+    // 20-minute forced watch lock / share-to-continue state
+    val prefs = remember { context.getSharedPreferences("streamhit_unlock_prefs", Context.MODE_PRIVATE) }
+    val contentKey = remember(subjectId, detailPath, initialVideoTitle) {
+        val raw = subjectId.ifBlank { detailPath }.ifBlank { initialVideoTitle }
+        raw.replace("[^a-zA-Z0-9_]".toRegex(), "_")
+    }
+    var hasSharedToUnlock by remember { mutableStateOf(prefs.getBoolean("unlock_$contentKey", false)) }
+    var showWatchLockDialog by remember { mutableStateOf(false) }
 
     // Load captions for AI Real-time Audio Translation
     LaunchedEffect(subjectId, detailPath, currentSeasonNum, currentEpisodeNum) {
@@ -855,6 +866,14 @@ fun AdaptivePlayerScreen(
                     isBuffering = false
                 }
 
+                // 20-minute forced watch lock / share-to-continue for Movies and TV Series
+                val isOffline = initialIsOffline || initialStreamUrl.startsWith("content://") || initialStreamUrl.startsWith("file://") || initialStreamUrl.startsWith("/")
+                val isLiveStream = !isOffline && (subjectId.isBlank() && detailPath.isBlank())
+                if (!isLiveStream && !hasSharedToUnlock && pos >= 20 * 60 * 1000L) {
+                    p.pause()
+                    showWatchLockDialog = true
+                }
+
                 // Real-time AI Audio Translation synchronization
                 com.streamhit.app.util.SubtitleTtsManager.syncWithPlayback(pos, p)
             }
@@ -1170,6 +1189,19 @@ fun AdaptivePlayerScreen(
         if (showTranslatorDialog) {
             TranslatorConfigDialog(
                 onDismiss = { showTranslatorDialog = false }
+            )
+        }
+
+        if (showWatchLockDialog) {
+            WatchLockShareDialog(
+                movieTitle = currentVideoTitle.ifBlank { detail?.title ?: initialVideoTitle },
+                onShareSuccess = {
+                    hasSharedToUnlock = true
+                    prefs.edit().putBoolean("unlock_$contentKey", true).apply()
+                    showWatchLockDialog = false
+                    exoPlayer?.play()
+                    Toast.makeText(context, "ধন্যবাদ! আপনার মুভিটি আবার প্লে হচ্ছে 🍿", Toast.LENGTH_SHORT).show()
+                }
             )
         }
     }

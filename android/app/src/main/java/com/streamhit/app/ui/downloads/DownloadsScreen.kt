@@ -30,6 +30,7 @@ import com.streamhit.app.data.local.DownloadStatus
 import com.streamhit.app.data.local.MediaDownloadManager
 import com.streamhit.app.data.model.SubjectSummary
 import com.streamhit.app.data.repository.MovieRepository
+import com.streamhit.app.ui.components.AppBrandHeader
 import com.streamhit.app.ui.components.MediaCard
 import com.streamhit.app.ui.theme.*
 import kotlinx.coroutines.delay
@@ -248,12 +249,24 @@ fun DownloadsScreen(
         }
     } else {
         // Main Downloads Screen View
-        LazyColumn(
+        Column(
             modifier = modifier
                 .fillMaxSize()
-                .background(BgDark),
-            contentPadding = PaddingValues(bottom = 90.dp)
+                .background(BgDark)
         ) {
+            AppBrandHeader(
+                tagText = "OFFLINE",
+                tagColor = AccentEmerald,
+                showSearchAction = false,
+                showShareAction = true
+            )
+
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(BgDark),
+                contentPadding = PaddingValues(bottom = 90.dp)
+            ) {
             // Top Header
             item {
                 Row(
@@ -555,6 +568,7 @@ fun DownloadsScreen(
             }
         }
     }
+}
 }
 
 @Composable

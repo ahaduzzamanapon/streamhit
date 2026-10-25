@@ -16,6 +16,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,13 +31,16 @@ import androidx.compose.ui.unit.sp
 import com.streamhit.app.data.model.SubjectSummary
 import com.streamhit.app.data.repository.MovieRepository
 import com.streamhit.app.ui.components.MediaCard
+import com.streamhit.app.ui.components.AppBrandHeader
 import com.streamhit.app.ui.theme.AccentEmerald
+import com.streamhit.app.ui.theme.AccentCyan
 import com.streamhit.app.ui.theme.BgCard
 import com.streamhit.app.ui.theme.BgDark
 import com.streamhit.app.ui.theme.TextMuted
 import com.streamhit.app.ui.theme.TextPrimary
 import kotlinx.coroutines.delay
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExploreScreen(
     repository: MovieRepository,
@@ -51,6 +57,20 @@ fun ExploreScreen(
     var selectedGenre by remember { mutableStateOf("All") }
     var items by remember { mutableStateOf<List<SubjectSummary>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+
+    val pullRefreshState = rememberPullToRefreshState()
+
+    if (pullRefreshState.isRefreshing) {
+        LaunchedEffect(true) {
+            val list = repository.filterContent(
+                page = 1,
+                subjectType = selectedType,
+                genre = selectedGenre
+            )
+            items = list
+            pullRefreshState.endRefresh()
+        }
+    }
 
     val genres = listOf("All", "Action", "Comedy", "Drama", "Romance", "Animation", "Sci-Fi", "Horror", "Thriller")
 
@@ -83,6 +103,13 @@ fun ExploreScreen(
             .fillMaxSize()
             .background(BgDark)
     ) {
+        AppBrandHeader(
+            tagText = "EXPLORE",
+            tagColor = AccentCyan,
+            showSearchAction = false,
+            showShareAction = true
+        )
+
         // Search Input Bar at top of Explore tab
         Box(
             modifier = Modifier
@@ -256,34 +283,47 @@ fun ExploreScreen(
                 }
             }
 
-            // Content Grid
-            if (isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(top = 80.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = AccentEmerald)
-                }
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 80.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    items(items) { item ->
-                        MediaCard(
-                            item = item,
-                            onClick = {
-                                val path = item.detailPath.ifEmpty { item.subjectId }
-                                onMediaClick(path, item.subjectId, item.subjectType)
-                            }
-                        )
+            // Content Grid with Pull to Refresh
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(pullRefreshState.nestedScrollConnection)
+            ) {
+                if (isLoading) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = 80.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = AccentEmerald)
+                    }
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(3),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 80.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(items) { item ->
+                            MediaCard(
+                                item = item,
+                                onClick = {
+                                    val path = item.detailPath.ifEmpty { item.subjectId }
+                                    onMediaClick(path, item.subjectId, item.subjectType)
+                                }
+                            )
+                        }
                     }
                 }
+
+                PullToRefreshContainer(
+                    state = pullRefreshState,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    containerColor = BgCard,
+                    contentColor = AccentEmerald
+                )
             }
         }
     }

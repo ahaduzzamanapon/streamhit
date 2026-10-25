@@ -14,6 +14,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +33,7 @@ import coil.compose.AsyncImage
 import com.streamhit.app.data.model.LiveTvChannel
 import com.streamhit.app.data.model.StreamLinkItem
 import com.streamhit.app.data.repository.LiveTvRepository
+import com.streamhit.app.ui.components.AppBrandHeader
 import com.streamhit.app.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -45,6 +49,16 @@ fun LiveTvScreen(
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("All") }
     var selectedChannelForServers by remember { mutableStateOf<LiveTvChannel?>(null) }
+
+    val pullRefreshState = rememberPullToRefreshState()
+
+    if (pullRefreshState.isRefreshing) {
+        LaunchedEffect(true) {
+            val list = repository.getChannels(context, forceRefresh = true)
+            channels = list
+            pullRefreshState.endRefresh()
+        }
+    }
 
     // Fetch channels using 5h cache
     LaunchedEffect(Unit) {
@@ -176,6 +190,13 @@ fun LiveTvScreen(
             .fillMaxSize()
             .background(BgDark)
     ) {
+        AppBrandHeader(
+            tagText = "LIVE TV",
+            tagColor = Color(0xFFFF334B),
+            showSearchAction = false,
+            showShareAction = true
+        )
+
         // Search & Header
         Column(
             modifier = Modifier
@@ -252,58 +273,71 @@ fun LiveTvScreen(
             }
         }
 
-        if (isLoading) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = AccentEmerald)
-            }
-            return
-        }
-
-        if (filteredChannels.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = 80.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.Tv, contentDescription = null, tint = TextMuted, modifier = Modifier.size(48.dp))
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = if (searchQuery.isNotBlank()) "No channels matching \"$searchQuery\"" else "No channels in $selectedCategory",
-                        color = TextMuted,
-                        fontSize = 14.sp
-                    )
-                }
-            }
-            return
-        }
-
-        // Channels Grid (3 Columns on phone)
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
-            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 90.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.fillMaxSize()
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .nestedScroll(pullRefreshState.nestedScrollConnection)
         ) {
-            items(filteredChannels, key = { it.id + it.name }) { channel ->
-                LiveChannelCard(
-                    channel = channel,
-                    onClick = {
-                        val servers = channel.activeServers
-                        if (servers.size > 1) {
-                            // Multiple servers: let user choose server
-                            selectedChannelForServers = channel
-                        } else if (servers.isNotEmpty()) {
-                            onPlayStream(servers[0].url, channel.name)
+            when {
+                isLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = AccentEmerald)
+                    }
+                }
+                filteredChannels.isEmpty() -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = 80.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.Tv, contentDescription = null, tint = TextMuted, modifier = Modifier.size(48.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = if (searchQuery.isNotBlank()) "No channels matching \"$searchQuery\"" else "No channels in $selectedCategory",
+                                color = TextMuted,
+                                fontSize = 14.sp
+                            )
                         }
                     }
-                )
+                }
+                else -> {
+                    // Channels Grid (3 Columns on phone)
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(3),
+                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 90.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(filteredChannels, key = { it.id + it.name }) { channel ->
+                            LiveChannelCard(
+                                channel = channel,
+                                onClick = {
+                                    val servers = channel.activeServers
+                                    if (servers.size > 1) {
+                                        // Multiple servers: let user choose server
+                                        selectedChannelForServers = channel
+                                    } else if (servers.isNotEmpty()) {
+                                        onPlayStream(servers[0].url, channel.name)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
             }
+
+            PullToRefreshContainer(
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter),
+                containerColor = BgCard,
+                contentColor = AccentEmerald
+            )
         }
     }
 }

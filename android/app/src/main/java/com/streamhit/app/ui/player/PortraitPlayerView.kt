@@ -33,6 +33,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.streamhit.app.ui.components.ShareAppBannerCard
+import com.streamhit.app.ui.components.AppShareDialog
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
@@ -773,6 +775,19 @@ fun PortraitMediaDetails(
                     Spacer(modifier = Modifier.width(3.dp))
                     Text("Share", color = Color.White, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
                 }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Prominent Share This App Card below Player
+            var showAppShareDialog by remember { mutableStateOf(false) }
+            ShareAppBannerCard(
+                onShareClick = { showAppShareDialog = true },
+                modifier = Modifier.padding(vertical = 2.dp)
+            )
+
+            if (showAppShareDialog) {
+                AppShareDialog(onDismiss = { showAppShareDialog = false })
             }
 
             Spacer(modifier = Modifier.height(8.dp))

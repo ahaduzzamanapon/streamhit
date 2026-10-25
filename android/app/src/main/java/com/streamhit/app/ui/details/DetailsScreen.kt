@@ -28,6 +28,9 @@ import coil.compose.AsyncImage
 import com.streamhit.app.data.model.StreamResource
 import com.streamhit.app.data.model.SubjectDetail
 import com.streamhit.app.data.repository.MovieRepository
+import com.streamhit.app.ui.components.AppBrandHeader
+import com.streamhit.app.ui.components.AppShareDialog
+import com.streamhit.app.ui.components.ShareAppBannerCard
 import com.streamhit.app.ui.theme.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -68,6 +71,7 @@ fun DetailsScreen(
     var showDownloadSheet by remember { mutableStateOf(false) }
     var isDownloadingActive by remember { mutableStateOf(false) }
     var savedHistory by remember { mutableStateOf<com.streamhit.app.data.local.WatchHistoryItem?>(null) }
+    var showAppShareDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     fun selectFastestPlayable(resList: List<StreamResource>): StreamResource? {
@@ -220,11 +224,18 @@ fun DetailsScreen(
         return
     }
 
-    Box(modifier = modifier.fillMaxSize().background(BgDark)) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 60.dp)
-        ) {
+    Column(modifier = modifier.fillMaxSize().background(BgDark)) {
+        AppBrandHeader(
+            showBackButton = true,
+            onBackClick = onBackClick,
+            showShareAction = true,
+            tagText = if (item.subjectType == 2) "SERIES" else "MOVIE"
+        )
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 60.dp)
+            ) {
             // Backdrop Header
             item {
                 Box(
@@ -401,7 +412,14 @@ fun DetailsScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Prominent Share App Banner Card
+                    ShareAppBannerCard(
+                        onShareClick = { showAppShareDialog = true }
+                    )
+
+                    Spacer(modifier = Modifier.height(18.dp))
 
                     // Storyline / Synopsis
                     Text("Synopsis", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
@@ -770,17 +788,6 @@ fun DetailsScreen(
             }
         }
 
-        // Top Back Button
-        IconButton(
-            onClick = onBackClick,
-            modifier = Modifier
-                .padding(start = 12.dp, top = 36.dp)
-                .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(50.dp))
-                .size(40.dp)
-        ) {
-            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
-        }
-
         // Floating Download Bottom Banner (Screenshot 5)
         if (isDownloadingActive) {
             Card(
@@ -904,5 +911,10 @@ fun DetailsScreen(
                 )
             }
         }
+
+        if (showAppShareDialog) {
+            AppShareDialog(onDismiss = { showAppShareDialog = false })
+        }
     }
+}
 }

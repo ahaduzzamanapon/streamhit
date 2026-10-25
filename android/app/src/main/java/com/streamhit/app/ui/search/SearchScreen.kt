@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import com.streamhit.app.data.local.RecentSearchManager
 import com.streamhit.app.data.model.SubjectSummary
 import com.streamhit.app.data.repository.MovieRepository
+import com.streamhit.app.ui.components.AppBrandHeader
 import com.streamhit.app.ui.components.MediaCard
 import com.streamhit.app.ui.theme.*
 import kotlinx.coroutines.delay
@@ -68,6 +69,13 @@ fun SearchScreen(
             .fillMaxSize()
             .background(BgDark)
     ) {
+        AppBrandHeader(
+            tagText = "SEARCH",
+            tagColor = AccentEmerald,
+            showSearchAction = false,
+            showShareAction = true
+        )
+
         // Search Input Field
         Box(
             modifier = Modifier

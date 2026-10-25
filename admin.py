@@ -6,6 +6,7 @@ import time
 import secrets
 import hashlib
 import hmac
+import urllib.parse
 import aiomysql
 from fastapi import APIRouter, Request, HTTPException, Response, UploadFile, File
 from fastapi.responses import RedirectResponse, JSONResponse
@@ -724,4 +725,127 @@ async def clear_app_users_admin(request: Request):
     from main import clear_all_app_installations
     success = clear_all_app_installations()
     return {"code": 0 if success else 500, "status": "ok" if success else "failed"}
+
+# ── Reels / Shorts Creator Endpoints ──────────────────────────────────────────
+import reel_generator
+
+@router.get("/api/admin/reels/seasons")
+async def admin_reels_seasons(request: Request, detailPath: str = "", subjectId: str = ""):
+    check_admin_auth(request)
+    from main import api_season
+    res = await api_season(detailPath=detailPath, subjectId=subjectId)
+    return res
+
+@router.get("/api/admin/reels/stream-url")
+async def admin_reels_stream_url(request: Request, subjectId: str = "", detailPath: str = "", se: int = 1, ep: int = 1):
+    check_admin_auth(request)
+    from main import api_resource
+    res = await api_resource(se=se, ep=ep, detailPath=detailPath, subjectId=subjectId)
+    
+    items = res.get("data", {}).get("list") or []
+    # Filter for direct playable links
+    resolutions = []
+    best_url = ""
+    
+    for it in items:
+        link = it.get("url") or it.get("resourceLink") or ""
+        # If wrapped in /fetch, extract source_url if direct access is better, or keep fetch
+        clean_link = link
+        if "source_url=" in link:
+            try:
+                clean_link = urllib.parse.unquote(link.split("source_url=")[-1])
+            except Exception:
+                clean_link = link
+                
+        if clean_link:
+            resolutions.append({
+                "resolution": it.get("resolution", 720),
+                "size": it.get("size", 0),
+                "url": clean_link
+            })
+            if not best_url:
+                best_url = clean_link
+                
+    # Sort resolutions descending
+    resolutions.sort(key=lambda x: x["resolution"], reverse=True)
+    if resolutions:
+        best_url = resolutions[0]["url"]
+        
+    return {
+        "code": 0,
+        "best_url": best_url,
+        "resolutions": resolutions
+    }
+
+@router.post("/api/admin/reels/start")
+async def admin_reels_start(request: Request, data: dict):
+    check_admin_auth(request)
+    title = data.get("title", "").strip()
+    stream_url = data.get("stream_url", "").strip()
+    start_time = data.get("start_time", "00:00").strip()
+    part_duration = int(data.get("part_duration", 60))
+    num_parts = int(data.get("num_parts", 1))
+    start_part_num = int(data.get("start_part_num", 1))
+    top_text = data.get("top_text", "").strip()
+    bottom_text = data.get("bottom_text", "").strip()
+    anti_copyright = bool(data.get("anti_copyright", True))
+    
+    if not title:
+        raise HTTPException(status_code=400, detail="Movie or Series title is required")
+    if not stream_url:
+        raise HTTPException(status_code=400, detail="Direct video or stream URL is required")
+    if num_parts < 1 or num_parts > 30:
+        raise HTTPException(status_code=400, detail="Number of reels must be between 1 and 30")
+    if part_duration < 10 or part_duration > 600:
+        raise HTTPException(status_code=400, detail="Part duration must be between 10s and 600s")
+        
+    job_id = reel_generator.start_reel_job(
+        title=title,
+        stream_url=stream_url,
+        start_time_str=start_time,
+        part_duration=part_duration,
+        num_parts=num_parts,
+        start_part_num=start_part_num,
+        top_text_custom=top_text,
+        bottom_text_custom=bottom_text,
+        anti_copyright=anti_copyright
+    )
+    
+    return {
+        "code": 0,
+        "job_id": job_id,
+        "message": f"Started generating {num_parts} reel(s) for '{title}'"
+    }
+
+@router.get("/api/admin/reels/job-status")
+async def admin_reels_job_status(request: Request, job_id: str):
+    check_admin_auth(request)
+    job = reel_generator.active_reel_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found or expired")
+    return {
+        "code": 0,
+        "job": job
+    }
+
+@router.get("/api/admin/reels/history")
+async def admin_reels_history(request: Request):
+    check_admin_auth(request)
+    history = reel_generator.load_reels_history()
+    return {
+        "code": 0,
+        "list": history
+    }
+
+@router.delete("/api/admin/reels/delete")
+async def admin_reels_delete(request: Request, filename: str):
+    check_admin_auth(request)
+    if not filename:
+        raise HTTPException(status_code=400, detail="Filename is required")
+    success = reel_generator.delete_reel_file(filename)
+    return {
+        "code": 0 if success else 404,
+        "status": "deleted" if success else "file not found"
+    }
+
 
