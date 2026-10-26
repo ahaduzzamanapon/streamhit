@@ -8,10 +8,13 @@ import urllib.parse
 import aiomysql
 from typing import Dict, Any, Optional
 
+import tempfile
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FB_CONFIG_FILE = os.path.join(BASE_DIR, "facebook_config.json")
 FB_HISTORY_FILE = os.path.join(BASE_DIR, "public", "reels", "facebook_history.json")
-FB_LOG_FILE = os.path.join(BASE_DIR, "public", "reels", "facebook_bot.log")
+TEMP_LOG_FILE = os.path.join(tempfile.gettempdir(), "nxly_facebook_bot.log")
+LOCAL_LOG_FILE = os.path.join(BASE_DIR, "public", "reels", "facebook_bot.log")
 
 _LIVE_LOGS = []
 
@@ -22,24 +25,26 @@ def bot_log(msg: str):
     _LIVE_LOGS.append(formatted)
     if len(_LIVE_LOGS) > 300:
         _LIVE_LOGS.pop(0)
-    try:
-        os.makedirs(os.path.dirname(FB_LOG_FILE), exist_ok=True)
-        with open(FB_LOG_FILE, "a", encoding="utf-8") as f:
-            f.write(formatted + "\n")
-    except Exception:
-        pass
-
-def get_live_logs() -> str:
-    if _LIVE_LOGS:
-        return "\n".join(_LIVE_LOGS[-150:])
-    if os.path.exists(FB_LOG_FILE):
+    for log_path in (TEMP_LOG_FILE, LOCAL_LOG_FILE):
         try:
-            with open(FB_LOG_FILE, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-                if lines:
-                    return "".join(lines[-150:])
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(formatted + "\n")
         except Exception:
             pass
+
+def get_live_logs() -> str:
+    for log_path in (TEMP_LOG_FILE, LOCAL_LOG_FILE):
+        if os.path.exists(log_path):
+            try:
+                with open(log_path, "r", encoding="utf-8") as f:
+                    lines = [l.strip() for l in f.readlines() if l.strip()]
+                    if lines:
+                        return "\n".join(lines[-150:])
+            except Exception:
+                pass
+    if _LIVE_LOGS:
+        return "\n".join(_LIVE_LOGS[-150:])
     return f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [FacebookBot] Auto-Pilot daemon active (10m cycle). Waiting for trigger."
 
 DEFAULT_PAGE_ID = os.environ.get("FB_PAGE_ID", "1367186939808744")
