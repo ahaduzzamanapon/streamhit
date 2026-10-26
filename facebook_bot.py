@@ -799,9 +799,14 @@ async def cleanup_copyrighted_videos():
 
 async def run_live_bot_cycle() -> Dict[str, Any]:
     bot_log("[Terminal] ⚡ Manually triggering immediate Auto-Pilot cycle...")
-    res = await trigger_auto_trending_reel()
-    bot_log(f"[Terminal] Cycle finished: success={res.get('success')}, title='{res.get('title')}', error={res.get('error')}")
-    return res
+    try:
+        res = await trigger_auto_trending_reel()
+        bot_log(f"[Terminal] Cycle finished: success={res.get('success')}, title='{res.get('title')}', error={res.get('error')}")
+        return res
+    except Exception as e:
+        bot_log(f"[Terminal] ❌ Exception in cycle execution: {e}")
+        return {"success": False, "error": str(e)}
+
 
 # Background auto-pilot scheduler loop
 async def fb_auto_pilot_loop():

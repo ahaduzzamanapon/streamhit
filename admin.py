@@ -1178,14 +1178,11 @@ async def admin_facebook_save_config(data: dict, request: Request):
 async def admin_facebook_trigger(request: Request):
     check_admin_auth(request)
     import facebook_bot
-    res = await facebook_bot.trigger_auto_trending_reel()
-    if not res.get("success"):
-        raise HTTPException(status_code=500, detail=res.get("error", "Reel creation or upload failed"))
+    asyncio.create_task(facebook_bot.run_live_bot_cycle())
     return {
         "code": 0,
         "success": True,
-        "message": f"Successfully created and posted Reel for '{res.get('title')}' on Facebook!",
-        "reel_url": res.get("reel_url")
+        "message": "Auto-Pilot cycle initiated in background! Check live terminal for progress."
     }
 
 @router.get("/api/admin/facebook/history")
@@ -1213,13 +1210,12 @@ async def admin_facebook_terminal_log(request: Request):
 async def admin_facebook_terminal_run(request: Request):
     check_admin_auth(request)
     import facebook_bot
-    res = await facebook_bot.run_live_bot_cycle()
-    logs = facebook_bot.get_live_logs()
+    asyncio.create_task(facebook_bot.run_live_bot_cycle())
     return {
         "code": 0,
-        "success": res.get("success", False),
-        "result": res,
-        "logs": logs
+        "success": True,
+        "message": "Auto-Pilot cycle initiated in background! Check terminal output below.",
+        "logs": facebook_bot.get_live_logs()
     }
 
 @router.post("/api/admin/facebook/publish-reel")
