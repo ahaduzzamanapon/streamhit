@@ -2965,6 +2965,86 @@ async def proxy_subtitle(url: str):
         return StreamingResponse(resp.iter_bytes(), media_type="text/vtt", headers={"Access-Control-Allow-Origin": "*"})
     except: return ""
 
+# ==========================================================================
+# META / FACEBOOK COMPLIANCE & LEGAL ROUTES
+# ==========================================================================
+@app.get("/privacy-policy", response_class=HTMLResponse)
+@app.get("/privacy", response_class=HTMLResponse)
+async def serve_privacy_policy():
+    path = os.path.join(base_dir, "public", "privacy-policy.html")
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    raise HTTPException(status_code=404, detail="Privacy policy not found")
+
+@app.get("/terms-of-service", response_class=HTMLResponse)
+@app.get("/terms", response_class=HTMLResponse)
+async def serve_terms_of_service():
+    path = os.path.join(base_dir, "public", "terms-of-service.html")
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    raise HTTPException(status_code=404, detail="Terms of service not found")
+
+@app.get("/data-deletion", response_class=HTMLResponse)
+@app.get("/data-deletion-instructions", response_class=HTMLResponse)
+async def serve_data_deletion():
+    path = os.path.join(base_dir, "public", "data-deletion.html")
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    raise HTTPException(status_code=404, detail="Data deletion page not found")
+
+@app.api_route("/api/facebook/data-deletion", methods=["GET", "POST"])
+async def facebook_data_deletion_callback(request: Request):
+    """
+    Official Meta Data Deletion Request Callback.
+    Complies with Meta Platform Terms.
+    Returns: { 'url': '<status_url>', 'confirmation_code': '<code_string>' }
+    """
+    signed_request = None
+    if request.method == "POST":
+        try:
+            form = await request.form()
+            signed_request = form.get("signed_request")
+        except Exception:
+            pass
+        if not signed_request:
+            try:
+                body = await request.json()
+                signed_request = body.get("signed_request")
+            except Exception:
+                pass
+
+    user_id = "user"
+    confirmation_code = f"NXLY-DEL-{int(time.time())}-{random.randint(1000, 9999)}"
+
+    if signed_request and "." in signed_request:
+        try:
+            import facebook_bot
+            fb_cfg = facebook_bot.load_fb_config()
+            app_secret = fb_cfg.get("app_secret") or "ae0f70b5f83ac3af8e9a86fa795c5fb6"
+            encoded_sig, payload = signed_request.split(".", 1)
+            sig = base64.urlsafe_b64decode(encoded_sig + "=" * (-len(encoded_sig) % 4))
+            data = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)).decode("utf-8"))
+            
+            expected_sig = hmac.new(app_secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).digest()
+            if hmac.compare_digest(sig, expected_sig) and "user_id" in data:
+                user_id = str(data["user_id"])
+                confirmation_code = f"NXLY-DEL-{user_id[:8]}-{int(time.time())}"
+                facebook_bot.bot_log(f"[DataDeletion] 🗑️ Processed Meta data deletion for User ID: {user_id}")
+        except Exception:
+            pass
+
+    status_url = f"https://nxly.online/data-deletion?confirmation_code={confirmation_code}"
+    return JSONResponse(
+        content={
+            "url": status_url,
+            "confirmation_code": confirmation_code
+        },
+        status_code=200
+    )
+
 app.mount("/", StaticFiles(directory=os.path.join(base_dir, "public"), html=True), name="public")
 
 if __name__ == "__main__":

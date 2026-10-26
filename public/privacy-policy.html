@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Privacy Policy — NXLY Stream</title>
+    <meta name="description" content="Privacy Policy for NXLY Stream website, mobile application, and Facebook integrations. Learn how we handle and protect your data.">
+    <link rel="canonical" href="https://nxly.online/privacy-policy">
+    <link rel="icon" type="image/svg+xml" href="/favicon-nxly.svg">
+    
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://nxly.online/privacy-policy">
+    <meta property="og:title" content="Privacy Policy — NXLY Stream">
+    <meta property="og:description" content="Learn how NXLY Stream collects, uses, and protects your personal information.">
+    <meta property="og:image" content="https://nxly.online/default-cover.png">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --bg-body: #07090e;
+            --bg-card: rgba(18, 22, 34, 0.7);
+            --border-card: rgba(255, 255, 255, 0.08);
+            --primary: #e50914;
+            --primary-glow: rgba(229, 9, 20, 0.35);
+            --accent-cyan: #00e5ff;
+            --text-main: #f0f3fa;
+            --text-muted: #94a3b8;
+            --text-heading: #ffffff;
+            --font-display: 'Outfit', sans-serif;
+            --font-body: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            font-family: var(--font-body);
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
+            background-image: 
+                radial-gradient(circle at 15% 10%, rgba(229, 9, 20, 0.12) 0%, transparent 40%),
+                radial-gradient(circle at 85% 80%, rgba(0, 229, 255, 0.08) 0%, transparent 40%);
+            min-height: 100vh;
+        }
+
+        /* Navbar */
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1.25rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            border-bottom: 1px solid var(--border-card);
+        }
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: #fff;
+            font-family: var(--font-display);
+            font-weight: 800;
+            font-size: 1.4rem;
+            letter-spacing: -0.5px;
+        }
+        .nav-logo span {
+            color: var(--primary);
+        }
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        .nav-links a:hover, .nav-links a.active {
+            color: #fff;
+        }
+        .nav-btn {
+            background: linear-gradient(135deg, var(--primary), #b80610);
+            color: #fff !important;
+            padding: 0.5rem 1.1rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            box-shadow: 0 4px 15px var(--primary-glow);
+        }
+
+        /* Container */
+        .container {
+            max-width: 900px;
+            margin: 3rem auto 5rem;
+            padding: 0 1.5rem;
+        }
+
+        .header-section {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(229, 9, 20, 0.12);
+            color: #ff5252;
+            border: 1px solid rgba(229, 9, 20, 0.3);
+            padding: 0.35rem 0.9rem;
+            border-radius: 9999px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 1rem;
+        }
+        .title {
+            font-family: var(--font-display);
+            font-size: 2.6rem;
+            font-weight: 800;
+            color: var(--text-heading);
+            letter-spacing: -1px;
+            margin-bottom: 0.75rem;
+        }
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+        }
+        .effective-date {
+            color: var(--accent-cyan);
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+            font-weight: 500;
+        }
+
+        /* Card Content */
+        .content-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            backdrop-filter: blur(16px);
+            border-radius: 20px;
+            padding: 2.5rem 2.5rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        h2 {
+            font-family: var(--font-display);
+            font-size: 1.4rem;
+            color: #fff;
+            margin: 2rem 0 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        h2:first-of-type {
+            margin-top: 0;
+        }
+        h2 i {
+            color: var(--primary);
+            font-size: 1.15rem;
+        }
+
+        p, ul {
+            color: var(--text-muted);
+            font-size: 0.98rem;
+            margin-bottom: 1rem;
+        }
+
+        ul {
+            padding-left: 1.5rem;
+        }
+        li {
+            margin-bottom: 0.5rem;
+        }
+        strong {
+            color: #fff;
+        }
+
+        .highlight-box {
+            background: rgba(0, 229, 255, 0.05);
+            border-left: 3px solid var(--accent-cyan);
+            border-radius: 0 10px 10px 0;
+            padding: 1rem 1.25rem;
+            margin: 1.5rem 0;
+            color: #e2e8f0;
+            font-size: 0.95rem;
+        }
+        .highlight-box a {
+            color: var(--accent-cyan);
+            text-decoration: underline;
+            font-weight: 600;
+        }
+
+        .meta-box {
+            background: rgba(229, 9, 20, 0.06);
+            border-left: 3px solid var(--primary);
+            border-radius: 0 10px 10px 0;
+            padding: 1rem 1.25rem;
+            margin: 1.5rem 0;
+            color: #f1f5f9;
+        }
+
+        /* Footer */
+        footer {
+            border-top: 1px solid var(--border-card);
+            padding: 2.5rem 1.5rem;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+        .footer-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        .footer-links a:hover {
+            color: #fff;
+        }
+
+        @media (max-width: 640px) {
+            .navbar { padding: 1rem; }
+            .content-card { padding: 1.5rem; }
+            .title { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar">
+        <a href="/" class="nav-logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 4L20 12L4 20V4Z" fill="#E50914"/></svg>
+            NXLY <span>STREAM</span>
+        </a>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/terms-of-service">Terms</a>
+            <a href="/data-deletion">Data Deletion</a>
+            <a href="/download" class="nav-btn"><i class="fab fa-android"></i> Get App</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="header-section">
+            <span class="badge"><i class="fas fa-shield-alt"></i> Legal &amp; Transparency</span>
+            <h1 class="title">Privacy Policy</h1>
+            <p class="subtitle">How NXLY Stream collects, uses, and safeguards your personal data</p>
+            <p class="effective-date"><i class="far fa-calendar-check"></i> Effective Date: October 26, 2026</p>
+        </div>
+
+        <div class="content-card">
+            <h2><i class="fas fa-info-circle"></i> 1. Introduction</h2>
+            <p>Welcome to <strong>NXLY Stream</strong> ("we", "our", or "us"). We provide high-quality video streaming information, catalog navigation, an Android mobile application, and automated social entertainment features via our website (<a href="https://nxly.online" style="color:var(--accent-cyan);">https://nxly.online</a>) and associated services.</p>
+            <p>We respect your privacy and are committed to protecting any personal data you share with us. This Privacy Policy describes what information we collect, how it is used, and the choices you have concerning your data.</p>
+
+            <h2><i class="fab fa-facebook"></i> 2. Meta &amp; Facebook Platform Data</h2>
+            <div class="meta-box">
+                <p><strong>Meta Platform Compliance:</strong> When you interact with our Facebook Page (NXLY), Facebook Reels, Groups, or use Facebook Login/Apps associated with NXLY Stream, we strictly comply with Meta Platform Terms and Developer Policies.</p>
+            </div>
+            <p>Through Facebook integration, we may receive:</p>
+            <ul>
+                <li><strong>Public Profile Information:</strong> Your Facebook User ID, Name, or Public Profile identifier if you explicitly log in or interact with our application.</li>
+                <li><strong>Engagement Data:</strong> Likes, public comments, or reel shares on our official Page reels.</li>
+                <li><strong>Page &amp; Group Administrative Permissions:</strong> For authorized page administrators who link a Facebook Page or Group to distribute movie trailers and automated reel snippets.</li>
+            </ul>
+            <p><strong>We never sell, rent, or trade Meta user data</strong> to third parties or advertising brokers.</p>
+
+            <h2><i class="fas fa-database"></i> 3. Information We Collect Automatically</h2>
+            <p>When you visit our website or use the NXLY Stream Android APK, our servers may automatically log:</p>
+            <ul>
+                <li><strong>Device Information:</strong> Operating system version, browser type, screen resolution, and language settings.</li>
+                <li><strong>Usage &amp; Performance Logs:</strong> Pages viewed, stream latency, crash analytics, and referral sources to optimize video delivery.</li>
+                <li><strong>Network Identifiers:</strong> Truncated IP addresses solely used for geographical CDN load balancing and abuse prevention.</li>
+            </ul>
+
+            <h2><i class="fas fa-cogs"></i> 4. How We Use Your Information</h2>
+            <p>Your information is used strictly for the following purposes:</p>
+            <ul>
+                <li>To deliver, maintain, and enhance the streaming catalog and video player.</li>
+                <li>To deliver automated movie reel updates and notifications to connected Facebook channels.</li>
+                <li>To detect, prevent, and address technical issues, abuse, or unauthorized exploitation.</li>
+                <li>To respond to user inquiries and customer support requests.</li>
+            </ul>
+
+            <h2><i class="fas fa-trash-alt"></i> 5. User Data Deletion Rights</h2>
+            <div class="highlight-box">
+                <p><strong>Want to delete your data?</strong> You have the absolute right to request the deletion of any personal data associated with your account or Facebook interactions. Visit our dedicated <a href="/data-deletion">User Data Deletion Page</a> or submit a request directly via our automated callback.</p>
+            </div>
+            <p>Under GDPR and CCPA, you have the following rights:</p>
+            <ul>
+                <li><strong>Right to Access:</strong> Request a copy of your stored personal information.</li>
+                <li><strong>Right to Erasure (Forget Me):</strong> Request complete deletion of your data from our active databases and caches.</li>
+                <li><strong>Right to Revoke Permissions:</strong> Remove the NXLY application from your Facebook account at any time via Facebook App Settings.</li>
+            </ul>
+
+            <h2><i class="fas fa-cookie-bite"></i> 6. Cookies and Local Storage</h2>
+            <p>We use minimal local storage and cookies to save your user preferences (e.g. playback volume, dark theme, and watch history bookmarks). We do not use intrusive cross-site tracking cookies.</p>
+
+            <h2><i class="fas fa-lock"></i> 7. Security</h2>
+            <p>We implement industry-standard HTTPS encryption (TLS 1.3), hashed tokens, and strict access controls to safeguard your data. While no method of transmission is 100% impenetrable, we continuously monitor and upgrade our infrastructure to prevent unauthorized access.</p>
+
+            <h2><i class="fas fa-envelope"></i> 8. Contact Us</h2>
+            <p>If you have any questions, concerns, or requests regarding this Privacy Policy or your data, please contact our Data Protection Officer:</p>
+            <ul>
+                <li><strong>Email:</strong> <a href="mailto:support@nxly.online" style="color:var(--accent-cyan);">support@nxly.online</a></li>
+                <li><strong>Website:</strong> <a href="https://nxly.online" style="color:var(--accent-cyan);">https://nxly.online</a></li>
+                <li><strong>Location:</strong> Dhaka, Bangladesh</li>
+            </ul>
+        </div>
+    </div>
+
+    <footer>
+        <div class="footer-links">
+            <a href="/">Home</a>
+            <a href="/privacy-policy">Privacy Policy</a>
+            <a href="/terms-of-service">Terms of Service</a>
+            <a href="/data-deletion">Data Deletion</a>
+            <a href="/download">Download App</a>
+        </div>
+        <p>&copy; 2026 NXLY Stream. All rights reserved.</p>
+    </footer>
+
+</body>
+</html>

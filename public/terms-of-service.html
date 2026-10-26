@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Terms of Service — NXLY Stream</title>
+    <meta name="description" content="Terms of Service and Conditions of Use for NXLY Stream website, mobile application, and Facebook integrations.">
+    <link rel="canonical" href="https://nxly.online/terms-of-service">
+    <link rel="icon" type="image/svg+xml" href="/favicon-nxly.svg">
+    
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://nxly.online/terms-of-service">
+    <meta property="og:title" content="Terms of Service — NXLY Stream">
+    <meta property="og:description" content="Read the Terms and Conditions governing use of NXLY Stream services.">
+    <meta property="og:image" content="https://nxly.online/default-cover.png">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --bg-body: #07090e;
+            --bg-card: rgba(18, 22, 34, 0.7);
+            --border-card: rgba(255, 255, 255, 0.08);
+            --primary: #e50914;
+            --primary-glow: rgba(229, 9, 20, 0.35);
+            --accent-cyan: #00e5ff;
+            --text-main: #f0f3fa;
+            --text-muted: #94a3b8;
+            --text-heading: #ffffff;
+            --font-display: 'Outfit', sans-serif;
+            --font-body: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            font-family: var(--font-body);
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
+            background-image: 
+                radial-gradient(circle at 85% 10%, rgba(229, 9, 20, 0.12) 0%, transparent 40%),
+                radial-gradient(circle at 15% 80%, rgba(0, 229, 255, 0.08) 0%, transparent 40%);
+            min-height: 100vh;
+        }
+
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1.25rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            border-bottom: 1px solid var(--border-card);
+        }
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: #fff;
+            font-family: var(--font-display);
+            font-weight: 800;
+            font-size: 1.4rem;
+            letter-spacing: -0.5px;
+        }
+        .nav-logo span { color: var(--primary); }
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        .nav-links a:hover, .nav-links a.active { color: #fff; }
+        .nav-btn {
+            background: linear-gradient(135deg, var(--primary), #b80610);
+            color: #fff !important;
+            padding: 0.5rem 1.1rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            box-shadow: 0 4px 15px var(--primary-glow);
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 3rem auto 5rem;
+            padding: 0 1.5rem;
+        }
+
+        .header-section {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(0, 229, 255, 0.1);
+            color: var(--accent-cyan);
+            border: 1px solid rgba(0, 229, 255, 0.3);
+            padding: 0.35rem 0.9rem;
+            border-radius: 9999px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 1rem;
+        }
+        .title {
+            font-family: var(--font-display);
+            font-size: 2.6rem;
+            font-weight: 800;
+            color: var(--text-heading);
+            letter-spacing: -1px;
+            margin-bottom: 0.75rem;
+        }
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+        }
+        .effective-date {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+            font-weight: 500;
+        }
+
+        .content-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            backdrop-filter: blur(16px);
+            border-radius: 20px;
+            padding: 2.5rem 2.5rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        h2 {
+            font-family: var(--font-display);
+            font-size: 1.4rem;
+            color: #fff;
+            margin: 2rem 0 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        h2:first-of-type { margin-top: 0; }
+        h2 i { color: var(--accent-cyan); font-size: 1.15rem; }
+
+        p, ul {
+            color: var(--text-muted);
+            font-size: 0.98rem;
+            margin-bottom: 1rem;
+        }
+
+        ul { padding-left: 1.5rem; }
+        li { margin-bottom: 0.5rem; }
+        strong { color: #fff; }
+
+        .callout {
+            background: rgba(229, 9, 20, 0.08);
+            border-left: 3px solid var(--primary);
+            border-radius: 0 10px 10px 0;
+            padding: 1rem 1.25rem;
+            margin: 1.5rem 0;
+            color: #f1f5f9;
+        }
+
+        footer {
+            border-top: 1px solid var(--border-card);
+            padding: 2.5rem 1.5rem;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+        .footer-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        .footer-links a:hover { color: #fff; }
+
+        @media (max-width: 640px) {
+            .navbar { padding: 1rem; }
+            .content-card { padding: 1.5rem; }
+            .title { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar">
+        <a href="/" class="nav-logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 4L20 12L4 20V4Z" fill="#E50914"/></svg>
+            NXLY <span>STREAM</span>
+        </a>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/privacy-policy">Privacy</a>
+            <a href="/data-deletion">Data Deletion</a>
+            <a href="/download" class="nav-btn"><i class="fab fa-android"></i> Get App</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="header-section">
+            <span class="badge"><i class="fas fa-file-contract"></i> User Agreement</span>
+            <h1 class="title">Terms of Service</h1>
+            <p class="subtitle">Please review these terms carefully before accessing NXLY Stream</p>
+            <p class="effective-date"><i class="far fa-calendar-alt"></i> Last Updated: October 26, 2026</p>
+        </div>
+
+        <div class="content-card">
+            <h2><i class="fas fa-check-circle"></i> 1. Acceptance of Terms</h2>
+            <p>By accessing or using the NXLY Stream website (<a href="https://nxly.online" style="color:var(--accent-cyan);">https://nxly.online</a>), our Android application, or our Facebook-integrated automated media services, you agree to be bound by these Terms of Service and our Privacy Policy. If you do not agree, please do not use our services.</p>
+
+            <h2><i class="fas fa-tv"></i> 2. Description of Services</h2>
+            <p>NXLY Stream is a digital media discovery, aggregation, and entertainment platform. Features include:</p>
+            <ul>
+                <li>Information index, metadata browsing, and trailers for movies and television series.</li>
+                <li>Official Android mobile streaming client.</li>
+                <li>Automated short-form video previews and social updates distributed through our official Meta/Facebook channels.</li>
+            </ul>
+
+            <h2><i class="fab fa-facebook-square"></i> 3. Meta &amp; Facebook Platform Terms</h2>
+            <div class="callout">
+                <p><strong>Compliance Notice:</strong> All features that interact with Meta technologies (such as Facebook Pages, Reels, Groups, and Messenger API) operate in strict compliance with the <a href="https://developers.facebook.com/terms/" target="_blank" style="color:var(--accent-cyan); text-decoration:underline;">Meta Platform Terms</a> and Developer Policies.</p>
+            </div>
+            <p>Users who interact with our Facebook Reels or Page grant NXLY Stream the necessary technical permissions to display comments, process reactions, and post responses according to user interaction.</p>
+
+            <h2><i class="fas fa-user-lock"></i> 4. User Conduct &amp; Prohibited Activities</h2>
+            <p>You agree not to engage in any of the following activities:</p>
+            <ul>
+                <li>Attempting to bypass, reverse engineer, or disrupt the platform's security mechanisms.</li>
+                <li>Using automated scrapers, bots, or excessive rate requests that strain or impair server infrastructure.</li>
+                <li>Submitting fraudulent, defamatory, or abusive content through any user input forms or comments.</li>
+                <li>Violating any applicable local, national, or international copyright and intellectual property laws.</li>
+            </ul>
+
+            <h2><i class="fas fa-shield-alt"></i> 5. Intellectual Property &amp; Content Disclaimer</h2>
+            <p>NXLY Stream functions as an indexing and metadata discovery tool. All video trademarks, logos, audio tracks, and visual assets referenced are the intellectual property of their respective copyright holders. NXLY does not claim ownership over third-party media.</p>
+            <p>If you are a copyright holder and believe content infringes upon your copyright, please submit a formal DMCA notice to <a href="mailto:support@nxly.online" style="color:var(--accent-cyan);">support@nxly.online</a> with detailed proof of ownership, and it will be removed promptly.</p>
+
+            <h2><i class="fas fa-exclamation-triangle"></i> 6. Limitation of Liability</h2>
+            <p>NXLY Stream is provided on an "AS IS" and "AS AVAILABLE" basis without warranties of any kind. In no event shall NXLY Stream, its developers, or affiliates be liable for any direct, indirect, incidental, or consequential damages resulting from the use or inability to use the service.</p>
+
+            <h2><i class="fas fa-ban"></i> 7. Termination</h2>
+            <p>We reserve the right to suspend or terminate access to any user or client that violates these Terms of Service or creates security hazards for the service, without prior notice.</p>
+
+            <h2><i class="fas fa-scale-balanced"></i> 8. Governing Law &amp; Contact</h2>
+            <p>These terms are governed by and construed in accordance with applicable laws. If you have questions regarding these Terms, contact us at:</p>
+            <ul>
+                <li><strong>Email:</strong> <a href="mailto:support@nxly.online" style="color:var(--accent-cyan);">support@nxly.online</a></li>
+                <li><strong>Website:</strong> <a href="https://nxly.online" style="color:var(--accent-cyan);">https://nxly.online</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <footer>
+        <div class="footer-links">
+            <a href="/">Home</a>
+            <a href="/privacy-policy">Privacy Policy</a>
+            <a href="/terms-of-service">Terms of Service</a>
+            <a href="/data-deletion">Data Deletion</a>
+            <a href="/download">Download App</a>
+        </div>
+        <p>&copy; 2026 NXLY Stream. All rights reserved.</p>
+    </footer>
+
+</body>
+</html>

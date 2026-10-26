@@ -27,13 +27,22 @@ async def main():
         now = int(time.time())
         last_post = int(cfg.get("last_post_time", 0))
 
+        # Single-instance file lock to prevent parallel executions
+        try:
+            import fcntl
+            lock_f = open("/tmp/autopilot_cron_py.lock", "w")
+            fcntl.flock(lock_f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except Exception:
+            # Another cron execution is actively in progress
+            return
+
         q_data = autopilot_queue.load_queue_data()
         st = q_data.get("state", {})
         if st.get("is_busy"):
-            # Check for stale lock (> 240 seconds)
+            # Check for stale lock (> 600 seconds)
             busy_since = st.get("busy_since") or 0
-            if now - busy_since > 240:
-                facebook_bot.bot_log("[CronDaemon] ⚠️ Releasing stale lock (>240s) and resetting job.")
+            if now - busy_since > 600:
+                facebook_bot.bot_log("[CronDaemon] ⚠️ Releasing stale lock (>600s) and resetting job.")
                 st["is_busy"] = False
                 st["step"] = "idle"
                 autopilot_queue.save_queue_data(q_data)
