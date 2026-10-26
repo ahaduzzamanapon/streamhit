@@ -1547,6 +1547,79 @@ async def admin_autopilot_run_now_legacy(request: Request):
     asyncio.create_task(autopilot_queue.process_next_queue_job())
     return {"code": 0, "success": True, "message": "Cycle triggered"}
 
+# ── SYSTEM PROCESS MANAGER & CLEANUP ──────────────────────────────────────────
+@router.get("/api/admin/system/processes")
+async def admin_get_processes(request: Request):
+    check_admin_auth(request)
+    import subprocess
+    try:
+        user = os.getenv("USER", "lcsyxfen")
+        res = subprocess.run(["ps", "-u", user, "-o", "pid,ppid,%cpu,%mem,etime,args"], capture_output=True, text=True, timeout=6)
+        lines = res.stdout.strip().split("\n")
+        processes = []
+        if len(lines) > 1:
+            for l in lines[1:]:
+                parts = l.strip().split(None, 5)
+                if len(parts) >= 6:
+                    processes.append({
+                        "pid": parts[0],
+                        "ppid": parts[1],
+                        "cpu": parts[2],
+                        "mem": parts[3],
+                        "etime": parts[4],
+                        "cmd": parts[5]
+                    })
+        # Sort by CPU usage desc
+        processes.sort(key=lambda x: float(x.get("cpu", 0) or 0), reverse=True)
+        return {"code": 0, "total": len(processes), "processes": processes}
+    except Exception as e:
+        return {"code": 500, "error": str(e)}
+
+@router.post("/api/admin/system/cleanup-processes")
+async def admin_cleanup_processes(request: Request):
+    """Safely terminates zombie/stuck bash updates, duplicate cp commands, and hung scripts."""
+    check_admin_auth(request)
+    import subprocess
+    import signal
+    killed = []
+    try:
+        user = os.getenv("USER", "lcsyxfen")
+        res = subprocess.run(["ps", "-u", user, "-o", "pid,args"], capture_output=True, text=True, timeout=6)
+        my_pid = str(os.getpid())
+        for line in res.stdout.strip().split("\n")[1:]:
+            parts = line.strip().split(None, 1)
+            if len(parts) >= 2:
+                pid_str, cmd = parts[0], parts[1]
+                # Kill stale bash deploy commands or redundant cp commands or stuck ffmpeg
+                is_stale = (
+                    "bash -c echo" in cmd or 
+                    "cp -rf" in cmd or 
+                    "sitemap_generator.py" in cmd or 
+                    "ffmpeg" in cmd
+                )
+                if pid_str != my_pid and is_stale:
+                    try:
+                        os.kill(int(pid_str), signal.SIGKILL)
+                        killed.append({"pid": pid_str, "cmd": cmd})
+                    except Exception:
+                        pass
+        return {"code": 0, "killed_count": len(killed), "killed": killed}
+    except Exception as e:
+        return {"code": 500, "error": str(e)}
+
+@router.post("/api/admin/system/kill-pid")
+async def admin_kill_pid(data: dict, request: Request):
+    check_admin_auth(request)
+    import signal
+    pid = int(data.get("pid", 0))
+    if pid <= 0 or pid == os.getpid():
+        raise HTTPException(status_code=400, detail="Cannot kill own process or invalid pid")
+    try:
+        os.kill(pid, signal.SIGKILL)
+        return {"code": 0, "message": f"Process {pid} terminated"}
+    except Exception as e:
+        return {"code": 500, "error": str(e)}
+
 
 
 
