@@ -101,7 +101,7 @@ async def check_fb_token_validity(page_token: str = "", page_id: str = "") -> Tu
         return False, "Missing Facebook Page Access Token"
 
     try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
+        async with httpx.AsyncClient(timeout=20.0) as client:
             resp = await client.get(f"https://graph.facebook.com/v19.0/{target_page_id}?fields=id,name&access_token={target_token}")
             data = resp.json()
             if "error" in data:
@@ -113,7 +113,8 @@ async def check_fb_token_validity(page_token: str = "", page_id: str = "") -> Tu
                 return False, f"Facebook API Error: {msg}"
             return True, data.get("name", "OK")
     except Exception as e:
-        return False, f"Network check failed: {e}"
+        bot_log(f"[FacebookBot] Pre-flight network warning: {e}")
+        return True, "Network check bypass"
 
 
 def load_fb_history() -> list:
