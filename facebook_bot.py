@@ -11,6 +11,36 @@ from typing import Dict, Any, Optional
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FB_CONFIG_FILE = os.path.join(BASE_DIR, "facebook_config.json")
 FB_HISTORY_FILE = os.path.join(BASE_DIR, "public", "reels", "facebook_history.json")
+FB_LOG_FILE = os.path.join(BASE_DIR, "public", "reels", "facebook_bot.log")
+
+_LIVE_LOGS = []
+
+def bot_log(msg: str):
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    formatted = f"[{timestamp}] {msg}"
+    print(formatted, flush=True)
+    _LIVE_LOGS.append(formatted)
+    if len(_LIVE_LOGS) > 300:
+        _LIVE_LOGS.pop(0)
+    try:
+        os.makedirs(os.path.dirname(FB_LOG_FILE), exist_ok=True)
+        with open(FB_LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(formatted + "\n")
+    except Exception:
+        pass
+
+def get_live_logs() -> str:
+    if _LIVE_LOGS:
+        return "\n".join(_LIVE_LOGS[-150:])
+    if os.path.exists(FB_LOG_FILE):
+        try:
+            with open(FB_LOG_FILE, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+                if lines:
+                    return "".join(lines[-150:])
+        except Exception:
+            pass
+    return f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [FacebookBot] Auto-Pilot daemon active (10m cycle). Waiting for trigger."
 
 DEFAULT_PAGE_ID = os.environ.get("FB_PAGE_ID", "1367186939808744")
 DEFAULT_PAGE_TOKEN = os.environ.get("FB_PAGE_TOKEN", "")
@@ -152,7 +182,7 @@ async def upload_reel_to_facebook(
     page_token = cfg.get("page_token", DEFAULT_PAGE_TOKEN)
 
     file_size = os.path.getsize(video_path)
-    print(f"[FacebookBot] Starting Reels upload ({file_size} bytes)...")
+    bot_log(f"[FacebookBot] Starting Reels upload ({file_size} bytes)...")
 
     async with httpx.AsyncClient(timeout=180.0) as client:
         # Phase 1: Initialize session
@@ -163,14 +193,17 @@ async def upload_reel_to_facebook(
         })
         init_data = init_resp.json()
         if "error" in init_data:
-            return {"success": False, "error": init_data["error"].get("message", "Init failed")}
+            err_msg = init_data["error"].get("message", "Init failed")
+            bot_log(f"[FacebookBot] Upload init failed: {err_msg}")
+            return {"success": False, "error": err_msg}
 
         video_id = init_data.get("video_id")
         upload_url = init_data.get("upload_url")
         if not video_id or not upload_url:
+            bot_log("[FacebookBot] Invalid init response from Facebook")
             return {"success": False, "error": "Invalid init response from Facebook"}
 
-        print(f"[FacebookBot] Initialized video_id: {video_id}")
+        bot_log(f"[FacebookBot] Initialized video_id: {video_id}")
 
         # Phase 2: Upload Binary
         with open(video_path, "rb") as vf:
@@ -183,9 +216,10 @@ async def upload_reel_to_facebook(
         }
         upload_resp = await client.post(upload_url, headers=headers, content=video_bytes)
         if upload_resp.status_code not in (200, 201):
+            bot_log(f"[FacebookBot] Binary upload failed: {upload_resp.text[:300]}")
             return {"success": False, "error": f"Binary upload failed: {upload_resp.text[:300]}"}
 
-        print(f"[FacebookBot] Binary uploaded successfully.")
+        bot_log("[FacebookBot] Binary uploaded successfully.")
 
         # Phase 3: Finish and Publish
         finish_resp = await client.post(init_url, data={
@@ -197,13 +231,15 @@ async def upload_reel_to_facebook(
         })
         finish_data = finish_resp.json()
         if "error" in finish_data:
-            return {"success": False, "error": finish_data["error"].get("message", "Finish failed")}
+            err_msg = finish_data["error"].get("message", "Finish failed")
+            bot_log(f"[FacebookBot] Finish publish failed: {err_msg}")
+            return {"success": False, "error": err_msg}
 
         reel_url = f"https://www.facebook.com/reel/{video_id}"
-        print(f"[FacebookBot] Reel published successfully: {reel_url}")
+        bot_log(f"[FacebookBot] ✅ Reel published successfully: {reel_url}")
 
         # Phase 4: Copyright Verification & Instant Auto-Delete Guard
-        print(f"[FacebookBot] Verifying copyright compliance for Reel {video_id}...")
+        bot_log(f"[FacebookBot] Verifying copyright compliance for Reel {video_id}...")
         has_copyright_violation = False
         copyright_reason = ""
 
@@ -570,10 +606,10 @@ async def trigger_auto_trending_reel(custom_title: Optional[str] = None, custom_
             start_seconds = random.randint(1200, 2400)
         duration_seconds = 75  # 1m 15s optimal high-retention reel duration
         min_label = f"{start_seconds // 60}:{start_seconds % 60:02d}"
-        print(f"[FacebookBot] Attempting {duration_seconds}s reel for '{target_title}' starting at {min_label} ({start_seconds}s)...")
+        bot_log(f"[FacebookBot] Attempting {duration_seconds}s reel for '{target_title}' starting at {min_label} ({start_seconds}s)...")
 
         for s_url in stream_candidates:
-            print(f"[FacebookBot] Slicing from stream: {s_url[:80]}...")
+            bot_log(f"[FacebookBot] Slicing from stream: {s_url[:80]}...")
             success = await reel_generator.render_single_reel_part(
                 stream_url=s_url,
                 start_seconds=start_seconds,
@@ -583,7 +619,7 @@ async def trigger_auto_trending_reel(custom_title: Optional[str] = None, custom_
                 anti_copyright=True
             )
             if success and os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
-                print(f"[FacebookBot] Successfully rendered reel with stream: {s_url[:60]}")
+                bot_log(f"[FacebookBot] Successfully rendered reel with stream: {s_url[:60]}")
                 break
 
         if os.path.exists(overlay_path):
@@ -646,12 +682,47 @@ async def trigger_auto_trending_reel(custom_title: Optional[str] = None, custom_
         }
         save_fb_history(history_entry)
 
+    # ── Multi-Platform Distribution: YouTube Shorts ──
+    yt_res = {}
+    try:
+        import youtube_bot
+        yt_cfg = youtube_bot.load_yt_config()
+        if yt_cfg.get("auto_pilot_enabled", False):
+            print(f"[FacebookBot] Auto-distributing reel to YouTube Shorts: {target_title}")
+            yt_res = await youtube_bot.upload_shorts_to_youtube(
+                video_path=output_path,
+                title=f"{target_title} • Part 1 #Shorts",
+                description=caption,
+                comment_text=comment_msg
+            )
+            print(f"[FacebookBot] YouTube Shorts result: {yt_res.get('success')}")
+    except Exception as yte:
+        print(f"[FacebookBot] YouTube distribution notice: {yte}")
+
+    # ── Multi-Platform Distribution: TikTok ──
+    tt_res = {}
+    try:
+        import tiktok_bot
+        tt_cfg = tiktok_bot.load_tt_config()
+        if tt_cfg.get("auto_pilot_enabled", False):
+            print(f"[FacebookBot] Auto-distributing reel to TikTok: {target_title}")
+            tt_caption = f"🔥 {target_title} 🍿 Google Search: NXLY Stream #shorts #movies #fyp #viral #nxly"
+            tt_res = await tiktok_bot.upload_video_to_tiktok(
+                video_path=output_path,
+                caption=tt_caption
+            )
+            print(f"[FacebookBot] TikTok result: {tt_res.get('success')}")
+    except Exception as tte:
+        print(f"[FacebookBot] TikTok distribution notice: {tte}")
+
     return {
-        "success": upload_res.get("success", False),
+        "success": upload_res.get("success", False) or yt_res.get("success", False) or tt_res.get("success", False),
         "title": target_title,
         "reel_url": upload_res.get("reel_url"),
         "comment_id": upload_res.get("comment_id"),
         "groups_shared": group_results,
+        "youtube": yt_res,
+        "tiktok": tt_res,
         "error": upload_res.get("error")
     }
 
@@ -722,13 +793,19 @@ async def cleanup_copyrighted_videos():
                 if cp.get("matches_found") is True or pub.get("publish_status") in ("blocked", "rejected"):
                     print(f"[FacebookBot] Background Guard: Auto-deleting claimed video {vid}...")
                     del_res = await client.delete(f"https://graph.facebook.com/v19.0/{vid}?access_token={page_token}")
-                    print(f"[FacebookBot] Background Guard delete response for {vid}: {del_res.text}")
+                    bot_log(f"[FacebookBot] Background Guard delete response for {vid}: {del_res.text}")
     except Exception as e:
-        print(f"[FacebookBot] Error in background copyright scan: {e}")
+        bot_log(f"[FacebookBot] Error in background copyright scan: {e}")
+
+async def run_live_bot_cycle() -> Dict[str, Any]:
+    bot_log("[Terminal] ⚡ Manually triggering immediate Auto-Pilot cycle...")
+    res = await trigger_auto_trending_reel()
+    bot_log(f"[Terminal] Cycle finished: success={res.get('success')}, title='{res.get('title')}', error={res.get('error')}")
+    return res
 
 # Background auto-pilot scheduler loop
 async def fb_auto_pilot_loop():
-    print("[FacebookBot] Auto-Pilot background daemon initialized (10-minute cycle).")
+    bot_log("[FacebookBot] Auto-Pilot background daemon initialized (10-minute cycle).")
     while True:
         try:
             await asyncio.sleep(30)  # check every 30s
@@ -752,13 +829,15 @@ async def fb_auto_pilot_loop():
             last_post = int(cfg.get("last_post_time", 0))
 
             if now - last_post >= interval_sec:
-                print(f"[FacebookBot] Triggering scheduled Auto-Pilot Reel (Interval: {interval_sec // 60}m)...")
+                bot_log(f"[FacebookBot] Triggering scheduled Auto-Pilot Reel (Interval: {interval_sec // 60}m)...")
                 res = await trigger_auto_trending_reel()
                 if not res.get("success"):
-                    print(f"[FacebookBot] Scheduled reel attempt failed: {res.get('error')}. Retrying in 90s...")
+                    bot_log(f"[FacebookBot] Scheduled reel attempt failed: {res.get('error')}. Retrying in 90s...")
                     # Set last_post so next retry happens in 90s instead of waiting a full cycle
                     cfg["last_post_time"] = now - interval_sec + 90
                     save_fb_config(cfg)
+                else:
+                    bot_log(f"[FacebookBot] Scheduled reel successfully posted: '{res.get('title')}'")
         except Exception as e:
-            print(f"[FacebookBot] Auto-pilot loop error: {e}")
+            bot_log(f"[FacebookBot] Auto-pilot loop error: {e}")
             await asyncio.sleep(30)

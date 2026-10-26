@@ -1195,6 +1195,33 @@ async def admin_facebook_history(request: Request):
     history = facebook_bot.load_fb_history()
     return {"code": 0, "history": history}
 
+@router.get("/api/admin/facebook/terminal-log")
+async def admin_facebook_terminal_log(request: Request):
+    check_admin_auth(request)
+    import facebook_bot
+    logs = facebook_bot.get_live_logs()
+    cfg = facebook_bot.load_fb_config()
+    return {
+        "code": 0,
+        "logs": logs,
+        "auto_pilot_enabled": cfg.get("auto_pilot_enabled", False),
+        "post_interval_minutes": cfg.get("post_interval_minutes", 10),
+        "last_post_time": cfg.get("last_post_time", 0)
+    }
+
+@router.post("/api/admin/facebook/terminal-run")
+async def admin_facebook_terminal_run(request: Request):
+    check_admin_auth(request)
+    import facebook_bot
+    res = await facebook_bot.run_live_bot_cycle()
+    logs = facebook_bot.get_live_logs()
+    return {
+        "code": 0,
+        "success": res.get("success", False),
+        "result": res,
+        "logs": logs
+    }
+
 @router.post("/api/admin/facebook/publish-reel")
 async def admin_facebook_publish_reel(data: dict, request: Request):
     check_admin_auth(request)
@@ -1285,6 +1312,107 @@ async def admin_facebook_post_poster(request: Request):
         "post_url": res.get("post_url"),
         "photo_id": res.get("photo_id")
     }
+
+# ── YOUTUBE SHORTS BOT ────────────────────────────────────────────────────────
+@router.get("/api/admin/youtube/config")
+async def admin_youtube_get_config(request: Request):
+    check_admin_auth(request)
+    import youtube_bot
+    cfg = youtube_bot.load_yt_config()
+    conn_info = await youtube_bot.verify_youtube_connection()
+    masked_secret = (cfg.get("client_secret", "")[:4] + "..." + cfg.get("client_secret", "")[-4:]) if len(cfg.get("client_secret", "")) > 8 else ""
+    masked_refresh = (cfg.get("refresh_token", "")[:6] + "..." + cfg.get("refresh_token", "")[-6:]) if len(cfg.get("refresh_token", "")) > 12 else ""
+    return {
+        "code": 0,
+        "config": {
+            "client_id": cfg.get("client_id", ""),
+            "masked_secret": masked_secret,
+            "masked_refresh": masked_refresh,
+            "channel_title": conn_info.get("channel_title") or cfg.get("channel_title", "YouTube Channel"),
+            "auto_pilot_enabled": cfg.get("auto_pilot_enabled", False),
+            "default_privacy": cfg.get("default_privacy", "public"),
+            "last_post_time": cfg.get("last_post_time", 0)
+        },
+        "connection": conn_info
+    }
+
+@router.post("/api/admin/youtube/config")
+async def admin_youtube_save_config(data: dict, request: Request):
+    check_admin_auth(request)
+    import youtube_bot
+    cfg = youtube_bot.load_yt_config()
+    if "client_id" in data:
+        cfg["client_id"] = str(data["client_id"]).strip()
+    if "client_secret" in data and data["client_secret"] and "..." not in data["client_secret"]:
+        cfg["client_secret"] = str(data["client_secret"]).strip()
+    if "refresh_token" in data and data["refresh_token"] and "..." not in data["refresh_token"]:
+        cfg["refresh_token"] = str(data["refresh_token"]).strip()
+    if "access_token" in data and data["access_token"] and "..." not in data["access_token"]:
+        cfg["access_token"] = str(data["access_token"]).strip()
+    if "auto_pilot_enabled" in data:
+        cfg["auto_pilot_enabled"] = bool(data["auto_pilot_enabled"])
+    if "default_privacy" in data:
+        cfg["default_privacy"] = str(data["default_privacy"]).strip()
+
+    youtube_bot.save_yt_config(cfg)
+    return {"code": 0, "message": "YouTube configuration saved successfully!"}
+
+@router.get("/api/admin/youtube/history")
+async def admin_youtube_history(request: Request):
+    check_admin_auth(request)
+    import youtube_bot
+    history = youtube_bot.load_yt_history()
+    return {"code": 0, "history": history}
+
+# ── TIKTOK BOT ───────────────────────────────────────────────────────────────
+@router.get("/api/admin/tiktok/config")
+async def admin_tiktok_get_config(request: Request):
+    check_admin_auth(request)
+    import tiktok_bot
+    cfg = tiktok_bot.load_tt_config()
+    conn_info = await tiktok_bot.verify_tiktok_connection()
+    masked_token = (cfg.get("access_token", "")[:6] + "..." + cfg.get("access_token", "")[-6:]) if len(cfg.get("access_token", "")) > 12 else ""
+    return {
+        "code": 0,
+        "config": {
+            "client_key": cfg.get("client_key", ""),
+            "masked_token": masked_token,
+            "username": conn_info.get("username") or cfg.get("username", "TikTok Account"),
+            "display_name": conn_info.get("display_name") or cfg.get("display_name", ""),
+            "auto_pilot_enabled": cfg.get("auto_pilot_enabled", False),
+            "privacy_level": cfg.get("privacy_level", "PUBLIC_TO_EVERYONE"),
+            "last_post_time": cfg.get("last_post_time", 0)
+        },
+        "connection": conn_info
+    }
+
+@router.post("/api/admin/tiktok/config")
+async def admin_tiktok_save_config(data: dict, request: Request):
+    check_admin_auth(request)
+    import tiktok_bot
+    cfg = tiktok_bot.load_tt_config()
+    if "client_key" in data:
+        cfg["client_key"] = str(data["client_key"]).strip()
+    if "client_secret" in data and data["client_secret"] and "..." not in data["client_secret"]:
+        cfg["client_secret"] = str(data["client_secret"]).strip()
+    if "access_token" in data and data["access_token"] and "..." not in data["access_token"]:
+        cfg["access_token"] = str(data["access_token"]).strip()
+    if "refresh_token" in data and data["refresh_token"] and "..." not in data["refresh_token"]:
+        cfg["refresh_token"] = str(data["refresh_token"]).strip()
+    if "auto_pilot_enabled" in data:
+        cfg["auto_pilot_enabled"] = bool(data["auto_pilot_enabled"])
+    if "privacy_level" in data:
+        cfg["privacy_level"] = str(data["privacy_level"]).strip()
+
+    tiktok_bot.save_tt_config(cfg)
+    return {"code": 0, "message": "TikTok configuration saved successfully!"}
+
+@router.get("/api/admin/tiktok/history")
+async def admin_tiktok_history(request: Request):
+    check_admin_auth(request)
+    import tiktok_bot
+    history = tiktok_bot.load_tt_history()
+    return {"code": 0, "history": history}
 
 
 

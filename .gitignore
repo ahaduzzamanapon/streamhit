@@ -31,5 +31,10 @@ android/app/build/
 android/local.properties
 firebase-service-account.json
 facebook_config.json
+youtube_config.json
+tiktok_config.json
 scratch/
 remote_fix.py
+public/reels/*.mp4
+public/reels/*.png
+public/reels/*.jpg

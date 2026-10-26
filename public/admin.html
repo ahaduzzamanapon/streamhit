@@ -751,6 +751,14 @@
                 <span class="icon">🤖</span> Facebook Auto-Pilot
                 <span class="badge-pill" style="color:var(--accent-red);border-color:rgba(255,42,84,0.3);">10m</span>
             </a>
+            <a class="nav-item" onclick="switchNavTab('youtube')">
+                <span class="icon">🔴</span> YouTube Shorts
+                <span class="badge-pill" style="color:#FF0000;border-color:rgba(255,0,0,0.3);">Shorts</span>
+            </a>
+            <a class="nav-item" onclick="switchNavTab('tiktok')">
+                <span class="icon">🎵</span> TikTok Auto-Pilot
+                <span class="badge-pill" style="color:#00F0FF;border-color:rgba(0,240,255,0.3);">v2</span>
+            </a>
             <a class="nav-item" onclick="switchNavTab('app-users')">
                 <span class="icon">📱</span> App Users & Devices
             </a>
@@ -977,6 +985,27 @@
 
             <!-- 3. FACEBOOK AUTO-PILOT BOT ─────────────────────────────────── -->
             <section class="tab-panel" id="panel-facebook">
+                <!-- LIVE TERMINAL CONSOLE -->
+                <div class="card" style="padding:0; overflow:hidden; border: 1px solid rgba(0, 240, 255, 0.35); box-shadow: 0 10px 30px rgba(0,0,0,0.6); margin-bottom:24px;">
+                    <div style="background:#090D16; padding:12px 18px; border-bottom:1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#FF5F56;"></span>
+                            <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#FFBD2E;"></span>
+                            <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#27C93F;"></span>
+                            <strong style="color:#fff; font-family:'Fira Code', monospace; font-size:13px; margin-left:8px;">nxly-bot-terminal@nxly.online:~ (Live Output)</strong>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <label style="display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text-muted); cursor:pointer;">
+                                <input type="checkbox" id="terminalAutoScroll" checked style="accent-color:var(--accent-cyan);"> Auto-scroll
+                            </label>
+                            <button type="button" class="btn-secondary" style="font-size:11.5px; padding:4px 10px;" onclick="fetchBotTerminalLogs()">🔄 Refresh</button>
+                            <button type="button" class="btn-secondary" style="font-size:11.5px; padding:4px 10px;" onclick="clearBotTerminal()">🧹 Clear</button>
+                            <button type="button" class="btn-primary" style="font-size:12px; padding:5px 14px;" id="btnTerminalRun" onclick="triggerLiveBotRun()">⚡ Run Cycle Now</button>
+                        </div>
+                    </div>
+                    <pre id="botTerminalOutput" style="background:#05070D; color:#00F0FF; font-family:'Fira Code', 'Courier New', monospace; font-size:12px; line-height:1.65; padding:18px; margin:0; height:320px; overflow-y:auto; white-space:pre-wrap; word-break:break-all; border-radius:0 0 var(--radius-md) var(--radius-md);">[Initializing NXLY Bot Live Terminal stream...]</pre>
+                </div>
+
                 <div class="card">
                     <div class="card-header">
                         <div>
@@ -1057,6 +1086,126 @@
                     </div>
                     <div id="fbHistoryList" style="display:flex; flex-direction:column; gap:12px;">
                         <p style="color:var(--text-muted);">No posts recorded yet.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3B. YOUTUBE SHORTS BOT ─────────────────────────────────────── -->
+            <section class="tab-panel" id="panel-youtube">
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <h2>🔴 YouTube Shorts Auto-Pilot Bot (API v3)</h2>
+                            <div class="subtitle">Automatically publishes viral vertical clips as YouTube Shorts with #Shorts and pinned 1st comments</div>
+                        </div>
+                        <div id="ytChannelBadge" style="display:inline-flex; align-items:center; gap:8px; padding:6px 14px; border-radius:var(--radius-sm); background:rgba(255,0,0,0.1); border:1px solid rgba(255,0,0,0.3); font-size:12.5px; font-weight:700; color:#FF4D4D;">
+                            🔴 Not Connected
+                        </div>
+                    </div>
+
+                    <form onsubmit="handleSaveYouTubeConfig(event)">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Google OAuth Client ID</label>
+                                <input type="text" id="ytClientId" class="form-control" placeholder="123456789-abc.apps.googleusercontent.com">
+                            </div>
+                            <div class="form-group">
+                                <label>Client Secret</label>
+                                <input type="password" id="ytClientSecret" class="form-control" placeholder="GOCSPX-...">
+                            </div>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>OAuth2 Refresh Token (Long-Lived)</label>
+                                <input type="password" id="ytRefreshToken" class="form-control" placeholder="1//04abc...">
+                            </div>
+                            <div class="form-group">
+                                <label>Default Video Privacy</label>
+                                <select id="ytPrivacy" class="form-control">
+                                    <option value="public">Public (Published directly)</option>
+                                    <option value="unlisted">Unlisted</option>
+                                    <option value="private">Private (Draft)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">
+                            <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:var(--text-muted); cursor:pointer;">
+                                <input type="checkbox" id="ytAutoPilotToggle" style="accent-color:#FF0000; width:16px; height:16px;">
+                                Auto-Distribute generated reels to YouTube Shorts automatically
+                            </label>
+                            <button type="submit" class="btn-primary" style="background:linear-gradient(135deg, #FF0000, #CC0000);">💾 Save YouTube Settings</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2>📜 Recent YouTube Shorts Uploads</h2>
+                    </div>
+                    <div id="ytHistoryList" style="display:flex; flex-direction:column; gap:12px;">
+                        <p style="color:var(--text-muted);">No YouTube uploads recorded yet.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3C. TIKTOK BOT ──────────────────────────────────────────────── -->
+            <section class="tab-panel" id="panel-tiktok">
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <h2>🎵 TikTok Video Auto-Pilot Bot (Content API v2)</h2>
+                            <div class="subtitle">Directly posts vertical 9:16 clips to TikTok with automated trending hashtags and Google Search prompt</div>
+                        </div>
+                        <div id="ttAccountBadge" style="display:inline-flex; align-items:center; gap:8px; padding:6px 14px; border-radius:var(--radius-sm); background:rgba(0,240,255,0.1); border:1px solid rgba(0,240,255,0.3); font-size:12.5px; font-weight:700; color:var(--accent-cyan);">
+                            🎵 Not Connected
+                        </div>
+                    </div>
+
+                    <form onsubmit="handleSaveTikTokConfig(event)">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>TikTok Client Key</label>
+                                <input type="text" id="ttClientKey" class="form-control" placeholder="aw123456...">
+                            </div>
+                            <div class="form-group">
+                                <label>TikTok Client Secret</label>
+                                <input type="password" id="ttClientSecret" class="form-control" placeholder="Secret Key">
+                            </div>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>TikTok User Access Token</label>
+                                <input type="password" id="ttAccessToken" class="form-control" placeholder="act.123...">
+                            </div>
+                            <div class="form-group">
+                                <label>Privacy Level</label>
+                                <select id="ttPrivacy" class="form-control">
+                                    <option value="PUBLIC_TO_EVERYONE">Public (Everyone)</option>
+                                    <option value="MUTUAL_FOLLOW_FRIENDS">Friends Only</option>
+                                    <option value="SELF_ONLY">Private (Only Me)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">
+                            <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:var(--text-muted); cursor:pointer;">
+                                <input type="checkbox" id="ttAutoPilotToggle" style="accent-color:var(--accent-cyan); width:16px; height:16px;">
+                                Auto-Distribute generated reels to TikTok automatically
+                            </label>
+                            <button type="submit" class="btn-primary" style="background:linear-gradient(135deg, #00F0FF, #0088FF); color:#000;">💾 Save TikTok Settings</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2>📜 Recent TikTok Video Uploads</h2>
+                    </div>
+                    <div id="ttHistoryList" style="display:flex; flex-direction:column; gap:12px;">
+                        <p style="color:var(--text-muted);">No TikTok uploads recorded yet.</p>
                     </div>
                 </div>
             </section>
@@ -1357,6 +1506,8 @@
                 dashboard: ['Dashboard Overview', 'Real-time telemetry, app traffic, and quick actions'],
                 reels: ['Reels & Shorts Creator', 'AI vertical video cutter with anti-copyright filters'],
                 facebook: ['Facebook Auto-Pilot Bot', 'Automated 10-minute posting cycle with 1st comment link'],
+                youtube: ['YouTube Shorts Bot', 'Automated Shorts upload via YouTube Data API v3'],
+                tiktok: ['TikTok Auto-Pilot Bot', 'Direct vertical video posting via Content Posting API v2'],
                 'app-users': ['App Users & Devices', 'Track active installations, models, and real-time playback'],
                 banners: ['Banners & Highlights', 'Homepage hero slider featured titles'],
                 sports: ['Live Sports Streaming', 'Manage live matches and streaming feeds'],
@@ -1396,6 +1547,8 @@
                 case 'dashboard': loadDashboardStats(); break;
                 case 'reels': loadReelsTab(); break;
                 case 'facebook': loadFacebookTab(); break;
+                case 'youtube': loadYouTubeTab(); break;
+                case 'tiktok': loadTikTokTab(); break;
                 case 'app-users': fetchAppUsersPage(1); break;
                 case 'banners': fetchBanners(); break;
                 case 'sports': fetchSports(); break;
@@ -1583,7 +1736,56 @@
         }
 
         // ── FACEBOOK BOT TAB ─────────────────────────────────────────────────
+        let _botTerminalTimer = null;
+
+        async function fetchBotTerminalLogs() {
+            try {
+                const res = await fetch('/api/admin/facebook/terminal-log', { headers: { 'Authorization': `Bearer ${token}` } });
+                const d = await res.json();
+                const term = document.getElementById('botTerminalOutput');
+                if (term) {
+                    term.innerText = d.logs || 'No logs captured yet.';
+                    const autoScroll = document.getElementById('terminalAutoScroll');
+                    if (autoScroll && autoScroll.checked) {
+                        term.scrollTop = term.scrollHeight;
+                    }
+                }
+            } catch(e) {
+                console.error("fetchBotTerminalLogs error:", e);
+            }
+        }
+
+        function clearBotTerminal() {
+            const term = document.getElementById('botTerminalOutput');
+            if (term) term.innerText = '[Logs cleared]';
+        }
+
+        async function triggerLiveBotRun() {
+            const btn = document.getElementById('btnTerminalRun');
+            if (btn) btn.disabled = true;
+            showToast('⚡ Triggering live bot cycle now...');
+            try {
+                const res = await fetch('/api/admin/facebook/terminal-run', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const d = await res.json();
+                showToast(d.message || 'Bot cycle started!');
+                fetchBotTerminalLogs();
+            } catch(err) {
+                alert('Trigger failed: ' + err);
+            } finally {
+                setTimeout(() => { if (btn) btn.disabled = false; }, 3000);
+            }
+        }
+
         async function loadFacebookTab() {
+            fetchBotTerminalLogs();
+            if (_botTerminalTimer) clearInterval(_botTerminalTimer);
+            _botTerminalTimer = setInterval(() => {
+                if (currentTab === 'facebook') fetchBotTerminalLogs();
+            }, 4000);
+
             try {
                 const res = await fetch('/api/admin/facebook/config', { headers: { 'Authorization': `Bearer ${token}` } });
                 const d = await res.json();
@@ -1599,11 +1801,12 @@
                 const hRes = await fetch('/api/admin/facebook/history', { headers: { 'Authorization': `Bearer ${token}` } });
                 const hData = await hRes.json();
                 const listEl = document.getElementById('fbHistoryList');
-                if (!hData.list || hData.list.length === 0) {
+                const list = hData.history || hData.list || [];
+                if (!list.length) {
                     listEl.innerHTML = '<p style="color:var(--text-muted);">No posts recorded yet.</p>';
                     return;
                 }
-                listEl.innerHTML = hData.list.map(p => `
+                listEl.innerHTML = list.map(p => `
                     <div style="background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:12px; display:flex; justify-content:space-between; align-items:center;">
                         <div>
                             <strong style="color:#fff;">${p.title}</strong>
@@ -1688,6 +1891,147 @@
                 }
             } catch(err) {
                 alert('Error exchanging token: ' + err);
+            }
+        }
+
+        // ── YOUTUBE BOT TAB ──────────────────────────────────────────────────
+        async function loadYouTubeTab() {
+            try {
+                const res = await fetch('/api/admin/youtube/config', { headers: { 'Authorization': `Bearer ${token}` } });
+                const d = await res.json();
+                if (d.config) {
+                    const c = d.config;
+                    document.getElementById('ytClientId').value = c.client_id || '';
+                    document.getElementById('ytClientSecret').value = c.masked_secret || '';
+                    document.getElementById('ytRefreshToken').value = c.masked_refresh || '';
+                    document.getElementById('ytPrivacy').value = c.default_privacy || 'public';
+                    document.getElementById('ytAutoPilotToggle').checked = c.auto_pilot_enabled !== false;
+                    
+                    const badge = document.getElementById('ytChannelBadge');
+                    if (c.client_id && c.masked_refresh) {
+                        badge.innerHTML = `🔴 Connected (${c.channel_title || 'YouTube'})`;
+                        badge.style.background = 'rgba(0,255,136,0.1)';
+                        badge.style.borderColor = 'rgba(0,255,136,0.3)';
+                        badge.style.color = '#00FF88';
+                    } else {
+                        badge.innerHTML = `🔴 Not Connected`;
+                        badge.style.background = 'rgba(255,0,0,0.1)';
+                        badge.style.borderColor = 'rgba(255,0,0,0.3)';
+                        badge.style.color = '#FF4D4D';
+                    }
+                }
+                const hRes = await fetch('/api/admin/youtube/history', { headers: { 'Authorization': `Bearer ${token}` } });
+                const hData = await hRes.json();
+                const listEl = document.getElementById('ytHistoryList');
+                const list = hData.history || hData.list || [];
+                if (!list.length) {
+                    listEl.innerHTML = '<p style="color:var(--text-muted);">No YouTube uploads recorded yet.</p>';
+                    return;
+                }
+                listEl.innerHTML = list.map(p => `
+                    <div style="background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:12px; display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <strong style="color:#fff;">${p.title}</strong>
+                            <div style="font-size:11px; color:var(--text-muted);">${p.created_at} | Video ID: ${p.video_id || 'N/A'}</div>
+                        </div>
+                        ${p.video_url ? `<a href="${p.video_url}" target="_blank" class="btn-secondary" style="font-size:11px; padding:4px 10px; text-decoration:none; color:#FF4D4D;">Watch Short ↗</a>` : ''}
+                    </div>
+                `).join('');
+            } catch(e) {
+                console.error("loadYouTubeTab error:", e);
+            }
+        }
+
+        async function handleSaveYouTubeConfig(e) {
+            e.preventDefault();
+            const payload = {
+                client_id: document.getElementById('ytClientId').value.trim(),
+                client_secret: document.getElementById('ytClientSecret').value.trim(),
+                refresh_token: document.getElementById('ytRefreshToken').value.trim(),
+                default_privacy: document.getElementById('ytPrivacy').value,
+                auto_pilot_enabled: document.getElementById('ytAutoPilotToggle').checked
+            };
+            try {
+                const res = await fetch('/api/admin/youtube/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(payload)
+                });
+                const d = await res.json();
+                showToast(d.message || 'YouTube config saved!');
+                loadYouTubeTab();
+            } catch(err) {
+                alert('Save failed: ' + err);
+            }
+        }
+
+        // ── TIKTOK BOT TAB ───────────────────────────────────────────────────
+        async function loadTikTokTab() {
+            try {
+                const res = await fetch('/api/admin/tiktok/config', { headers: { 'Authorization': `Bearer ${token}` } });
+                const d = await res.json();
+                if (d.config) {
+                    const c = d.config;
+                    document.getElementById('ttClientKey').value = c.client_key || '';
+                    document.getElementById('ttClientSecret').value = c.masked_secret || '';
+                    document.getElementById('ttAccessToken').value = c.masked_token || '';
+                    document.getElementById('ttPrivacy').value = c.privacy_level || 'PUBLIC_TO_EVERYONE';
+                    document.getElementById('ttAutoPilotToggle').checked = c.auto_pilot_enabled !== false;
+
+                    const badge = document.getElementById('ttAccountBadge');
+                    if (c.masked_token || c.client_key) {
+                        badge.innerHTML = `🎵 Connected (${c.username || 'TikTok'})`;
+                        badge.style.background = 'rgba(0,255,136,0.1)';
+                        badge.style.borderColor = 'rgba(0,255,136,0.3)';
+                        badge.style.color = '#00FF88';
+                    } else {
+                        badge.innerHTML = `🎵 Not Connected`;
+                        badge.style.background = 'rgba(0,240,255,0.1)';
+                        badge.style.borderColor = 'rgba(0,240,255,0.3)';
+                        badge.style.color = 'var(--accent-cyan)';
+                    }
+                }
+                const hRes = await fetch('/api/admin/tiktok/history', { headers: { 'Authorization': `Bearer ${token}` } });
+                const hData = await hRes.json();
+                const listEl = document.getElementById('ttHistoryList');
+                const list = hData.history || hData.list || [];
+                if (!list.length) {
+                    listEl.innerHTML = '<p style="color:var(--text-muted);">No TikTok uploads recorded yet.</p>';
+                    return;
+                }
+                listEl.innerHTML = list.map(p => `
+                    <div style="background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:12px; display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <strong style="color:#fff;">${p.title}</strong>
+                            <div style="font-size:11px; color:var(--text-muted);">${p.created_at} | Publish ID: ${p.publish_id || 'N/A'}</div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch(e) {
+                console.error("loadTikTokTab error:", e);
+            }
+        }
+
+        async function handleSaveTikTokConfig(e) {
+            e.preventDefault();
+            const payload = {
+                client_key: document.getElementById('ttClientKey').value.trim(),
+                client_secret: document.getElementById('ttClientSecret').value.trim(),
+                access_token: document.getElementById('ttAccessToken').value.trim(),
+                privacy_level: document.getElementById('ttPrivacy').value,
+                auto_pilot_enabled: document.getElementById('ttAutoPilotToggle').checked
+            };
+            try {
+                const res = await fetch('/api/admin/tiktok/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(payload)
+                });
+                const d = await res.json();
+                showToast(d.message || 'TikTok config saved!');
+                loadTikTokTab();
+            } catch(err) {
+                alert('Save failed: ' + err);
             }
         }
 
