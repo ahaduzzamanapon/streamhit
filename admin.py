@@ -1193,6 +1193,9 @@ async def admin_facebook_history(request: Request):
     return {"code": 0, "history": history}
 
 @router.get("/api/admin/facebook/terminal-log")
+@router.get("/api/admin/facebook/logs")
+@router.get("/api/admin/automation/terminal-log")
+@router.get("/api/admin/automation/logs")
 async def admin_facebook_terminal_log(request: Request):
     check_admin_auth(request)
     import facebook_bot
@@ -1525,12 +1528,29 @@ async def admin_automation_platforms_toggle(data: dict, request: Request):
 @router.post("/api/admin/automation/run-now")
 async def admin_automation_run_now(request: Request):
     check_admin_auth(request)
+    target_job_id = None
+    try:
+        body = await request.json()
+        target_job_id = body.get("job_id")
+    except Exception:
+        pass
     import autopilot_queue
-    asyncio.create_task(autopilot_queue.process_next_queue_job())
+    from facebook_bot import bot_log
+    bot_log(f"[Terminal] ⚡ Manual Auto-Pilot cycle triggered by Admin{' (Target Job: ' + target_job_id + ')' if target_job_id else ''}...")
+    
+    async def _safe_run():
+        try:
+            await autopilot_queue.process_next_queue_job(target_job_id=target_job_id)
+        except Exception as e:
+            import traceback
+            bot_log(f"[AutoPilot] ❌ Background run exception: {e}")
+            bot_log(traceback.format_exc())
+
+    asyncio.create_task(_safe_run())
     return {
         "code": 0,
         "success": True,
-        "message": "Auto-Pilot cycle triggered! Watch n8n visual flow and live terminal."
+        "message": "Auto-Pilot cycle triggered! Watch live terminal and visual workflow."
     }
 
 # Legacy aliases for backwards compatibility

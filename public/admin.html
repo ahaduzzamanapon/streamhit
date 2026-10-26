@@ -2788,7 +2788,15 @@
             else if (subTab === 'queue') renderQueueList();
             else if (subTab === 'calendar') renderCalendar();
             else if (subTab === 'finished') renderFinishedList();
-            else if (subTab === 'terminal') fetchBotTerminalLogs();
+            else if (subTab === 'terminal') {
+                fetchBotTerminalLogs();
+                if (_botTerminalTimer) clearInterval(_botTerminalTimer);
+                _botTerminalTimer = setInterval(fetchBotTerminalLogs, 2000);
+            }
+            if (subTab !== 'terminal' && _botTerminalTimer) {
+                clearInterval(_botTerminalTimer);
+                _botTerminalTimer = null;
+            }
         }
 
         // Global Platform Toggle Switch (Facebook, YouTube, TikTok)
@@ -2859,10 +2867,12 @@
                         const completedCalc = activeItem.completed_parts_count || 0;
                         const pct = Math.min(100, Math.round((completedCalc / totalCalc) * 100));
                         const subText = isSeries ? `Series • S${activeItem.current_season||1} E${activeItem.current_episode||1} of ${activeItem.total_episodes||1} eps` : `Movie • ${activeItem.total_parts || 8} parts planned`;
-                        const statusNote = d.daemon ? d.daemon.next_post_display : 'Scheduled';
+                        const isBusy = d.daemon && d.daemon.is_busy;
+                        const currentStep = d.daemon && d.daemon.current_step;
+                        const statusNote = isBusy ? `⚙️ Rendering Part ${activeItem.current_part||1}...` : (d.daemon ? d.daemon.next_post_display : 'Scheduled');
 
                         activeContainer.innerHTML = `
-                            <div style="background:#0D1321; border:1px solid rgba(0,240,255,0.25); border-radius:10px; padding:18px; display:flex; gap:18px; align-items:center;">
+                            <div style="background:#0D1321; border:1px solid ${isBusy ? 'var(--accent-green)' : 'rgba(0,240,255,0.25)'}; border-radius:10px; padding:18px; display:flex; gap:18px; align-items:center;">
                                 <img src="${activeItem.cover || 'https://via.placeholder.com/80x120'}" style="width:70px; height:105px; border-radius:6px; object-fit:cover; border:1px solid rgba(255,255,255,0.1);">
                                 <div style="flex:1;">
                                     <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
@@ -2871,8 +2881,11 @@
                                             <div style="font-size:12.5px; color:var(--text-muted); margin-top:2px;">${subText}</div>
                                         </div>
                                         <div style="text-align:right;">
-                                            <span class="badge-pill" style="color:var(--accent-cyan); border-color:rgba(0,240,255,0.3); font-size:11px;">Next post: ${statusNote}</span>
+                                            <span class="badge-pill" style="color:${isBusy ? '#00FF88' : 'var(--accent-cyan)'}; border-color:${isBusy ? '#00FF88' : 'rgba(0,240,255,0.3)'}; font-size:11px; ${isBusy ? 'background:rgba(0,255,136,0.15);' : ''}">${isBusy ? '⚡ CREATING VIDEO NOW' : `Next post: ${statusNote}`}</span>
                                         </div>
+                                    </div>
+                                    <div style="font-size:12px; color:#00F0FF; margin-bottom:6px;">
+                                        🎬 Target: ${isSeries ? `S${activeItem.current_season||1} E${activeItem.current_episode||1} • Part ${activeItem.current_part||1}` : `Part ${activeItem.current_part||1}`} (75s clip) • Search banner: <em>"NXLY STREAM"</em>
                                     </div>
                                     <div style="display:flex; justify-content:space-between; font-size:11.5px; margin-bottom:6px; color:var(--text-muted);">
                                         <span>Progress: ${completedCalc}/${totalCalc} parts</span>
@@ -2881,10 +2894,11 @@
                                     <div style="height:6px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden;">
                                         <div style="height:100%; width:${pct}%; background:linear-gradient(90deg, var(--accent-cyan), var(--accent-green));"></div>
                                     </div>
-                                    <div style="display:flex; gap:8px; margin-top:10px;">
+                                    <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
                                         <button class="btn-secondary" style="font-size:11px; padding:3px 8px;" onclick="handleTogglePlatformOnJob('${activeItem.id}', 'facebook')">📘 FB: ${activeItem.platforms?.facebook !== false ? 'ON' : 'OFF'}</button>
                                         <button class="btn-secondary" style="font-size:11px; padding:3px 8px;" onclick="handleTogglePlatformOnJob('${activeItem.id}', 'youtube')">🔴 YT: ${activeItem.platforms?.youtube ? 'ON' : 'OFF'}</button>
                                         <button class="btn-secondary" style="font-size:11px; padding:3px 8px;" onclick="handleTogglePlatformOnJob('${activeItem.id}', 'tiktok')">🎵 TT: ${activeItem.platforms?.tiktok ? 'ON' : 'OFF'}</button>
+                                        <button class="btn-primary" style="margin-left:auto; font-size:11px; padding:4px 12px; background:linear-gradient(135deg, #00FF88, #00CC66); color:#000; font-weight:800;" onclick="handleRunJobNow('${activeItem.id}')">⚡ Generate Part ${activeItem.current_part||1} Now</button>
                                     </div>
                                 </div>
                             </div>
@@ -3001,27 +3015,43 @@
                     const totalParts = isSeries ? ((j.total_episodes || 1) * (j.parts_per_episode || 3)) : (j.total_parts || 8);
                     const completed = j.completed_parts_count || 0;
                     const pct = Math.min(100, Math.round((completed / totalParts) * 100));
+                    const isProcessing = j.status === 'processing';
+                    const isPaused = j.status === 'paused';
 
                     return `
-                        <div style="background:#0D1321; border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:16px; display:flex; gap:16px; align-items:center;">
+                        <div style="background:#0D1321; border:1px solid ${isProcessing ? 'var(--accent-green)' : 'rgba(255,255,255,0.08)'}; border-radius:10px; padding:16px; display:flex; gap:16px; align-items:center;">
                             <span style="font-size:13px; font-weight:800; color:var(--text-muted); width:20px;">#${idx+1}</span>
-                            <img src="${j.cover || 'https://via.placeholder.com/60x90'}" style="width:50px; height:75px; border-radius:6px; object-fit:cover;">
+                            <img src="${j.cover || 'https://via.placeholder.com/60x90'}" style="width:55px; height:82px; border-radius:6px; object-fit:cover; border:1px solid rgba(255,255,255,0.1);">
                             <div style="flex:1;">
-                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                                     <strong style="color:#fff; font-size:15px;">${j.title}</strong>
-                                    <span class="badge-pill" style="color:${j.status === 'paused' ? '#EF4444' : 'var(--accent-cyan)'};">${j.status.toUpperCase()}</span>
+                                    ${isProcessing ? `
+                                        <span class="badge-pill" style="color:#00FF88; background:rgba(0,255,136,0.18); border:1px solid #00FF88; font-weight:800; font-size:11px;">
+                                            <span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#00FF88; margin-right:4px;"></span>⚡ CREATING VIDEO NOW
+                                        </span>
+                                    ` : (isPaused ? `
+                                        <span class="badge-pill" style="color:#EF4444; background:rgba(239,68,68,0.15); border:1px solid #EF4444; font-size:11px;">⏸ PAUSED</span>
+                                    ` : `
+                                        <span class="badge-pill" style="color:var(--accent-cyan); background:rgba(0,240,255,0.12); border:1px solid rgba(0,240,255,0.3); font-size:11px;">
+                                            <span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--accent-cyan); margin-right:4px;"></span>⏳ WAITING IN QUEUE
+                                        </span>
+                                    `)}
                                 </div>
-                                <div style="font-size:12px; color:var(--text-muted); margin:4px 0;">
-                                    ${isSeries ? `Series • S${j.current_season||1} E${j.current_episode||1}` : `Movie • ${j.total_parts||8} parts`} | Completed: ${completed}/${totalParts} (${pct}%)
+                                <div style="font-size:12px; color:#A0AEC0; margin-bottom:4px;">
+                                    🎬 <strong>Next Target:</strong> ${isSeries ? `S${j.current_season||1} E${j.current_episode||1} • Part ${j.current_part||1}` : `Part ${j.current_part||1} of ${totalParts}`} (${j.part_duration_seconds || 75}s vertical clip) | Completed: <span style="color:#fff; font-weight:700;">${completed}/${totalParts}</span> (${pct}%)
                                 </div>
-                                <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+                                <div style="font-size:11px; color:#00F0FF; margin-bottom:8px;">
+                                    🔍 <strong>Overlay Banner:</strong> FULL DEKHAR JONNE GOOGLE SEARCH: "NXLY STREAM" • OR VISIT: NXLY.ONLINE
+                                </div>
+                                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                                     <button class="btn-secondary" style="font-size:10.5px; padding:2px 8px;" onclick="handleTogglePlatformOnJob('${j.id}', 'facebook')">📘 FB: ${j.platforms?.facebook !== false ? 'ON' : 'OFF'}</button>
                                     <button class="btn-secondary" style="font-size:10.5px; padding:2px 8px;" onclick="handleTogglePlatformOnJob('${j.id}', 'youtube')">🔴 YT: ${j.platforms?.youtube ? 'ON' : 'OFF'}</button>
                                     <button class="btn-secondary" style="font-size:10.5px; padding:2px 8px;" onclick="handleTogglePlatformOnJob('${j.id}', 'tiktok')">🎵 TT: ${j.platforms?.tiktok ? 'ON' : 'OFF'}</button>
-                                    <span style="margin-left:auto; display:flex; gap:6px;">
+                                    <span style="margin-left:auto; display:flex; gap:6px; align-items:center;">
+                                        <button class="btn-primary" style="font-size:11px; padding:3px 10px; background:linear-gradient(135deg, #00FF88, #00CC66); color:#000; font-weight:800;" onclick="handleRunJobNow('${j.id}')">⚡ Generate Part ${j.current_part||1} Now</button>
                                         <button class="btn-secondary" style="font-size:11px; padding:2px 7px;" onclick="handleJobAction('${j.id}', 'reorder', 'up')" ${idx === 0 ? 'disabled' : ''}>▲</button>
                                         <button class="btn-secondary" style="font-size:11px; padding:2px 7px;" onclick="handleJobAction('${j.id}', 'reorder', 'down')" ${idx === d.jobs.length - 1 ? 'disabled' : ''}>▼</button>
-                                        <button class="btn-secondary" style="font-size:11px; padding:2px 8px;" onclick="handleJobAction('${j.id}', '${j.status === 'paused' ? 'resume' : 'pause'}')">${j.status === 'paused' ? '▶ Resume' : '⏸ Pause'}</button>
+                                        <button class="btn-secondary" style="font-size:11px; padding:2px 8px;" onclick="handleJobAction('${j.id}', '${isPaused ? 'resume' : 'pause'}')">${isPaused ? '▶ Resume' : '⏸ Pause'}</button>
                                         <button class="btn-danger" style="font-size:11px; padding:2px 8px;" onclick="handleJobAction('${j.id}', 'delete')">🗑 Delete</button>
                                     </span>
                                 </div>
@@ -3181,7 +3211,7 @@
         // Live Bot Terminal
         async function fetchBotTerminalLogs() {
             try {
-                const res = await fetch('/api/admin/facebook/logs', { headers: { 'Authorization': `Bearer ${token}` } });
+                const res = await fetch('/api/admin/facebook/terminal-log', { headers: { 'Authorization': `Bearer ${token}` } });
                 const d = await res.json();
                 const term = document.getElementById('botTerminalOutput');
                 if (term) {
@@ -3198,25 +3228,49 @@
             if (term) term.innerText = '[Terminal cleared]';
         }
 
-        async function triggerAutomationCycleNow() {
-            const btn = document.getElementById('btnAutoRunNow');
-            if (btn) { btn.disabled = true; btn.innerText = '⚡ Starting...'; }
+        async function handleRunJobNow(jobId) {
+            showToast('⚡ Starting immediate video generation for selected title...');
             try {
                 const res = await fetch('/api/admin/automation/run-now', {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ job_id: jobId })
+                });
+                const d = await res.json();
+                showToast(d.message || 'Video generation started!');
+                switchAutomationSubtab('terminal');
+                fetchBotTerminalLogs();
+            } catch(err) {
+                alert('Run failed: ' + err);
+            }
+        }
+
+        async function triggerAutomationCycleNow() {
+            const btn = document.getElementById('btnAutoRunNow');
+            const btnT = document.getElementById('btnTerminalRun');
+            if (btn) { btn.disabled = true; btn.innerText = '⚡ Starting...'; }
+            if (btnT) { btnT.disabled = true; btnT.innerText = '⚡ Starting...'; }
+            try {
+                const res = await fetch('/api/admin/automation/run-now', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({})
                 });
                 const d = await res.json();
                 showToast(d.message || 'Auto-pilot cycle triggered!');
+                switchAutomationSubtab('terminal');
+                fetchBotTerminalLogs();
                 setTimeout(() => {
                     fetchAutomationOverview();
                     fetchAutomationWorkflow();
                     fetchBotTerminalLogs();
                     if (btn) { btn.disabled = false; btn.innerText = '⚡ Run Cycle Now'; }
-                }, 1500);
+                    if (btnT) { btnT.disabled = false; btnT.innerText = '⚡ Run Cycle Now'; }
+                }, 2000);
             } catch(err) {
                 alert('Trigger failed: ' + err);
                 if (btn) { btn.disabled = false; btn.innerText = '⚡ Run Cycle Now'; }
+                if (btnT) { btnT.disabled = false; btnT.innerText = '⚡ Run Cycle Now'; }
             }
         }
 

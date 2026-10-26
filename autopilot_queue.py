@@ -231,6 +231,14 @@ def execute_job_action(job_id: str, action: str, direction: Optional[str] = None
             return {"code": 0, "message": f"Job '{removed.get('title')}' deleted"}
         return {"code": 404, "message": "Job not found"}
 
+    if action == "run_now":
+        if idx != -1:
+            jobs[idx]["status"] = "queued"
+            save_queue_data(data)
+            asyncio.create_task(process_next_queue_job(target_job_id=job_id))
+            return {"code": 0, "message": f"Started rendering Part {jobs[idx].get('current_part', 1)} for '{jobs[idx].get('title')}'"}
+        return {"code": 404, "message": "Job not found"}
+
     if action == "pause":
         if idx != -1:
             jobs[idx]["status"] = "paused"
@@ -538,23 +546,33 @@ def get_publishing_calendar() -> List[Dict[str, Any]]:
     return timeline
 
 # ── CORE SCHEDULER EXECUTION CYCLE ────────────────────────────────────────────
-async def process_next_queue_job() -> Dict[str, Any]:
+async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[str, Any]:
     """Extracts next due video part, cuts clip with FFmpeg, renders Google Search safe zone, and auto-posts."""
     from facebook_bot import bot_log, upload_reel_to_facebook, load_fb_config, save_fb_config
     import reel_generator
     import youtube_bot
     import tiktok_bot
+    import traceback
 
     data = load_queue_data()
     jobs = data["jobs"]
 
     active_job = None
     active_idx = -1
-    for i, j in enumerate(jobs):
-        if j.get("status") in ("queued", "active", "processing"):
-            active_job = j
-            active_idx = i
-            break
+
+    if target_job_id:
+        for i, j in enumerate(jobs):
+            if j.get("id") == target_job_id:
+                active_job = j
+                active_idx = i
+                break
+
+    if not active_job:
+        for i, j in enumerate(jobs):
+            if j.get("status") in ("queued", "active", "processing"):
+                active_job = j
+                active_idx = i
+                break
 
     if not active_job:
         bot_log("[AutoPilot] ℹ️ Queue is empty or all titles paused. Standing by for content.")
@@ -585,8 +603,6 @@ async def process_next_queue_job() -> Dict[str, Any]:
         se_arg = 0
         ep_arg = 0
 
-    bottom_text = "SEARCH ON GOOGLE: \"NXLY STREAM\" • First Result • Free 1080p"
-
     bot_log(f"[AutoPilot] ⚡ Step 1: Processing Job ({active_idx+1}/{len(jobs)}): '{title}' [{part_label}]")
     data["state"]["is_busy"] = True
     data["state"]["step"] = "fetching_stream"
@@ -595,229 +611,239 @@ async def process_next_queue_job() -> Dict[str, Any]:
     data["state"]["current_part_label"] = part_label
     save_queue_data(data)
 
-    # 1. Fetch direct video stream
-    stream_candidates = []
     try:
-        from main import api_resource
-        res = await api_resource(
-            se=se_arg,
-            ep=ep_arg,
-            detailPath=active_job.get("detail_path", ""),
-            subjectId=active_job.get("subject_id", "")
+        # 1. Fetch direct video stream
+        stream_candidates = []
+        try:
+            from main import api_resource
+            bot_log(f"[AutoPilot] 🔍 Resolving stream for '{title}' (detailPath={active_job.get('detail_path')}, S{se_arg}E{ep_arg})...")
+            res = await api_resource(
+                se=se_arg,
+                ep=ep_arg,
+                detailPath=active_job.get("detail_path", ""),
+                subjectId=active_job.get("subject_id", "")
+            )
+            items = res.get("data", {}).get("list") or []
+            for it in items:
+                link = it.get("url") or it.get("resourceLink") or ""
+                if "source_url=" in link:
+                    try:
+                        link = urllib.parse.unquote(link.split("source_url=")[-1])
+                    except Exception:
+                        pass
+                if link:
+                    stream_candidates.append(link)
+        except Exception as e:
+            bot_log(f"[AutoPilot] Warning: failed to fetch stream: {e}")
+
+        if not stream_candidates:
+            bot_log(f"[AutoPilot] ❌ No playable video stream found for '{title}' [{part_label}]. Pausing job.")
+            active_job["status"] = "paused"
+            data["state"]["is_busy"] = False
+            data["state"]["step"] = "error_no_stream"
+            save_queue_data(data)
+            return {"success": False, "error": "No working video stream"}
+
+        # 2. Slice and Render Video Clip
+        data["state"]["step"] = "rendering"
+        save_queue_data(data)
+
+        sanitized = re.sub(r'[^a-zA-Z0-9_\-]', '_', title)[:30]
+        timestamp = int(time.time())
+        output_filename = f"fb_reel_{sanitized}_P{part}_{timestamp}.mp4"
+        output_path = os.path.join(BASE_DIR, "public", "reels", output_filename)
+        overlay_path = os.path.join(BASE_DIR, "public", "reels", f"fb_overlay_{sanitized}_{timestamp}.png")
+
+        try:
+            total_p_calc = active_job.get("parts_per_episode", 3) if is_series else active_job.get("total_parts", 8)
+            reel_generator.generate_overlay_image(
+                title=title,
+                part_num=part,
+                total_parts=total_p_calc,
+                top_text_custom=top_text,
+                bottom_text_custom='FULL DEKHAR JONNE GOOGLE SEARCH: "NXLY STREAM"',
+                output_path=overlay_path
+            )
+        except Exception as oe:
+            bot_log(f"[AutoPilot] Overlay generation note: {oe}")
+
+        render_success = False
+        for s_url in stream_candidates[:2]:
+            bot_log(f"[AutoPilot] ⚙️ Slicing {part_duration}s at {start_seconds // 60}:{start_seconds % 60:02d} from stream...")
+            render_success = await reel_generator.render_single_reel_part(
+                stream_url=s_url,
+                start_seconds=start_seconds,
+                duration_seconds=part_duration,
+                overlay_png_path=overlay_path,
+                output_mp4_path=output_path,
+                anti_copyright=True
+            )
+            if render_success and os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+                break
+
+        if os.path.exists(overlay_path):
+            try: os.remove(overlay_path)
+            except Exception: pass
+
+        if not render_success or not os.path.exists(output_path) or os.path.getsize(output_path) < 1000:
+            bot_log(f"[AutoPilot] ❌ Video rendering failed for '{title}' [{part_label}].")
+            active_job["status"] = "failed"
+            data["state"]["is_busy"] = False
+            data["state"]["step"] = "error_render_failed"
+            save_queue_data(data)
+            return {"success": False, "error": "Rendering failed"}
+
+        file_size_mb = round(os.path.getsize(output_path) / (1024 * 1024), 2)
+        bot_log(f"[AutoPilot] ✅ Render complete: {output_filename} ({file_size_mb} MB)")
+
+        # 3. Multi-Platform Distribution
+        data["state"]["step"] = "distributing"
+        save_queue_data(data)
+
+        movie_web_url = f"https://nxly.online/movie/{active_job.get('detail_path')}" if active_job.get("detail_path") else "https://nxly.online"
+        caption = (
+            f"🔥 {top_text} 🎬🍿\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"🔍 Full দেখার জন্য Google-এ Search করুন: NXLY Stream\n"
+            f"🌐 অথবা Visit করুন: nxly.online\n"
+            f"👉 ১ম যে রেজাল্ট আসবে সেটাই! (First result on Google)\n\n"
+            f"💬 ফুল ভিডিও ডিরেক্ট লিংক ১ম কমেন্টে দেওয়া আছে (1st Comment)! 👇\n"
+            f"📲 Watch Free in 1080p Full HD on NXLY Stream!\n\n"
+            f"#reels #shorts #viral #movies #trending #nxly"
         )
-        items = res.get("data", {}).get("list") or []
-        for it in items:
-            link = it.get("url") or it.get("resourceLink") or ""
-            if "source_url=" in link:
-                try:
-                    link = urllib.parse.unquote(link.split("source_url=")[-1])
-                except Exception:
-                    pass
-            if link:
-                stream_candidates.append(link)
+        comment_msg = (
+            f"🍿 Full দেখার জন্য Google Search করুন: \"NXLY Stream\" অথবা সরাসরি Visit করুন: https://nxly.online\n\n"
+            f"👉 ডিরেক্ট ওয়াচ লিংক:\n{movie_web_url}\n\n"
+            f"📲 Download Free Official Android App:\n👉 https://nxly.online/download"
+        )
+
+        platforms_cfg = active_job.get("platforms") or {"facebook": True, "youtube": True, "tiktok": True}
+        fb_cfg = load_fb_config()
+        yt_cfg = youtube_bot.load_yt_config()
+        tt_cfg = tiktok_bot.load_tt_config()
+
+        # A. Facebook Reels
+        fb_res = {}
+        if platforms_cfg.get("facebook", True) and fb_cfg.get("auto_pilot_enabled", True):
+            try:
+                bot_log(f"[FacebookBot] Uploading reel to Facebook Page: '{top_text}'...")
+                fb_res = await upload_reel_to_facebook(
+                    video_path=output_path,
+                    caption=caption,
+                    comment_text=comment_msg
+                )
+                bot_log(f"[FacebookBot] Publish response: success={fb_res.get('success')}, url={fb_res.get('reel_url')}")
+            except Exception as fbe:
+                bot_log(f"[FacebookBot] Error: {fbe}")
+        else:
+            bot_log(f"[FacebookBot] ⏸️ Facebook posting skipped (Switch is OFF)")
+
+        # B. YouTube Shorts
+        yt_res = {}
+        if platforms_cfg.get("youtube", True) and yt_cfg.get("auto_pilot_enabled", False):
+            try:
+                bot_log(f"[YouTubeBot] Auto-distributing to YouTube Shorts: '{top_text}'...")
+                yt_res = await youtube_bot.upload_shorts_to_youtube(
+                    video_path=output_path,
+                    title=f"{top_text} #Shorts",
+                    description=caption,
+                    comment_text=comment_msg
+                )
+                bot_log(f"[YouTubeBot] YouTube Shorts result: success={yt_res.get('success')}")
+            except Exception as yte:
+                bot_log(f"[YouTubeBot] Error: {yte}")
+        else:
+            bot_log(f"[YouTubeBot] ⏸️ YouTube Shorts posting skipped (Switch is OFF)")
+
+        # C. TikTok
+        tt_res = {}
+        if platforms_cfg.get("tiktok", True) and tt_cfg.get("auto_pilot_enabled", False):
+            try:
+                bot_log(f"[TikTokBot] Auto-distributing to TikTok: '{top_text}'...")
+                tt_caption = f"🔥 {top_text} 🍿 Google Search: NXLY Stream or Visit nxly.online #shorts #movies #fyp #viral #nxly"
+                tt_res = await tiktok_bot.upload_video_to_tiktok(
+                    video_path=output_path,
+                    caption=tt_caption
+                )
+                bot_log(f"[TikTokBot] TikTok result: success={tt_res.get('success')}")
+            except Exception as tte:
+                bot_log(f"[TikTokBot] Error: {tte}")
+        else:
+            bot_log(f"[TikTokBot] ⏸️ TikTok posting skipped (Switch is OFF)")
+
+        # 4. Advance Sequence Progress & Check Completion
+        now_str = time.strftime("%Y-%m-%d %H:%M:%S")
+        active_job["last_posted_at"] = now_str
+        active_job["completed_parts_count"] = active_job.get("completed_parts_count", 0) + 1
+        active_job["history"].append({
+            "part_label": part_label,
+            "posted_at": now_str,
+            "video_filename": output_filename,
+            "fb_url": fb_res.get("reel_url"),
+            "yt_url": yt_res.get("video_url"),
+            "file_size_mb": file_size_mb
+        })
+
+        job_finished = False
+
+        if is_series:
+            active_job["current_part"] += 1
+            if active_job["current_part"] > active_job.get("parts_per_episode", 3):
+                active_job["current_part"] = 1
+                active_job["current_episode"] += 1
+                bot_log(f"[AutoPilot] 📌 '{title}' completed episode! Advancing to Episode {active_job['current_episode']}.")
+
+                if active_job["current_episode"] > active_job.get("total_episodes_in_season", 10):
+                    seasons = active_job.get("seasons") or [1]
+                    curr_s_idx = seasons.index(active_job["current_season"]) if active_job["current_season"] in seasons else -1
+                    if curr_s_idx != -1 and curr_s_idx + 1 < len(seasons):
+                        active_job["current_season"] = seasons[curr_s_idx + 1]
+                        active_job["current_episode"] = 1
+                        bot_log(f"[AutoPilot] 🌟 '{title}' advanced to Season {active_job['current_season']}!")
+                    else:
+                        job_finished = True
+        else:
+            active_job["current_part"] += 1
+            if active_job["current_part"] > active_job.get("total_parts", 8):
+                job_finished = True
+
+        if job_finished:
+            bot_log(f"[AutoPilot] 🏆 ALL PLANNED VIDEOS COMPLETED for '{title}'! Moving to Finished List.")
+            active_job["status"] = "finished"
+            active_job["finished_at"] = now_str
+            data["finished"].insert(0, active_job)
+            data["jobs"].pop(active_idx)
+        else:
+            active_job["status"] = "queued"
+            bot_log(f"[AutoPilot] 📊 Progress for '{title}': {active_job['completed_parts_count']} parts completed.")
+
+        # Save state & update last post timestamp
+        fb_cfg = load_fb_config()
+        fb_cfg["last_post_time"] = int(time.time())
+        save_fb_config(fb_cfg)
+
+        data["state"]["is_busy"] = False
+        data["state"]["step"] = "idle"
+        data["state"]["last_run_timestamp"] = int(time.time())
+        data["state"]["next_run_timestamp"] = int(time.time()) + (int(fb_cfg.get("post_interval_minutes", 10)) * 60)
+        save_queue_data(data)
+
+        bot_log(f"[AutoPilot] ⏱️ Next scheduled video post in {fb_cfg.get('post_interval_minutes', 10)} minutes.")
+
+        return {
+            "success": True,
+            "title": title,
+            "part_label": part_label,
+            "finished": job_finished,
+            "facebook": fb_res,
+            "youtube": yt_res,
+            "tiktok": tt_res
+        }
     except Exception as e:
-        bot_log(f"[AutoPilot] Warning: failed to fetch stream: {e}")
-
-    if not stream_candidates:
-        bot_log(f"[AutoPilot] ❌ No playable video stream found for '{title}' [{part_label}]. Pausing job.")
-        active_job["status"] = "paused"
-        data["state"]["is_busy"] = False
-        data["state"]["step"] = "error_no_stream"
-        save_queue_data(data)
-        return {"success": False, "error": "No working video stream"}
-
-    # 2. Slice and Render Video Clip
-    data["state"]["step"] = "rendering"
-    save_queue_data(data)
-
-    sanitized = re.sub(r'[^a-zA-Z0-9_\-]', '_', title)[:30]
-    timestamp = int(time.time())
-    output_filename = f"fb_reel_{sanitized}_P{part}_{timestamp}.mp4"
-    output_path = os.path.join(BASE_DIR, "public", "reels", output_filename)
-    overlay_path = os.path.join(BASE_DIR, "public", "reels", f"fb_overlay_{sanitized}_{timestamp}.png")
-
-    try:
-        total_p_calc = active_job.get("parts_per_episode", 3) if is_series else active_job.get("total_parts", 8)
-        reel_generator.generate_overlay_image(
-            title=title,
-            part_num=part,
-            total_parts=total_p_calc,
-            top_text_custom=top_text,
-            bottom_text_custom='FULL DEKHAR JONNE GOOGLE SEARCH: "NXLY STREAM"',
-            output_path=overlay_path
-        )
-    except Exception as oe:
-        bot_log(f"[AutoPilot] Overlay generation note: {oe}")
-
-    render_success = False
-    for s_url in stream_candidates[:2]:
-        bot_log(f"[AutoPilot] ⚙️ Slicing {part_duration}s at {start_seconds // 60}:{start_seconds % 60:02d} from stream...")
-        render_success = await reel_generator.render_single_reel_part(
-            stream_url=s_url,
-            start_seconds=start_seconds,
-            duration_seconds=part_duration,
-            overlay_png_path=overlay_path,
-            output_mp4_path=output_path,
-            anti_copyright=True
-        )
-        if render_success and os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
-            break
-
-    if os.path.exists(overlay_path):
-        try: os.remove(overlay_path)
-        except Exception: pass
-
-    if not render_success or not os.path.exists(output_path) or os.path.getsize(output_path) < 1000:
-        bot_log(f"[AutoPilot] ❌ Video rendering failed for '{title}' [{part_label}].")
-        active_job["status"] = "failed"
-        data["state"]["is_busy"] = False
-        data["state"]["step"] = "error_render_failed"
-        save_queue_data(data)
-        return {"success": False, "error": "Rendering failed"}
-
-    file_size_mb = round(os.path.getsize(output_path) / (1024 * 1024), 2)
-    bot_log(f"[AutoPilot] ✅ Render complete: {output_filename} ({file_size_mb} MB)")
-
-    # 3. Multi-Platform Distribution
-    data["state"]["step"] = "distributing"
-    save_queue_data(data)
-
-    movie_web_url = f"https://nxly.online/movie/{active_job.get('detail_path')}" if active_job.get("detail_path") else "https://nxly.online"
-    caption = (
-        f"🔥 {top_text} 🎬🍿\n"
-        f"━━━━━━━━━━━━━━━━━━\n"
-        f"🔍 Full দেখার জন্য Google-এ Search করুন: NXLY Stream\n"
-        f"🌐 অথবা Visit করুন: nxly.online\n"
-        f"👉 ১ম যে রেজাল্ট আসবে সেটাই! (First result on Google)\n\n"
-        f"💬 ফুল ভিডিও ডিরেক্ট লিংক ১ম কমেন্টে দেওয়া আছে (1st Comment)! 👇\n"
-        f"📲 Watch Free in 1080p Full HD on NXLY Stream!\n\n"
-        f"#reels #shorts #viral #movies #trending #nxly"
-    )
-    comment_msg = (
-        f"🍿 Full দেখার জন্য Google Search করুন: \"NXLY Stream\" অথবা সরাসরি Visit করুন: https://nxly.online\n\n"
-        f"👉 ডিরেক্ট ওয়াচ লিংক:\n{movie_web_url}\n\n"
-        f"📲 Download Free Official Android App:\n👉 https://nxly.online/download"
-    )
-
-    platforms_cfg = active_job.get("platforms") or {"facebook": True, "youtube": True, "tiktok": True}
-    fb_cfg = load_fb_config()
-    yt_cfg = youtube_bot.load_yt_config()
-    tt_cfg = tiktok_bot.load_tt_config()
-
-    # A. Facebook Reels
-    fb_res = {}
-    if platforms_cfg.get("facebook", True) and fb_cfg.get("auto_pilot_enabled", True):
-        try:
-            bot_log(f"[FacebookBot] Uploading reel to Facebook Page: '{top_text}'...")
-            fb_res = await upload_reel_to_facebook(
-                video_path=output_path,
-                caption=caption,
-                comment_text=comment_msg
-            )
-            bot_log(f"[FacebookBot] Publish response: success={fb_res.get('success')}, url={fb_res.get('reel_url')}")
-        except Exception as fbe:
-            bot_log(f"[FacebookBot] Error: {fbe}")
-    else:
-        bot_log(f"[FacebookBot] ⏸️ Facebook posting skipped (Switch is OFF)")
-
-    # B. YouTube Shorts
-    yt_res = {}
-    if platforms_cfg.get("youtube", True) and yt_cfg.get("auto_pilot_enabled", False):
-        try:
-            bot_log(f"[YouTubeBot] Auto-distributing to YouTube Shorts: '{top_text}'...")
-            yt_res = await youtube_bot.upload_shorts_to_youtube(
-                video_path=output_path,
-                title=f"{top_text} #Shorts",
-                description=caption,
-                comment_text=comment_msg
-            )
-            bot_log(f"[YouTubeBot] YouTube Shorts result: success={yt_res.get('success')}")
-        except Exception as yte:
-            bot_log(f"[YouTubeBot] Error: {yte}")
-    else:
-        bot_log(f"[YouTubeBot] ⏸️ YouTube Shorts posting skipped (Switch is OFF)")
-
-    # C. TikTok
-    tt_res = {}
-    if platforms_cfg.get("tiktok", True) and tt_cfg.get("auto_pilot_enabled", False):
-        try:
-            bot_log(f"[TikTokBot] Auto-distributing to TikTok: '{top_text}'...")
-            tt_caption = f"🔥 {top_text} 🍿 Google Search: NXLY Stream or Visit nxly.online #shorts #movies #fyp #viral #nxly"
-            tt_res = await tiktok_bot.upload_video_to_tiktok(
-                video_path=output_path,
-                caption=tt_caption
-            )
-            bot_log(f"[TikTokBot] TikTok result: success={tt_res.get('success')}")
-        except Exception as tte:
-            bot_log(f"[TikTokBot] Error: {tte}")
-    else:
-        bot_log(f"[TikTokBot] ⏸️ TikTok posting skipped (Switch is OFF)")
-
-    # 4. Advance Sequence Progress & Check Completion
-    now_str = time.strftime("%Y-%m-%d %H:%M:%S")
-    active_job["last_posted_at"] = now_str
-    active_job["completed_parts_count"] = active_job.get("completed_parts_count", 0) + 1
-    active_job["history"].append({
-        "part_label": part_label,
-        "posted_at": now_str,
-        "video_filename": output_filename,
-        "fb_url": fb_res.get("reel_url"),
-        "yt_url": yt_res.get("video_url"),
-        "file_size_mb": file_size_mb
-    })
-
-    job_finished = False
-
-    if is_series:
-        active_job["current_part"] += 1
-        if active_job["current_part"] > active_job.get("parts_per_episode", 3):
-            active_job["current_part"] = 1
-            active_job["current_episode"] += 1
-            bot_log(f"[AutoPilot] 📌 '{title}' completed episode! Advancing to Episode {active_job['current_episode']}.")
-
-            if active_job["current_episode"] > active_job.get("total_episodes_in_season", 10):
-                seasons = active_job.get("seasons") or [1]
-                curr_s_idx = seasons.index(active_job["current_season"]) if active_job["current_season"] in seasons else -1
-                if curr_s_idx != -1 and curr_s_idx + 1 < len(seasons):
-                    active_job["current_season"] = seasons[curr_s_idx + 1]
-                    active_job["current_episode"] = 1
-                    bot_log(f"[AutoPilot] 🌟 '{title}' advanced to Season {active_job['current_season']}!")
-                else:
-                    job_finished = True
-    else:
-        active_job["current_part"] += 1
-        if active_job["current_part"] > active_job.get("total_parts", 8):
-            job_finished = True
-
-    if job_finished:
-        bot_log(f"[AutoPilot] 🏆 ALL PLANNED VIDEOS COMPLETED for '{title}'! Moving to Finished List.")
-        active_job["status"] = "finished"
-        active_job["finished_at"] = now_str
-        data["finished"].insert(0, active_job)
-        data["jobs"].pop(active_idx)
-    else:
+        bot_log(f"[AutoPilot] ❌ FATAL error in cycle: {e}")
+        bot_log(traceback.format_exc())
         active_job["status"] = "queued"
-        bot_log(f"[AutoPilot] 📊 Progress for '{title}': {active_job['completed_parts_count']} parts completed.")
-
-    # Save state & update last post timestamp
-    fb_cfg = load_fb_config()
-    fb_cfg["last_post_time"] = int(time.time())
-    save_fb_config(fb_cfg)
-
-    data["state"]["is_busy"] = False
-    data["state"]["step"] = "idle"
-    data["state"]["last_run_timestamp"] = int(time.time())
-    data["state"]["next_run_timestamp"] = int(time.time()) + (int(fb_cfg.get("post_interval_minutes", 10)) * 60)
-    save_queue_data(data)
-
-    bot_log(f"[AutoPilot] ⏱️ Next scheduled video post in {fb_cfg.get('post_interval_minutes', 10)} minutes.")
-
-    return {
-        "success": True,
-        "title": title,
-        "part_label": part_label,
-        "finished": job_finished,
-        "facebook": fb_res,
-        "youtube": yt_res,
-        "tiktok": tt_res
-    }
+        data["state"]["is_busy"] = False
+        data["state"]["step"] = "error"
+        save_queue_data(data)
+        return {"success": False, "error": str(e)}

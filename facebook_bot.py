@@ -21,7 +21,15 @@ _LIVE_LOGS = []
 def bot_log(msg: str):
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
     formatted = f"[{timestamp}] {msg}"
-    print(formatted, flush=True)
+    try:
+        print(formatted, flush=True)
+    except Exception:
+        try:
+            import sys
+            sys.stdout.buffer.write((formatted + "\n").encode('utf-8', errors='replace'))
+            sys.stdout.buffer.flush()
+        except Exception:
+            pass
     _LIVE_LOGS.append(formatted)
     if len(_LIVE_LOGS) > 300:
         _LIVE_LOGS.pop(0)
