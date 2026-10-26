@@ -821,6 +821,16 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
 
             if fb_res.get("success"):
                 bot_log(f"[FacebookBot] 🎉 Successfully published pending Reel: {fb_res.get('reel_url')}!")
+                try:
+                    from facebook_bot import share_reel_to_groups
+                    m_url = f"https://nxly.online/movie/{active_job.get('detail_path')}" if active_job.get("detail_path") else "https://nxly.online"
+                    await share_reel_to_groups(
+                        reel_url=fb_res.get("reel_url"),
+                        title=f"{title} • {p_label}",
+                        watch_url=m_url
+                    )
+                except Exception as _ge:
+                    bot_log(f"[FacebookBot] Group share note: {_ge}")
                 pending_uploads.pop(0)
                 active_job["pending_uploads"] = pending_uploads
                 now_str = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -1019,11 +1029,11 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
         caption = (
             f"🔥 {top_text} 🎬🍿\n"
             f"━━━━━━━━━━━━━━━━━━\n"
-            f"🔍 Full দেখার জন্য Google-এ Search করুন: NXLY Stream\n"
-            f"🌐 অথবা Visit করুন: nxly.online\n"
-            f"👉 ১ম যে রেজাল্ট আসবে সেটাই! (First result on Google)\n\n"
-            f"💬 ফুল ভিডিও ডিরেক্ট লিংক ১ম কমেন্টে দেওয়া আছে (1st Comment)! 👇\n"
-            f"📲 Watch Free in 1080p Full HD on NXLY Stream!\n\n"
+            f"🍿 Full Movie/Episode Watch Link:\n"
+            f"👉 {movie_web_url}\n\n"
+            f"🔍 অথবা Google-এ Search করুন: NXLY Stream\n"
+            f"🌐 Website: https://nxly.online\n"
+            f"📲 Free Official Android App: https://nxly.online/download\n\n"
             f"#reels #shorts #viral #movies #trending #nxly"
         )
         comment_msg = (
@@ -1048,6 +1058,16 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
                     comment_text=comment_msg
                 )
                 bot_log(f"[FacebookBot] Publish response: success={fb_res.get('success')}, url={fb_res.get('reel_url')}")
+                if fb_res.get("success") and fb_res.get("reel_url"):
+                    try:
+                        from facebook_bot import share_reel_to_groups
+                        await share_reel_to_groups(
+                            reel_url=fb_res.get("reel_url"),
+                            title=top_text,
+                            watch_url=movie_web_url
+                        )
+                    except Exception as _ge:
+                        bot_log(f"[FacebookBot] Group share note: {_ge}")
             except Exception as fbe:
                 bot_log(f"[FacebookBot] Error: {fbe}")
         else:

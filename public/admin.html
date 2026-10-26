@@ -1713,6 +1713,13 @@
                         </div>
                         <input type="password" id="fbPageToken" class="form-control" placeholder="EAA...">
                     </div>
+                    <div class="form-group" style="margin-top:10px;">
+                        <label>Target Facebook Group IDs <span style="font-size:11px; color:#A78BFA; font-weight:normal;">(কমা দিয়ে একাধিক গ্রুপ আইডি দিন)</span></label>
+                        <input type="text" id="fbTargetGroups" class="form-control" placeholder="e.g. 123456789012345, 987654321098765">
+                        <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">
+                            💡 Auto-Pilot রিল পোস্ট হওয়ার পর স্বয়ংক্রিয়ভাবে এই গ্রুপগুলোতে রিলটি শেয়ার করবে।
+                        </div>
+                    </div>
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">
                         <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:#fff; cursor:pointer;">
                             <input type="checkbox" id="fbAutoPilotToggle" checked style="accent-color:var(--accent-green); width:16px; height:16px;">
@@ -1734,7 +1741,7 @@
                         Convert your short-lived Meta user token into a Page Access Token that <strong>NEVER EXPIRES</strong> (আজীবনের জন্য ভ্যালিড):
                         <ol style="margin:6px 0 0 16px; padding:0; color:#CBD5E1;">
                             <li>Open <a href="https://developers.facebook.com/apps" target="_blank" style="color:var(--accent-cyan); text-decoration:underline;">Meta Developers Apps ↗</a> &gt; Select App &gt; <strong>App settings &gt; Basic</strong>. Copy <strong>App ID</strong> &amp; <strong>App Secret</strong>.</li>
-                            <li>Open <a href="https://developers.facebook.com/tools/explorer" target="_blank" style="color:var(--accent-cyan); text-decoration:underline;">Graph API Explorer ↗</a> &gt; Generate User Token with <code>pages_show_list, pages_manage_posts</code>.</li>
+                            <li>Open <a href="https://developers.facebook.com/tools/explorer" target="_blank" style="color:var(--accent-cyan); text-decoration:underline;">Graph API Explorer ↗</a> &gt; Generate User Token with: <code>pages_show_list, pages_manage_posts, pages_manage_engagement, pages_read_user_content</code> (কমেন্ট ও পোস্টের সব পারমিশন)।</li>
                             <li>Paste them below and click <strong>Exchange for Permanent Token</strong>. Meta will generate &amp; save it automatically!</li>
                         </ol>
                     </div>
@@ -3747,6 +3754,9 @@
                     if (c.page_token) {
                         document.getElementById('fbPageToken').value = c.page_token;
                     }
+                    if (c.target_groups) {
+                        document.getElementById('fbTargetGroups').value = Array.isArray(c.target_groups) ? c.target_groups.join(', ') : c.target_groups;
+                    }
                     if (c.app_id) {
                         const el = document.getElementById('fbExchangeAppId');
                         if (el) el.value = c.app_id;
@@ -3774,11 +3784,13 @@
 
         async function handleSaveFacebookConfig(e) {
             e.preventDefault();
+            const groupsStr = document.getElementById('fbTargetGroups')?.value || '';
             const payload = {
                 page_id: document.getElementById('fbPageId').value.trim(),
                 page_token: document.getElementById('fbPageToken').value.trim(),
                 post_interval_minutes: parseInt(document.getElementById('fbIntervalMinutes').value || 10),
-                auto_pilot_enabled: document.getElementById('fbAutoPilotToggle').checked
+                auto_pilot_enabled: document.getElementById('fbAutoPilotToggle').checked,
+                target_groups: groupsStr.split(',').map(s => s.trim()).filter(Boolean)
             };
             try {
                 const res = await fetch('/api/admin/facebook/config', {

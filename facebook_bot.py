@@ -413,10 +413,17 @@ async def upload_reel_to_facebook(
                         bot_log(f"[FacebookBot] ✅ Auto-comment successfully posted on post {fb_post_id}: {comment_id}")
                         break
 
-                    # If token is invalid or expired, stop immediately and log
-                    if c_data.get("error", {}).get("code") == 190:
-                        bot_log(f"[FacebookBot] ❌ Token expired or invalid! Cannot comment: {err_msg}")
-                        break
+                    # Check error details
+                    if not comment_id:
+                        err_code = c_data.get("error", {}).get("code")
+                        if "pages_manage_engagement" in err_msg or err_code in (200, 403):
+                            bot_log(f"[FacebookBot] ⚠️ Comment skipped by Meta: 'pages_manage_engagement' permission is required on the Page Token. ({err_msg})")
+                            break
+                        elif err_code == 190:
+                            bot_log(f"[FacebookBot] ❌ Token expired or invalid! Cannot comment: {err_msg}")
+                            break
+                        elif comment_attempt == 4:
+                            bot_log(f"[FacebookBot] ⚠️ Comment could not be posted: {err_msg}")
                 except Exception as ce:
                     bot_log(f"[FacebookBot] Comment attempt {comment_attempt+1} note: {ce}")
 
@@ -813,13 +820,15 @@ async def share_reel_to_groups(reel_url: str, title: str, watch_url: str) -> lis
     cfg = load_fb_config()
     groups = cfg.get("target_groups", [])
     if not groups:
+        bot_log("[FacebookBot] ℹ️ Group sharing skipped: No Facebook Target Groups configured in Settings.")
         return []
-    
+
     page_token = cfg.get("page_token", "")
     user_token = cfg.get("user_token", "")
     token_to_use = page_token or user_token
     results = []
-    
+
+    bot_log(f"[FacebookBot] 📢 Sharing reel to {len(groups)} target Facebook group(s)...")
     async with httpx.AsyncClient(timeout=30.0) as client:
         for grp_id in groups:
             grp_id = str(grp_id).strip()
@@ -828,24 +837,22 @@ async def share_reel_to_groups(reel_url: str, title: str, watch_url: str) -> lis
                 # 1. Post to group feed
                 feed_url = f"https://graph.facebook.com/v19.0/{grp_id}/feed"
                 post_resp = await client.post(feed_url, data={
-                    "message": f"🔥 {title} • New Viral Reel 🍿\n👉 Watch Reel: {reel_url}",
+                    "message": f"🔥 {title} • New Viral Reel 🍿\n👉 Watch Reel: {reel_url}\n\n🍿 Full Movie Link: {watch_url}\n📲 App: https://nxly.online/download",
                     "link": reel_url,
                     "access_token": token_to_use
                 })
                 post_data = post_resp.json()
                 post_id = post_data.get("id")
-                
-                # 2. Comment in the group post with links
-                comment_id = None
+                err_detail = post_data.get("error", {}).get("message")
+
                 if post_id:
-                    c_resp = await client.post(f"https://graph.facebook.com/v19.0/{post_id}/comments", data={
-                        "message": f"🍿 Full Movie Link: 👉 {watch_url}\n📲 Free Official App: https://nxly.online/download",
-                        "access_token": token_to_use
-                    })
-                    comment_id = c_resp.json().get("id")
-                    
-                results.append({"group_id": grp_id, "success": bool(post_id), "post_id": post_id, "comment_id": comment_id, "error": post_data.get("error")})
+                    bot_log(f"[FacebookBot] ✅ Shared successfully to group {grp_id}: {post_id}")
+                else:
+                    bot_log(f"[FacebookBot] ⚠️ Could not share to group {grp_id}: {err_detail or 'Permission error'}")
+
+                results.append({"group_id": grp_id, "success": bool(post_id), "post_id": post_id, "error": err_detail})
             except Exception as ge:
+                bot_log(f"[FacebookBot] ❌ Group {grp_id} share error: {ge}")
                 results.append({"group_id": grp_id, "success": False, "error": str(ge)})
     return results
 

@@ -1148,7 +1148,8 @@ async def admin_facebook_get_config(request: Request):
             "post_interval_minutes": cfg.get("post_interval_minutes", 10),
             "post_interval_hours": cfg.get("post_interval_hours", 0.166),
             "last_post_time": cfg.get("last_post_time", 0),
-            "auto_comment_template": cfg.get("auto_comment_template", "")
+            "auto_comment_template": cfg.get("auto_comment_template", ""),
+            "target_groups": cfg.get("target_groups", [])
         },
         "connection": conn_info
     }
@@ -1172,6 +1173,12 @@ async def admin_facebook_save_config(data: dict, request: Request):
         cfg["post_interval_minutes"] = max(1, int(cfg["post_interval_hours"] * 60))
     if "auto_comment_template" in data:
         cfg["auto_comment_template"] = str(data["auto_comment_template"])
+    if "target_groups" in data:
+        raw_groups = data["target_groups"]
+        if isinstance(raw_groups, str):
+            cfg["target_groups"] = [g.strip() for g in raw_groups.split(",") if g.strip()]
+        elif isinstance(raw_groups, list):
+            cfg["target_groups"] = [str(g).strip() for g in raw_groups if str(g).strip()]
 
     facebook_bot.save_fb_config(cfg)
     return {"code": 0, "message": "Facebook configuration saved successfully!"}
