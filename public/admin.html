@@ -951,7 +951,7 @@
                             </div>
                             <div class="form-group">
                                 <label>Custom Bottom Banner Text</label>
-                                <input type="text" id="reelBottomText" class="form-control" value="FULL MOVIE LINK IN 1ST COMMENT">
+                                <input type="text" id="reelBottomText" class="form-control" value='GOOGLE SEARCH: "NXLY STREAM"'>
                             </div>
                         </div>
 
@@ -1005,7 +1005,9 @@
 
                         <div class="form-group" style="margin-bottom:14px;">
                             <label>Auto-Comment Template (Contains Site & App Links)</label>
-                            <textarea id="fbCommentTemplate" class="form-control">🍿 Watch Full Movie/Show in 1080p HD on NXLY Stream:
+                            <textarea id="fbCommentTemplate" class="form-control">🔍 Google Search: NXLY Stream (First result is the one!)
+
+🍿 Watch Full Movie/Show in 1080p HD:
 👉 {movie_url}
 
 📲 Download Free Official Android App:
@@ -1508,15 +1510,17 @@
             _reelsSearchTimeout = setTimeout(async () => {
                 const res = await fetch(`/api/admin/subjects/search?q=${encodeURIComponent(q)}`, { headers: { 'Authorization': `Bearer ${token}` } });
                 const d = await res.json();
-                if (d.items && d.items.length > 0) {
+                const items = d.items || d.list || [];
+                if (items && items.length > 0) {
                     box.style.display = 'block';
-                    box.innerHTML = d.items.map(it => `
-                        <div style="padding:8px 12px; cursor:pointer; border-bottom:1px solid var(--border-subtle); font-size:13px;" onclick="selectReelSubject('${it.subjectId}', '${it.title.replace(/'/g, "\\'")}', '${it.detailPath}', ${it.subjectType})">
-                            <strong>${it.title}</strong> (${it.subjectType === 2 ? 'TV Series' : 'Movie'})
+                    box.innerHTML = items.map(it => `
+                        <div style="padding:10px 14px; cursor:pointer; border-bottom:1px solid var(--border-subtle); font-size:13px; color:#fff;" onclick="selectReelSubject('${it.subjectId}', '${it.title.replace(/'/g, "\\'")}', '${it.detailPath}', ${it.subjectType})">
+                            <strong style="color:var(--accent-cyan);">${it.title}</strong> <span style="font-size:11px; color:var(--text-muted);">(${it.subjectType === 2 ? 'TV Series' : 'Movie'})</span>
                         </div>
                     `).join('');
                 } else {
-                    box.style.display = 'none';
+                    box.style.display = 'block';
+                    box.innerHTML = `<div style="padding:10px 14px; font-size:12.5px; color:var(--text-muted);">No matches found for "${q}"</div>`;
                 }
             }, 300);
         }

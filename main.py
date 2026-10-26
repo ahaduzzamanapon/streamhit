@@ -2419,7 +2419,10 @@ DEPRECATED_VIDEO_HASHES = [
     "80da52722ee7de7a4303290af6783424",
     "/other/2026/10/10/",
     "service_update",
-    "discontinued"
+    "discontinued",
+    "vegamovies",
+    "asiafilm",
+    "480p-tran-audio-channel"
 ]
 
 def is_deprecated_or_dummy_url(url: str) -> bool:
@@ -2540,6 +2543,41 @@ async def _do_fetch_resource(subjectId: str, se: int, ep: int, detailPath: str, 
             except Exception:
                 pass
 
+    # Search fallback if title has dub markers like [Hindi], [Dual Audio], etc.
+    if not items and mob_subj:
+        raw_title = mob_subj.get("title", "")
+        import re
+        cleaned_title = re.sub(r'\[.*?\]|\(.*?\)', '', raw_title).strip()
+        if cleaned_title and len(cleaned_title) > 2 and cleaned_title.lower() != raw_title.lower():
+            try:
+                search_res = await request_moviebox_mobile(
+                    "/wefeed-mobile-bff/subject-api/search",
+                    params={"keyword": cleaned_title, "page": 1, "size": 5}
+                )
+                if isinstance(search_res, dict):
+                    cand_list = search_res.get("data", {}).get("list") or search_res.get("data", {}).get("items") or []
+                    for c_item in cand_list:
+                        c_id = str(c_item.get("subjectId") or c_item.get("id") or "")
+                        c_path = c_item.get("detailPath") or ""
+                        if c_id and c_id != str(subjectId):
+                            c_h5 = await _fetch_download_resources(c_id, se, ep, c_path)
+                            for d in (c_h5.get("downloads") or []):
+                                u = d.get("url")
+                                if u and not is_deprecated_or_dummy_url(u):
+                                    fetch_link = f"https://nxly.online/fetch?source_url={urllib.parse.quote(u)}"
+                                    items.append({
+                                        "resourceId": str(d.get("id") or "0"),
+                                        "resolution": int(d.get("resolution") or 720),
+                                        "size": int(d.get("size") or 0),
+                                        "url": u,
+                                        "resourceLink": fetch_link,
+                                        "proxyUrl": fetch_link
+                                    })
+                            if items:
+                                break
+            except Exception as se:
+                print(f"Fallback cleaned title search error: {se}")
+
     res = {"code": 0, "data": {"list": items, "isUpcoming": len(items) == 0}}
     _resource_cache[cache_key] = res
     # Cache valid resources for 2 hours; empty results negative-cached for 60s
@@ -2571,10 +2609,11 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
     db_data = await db_get_stream_resource(subjectId, se, ep)
     if db_data and db_data.get("resources"):
         items = db_data["resources"]
-        res = {"code": 0, "data": {"list": items, "isUpcoming": False}}
-        _resource_cache[cache_key] = res
-        _resource_cache_time[cache_key] = now
-        return res
+        if not any(is_deprecated_or_dummy_url(it.get("url", "")) or is_deprecated_or_dummy_url(it.get("resourceLink", "")) for it in items):
+            res = {"code": 0, "data": {"list": items, "isUpcoming": False}}
+            _resource_cache[cache_key] = res
+            _resource_cache_time[cache_key] = now
+            return res
 
     # 3. Single-flight request coalescing for upstream fetch
     if cache_key in _resource_inflight:

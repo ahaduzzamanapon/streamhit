@@ -104,34 +104,72 @@ async def admin_logout(request: Request, response: Response):
 @router.get("/api/admin/subjects/search")
 async def admin_search_subjects(q: str, request: Request):
     check_admin_auth(request)
-    from main import get_db_pool
+    q_clean = q.strip()
+    if not q_clean:
+        return {"list": [], "items": []}
+
+    from main import get_db_pool, request_moviebox_mobile
+    items = []
+    existing_ids = set()
     pool = await get_db_pool()
-    if not pool: return {"list": []}
-    
-    async with pool.acquire() as conn:
-        async with conn.cursor(aiomysql.DictCursor) as cur:
-            await cur.execute("""
-                SELECT subject_id, title, cover, detail_path, subject_type 
-                FROM subjects 
-                WHERE title LIKE %s 
-                LIMIT 50
-            """, (f"%{q}%",))
-            rows = await cur.fetchall()
-            
-            items = []
-            for r in rows:
-                items.append({
-                    "subjectId": r["subject_id"],
-                    "subject_id": r["subject_id"],
-                    "title": r["title"],
-                    "coverUrl": r["cover"],
-                    "cover": r["cover"],
-                    "detailPath": r["detail_path"],
-                    "detail_path": r["detail_path"],
-                    "subjectType": r["subject_type"],
-                    "subject_type": r["subject_type"]
-                })
-            return {"list": items}
+
+    if pool:
+        try:
+            async with pool.acquire() as conn:
+                async with conn.cursor(aiomysql.DictCursor) as cur:
+                    await cur.execute("""
+                        SELECT subject_id, title, cover, detail_path, subject_type 
+                        FROM subjects 
+                        WHERE title LIKE %s 
+                        LIMIT 50
+                    """, (f"%{q_clean}%",))
+                    rows = await cur.fetchall()
+                    for r in rows:
+                        s_id = str(r["subject_id"])
+                        items.append({
+                            "subjectId": s_id,
+                            "subject_id": s_id,
+                            "title": r["title"],
+                            "coverUrl": r.get("cover") or "",
+                            "cover": r.get("cover") or "",
+                            "detailPath": r.get("detail_path") or "",
+                            "detail_path": r.get("detail_path") or "",
+                            "subjectType": r.get("subject_type", 1),
+                            "subject_type": r.get("subject_type", 1)
+                        })
+                        existing_ids.add(s_id)
+        except Exception as dbe:
+            print(f"DB search error: {dbe}")
+
+    # Fallback to online search if DB has fewer than 5 items (so Naruto, Anime, etc. all show up)
+    if len(items) < 5:
+        try:
+            search_res = await request_moviebox_mobile(
+                "/wefeed-mobile-bff/subject-api/search",
+                params={"keyword": q_clean, "page": 1, "pageSize": 20}
+            )
+            online_items = search_res.get("data", {}).get("items", []) or []
+            for it in online_items:
+                s_id = str(it.get("subjectId") or "")
+                if s_id and s_id not in existing_ids:
+                    cover_val = it.get("cover", {})
+                    cover_url = cover_val.get("url") if isinstance(cover_val, dict) else str(cover_val or "")
+                    items.append({
+                        "subjectId": s_id,
+                        "subject_id": s_id,
+                        "title": it.get("title") or "Title",
+                        "coverUrl": cover_url,
+                        "cover": cover_url,
+                        "detailPath": it.get("detailPath") or "",
+                        "detail_path": it.get("detailPath") or "",
+                        "subjectType": it.get("subjectType", 1),
+                        "subject_type": it.get("subjectType", 1)
+                    })
+                    existing_ids.add(s_id)
+        except Exception as se:
+            print(f"Online search error: {se}")
+
+    return {"list": items, "items": items}
 
 @router.get("/api/admin/banners")
 async def admin_get_banners(request: Request):

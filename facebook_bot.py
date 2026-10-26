@@ -330,7 +330,15 @@ async def publish_existing_reel(
     movie_url = f"https://nxly.online/watch?id={subject_id}" if subject_id else "https://nxly.online"
     comment_text = template.replace("{movie_url}", movie_url).replace("{title}", title or "this title")
 
-    raw_caption = caption or f"🔥 {title or 'Trending Cinema'} • Watch Full HD on NXLY Stream 🍿\n\n💬 Full Movie Link is in the 1st Comment! 👇\n\n#nxlystream #reels #viral #trending #shorts"
+    raw_caption = caption or (
+        f"🔥 {title or 'Trending Cinema'} • Watch Full HD on NXLY Stream 🍿\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"🔍 Google-এ Search করুন: NXLY Stream\n"
+        f"👉 ১ম যে ওয়েবসাইট আসবে সেটাই! (First result is the one)\n\n"
+        f"💬 ফুল ভিডিও ডিরেক্ট লিংক ১ম কমেন্টে দেওয়া আছে (1st Comment)! 👇\n"
+        f"📲 Watch Free in 1080p Full HD on NXLY Stream!\n\n"
+        f"#nxlystream #reels #viral #trending #shorts"
+    )
     # Ensure no external URLs in post caption to avoid Facebook reach throttling
     import re
     clean_caption = re.sub(r'https?://\S+', '', raw_caption).strip()
@@ -392,11 +400,10 @@ async def trigger_auto_trending_reel(custom_title: Optional[str] = None, custom_
                 print(f"[FacebookBot] DB query fallback: {dbe}")
 
         if not items:
-            # Fallback to homepage trending items
+            # Fallback to homepage trending items from MovieBox
             try:
-                home_data = await main.fetch_home_data()
-                banner_list = home_data.get("data", {}).get("banners", [])
-                for b in banner_list:
+                banners = await main.get_latest_banners()
+                for b in banners:
                     items.append({
                         "subject_id": str(b.get("subjectId") or ""),
                         "title": b.get("title") or "Popular Cinema",
@@ -404,7 +411,7 @@ async def trigger_auto_trending_reel(custom_title: Optional[str] = None, custom_
                         "subject_type": b.get("subjectType", 1)
                     })
             except Exception as he:
-                print(f"[FacebookBot] Home data error: {he}")
+                print(f"[FacebookBot] Banners data fallback error: {he}")
 
         if not items:
             return {"success": False, "error": "No media subjects available for reels generation"}
@@ -467,7 +474,7 @@ async def trigger_auto_trending_reel(custom_title: Optional[str] = None, custom_
             part_num=1,
             total_parts=1,
             top_text_custom="PART 1",
-            bottom_text_custom="FULL MOVIE LINK IN 1ST COMMENT",
+            bottom_text_custom='GOOGLE SEARCH: "NXLY STREAM"',
             output_path=overlay_path
         )
 
@@ -504,19 +511,26 @@ async def trigger_auto_trending_reel(custom_title: Optional[str] = None, custom_
     if not success or not os.path.exists(output_path):
         return {"success": False, "error": "FFmpeg Reel generation failed for all candidates"}
 
-    # Prepare Caption: NO external links in post caption (keeps FB reach high)
+    # Prepare Caption: SEO search prompt + High engagement (FB algorithm reach boost)
     caption = (
         f"🔥 {target_title} 🎬🍿\n"
         f"━━━━━━━━━━━━━━━━━━\n"
-        f"💬 Full Movie / Series link is in the 1st Comment! 👇\n"
-        f"📲 Watch free in 1080p Full HD on NXLY Stream App!\n\n"
+        f"🔍 Google-এ Search করুন: NXLY Stream\n"
+        f"👉 ১ম যে ওয়েবসাইট আসবে সেটাই! (First result is the one)\n\n"
+        f"💬 ফুল ভিডিও ডিরেক্ট লিংক ১ম কমেন্টে দেওয়া আছে (1st Comment)! 👇\n"
+        f"📲 Watch Free in 1080p Full HD on NXLY Stream!\n\n"
         f"#reels #shorts #viral #movies #trending #nxly #{slug.lower()}"
     )
 
-    # Prepare Comment: Contains ALL the links
+    # Prepare Comment: Contains ALL the links + Google Search hint
     watch_url = f"https://nxly.online/watch?id={subject_id}" if subject_id else "https://nxly.online"
     cfg = load_fb_config()
-    comment_tpl = cfg.get("auto_comment_template", "🍿 Watch Full in 1080p HD on NXLY:\n👉 {movie_url}\n\n📲 Download Official App:\n👉 https://nxly.online/download")
+    default_tpl = (
+        "🔍 Google Search: NXLY Stream (First result is the one!)\n\n"
+        "🍿 Watch Full Movie/Show in 1080p HD:\n👉 {movie_url}\n\n"
+        "📲 Download Free Official Android App:\n👉 https://nxly.online/download"
+    )
+    comment_tpl = cfg.get("auto_comment_template") or default_tpl
     comment_msg = comment_tpl.replace("{movie_url}", watch_url).replace("{title}", target_title)
 
     # Upload to Facebook

@@ -262,8 +262,8 @@ def generate_overlay_image(
         b1_text = bottom_text_custom.replace("{title}", clean_title).replace("{part_num}", str(part_num))
         b1_text = re.sub(r'[^\x00-\x7F]+', '', b1_text).strip()
     else:
-        b1_text = "FULL MOVIE LINK IN 1ST COMMENT"
-    b2_text = "Watch Free in 1080p HD on NXLY App"
+        b1_text = 'GOOGLE SEARCH: "NXLY STREAM"'
+    b2_text = "1ST RESULT IS THE ONE • WATCH FREE"
 
     font_b1 = get_font(52, bold=True)
     b1_box = draw.textbbox((0, 0), b1_text, font=font_b1)
@@ -293,9 +293,10 @@ def generate_captions(title: str, part_num: int, total_parts: int = 1) -> Dict[s
     caption = (
         f"🔥 {title} • PART {part_num} 🎬🍿\n"
         f"━━━━━━━━━━━━━━━━━━\n"
-        f"💬 Full Movie / Series link is given in 1st comment! 👇\n"
+        f"🔍 Google-এ Search করুন: NXLY Stream\n"
+        f"👉 ১ম যে ওয়েবসাইট আসবে সেটাই! (First result is the one)\n\n"
+        f"💬 Full Movie / Series link is in 1st comment! 👇\n"
         f"📲 Watch all movies & web series in Full HD for FREE on NXLY Stream App!\n\n"
-        f"👉 Download Link in Comment & Bio 👈\n\n"
         f"#reels #shorts #viral #fyp #movie #nxlystream #trending #part{part_num} #{slug}"
     )
     
