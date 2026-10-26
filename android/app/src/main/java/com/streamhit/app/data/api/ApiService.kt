@@ -56,7 +56,8 @@ interface ApiService {
         @Query("subjectId") subjectId: String,
         @Query("detailPath") detailPath: String = "",
         @Query("se") season: Int = 1,
-        @Query("ep") episode: Int = 1
+        @Query("ep") episode: Int = 1,
+        @Query("resourceId") resourceId: String = ""
     ): Response<CaptionsResponse>
 
     // Telemetry & Device Heartbeat

@@ -91,10 +91,11 @@ class MovieRepository {
         subjectId: String,
         detailPath: String = "",
         season: Int = 1,
-        episode: Int = 1
+        episode: Int = 1,
+        resourceId: String = ""
     ): List<CaptionItem> {
         return try {
-            val response = api.getCaptions(subjectId, detailPath, season, episode)
+            val response = api.getCaptions(subjectId, detailPath, season, episode, resourceId)
             if (response.isSuccessful) {
                 response.body()?.data?.list ?: emptyList()
             } else emptyList()

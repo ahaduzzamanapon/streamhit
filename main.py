@@ -608,29 +608,26 @@ async def _get_h5_cookie() -> str:
 async def _fetch_download_resources(subject_id: str, se: int = 1, ep: int = 1, detail_path: str = "") -> dict:
     cookie = await _get_h5_cookie()
     url = f"https://h5.aoneroom.com/wefeed-h5-bff/web/subject/download?subjectId={subject_id}&se={se}&ep={ep}"
-    for attempt in range(2):
-        ip = get_random_singapore_ip()
-        headers = {
-            "X-Forwarded-For": ip,
-            "CF-Connecting-IP": ip,
-            "X-Real-IP": ip,
-            "Accept-Language": "en-US,en;q=0.5",
-            "Accept": "application/json",
-            "User-Agent": "okhttp/4.12.0",
-            "Origin": "https://123movienow.cc",
-            "Referer": f"https://123movienow.cc/spa/videoPlayPage/movies/{detail_path}?id={subject_id}&type=/movie/detail" if detail_path else f"https://123movienow.cc/spa/videoPlayPage/movies/details?id={subject_id}&type=/movie/detail",
-            "Cookie": cookie
-        }
-        try:
-            resp = await http_client.get(url, headers=headers)
-            if resp.status_code == 200:
-                data = resp.json().get("data")
-                if data:
-                    return data
-                return {}
-        except Exception as e:
-            if attempt == 0:
-                await asyncio.sleep(0.1)
+    ip = get_random_singapore_ip()
+    headers = {
+        "X-Forwarded-For": ip,
+        "CF-Connecting-IP": ip,
+        "X-Real-IP": ip,
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept": "application/json",
+        "User-Agent": "okhttp/4.12.0",
+        "Origin": "https://123movienow.cc",
+        "Referer": f"https://123movienow.cc/spa/videoPlayPage/movies/{detail_path}?id={subject_id}&type=/movie/detail" if detail_path else f"https://123movienow.cc/spa/videoPlayPage/movies/details?id={subject_id}&type=/movie/detail",
+        "Cookie": cookie
+    }
+    try:
+        resp = await http_client.get(url, headers=headers, timeout=2.0)
+        if resp.status_code == 200:
+            data = resp.json().get("data")
+            if data:
+                return data
+    except Exception:
+        pass
     return {}
 
 async def _get_bearer_token() -> str:
@@ -2331,25 +2328,13 @@ def _extract_playable_detectors(detectors: list) -> list:
                 })
     return mob_items
 
-@app.get("/api/resource")
-async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId: str = ""):
-    if not subjectId and detailPath:
-        subjectId = await resolve_subject_id(detailPath, subjectId)
-            
-    if not subjectId:
-        return {"code": 0, "data": {"list": []}}
+_resource_inflight = {}
+_captions_cache = {}
+_captions_cache_time = {}
+_tts_cache = {}
 
-    if not detailPath and subjectId:
-        detailPath = await resolve_detail_path(subjectId, detailPath)
-
-    cache_key = f"{subjectId}_{se}_{ep}_{detailPath}"
+async def _do_fetch_resource(subjectId: str, se: int, ep: int, detailPath: str, cache_key: str) -> dict:
     now = time.time()
-    if cache_key in _resource_cache and (now - _resource_cache_time.get(cache_key, 0) < 3600):
-        cached_val = _resource_cache[cache_key]
-        cached_list = cached_val.get("data", {}).get("list") or []
-        if not any(is_deprecated_or_dummy_url(it.get("url", "")) or is_deprecated_or_dummy_url(it.get("resourceLink", "")) for it in cached_list):
-            return cached_val
-
     items = []
 
     # 1. Primary: Official H5 Download API (Real full 1080p, 720p, 480p, 360p CDN files)
@@ -2427,10 +2412,43 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
                 pass
 
     res = {"code": 0, "data": {"list": items, "isUpcoming": len(items) == 0}}
-    if items:
-        _resource_cache[cache_key] = res
-        _resource_cache_time[cache_key] = now
+    _resource_cache[cache_key] = res
+    # Cache valid resources for 2 hours; empty results negative-cached for 60s
+    _resource_cache_time[cache_key] = now if items else (now - 7200 + 60)
     return res
+
+@app.get("/api/resource")
+async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId: str = ""):
+    if not subjectId and detailPath:
+        subjectId = await resolve_subject_id(detailPath, subjectId)
+            
+    if not subjectId:
+        return {"code": 0, "data": {"list": []}}
+
+    if not detailPath and subjectId:
+        detailPath = await resolve_detail_path(subjectId, detailPath)
+
+    cache_key = f"{subjectId}_{se}_{ep}_{detailPath}"
+    now = time.time()
+    if cache_key in _resource_cache and (now - _resource_cache_time.get(cache_key, 0) < 7200):
+        cached_val = _resource_cache[cache_key]
+        cached_list = cached_val.get("data", {}).get("list") or []
+        if not any(is_deprecated_or_dummy_url(it.get("url", "")) or is_deprecated_or_dummy_url(it.get("resourceLink", "")) for it in cached_list):
+            return cached_val
+
+    # Request coalescing (single-flight): if already being fetched by another worker/coroutine, await that task!
+    if cache_key in _resource_inflight:
+        try:
+            return await _resource_inflight[cache_key]
+        except Exception:
+            pass
+
+    task = asyncio.create_task(_do_fetch_resource(subjectId, se, ep, detailPath, cache_key))
+    _resource_inflight[cache_key] = task
+    try:
+        return await task
+    finally:
+        _resource_inflight.pop(cache_key, None)
  
 _translate_cache = {}
 
@@ -2479,6 +2497,26 @@ async def api_translate_batch(payload: dict):
             results.append(text)
     return {"code": 0, "translations": results}
 
+@app.get("/api/tts")
+async def api_tts(text: str = "", lang: str = "bn"):
+    if not text:
+        return Response(status_code=400, content="Missing text")
+    cache_key = f"{lang}_{text}"
+    if cache_key in _tts_cache:
+        return Response(content=_tts_cache[cache_key], media_type="audio/mpeg")
+    
+    encoded = urllib.parse.quote(text)
+    url = f"https://translate.google.com/translate_tts?ie=UTF-8&tl={lang}&client=tw-ob&q={encoded}"
+    try:
+        async with httpx.AsyncClient(timeout=6.0) as client:
+            resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"})
+            if resp.status_code == 200 and len(resp.content) > 100:
+                _tts_cache[cache_key] = resp.content
+                return Response(content=resp.content, media_type="audio/mpeg")
+    except Exception as e:
+        print(f"TTS fetch error: {e}")
+    return Response(status_code=502, content="TTS service unavailable")
+
 @app.get("/api/captions")
 async def api_captions(se: int = 1, ep: int = 1, detailPath: str = "", subjectId: str = "", resourceId: str = ""):
     if not subjectId and detailPath:
@@ -2486,19 +2524,45 @@ async def api_captions(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
             
     if not subjectId:
         return {"code": 0, "data": {"list": []}}
-        
-    data = await _fetch_download_resources(subjectId, se, ep, detailPath)
-    captions = data.get("captions") or []
 
-    if not captions:
+    cap_cache_key = f"{subjectId}_{se}_{ep}"
+    now = time.time()
+    if cap_cache_key in _captions_cache and (now - _captions_cache_time.get(cap_cache_key, 0) < 43200):
+        return _captions_cache[cap_cache_key]
+
+    # Resolve resourceId if not supplied
+    if not resourceId:
+        for ck, cv in _resource_cache.items():
+            if ck.startswith(f"{subjectId}_{se}_{ep}"):
+                c_list = cv.get("data", {}).get("list") or []
+                if c_list and c_list[0].get("resourceId"):
+                    resourceId = str(c_list[0].get("resourceId"))
+                    break
+        if not resourceId:
+            try:
+                res_obj = await api_resource(se=se, ep=ep, detailPath=detailPath, subjectId=subjectId)
+                c_list = res_obj.get("data", {}).get("list") or []
+                if c_list and c_list[0].get("resourceId"):
+                    resourceId = str(c_list[0].get("resourceId"))
+            except Exception:
+                pass
+
+    captions = []
+    if resourceId:
         try:
-            r_id = resourceId or subjectId
             ext_res = await request_moviebox_mobile(
                 "/wefeed-mobile-bff/subject-api/get-ext-captions",
-                params={"subjectId": subjectId, "resourceId": r_id, "episode": ep}
+                params={"subjectId": subjectId, "resourceId": resourceId, "episode": ep}
             )
             if isinstance(ext_res, dict):
                 captions = ext_res.get("data", {}).get("extCaptions") or ext_res.get("data", {}).get("list") or []
+        except Exception:
+            pass
+
+    if not captions:
+        try:
+            data = await _fetch_download_resources(subjectId, se, ep, detailPath)
+            captions = data.get("captions") or []
         except Exception:
             pass
     
@@ -2513,7 +2577,12 @@ async def api_captions(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
                 "lang": c.get("lan", "en"),
                 "url": f"/api/proxy-subtitle?url={urllib.parse.quote(raw_u)}"
             })
-    return {"code": 0, "data": {"list": formatted}}
+
+    result = {"code": 0, "data": {"list": formatted}}
+    if formatted:
+        _captions_cache[cap_cache_key] = result
+        _captions_cache_time[cap_cache_key] = now
+    return result
 
 CDN_CANDIDATE_HEADERS = [
     {

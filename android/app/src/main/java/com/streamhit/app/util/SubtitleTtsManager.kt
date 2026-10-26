@@ -232,12 +232,14 @@ object SubtitleTtsManager {
             else -> listOf(Locale.US, Locale.ENGLISH)
         }
 
-        // 1. Check if an installed voice matches this language & gender
+        // 1. Check if an installed offline voice actually matches this language & gender
+        var hasValidOfflineVoice = false
         try {
             val voices = t.voices
             if (!voices.isNullOrEmpty()) {
                 val matchingLangVoices = voices.filter { voice ->
-                    voice.locale.language.equals(langCode, ignoreCase = true)
+                    voice.locale.language.equals(langCode, ignoreCase = true) &&
+                    voice.features?.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) != true
                 }
                 val selectedVoice = if (voiceGender == VoiceGender.MALE) {
                     matchingLangVoices.firstOrNull { it.name.lowercase().contains("male") && !it.name.lowercase().contains("female") }
@@ -252,19 +254,26 @@ object SubtitleTtsManager {
                     t.voice = selectedVoice
                     t.language = selectedVoice.locale
                     isNativeTtsSupportedForLang = true
+                    hasValidOfflineVoice = true
                 }
             }
         } catch (_: Exception) {}
 
-        // 2. Try setLanguage for each candidate locale
-        for (loc in localesToTry) {
-            try {
-                val res = t.setLanguage(loc)
-                if (res != TextToSpeech.LANG_MISSING_DATA && res != TextToSpeech.LANG_NOT_SUPPORTED) {
-                    isNativeTtsSupportedForLang = true
-                    break
-                }
-            } catch (_: Exception) {}
+        // 2. Try setLanguage for English or verified installed voice
+        if (langCode == "en") {
+            for (loc in localesToTry) {
+                try {
+                    val res = t.setLanguage(loc)
+                    if (res != TextToSpeech.LANG_MISSING_DATA && res != TextToSpeech.LANG_NOT_SUPPORTED) {
+                        isNativeTtsSupportedForLang = true
+                        break
+                    }
+                } catch (_: Exception) {}
+            }
+        } else if (!hasValidOfflineVoice) {
+            // If offline voice pack is not verified/installed on this device,
+            // fallback to crystal-clear Cloud TTS engine!
+            isNativeTtsSupportedForLang = false
         }
 
         // Apply pitch based on Male / Female voice selection
@@ -633,53 +642,108 @@ object SubtitleTtsManager {
     }
 
     private fun executeCloudPlayback(text: String, lang: String, speed: Float, exoPlayer: ExoPlayer) {
-        try {
-            cloudPlayer?.release()
-            cloudPlayer = null
-
-            val cachedFile = getCachedAudioFile(text, lang)
-            val dataSource = if (cachedFile.exists() && cachedFile.length() > 0) {
-                cachedFile.absolutePath
-            } else {
-                val encoded = URLEncoder.encode(text, "UTF-8")
-                "https://translate.google.com/translate_tts?ie=UTF-8&tl=$lang&client=tw-ob&q=$encoded"
-            }
-
-            val mp = MediaPlayer().apply {
-                setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .build()
-                )
-                setDataSource(dataSource)
-                setOnPreparedListener { player ->
-                    isSpeakingCurrently = true
+        scope.launch(Dispatchers.IO) {
+            try {
+                val cachedFile = getCachedAudioFile(text, lang)
+                if (!cachedFile.exists() || cachedFile.length() <= 0) {
+                    var downloaded = false
+                    val encoded = URLEncoder.encode(text, "UTF-8")
+                    // 1. Try server proxy endpoint
                     try {
-                        val targetPitch = if (voiceGender == VoiceGender.MALE) 0.82f else 1.18f
-                        player.playbackParams = player.playbackParams
-                            .setPitch(targetPitch)
-                            .setSpeed(speed.coerceIn(0.85f, 1.65f))
+                        val proxyUrl = "https://nxly.online/api/tts?lang=$lang&text=$encoded"
+                        val req = Request.Builder().url(proxyUrl).build()
+                        val resp = httpClient.newCall(req).execute()
+                        if (resp.isSuccessful) {
+                            val bytes = resp.body?.bytes()
+                            resp.close()
+                            if (bytes != null && bytes.isNotEmpty()) {
+                                cachedFile.writeBytes(bytes)
+                                downloaded = true
+                            }
+                        } else {
+                            resp.close()
+                        }
                     } catch (_: Exception) {}
-                    player.start()
+
+                    // 2. Direct Google TTS fallback
+                    if (!downloaded) {
+                        try {
+                            val directUrl = "https://translate.google.com/translate_tts?ie=UTF-8&tl=$lang&client=tw-ob&q=$encoded"
+                            val req = Request.Builder().url(directUrl).header("User-Agent", "Mozilla/5.0").build()
+                            val resp = httpClient.newCall(req).execute()
+                            if (resp.isSuccessful) {
+                                val bytes = resp.body?.bytes()
+                                resp.close()
+                                if (bytes != null && bytes.isNotEmpty()) {
+                                    cachedFile.writeBytes(bytes)
+                                    downloaded = true
+                                }
+                            } else {
+                                resp.close()
+                            }
+                        } catch (_: Exception) {}
+                    }
                 }
-                setOnCompletionListener {
-                    it.release()
-                    if (cloudPlayer === it) cloudPlayer = null
-                    handleDialogueCompleted()
+
+                if (cachedFile.exists() && cachedFile.length() > 0) {
+                    withContext(Dispatchers.Main) {
+                        if (!isEnabled) {
+                            restoreVolume()
+                            return@withContext
+                        }
+                        try {
+                            cloudPlayer?.release()
+                            cloudPlayer = null
+
+                            val mp = MediaPlayer().apply {
+                                setAudioAttributes(
+                                    AudioAttributes.Builder()
+                                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                                        .build()
+                                )
+                                setDataSource(cachedFile.absolutePath)
+                                setOnPreparedListener { player ->
+                                    isSpeakingCurrently = true
+                                    try {
+                                        val targetPitch = if (voiceGender == VoiceGender.MALE) 0.82f else 1.18f
+                                        player.playbackParams = player.playbackParams
+                                            .setPitch(targetPitch)
+                                            .setSpeed(speed.coerceIn(0.85f, 1.65f))
+                                    } catch (_: Exception) {}
+                                    player.start()
+                                }
+                                setOnCompletionListener {
+                                    it.release()
+                                    if (cloudPlayer === it) cloudPlayer = null
+                                    handleDialogueCompleted()
+                                }
+                                setOnErrorListener { it, _, _ ->
+                                    it.release()
+                                    if (cloudPlayer === it) cloudPlayer = null
+                                    handleDialogueCompleted()
+                                    true
+                                }
+                                prepareAsync()
+                            }
+                            cloudPlayer = mp
+                        } catch (_: Exception) {
+                            isSpeakingCurrently = false
+                            restoreVolume()
+                        }
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        isSpeakingCurrently = false
+                        restoreVolume()
+                    }
                 }
-                setOnErrorListener { it, _, _ ->
-                    it.release()
-                    if (cloudPlayer === it) cloudPlayer = null
-                    handleDialogueCompleted()
-                    true
+            } catch (_: Exception) {
+                withContext(Dispatchers.Main) {
+                    isSpeakingCurrently = false
+                    restoreVolume()
                 }
-                prepareAsync()
             }
-            cloudPlayer = mp
-        } catch (_: Exception) {
-            isSpeakingCurrently = false
-            restoreVolume()
         }
     }
 

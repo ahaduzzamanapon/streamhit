@@ -1,9 +1,15 @@
 package com.streamhit.app.ui.player
 
+import android.app.PendingIntent
 import android.app.PictureInPictureParams
+import android.app.RemoteAction
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ActivityInfo
+import android.content.res.Configuration
+import android.graphics.drawable.Icon
 import android.media.AudioManager
 import android.media.audiofx.LoudnessEnhancer
 import android.net.Uri
@@ -18,6 +24,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.annotation.OptIn
+import androidx.lifecycle.Lifecycle
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -91,9 +98,46 @@ fun resolveDirectPlayableUrl(url: String): String {
 
 class PlayerActivity : ComponentActivity() {
 
+    companion object {
+        private const val ACTION_PIP_REWIND = "com.streamhit.app.PIP_ACTION_REWIND"
+        private const val ACTION_PIP_PLAY_PAUSE = "com.streamhit.app.PIP_ACTION_PLAY_PAUSE"
+        private const val ACTION_PIP_FORWARD = "com.streamhit.app.PIP_ACTION_FORWARD"
+    }
+
     private var exoPlayer: ExoPlayer? = null
     private var loudnessEnhancer: LoudnessEnhancer? = null
     private lateinit var audioManager: AudioManager
+
+    private val pipActionReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                ACTION_PIP_REWIND -> {
+                    exoPlayer?.let { p ->
+                        val target = (p.currentPosition - 10_000L).coerceAtLeast(0L)
+                        p.seekTo(target)
+                    }
+                }
+                ACTION_PIP_PLAY_PAUSE -> {
+                    exoPlayer?.let { p ->
+                        if (p.isPlaying) {
+                            p.pause()
+                            updatePipParams(false)
+                        } else {
+                            p.play()
+                            updatePipParams(true)
+                        }
+                    }
+                }
+                ACTION_PIP_FORWARD -> {
+                    exoPlayer?.let { p ->
+                        val dur = p.duration.coerceAtLeast(0L)
+                        val target = if (dur > 0L) (p.currentPosition + 10_000L).coerceAtMost(dur) else p.currentPosition + 10_000L
+                        p.seekTo(target)
+                    }
+                }
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -105,6 +149,18 @@ class PlayerActivity : ComponentActivity() {
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
 
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+        // Register PiP action broadcast receiver
+        val filter = IntentFilter().apply {
+            addAction(ACTION_PIP_REWIND)
+            addAction(ACTION_PIP_PLAY_PAUSE)
+            addAction(ACTION_PIP_FORWARD)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(pipActionReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(pipActionReceiver, filter)
+        }
 
         // Initialize Real-time AI Audio Translation TTS engine
         com.streamhit.app.util.SubtitleTtsManager.init(this)
@@ -146,12 +202,70 @@ class PlayerActivity : ComponentActivity() {
         }
     }
 
+    fun setPlayerInstance(player: ExoPlayer?) {
+        this.exoPlayer = player
+        updatePipParams(player?.isPlaying == true)
+    }
+
+    fun updatePipParams(isPlaying: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val flags = PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
+
+            val rewindIntent = Intent(ACTION_PIP_REWIND).setPackage(packageName)
+            val rewindPending = PendingIntent.getBroadcast(this, 101, rewindIntent, flags)
+            val rewindAction = RemoteAction(
+                Icon.createWithResource(this, android.R.drawable.ic_media_rew),
+                "Rewind 10s",
+                "Rewind 10s",
+                rewindPending
+            )
+
+            val playPauseIntent = Intent(ACTION_PIP_PLAY_PAUSE).setPackage(packageName)
+            val playPausePending = PendingIntent.getBroadcast(this, 102, playPauseIntent, flags)
+            val playPauseIconRes = if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
+            val playPauseText = if (isPlaying) "Pause" else "Play"
+            val playPauseAction = RemoteAction(
+                Icon.createWithResource(this, playPauseIconRes),
+                playPauseText,
+                playPauseText,
+                playPausePending
+            )
+
+            val forwardIntent = Intent(ACTION_PIP_FORWARD).setPackage(packageName)
+            val forwardPending = PendingIntent.getBroadcast(this, 103, forwardIntent, flags)
+            val forwardAction = RemoteAction(
+                Icon.createWithResource(this, android.R.drawable.ic_media_ff),
+                "Forward 10s",
+                "Forward 10s",
+                forwardPending
+            )
+
+            val actions = listOf(rewindAction, playPauseAction, forwardAction)
+
+            val builder = PictureInPictureParams.Builder()
+                .setAspectRatio(Rational(16, 9))
+                .setActions(actions)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                builder.setAutoEnterEnabled(true)
+            }
+
+            try {
+                val params = builder.build()
+                setPictureInPictureParams(params)
+            } catch (_: Exception) {}
+        }
+    }
+
     private fun enterPipMode() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            updatePipParams(exoPlayer?.isPlaying == true)
             val params = PictureInPictureParams.Builder()
                 .setAspectRatio(Rational(16, 9))
                 .build()
-            enterPictureInPictureMode(params)
+            try {
+                enterPictureInPictureMode(params)
+            } catch (_: Exception) {}
         }
     }
 
@@ -162,13 +276,42 @@ class PlayerActivity : ComponentActivity() {
         }
     }
 
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        if (isInPictureInPictureMode) {
+            updatePipParams(exoPlayer?.isPlaying == true)
+        } else {
+            if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                exoPlayer?.pause()
+                com.streamhit.app.util.SubtitleTtsManager.onPause()
+            }
+        }
+    }
+
     override fun onPause() {
         super.onPause()
         com.streamhit.app.util.SubtitleTtsManager.onPause()
     }
 
+    override fun onStop() {
+        super.onStop()
+        // If minimized and not in Picture-in-Picture mode, pause video and audio completely
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            if (!isInPictureInPictureMode) {
+                exoPlayer?.pause()
+                com.streamhit.app.util.SubtitleTtsManager.onPause()
+            }
+        } else {
+            exoPlayer?.pause()
+            com.streamhit.app.util.SubtitleTtsManager.onPause()
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        try {
+            unregisterReceiver(pipActionReceiver)
+        } catch (_: Exception) {}
         com.streamhit.app.util.SubtitleTtsManager.destroy(exoPlayer)
         loudnessEnhancer?.release()
         loudnessEnhancer = null
@@ -265,12 +408,15 @@ fun AdaptivePlayerScreen(
     var showWatchLockDialog by remember { mutableStateOf(false) }
 
     // Load captions for AI Real-time Audio Translation
-    LaunchedEffect(subjectId, detailPath, currentSeasonNum, currentEpisodeNum) {
+    LaunchedEffect(subjectId, detailPath, currentSeasonNum, currentEpisodeNum, resources) {
         val sId = subjectId.ifBlank { detailPath }
         if (sId.isNotBlank()) {
             try {
-                val caps = repository.getCaptions(sId, detailPath, currentSeasonNum, currentEpisodeNum)
-                val bestCap = caps.firstOrNull { it.lang.equals("en", ignoreCase = true) || it.label.contains("English", ignoreCase = true) }
+                val resId = resources.firstOrNull()?.resourceId ?: ""
+                val caps = repository.getCaptions(sId, detailPath, currentSeasonNum, currentEpisodeNum, resId)
+                val targetLang = com.streamhit.app.util.SubtitleTtsManager.targetLanguage
+                val bestCap = caps.firstOrNull { it.lang.equals(targetLang, ignoreCase = true) }
+                    ?: caps.firstOrNull { it.lang.equals("en", ignoreCase = true) || it.label.contains("English", ignoreCase = true) }
                     ?: caps.firstOrNull()
                 if (bestCap != null && bestCap.url.isNotBlank()) {
                     com.streamhit.app.util.SubtitleTtsManager.loadCaptionsFromUrl(bestCap.url)
@@ -749,6 +895,7 @@ fun AdaptivePlayerScreen(
 
         exoPlayer = player
         loudnessEnhancer = enhancer
+        (activity as? PlayerActivity)?.setPlayerInstance(player)
 
         val listener = object : Player.Listener {
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
@@ -772,6 +919,7 @@ fun AdaptivePlayerScreen(
                 if (playing) {
                     isBuffering = false
                 }
+                (activity as? PlayerActivity)?.updatePipParams(playing)
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -839,6 +987,7 @@ fun AdaptivePlayerScreen(
                     dubName = selectedDub?.name
                 )
             }
+            (activity as? PlayerActivity)?.setPlayerInstance(null)
             player.removeListener(listener)
             enhancer?.release()
             player.release()
