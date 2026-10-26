@@ -1698,7 +1698,7 @@
                 <form onsubmit="handleSaveFacebookConfig(event)">
                     <div class="form-grid">
                         <div class="form-group">
-                            <label>Facebook Page ID</label>
+                            <label>Facebook Page ID <span style="font-size:11px; color:#A78BFA; font-weight:normal;">(Page ID, NOT App ID — e.g. 1367186939808744)</span></label>
                             <input type="text" id="fbPageId" class="form-control" placeholder="1367186939808744">
                         </div>
                         <div class="form-group">
@@ -3696,7 +3696,10 @@
             const appId = document.getElementById('fbExchangeAppId')?.value?.trim();
             const appSecret = document.getElementById('fbExchangeAppSecret')?.value?.trim();
             const userToken = document.getElementById('fbExchangeUserToken')?.value?.trim();
-            const pageId = document.getElementById('fbPageId')?.value?.trim();
+            let pageId = document.getElementById('fbPageId')?.value?.trim();
+            if (pageId === appId) {
+                pageId = '';
+            }
 
             if (!appId || !appSecret || !userToken) {
                 alert('Please fill in Facebook App ID, App Secret, and User Token.');
@@ -3738,7 +3741,7 @@
                 const fbData = await fbRes.json();
                 if (fbData.code === 0 && fbData.config) {
                     const c = fbData.config;
-                    document.getElementById('fbPageId').value = c.page_id || '';
+                    document.getElementById('fbPageId').value = c.page_id || '1367186939808744';
                     document.getElementById('fbIntervalMinutes').value = c.post_interval_minutes || 10;
                     document.getElementById('fbAutoPilotToggle').checked = c.auto_pilot_enabled !== false;
                     if (c.page_token) {

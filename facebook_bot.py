@@ -177,50 +177,63 @@ async def exchange_for_permanent_page_token(
         if not long_lived_user_token:
             return {"success": False, "error": "Could not obtain long-lived token from Meta"}
 
-        # Step 2: Fetch permanent Page Access Token using the long-lived user token
-        page_url = f"https://graph.facebook.com/v19.0/{target_page_id}"
-        p_resp = await client.get(page_url, params={
-            "fields": "access_token,name",
+        # Step 2: Fetch permanent Page Access Token from /me/accounts using long-lived user token
+        acc_resp = await client.get("https://graph.facebook.com/v19.0/me/accounts", params={
             "access_token": long_lived_user_token
         })
-        p_data = p_resp.json()
-        if "error" in p_data:
-            return {"success": False, "error": p_data["error"].get("message", "Page token fetch failed")}
+        acc_data = acc_resp.json()
+        if "error" in acc_data:
+            return {"success": False, "error": acc_data["error"].get("message", "Failed to retrieve Facebook Pages from Meta")}
 
-        permanent_page_token = p_data.get("access_token")
-        page_name = p_data.get("name", "NXLY")
+        accounts = acc_data.get("data", [])
+        if not accounts:
+            return {"success": False, "error": "No Facebook Pages found under this user account. Ensure you are an Admin of the Page."}
+
+        permanent_page_token = None
+        page_name = "NXLY"
+        matched_page_id = None
+
+        # 1. Match requested page_id if provided and not equal to app_id
+        if target_page_id and target_page_id != app_id.strip():
+            for acc in accounts:
+                if str(acc.get("id")) == str(target_page_id):
+                    permanent_page_token = acc.get("access_token")
+                    page_name = acc.get("name", page_name)
+                    matched_page_id = str(acc.get("id"))
+                    break
+
+        # 2. Look for page with name containing 'NXLY' or fallback to first account
+        if not permanent_page_token:
+            for acc in accounts:
+                if "nxly" in str(acc.get("name", "")).lower():
+                    permanent_page_token = acc.get("access_token")
+                    page_name = acc.get("name", page_name)
+                    matched_page_id = str(acc.get("id"))
+                    break
 
         if not permanent_page_token:
-            # Fallback: check /me/accounts with the long-lived user token
-            try:
-                acc_resp = await client.get("https://graph.facebook.com/v19.0/me/accounts", params={
-                    "access_token": long_lived_user_token
-                })
-                acc_data = acc_resp.json()
-                for acc in acc_data.get("data", []):
-                    if str(acc.get("id")) == str(target_page_id) or not target_page_id:
-                        permanent_page_token = acc.get("access_token")
-                        page_name = acc.get("name", page_name)
-                        target_page_id = str(acc.get("id"))
-                        break
-            except Exception:
-                pass
+            first_acc = accounts[0]
+            permanent_page_token = first_acc.get("access_token")
+            page_name = first_acc.get("name", page_name)
+            matched_page_id = str(first_acc.get("id"))
 
         if not permanent_page_token:
-            return {"success": False, "error": f"No page token returned for Page ID {target_page_id}. Ensure you are an Admin of this Page and granted 'pages_manage_posts' permission."}
+            return {"success": False, "error": f"Could not obtain page access token. Ensure you granted 'pages_manage_posts' and 'pages_show_list'."}
 
         # Save to config automatically
         cfg["page_token"] = permanent_page_token
         cfg["app_id"] = app_id.strip()
         cfg["app_secret"] = app_secret.strip()
-        cfg["page_id"] = target_page_id
+        cfg["page_id"] = matched_page_id
         cfg["page_name"] = page_name
+        cfg["user_token"] = user_or_page_token.strip()
         save_fb_config(cfg)
 
         return {
             "success": True,
-            "message": f"Successfully generated & saved Permanent Never-Expiring Page Token for '{page_name}'!",
+            "message": f"Successfully generated & saved Permanent Never-Expiring Page Token for '{page_name}' (ID: {matched_page_id})!",
             "page_name": page_name,
+            "page_id": matched_page_id,
             "token_preview": permanent_page_token[:15] + "..." + permanent_page_token[-10:]
         }
 

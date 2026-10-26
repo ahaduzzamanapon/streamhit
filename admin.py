@@ -1141,7 +1141,9 @@ async def admin_facebook_get_config(request: Request):
             "page_id": cfg.get("page_id", ""),
             "page_name": conn_info.get("name") or cfg.get("page_name", "NXLY"),
             "masked_token": masked_token,
+            "page_token": raw_token,
             "app_id": cfg.get("app_id", ""),
+            "app_secret": cfg.get("app_secret", ""),
             "auto_pilot_enabled": cfg.get("auto_pilot_enabled", True),
             "post_interval_minutes": cfg.get("post_interval_minutes", 10),
             "post_interval_hours": cfg.get("post_interval_hours", 0.166),
@@ -1277,12 +1279,19 @@ async def admin_facebook_test_connection(data: dict, request: Request):
     page_id = (data.get("page_id") or cfg.get("page_id", facebook_bot.DEFAULT_PAGE_ID)).strip()
     page_token = (data.get("page_token") or cfg.get("page_token", "")).strip()
 
+    # If user mistakenly passed their App ID as Page ID, auto-correct to the actual page_id
+    if page_id == cfg.get("app_id") or page_id == "1654390072739197":
+        page_id = cfg.get("page_id") or facebook_bot.DEFAULT_PAGE_ID
+
+    if not page_token or "..." in page_token:
+        page_token = cfg.get("page_token", "")
+
     if not page_id or not page_token:
         return {"code": 400, "success": False, "error": "Both Facebook Page ID and Access Token are required to test connection."}
 
     async with httpx.AsyncClient(timeout=12.0) as client:
         try:
-            resp = await client.get(f"https://graph.facebook.com/v19.0/{page_id}?fields=id,name,link,is_published&access_token={page_token}")
+            resp = await client.get(f"https://graph.facebook.com/v19.0/{page_id}?fields=id,name,link&access_token={page_token}")
             p_data = resp.json()
             if "error" in p_data:
                 err = p_data["error"]
