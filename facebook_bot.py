@@ -805,7 +805,15 @@ async def cleanup_copyrighted_videos():
 async def run_live_bot_cycle() -> Dict[str, Any]:
     bot_log("[Terminal] ⚡ Manually triggering immediate Auto-Pilot cycle...")
     try:
-        res = await trigger_auto_trending_reel()
+        import autopilot_queue
+        q_data = autopilot_queue.load_queue_data()
+        jobs_list = q_data.get("jobs", [])
+        has_active = any(it.get("status") in ("queued", "active", "processing") for it in jobs_list)
+        if has_active:
+            res = await autopilot_queue.process_next_queue_job()
+        else:
+            bot_log("[Terminal] Notice: Queue has no active items. Processing trending title fallback...")
+            res = await trigger_auto_trending_reel()
         bot_log(f"[Terminal] Cycle finished: success={res.get('success')}, title='{res.get('title')}', error={res.get('error')}")
         return res
     except Exception as e:
@@ -839,15 +847,16 @@ async def fb_auto_pilot_loop():
             last_post = int(cfg.get("last_post_time", 0))
 
             if now - last_post >= interval_sec:
-                bot_log(f"[FacebookBot] Triggering scheduled Auto-Pilot Reel (Interval: {interval_sec // 60}m)...")
-                res = await trigger_auto_trending_reel()
-                if not res.get("success"):
-                    bot_log(f"[FacebookBot] Scheduled reel attempt failed: {res.get('error')}. Retrying in 90s...")
-                    # Set last_post so next retry happens in 90s instead of waiting a full cycle
-                    cfg["last_post_time"] = now - interval_sec + 90
-                    save_fb_config(cfg)
+                bot_log(f"[FacebookBot] Triggering scheduled Auto-Pilot cycle (Interval: {interval_sec // 60}m)...")
+                import autopilot_queue
+                q_data = autopilot_queue.load_queue_data()
+                jobs_list = q_data.get("jobs", [])
+                has_active = any(it.get("status") in ("queued", "active", "processing") for it in jobs_list)
+                if has_active:
+                    res = await autopilot_queue.process_next_queue_job()
                 else:
-                    bot_log(f"[FacebookBot] Scheduled reel successfully posted: '{res.get('title')}'")
+                    bot_log("[FacebookBot] Notice: Queue has no active items. Running fallback...")
+                    res = await trigger_auto_trending_reel()
         except Exception as e:
             bot_log(f"[FacebookBot] Auto-pilot loop error: {e}")
             await asyncio.sleep(30)

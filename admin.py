@@ -1410,6 +1410,144 @@ async def admin_tiktok_history(request: Request):
     history = tiktok_bot.load_tt_history()
     return {"code": 0, "history": history}
 
+# ── UNIFIED CONTENT AUTOMATION & N8N PIPELINE ─────────────────────────────────
+@router.get("/api/admin/automation/overview")
+async def admin_automation_overview(request: Request):
+    check_admin_auth(request)
+    import autopilot_queue
+    return await autopilot_queue.get_dashboard_summary()
+
+@router.get("/api/admin/automation/workflow")
+async def admin_automation_workflow(request: Request):
+    check_admin_auth(request)
+    import autopilot_queue
+    return autopilot_queue.get_workflow_graph_state()
+
+@router.get("/api/admin/automation/jobs")
+async def admin_automation_jobs(request: Request, status: str = "", type: str = "", search: str = ""):
+    check_admin_auth(request)
+    import autopilot_queue
+    data = autopilot_queue.load_queue_data()
+    jobs = data.get("jobs", [])
+    if status:
+        jobs = [j for j in jobs if j.get("status") == status]
+    if type:
+        jobs = [j for j in jobs if j.get("type") == type]
+    if search:
+        s_low = search.lower()
+        jobs = [j for j in jobs if s_low in j.get("title", "").lower()]
+    return {"code": 0, "jobs": jobs, "total": len(jobs)}
+
+@router.post("/api/admin/automation/jobs/bulk-create")
+async def admin_automation_jobs_bulk_create(data: dict, request: Request):
+    check_admin_auth(request)
+    import autopilot_queue
+    items = data.get("items", [])
+    config = data.get("config", {})
+    res = autopilot_queue.add_bulk_jobs(items, config)
+    return res
+
+@router.post("/api/admin/automation/jobs/{job_id}/action")
+async def admin_automation_job_action(job_id: str, data: dict, request: Request):
+    check_admin_auth(request)
+    import autopilot_queue
+    action = data.get("action", "")
+    direction = data.get("direction")
+    return autopilot_queue.execute_job_action(job_id, action, direction)
+
+@router.get("/api/admin/automation/calendar")
+async def admin_automation_calendar(request: Request):
+    check_admin_auth(request)
+    import autopilot_queue
+    calendar = autopilot_queue.get_publishing_calendar()
+    return {"code": 0, "calendar": calendar, "total": len(calendar)}
+
+@router.get("/api/admin/automation/finished")
+async def admin_automation_finished(request: Request):
+    check_admin_auth(request)
+    import autopilot_queue
+    data = autopilot_queue.load_queue_data()
+    return {"code": 0, "finished": data.get("finished", []), "total": len(data.get("finished", []))}
+
+@router.post("/api/admin/automation/finished/requeue")
+async def admin_automation_finished_requeue(data: dict, request: Request):
+    check_admin_auth(request)
+    import autopilot_queue
+    job_id = str(data.get("job_id") or data.get("item_id", ""))
+    success = autopilot_queue.requeue_finished(job_id)
+    return {"code": 0 if success else 404, "success": success}
+
+@router.delete("/api/admin/automation/finished/delete")
+async def admin_automation_finished_delete(request: Request, job_id: str = ""):
+    check_admin_auth(request)
+    import autopilot_queue
+    success = autopilot_queue.delete_finished(job_id)
+    return {"code": 0 if success else 404, "success": success}
+
+@router.get("/api/admin/automation/platforms")
+async def admin_automation_platforms(request: Request):
+    check_admin_auth(request)
+    import autopilot_queue
+    conns = await autopilot_queue.check_platform_connections()
+    return {"code": 0, "platforms": conns}
+
+@router.post("/api/admin/automation/platforms/toggle")
+async def admin_automation_platforms_toggle(data: dict, request: Request):
+    check_admin_auth(request)
+    platform = str(data.get("platform", "")).lower().strip()
+    enabled = bool(data.get("enabled", True))
+    
+    if platform == "facebook":
+        from facebook_bot import load_fb_config, save_fb_config
+        cfg = load_fb_config()
+        cfg["auto_pilot_enabled"] = enabled
+        save_fb_config(cfg)
+    elif platform == "youtube":
+        import youtube_bot
+        cfg = youtube_bot.load_yt_config()
+        cfg["auto_pilot_enabled"] = enabled
+        youtube_bot.save_yt_config(cfg)
+    elif platform == "tiktok":
+        import tiktok_bot
+        cfg = tiktok_bot.load_tt_config()
+        cfg["auto_pilot_enabled"] = enabled
+        tiktok_bot.save_tt_config(cfg)
+    else:
+        raise HTTPException(status_code=400, detail="Invalid platform name")
+        
+    return {
+        "code": 0,
+        "platform": platform,
+        "enabled": enabled,
+        "message": f"{platform.capitalize()} auto-pilot switch turned {'ON' if enabled else 'OFF'}"
+    }
+
+@router.post("/api/admin/automation/run-now")
+async def admin_automation_run_now(request: Request):
+    check_admin_auth(request)
+    import autopilot_queue
+    asyncio.create_task(autopilot_queue.process_next_queue_job())
+    return {
+        "code": 0,
+        "success": True,
+        "message": "Auto-Pilot cycle triggered! Watch n8n visual flow and live terminal."
+    }
+
+# Legacy aliases for backwards compatibility
+@router.get("/api/admin/autopilot/status")
+async def admin_autopilot_status(request: Request):
+    check_admin_auth(request)
+    import autopilot_queue
+    return await autopilot_queue.get_dashboard_summary()
+
+@router.post("/api/admin/autopilot/run-now")
+async def admin_autopilot_run_now_legacy(request: Request):
+    check_admin_auth(request)
+    import autopilot_queue
+    asyncio.create_task(autopilot_queue.process_next_queue_job())
+    return {"code": 0, "success": True, "message": "Cycle triggered"}
+
+
 
 
 

@@ -647,6 +647,47 @@
             transition: width 0.3s ease;
         }
 
+                /* Modern Switch Toggle */
+        .switch-toggle {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+            margin: 0;
+            vertical-align: middle;
+        }
+        .switch-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .switch-toggle .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #334155;
+            transition: .2s;
+            border-radius: 24px;
+        }
+        .switch-toggle .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .2s;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+        }
+        .switch-toggle input:checked + .slider {
+            background-color: var(--accent-green);
+        }
+        .switch-toggle input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+
         /* Toast & Modals */
         .toast {
             position: fixed;
@@ -743,21 +784,9 @@
             <a class="nav-item active" onclick="switchNavTab('dashboard')">
                 <span class="icon">📊</span> Dashboard
             </a>
-            <a class="nav-item" onclick="switchNavTab('reels')">
-                <span class="icon">🎬</span> Reels & Shorts
-                <span class="badge-pill">AI Auto</span>
-            </a>
-            <a class="nav-item" onclick="switchNavTab('facebook')">
-                <span class="icon">🤖</span> Facebook Auto-Pilot
-                <span class="badge-pill" style="color:var(--accent-red);border-color:rgba(255,42,84,0.3);">10m</span>
-            </a>
-            <a class="nav-item" onclick="switchNavTab('youtube')">
-                <span class="icon">🔴</span> YouTube Shorts
-                <span class="badge-pill" style="color:#FF0000;border-color:rgba(255,0,0,0.3);">Shorts</span>
-            </a>
-            <a class="nav-item" onclick="switchNavTab('tiktok')">
-                <span class="icon">🎵</span> TikTok Auto-Pilot
-                <span class="badge-pill" style="color:#00F0FF;border-color:rgba(0,240,255,0.3);">v2</span>
+            <a class="nav-item" id="nav-automation" onclick="switchNavTab('automation')">
+                <span class="icon">🔮</span> Content Automation
+                <span class="badge-pill" style="color:var(--accent-cyan);border-color:rgba(0,240,255,0.3);">n8n Flow</span>
             </a>
             <a class="nav-item" onclick="switchNavTab('app-users')">
                 <span class="icon">📱</span> App Users & Devices
@@ -888,327 +917,400 @@
             </section>
 
             <!-- 2. REELS & SHORTS CREATOR ──────────────────────────────────── -->
-            <section class="tab-panel" id="panel-reels">
-                <div class="card">
-                    <div class="card-header">
-                        <div>
-                            <h2>🎬 1-Click Viral Reels & Shorts Engine</h2>
-                            <div class="subtitle">Cut 60-90s vertical anti-copyright clips with high-contrast banners placed above FB UI</div>
-                        </div>
-                        <button class="btn-danger" onclick="cancelStuckReelsJob()">❌ Cancel Stuck Job / Reset Queue</button>
+                        <!-- 2. UNIFIED CONTENT AUTOMATION & N8N WORKFLOW ENGINE ──────────────────────── -->
+            <section class="tab-panel" id="panel-automation">
+                <!-- SUB-NAVIGATION BAR -->
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:22px; padding-bottom:14px; border-bottom:1px solid var(--border-subtle);">
+                    <div style="display:flex; gap:8px; overflow-x:auto;">
+                        <button type="button" class="btn-secondary auto-tab-btn active" id="btnAutoTab-overview" onclick="switchAutoSubTab('overview')">📊 Overview</button>
+                        <button type="button" class="btn-secondary auto-tab-btn" id="btnAutoTab-workflow" onclick="switchAutoSubTab('workflow')">🔀 Visual Workflow (n8n)</button>
+                        <button type="button" class="btn-secondary auto-tab-btn" id="btnAutoTab-queue" onclick="switchAutoSubTab('queue')">📋 Active Queue <span class="badge-pill" id="autoQueueCountBadge" style="margin-left:4px;">0</span></button>
+                        <button type="button" class="btn-secondary auto-tab-btn" id="btnAutoTab-calendar" onclick="switchAutoSubTab('calendar')">📅 Publishing Calendar</button>
+                        <button type="button" class="btn-secondary auto-tab-btn" id="btnAutoTab-finished" onclick="switchAutoSubTab('finished')">✅ Finished Archive <span class="badge-pill" id="autoFinishedCountBadge" style="margin-left:4px;">0</span></button>
+                        <button type="button" class="btn-secondary auto-tab-btn" id="btnAutoTab-terminal" onclick="switchAutoSubTab('terminal')">💻 Live Terminal</button>
                     </div>
-
-                    <!-- Progress Bar for Running Job -->
-                    <div class="progress-box" id="reelsJobCard" style="display:none;">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <strong style="color:var(--accent-cyan); font-size:14px;" id="reelsJobStep">Processing video on server...</strong>
-                            <span style="font-weight:800; color:#fff;" id="reelsJobPercent">0%</span>
-                        </div>
-                        <div class="progress-track">
-                            <div class="progress-fill" id="reelsJobProgressFill"></div>
-                        </div>
-                    </div>
-
-                    <form onsubmit="handleStartReel(event)">
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label>Search Movie / Series</label>
-                                <input type="text" id="reelMovieSearch" class="form-control" placeholder="Type title (e.g. Dune, Loki, Avengers)..." oninput="handleReelsSearch(this)">
-                                <div id="reelSearchResults" style="display:none; background:var(--bg-card); border:1px solid var(--border-hover); border-radius:var(--radius-sm); max-height:180px; overflow-y:auto; margin-top:4px;"></div>
-                            </div>
-                            <div class="form-group">
-                                <label>Selected Subject Title</label>
-                                <input type="text" id="reelTargetTitle" class="form-control" required readonly placeholder="Select a title from search above">
-                            </div>
-                        </div>
-
-                        <div class="form-grid" id="reelSeasonRow" style="display:none;">
-                            <div class="form-group">
-                                <label>Season</label>
-                                <select id="reelSeasonSelect" class="form-control" onchange="onReelSeasonChange()"></select>
-                            </div>
-                            <div class="form-group">
-                                <label>Episode</label>
-                                <select id="reelEpisodeSelect" class="form-control" onchange="onReelEpisodeChange()"></select>
-                            </div>
-                        </div>
-
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label>Start Time (MM:SS or Seconds)</label>
-                                <input type="text" id="reelStartTime" class="form-control" value="15:00" placeholder="e.g. 15:00 or 900">
-                            </div>
-                            <div class="form-group">
-                                <label>Clip Duration (Seconds)</label>
-                                <input type="number" id="reelDuration" class="form-control" value="75" min="30" max="180">
-                            </div>
-                            <div class="form-group">
-                                <label>Number of Sequential Parts</label>
-                                <input type="number" id="reelNumParts" class="form-control" value="1" min="1" max="10">
-                            </div>
-                            <div class="form-group">
-                                <label>Start Part Number</label>
-                                <input type="number" id="reelStartPartNum" class="form-control" value="1" min="1">
-                            </div>
-                        </div>
-
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label>Custom Top Badge Text</label>
-                                <input type="text" id="reelTopText" class="form-control" placeholder="PART {part_num}">
-                            </div>
-                            <div class="form-group">
-                                <label>Custom Bottom Banner Text</label>
-                                <input type="text" id="reelBottomText" class="form-control" value='GOOGLE SEARCH: "NXLY STREAM"'>
-                            </div>
-                        </div>
-
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">
-                            <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:var(--text-muted); cursor:pointer;">
-                                <input type="checkbox" id="reelAntiCopyright" checked style="accent-color:var(--accent-cyan); width:16px; height:16px;">
-                                Enable 4-Layer Anti-Copyright Engine (Speed / Pitch / EQ / Crop)
-                            </label>
-                            <button type="submit" class="btn-primary" id="reelsGenerateBtn">🚀 Start Rendering Reel</button>
-                        </div>
-                    </form>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <h2>🎞️ Generated Reels History & Downloads</h2>
-                    </div>
-                    <div id="reelsHistoryList" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:16px;">
-                        <p style="color:var(--text-muted); font-size:13.5px;">Loading history...</p>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <button type="button" class="btn-primary" onclick="openAddContentWizard()" style="background:linear-gradient(135deg, var(--accent-cyan), #0088FF); color:#000; font-weight:800; font-size:13px; padding:7px 16px;">✨ Add Content</button>
+                        <button type="button" class="btn-secondary" onclick="openPlatformSettingsModal()" style="font-size:13px; padding:7px 14px;">⚙️ Platforms</button>
+                        <button type="button" class="btn-primary" id="btnAutoRunNow" onclick="triggerAutomationCycleNow()" style="background:linear-gradient(135deg, #00FF88, #00CC66); color:#000; font-weight:800; font-size:13px; padding:7px 16px;">⚡ Run Cycle Now</button>
                     </div>
                 </div>
-            </section>
 
-            <!-- 3. FACEBOOK AUTO-PILOT BOT ─────────────────────────────────── -->
-            <section class="tab-panel" id="panel-facebook">
-                <!-- LIVE TERMINAL CONSOLE -->
-                <div class="card" style="padding:0; overflow:hidden; border: 1px solid rgba(0, 240, 255, 0.35); box-shadow: 0 10px 30px rgba(0,0,0,0.6); margin-bottom:24px;">
-                    <div style="background:#090D16; padding:12px 18px; border-bottom:1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#FF5F56;"></span>
-                            <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#FFBD2E;"></span>
-                            <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#27C93F;"></span>
-                            <strong style="color:#fff; font-family:'Fira Code', monospace; font-size:13px; margin-left:8px;">nxly-bot-terminal@nxly.online:~ (Live Output)</strong>
-                        </div>
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <label style="display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text-muted); cursor:pointer;">
-                                <input type="checkbox" id="terminalAutoScroll" checked style="accent-color:var(--accent-cyan);"> Auto-scroll
-                            </label>
-                            <button type="button" class="btn-secondary" style="font-size:11.5px; padding:4px 10px;" onclick="fetchBotTerminalLogs()">🔄 Refresh</button>
-                            <button type="button" class="btn-secondary" style="font-size:11.5px; padding:4px 10px;" onclick="clearBotTerminal()">🧹 Clear</button>
-                            <button type="button" class="btn-primary" style="font-size:12px; padding:5px 14px;" id="btnTerminalRun" onclick="triggerLiveBotRun()">⚡ Run Cycle Now</button>
+                <!-- ═══════════════════════════════════════════════════════════════════ -->
+                <!-- VIEW 1: OVERVIEW                                                    -->
+                <!-- ═══════════════════════════════════════════════════════════════════ -->
+                <div class="auto-subview" id="autoView-overview">
+                    <!-- Global Publishing Platform Switches (Instant Control Bar) -->
+                    <div class="card" style="margin-bottom:20px; background:linear-gradient(135deg, rgba(15,23,42,0.95), rgba(11,15,25,0.95)); border:1px solid rgba(0,240,255,0.25); border-radius:var(--radius-md); padding:16px 20px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+                            <div>
+                                <div style="font-size:15px; font-weight:800; color:#fff; display:flex; align-items:center; gap:8px;">
+                                    <span>🌐 Global Publishing Platform Switches</span>
+                                    <span class="badge-pill" style="color:var(--accent-cyan); border-color:rgba(0,240,255,0.3); font-size:10px;">Instant Control</span>
+                                </div>
+                                <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Turn individual platforms ON/OFF. The bot will only publish to active platforms.</div>
+                            </div>
+                            
+                            <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap;">
+                                <!-- Facebook Switch -->
+                                <div style="display:flex; align-items:center; gap:10px; background:rgba(24,119,242,0.1); border:1px solid rgba(24,119,242,0.3); padding:8px 14px; border-radius:24px;">
+                                    <span style="font-size:16px;">📘</span>
+                                    <span style="font-size:13px; font-weight:700; color:#fff;">Facebook</span>
+                                    <label class="switch-toggle">
+                                        <input type="checkbox" id="globalSwitchFb" onchange="togglePlatformGlobal('facebook', this.checked)">
+                                        <span class="slider round"></span>
+                                    </label>
+                                    <span id="globalSwitchFbStatus" style="font-size:11px; font-weight:800; color:var(--accent-green); min-width:24px;">ON</span>
+                                </div>
+
+                                <!-- YouTube Switch -->
+                                <div style="display:flex; align-items:center; gap:10px; background:rgba(255,0,0,0.1); border:1px solid rgba(255,0,0,0.3); padding:8px 14px; border-radius:24px;">
+                                    <span style="font-size:16px;">🔴</span>
+                                    <span style="font-size:13px; font-weight:700; color:#fff;">YouTube</span>
+                                    <label class="switch-toggle">
+                                        <input type="checkbox" id="globalSwitchYt" onchange="togglePlatformGlobal('youtube', this.checked)">
+                                        <span class="slider round"></span>
+                                    </label>
+                                    <span id="globalSwitchYtStatus" style="font-size:11px; font-weight:800; color:var(--text-muted); min-width:24px;">OFF</span>
+                                </div>
+
+                                <!-- TikTok Switch -->
+                                <div style="display:flex; align-items:center; gap:10px; background:rgba(0,240,255,0.1); border:1px solid rgba(0,240,255,0.3); padding:8px 14px; border-radius:24px;">
+                                    <span style="font-size:16px;">🎵</span>
+                                    <span style="font-size:13px; font-weight:700; color:#fff;">TikTok</span>
+                                    <label class="switch-toggle">
+                                        <input type="checkbox" id="globalSwitchTt" onchange="togglePlatformGlobal('tiktok', this.checked)">
+                                        <span class="slider round"></span>
+                                    </label>
+                                    <span id="globalSwitchTtStatus" style="font-size:11px; font-weight:800; color:var(--text-muted); min-width:24px;">OFF</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <pre id="botTerminalOutput" style="background:#05070D; color:#00F0FF; font-family:'Fira Code', 'Courier New', monospace; font-size:12px; line-height:1.65; padding:18px; margin:0; height:320px; overflow-y:auto; white-space:pre-wrap; word-break:break-all; border-radius:0 0 var(--radius-md) var(--radius-md);">[Initializing NXLY Bot Live Terminal stream...]</pre>
+                    <!-- Top 8 Metric KPI Cards -->
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:12px; margin-bottom:20px;">
+                        <div class="stat-card" style="padding:14px;">
+                            <div class="stat-info">
+                                <div class="label" style="font-size:11px;">Total Jobs</div>
+                                <div class="value" id="autoMetricTotal" style="font-size:24px; font-weight:800;">0</div>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="padding:14px; border-left:3px solid var(--accent-cyan);">
+                            <div class="stat-info">
+                                <div class="label" style="font-size:11px;">In Queue</div>
+                                <div class="value" id="autoMetricQueue" style="font-size:24px; font-weight:800; color:var(--accent-cyan);">0</div>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="padding:14px; border-left:3px solid #0088FF;">
+                            <div class="stat-info">
+                                <div class="label" style="font-size:11px;">Processing</div>
+                                <div class="value" id="autoMetricProcessing" style="font-size:24px; font-weight:800; color:#0088FF;">0</div>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="padding:14px; border-left:3px solid #FFBD2E;">
+                            <div class="stat-info">
+                                <div class="label" style="font-size:11px;">Ready to Post</div>
+                                <div class="value" id="autoMetricReady" style="font-size:24px; font-weight:800; color:#FFBD2E;">0</div>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="padding:14px; border-left:3px solid #A855F7;">
+                            <div class="stat-info">
+                                <div class="label" style="font-size:11px;">Scheduled</div>
+                                <div class="value" id="autoMetricScheduled" style="font-size:24px; font-weight:800; color:#A855F7;">0</div>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="padding:14px; border-left:3px solid #FF0055;">
+                            <div class="stat-info">
+                                <div class="label" style="font-size:11px;">Publishing</div>
+                                <div class="value" id="autoMetricPublishing" style="font-size:24px; font-weight:800; color:#FF0055;">0</div>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="padding:14px; border-left:3px solid #EF4444;">
+                            <div class="stat-info">
+                                <div class="label" style="font-size:11px;">Failed</div>
+                                <div class="value" id="autoMetricFailed" style="font-size:24px; font-weight:800; color:#EF4444;">0</div>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="padding:14px; border-left:3px solid var(--accent-green);">
+                            <div class="stat-info">
+                                <div class="label" style="font-size:11px;">Finished</div>
+                                <div class="value" id="autoMetricFinished" style="font-size:24px; font-weight:800; color:var(--accent-green);">0</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Content Automation Live Status Card (Matches Screenshot 2) -->
+                    <div class="card" style="background:#080C14; border:1px solid rgba(255,255,255,0.08); border-radius:var(--radius-md); padding:22px; margin-bottom:20px;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:18px;">
+                            <div style="display:flex; align-items:center; gap:14px;">
+                                <div style="width:42px; height:42px; border-radius:10px; background:linear-gradient(135deg, #7C3AED, #4F46E5); display:flex; align-items:center; justify-content:center; font-size:22px;">🔮</div>
+                                <div>
+                                    <h2 style="font-size:19px; margin:0; color:#fff; font-weight:800;">Content Automation</h2>
+                                    <div style="font-size:12.5px; color:var(--text-muted); margin-top:3px;">Movie & Series • Automated publishing</div>
+                                </div>
+                            </div>
+                            <div id="autoDaemonRunningBadge" style="display:inline-flex; align-items:center; gap:8px; padding:6px 14px; border-radius:20px; background:rgba(0,255,136,0.1); border:1px solid rgba(0,255,136,0.3); font-size:12px; font-weight:800; color:var(--accent-green);">
+                                <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--accent-green); box-shadow:0 0 10px var(--accent-green);"></span> Running
+                            </div>
+                        </div>
+
+                        <!-- 3 Summary Columns -->
+                        <div style="display:flex; gap:36px; margin-bottom:24px; border-bottom:1px solid rgba(255,255,255,0.06); padding-bottom:16px;">
+                            <div>
+                                <div style="font-size:11px; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.5px;">In Queue</div>
+                                <div id="liveSubQueueCount" style="font-size:26px; font-weight:800; color:#fff; margin-top:2px;">0</div>
+                            </div>
+                            <div>
+                                <div style="font-size:11px; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.5px;">Processing</div>
+                                <div id="liveSubProcessingCount" style="font-size:26px; font-weight:800; color:var(--accent-cyan); margin-top:2px;">0</div>
+                            </div>
+                            <div>
+                                <div style="font-size:11px; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.5px;">Finished</div>
+                                <div id="liveSubFinishedCount" style="font-size:26px; font-weight:800; color:var(--accent-green); margin-top:2px;">0</div>
+                            </div>
+                        </div>
+
+                        <!-- Active Processing Cards Container (Screenshot 2 Match) -->
+                        <div id="liveActivePipelineContainer" style="display:flex; flex-direction:column; gap:16px;">
+                            <div style="text-align:center; padding:30px; color:var(--text-muted); font-size:13px;">No content in active processing queue. Click '✨ Add Content' to begin automation.</div>
+                        </div>
+                    </div>
+
+                    <!-- Social Platforms Health & Status Cards -->
+                    <div class="card" style="margin-bottom:20px;">
+                        <div class="card-header">
+                            <div>
+                                <h2>🌐 Social Platform Connections</h2>
+                                <div class="subtitle">Live status & publication authorization for Facebook, YouTube, and TikTok</div>
+                            </div>
+                            <button type="button" class="btn-secondary" onclick="openPlatformSettingsModal()">⚙️ Manage Credentials</button>
+                        </div>
+                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px;" id="platformHealthGrid">
+                            <!-- Facebook Card -->
+                            <div style="background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:16px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                    <div style="display:flex; align-items:center; gap:10px;">
+                                        <span style="font-size:22px;">📘</span>
+                                        <strong>Facebook Reels</strong>
+                                    </div>
+                                    <span id="badgeFbStatus" class="badge-pill" style="color:var(--text-muted);">Checking...</span>
+                                </div>
+                                <div id="infoFbStatus" style="font-size:12px; color:var(--text-muted); line-height:1.6;">Page ID: Not configured</div>
+                                <div style="margin-top:12px;">
+                                    <button type="button" class="btn-secondary" style="font-size:11px; padding:4px 10px; width:100%;" onclick="openPlatformGuide('facebook')">📖 How to Connect Facebook Page</button>
+                                </div>
+                            </div>
+                            <!-- YouTube Card -->
+                            <div style="background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:16px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                    <div style="display:flex; align-items:center; gap:10px;">
+                                        <span style="font-size:22px;">🔴</span>
+                                        <strong>YouTube Shorts</strong>
+                                    </div>
+                                    <span id="badgeYtStatus" class="badge-pill" style="color:var(--text-muted);">Checking...</span>
+                                </div>
+                                <div id="infoYtStatus" style="font-size:12px; color:var(--text-muted); line-height:1.6;">OAuth: Not configured</div>
+                                <div style="margin-top:12px;">
+                                    <button type="button" class="btn-secondary" style="font-size:11px; padding:4px 10px; width:100%;" onclick="openPlatformGuide('youtube')">📖 How to Connect YouTube Shorts</button>
+                                </div>
+                            </div>
+                            <!-- TikTok Card -->
+                            <div style="background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:16px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                    <div style="display:flex; align-items:center; gap:10px;">
+                                        <span style="font-size:22px;">🎵</span>
+                                        <strong>TikTok Video API</strong>
+                                    </div>
+                                    <span id="badgeTtStatus" class="badge-pill" style="color:var(--text-muted);">Checking...</span>
+                                </div>
+                                <div id="infoTtStatus" style="font-size:12px; color:var(--text-muted); line-height:1.6;">Content API v2: Not configured</div>
+                                <div style="margin-top:12px;">
+                                    <button type="button" class="btn-secondary" style="font-size:11px; padding:4px 10px; width:100%;" onclick="openPlatformGuide('tiktok')">📖 How to Connect TikTok API</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="card">
-                    <div class="card-header">
-                        <div>
-                            <h2>🤖 Facebook Page Auto-Pilot Bot (10m Cycle)</h2>
-                            <div class="subtitle">Continuously slices and auto-posts viral movie clips every 10 minutes with 1st comment links</div>
-                        </div>
-                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                            <button type="button" class="btn-secondary" onclick="triggerPostMemePoster()">🖼️ Post Meme Poster</button>
-                            <button type="button" class="btn-primary" onclick="triggerFacebookAutoReel()">⚡ Post Trending Reel Now</button>
-                        </div>
-                    </div>
-
-                    <form onsubmit="handleSaveFacebookConfig(event)">
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label>Facebook Page ID</label>
-                                <input type="text" id="fbPageId" class="form-control" required placeholder="1367186939808744">
+                <!-- ═══════════════════════════════════════════════════════════════════ -->
+                <!-- VIEW 2: VISUAL WORKFLOW (n8n Style - Matches Screenshot 1)          -->
+                <!-- ═══════════════════════════════════════════════════════════════════ -->
+                <div class="auto-subview" id="autoView-workflow" style="display:none;">
+                    <div class="card" style="padding:0; overflow:hidden; background:#07090F; border:1px solid rgba(0,240,255,0.25); box-shadow:0 12px 36px rgba(0,0,0,0.6);">
+                        <div style="padding:14px 20px; background:#0A0E18; border-bottom:1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center;">
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <span style="font-size:20px;">🔀</span>
+                                <strong style="color:#fff; font-size:15px; font-weight:800;">Visual Workflow</strong>
                             </div>
-                            <div class="form-group">
-                                <label>Posting Interval (Minutes)</label>
-                                <input type="number" id="fbIntervalMinutes" class="form-control" value="10" min="5" max="1440" required>
+                            <span class="badge-pill" style="background:rgba(255,255,255,0.06); color:#fff; border-color:rgba(255,255,255,0.15); font-size:11.5px;">n8n-style</span>
+                        </div>
+
+                        <!-- Canvas Workspace (Matches Screenshot 1 Layout Exactly) -->
+                        <div style="padding:36px 20px; background-color:#05070D; background-image:radial-gradient(rgba(255,255,255,0.07) 1px, transparent 1px); background-size:24px 24px; min-height:640px; display:flex; flex-direction:column; align-items:center;">
+                            <div style="width:100%; max-width:680px; display:flex; flex-direction:column; align-items:center; gap:0;">
+                                <!-- Node 1: Movie / Series Input -->
+                                <div class="workflow-node" id="node-input" onclick="openNodeDetail('node_input')" style="width:100%; background:#0B0F19; border:1px solid rgba(255,255,255,0.12); border-radius:12px; padding:18px 24px; text-align:center; cursor:pointer; transition:all 0.2s ease;">
+                                    <div style="font-size:22px; margin-bottom:4px;">🎞️</div>
+                                    <div style="color:#fff; font-weight:800; font-size:15px;">Movie / Series Input</div>
+                                    <div style="color:var(--text-muted); font-size:12px; margin-top:2px;">Bulk selection</div>
+                                </div>
+
+                                <!-- Down Arrow -->
+                                <div style="color:var(--text-muted); font-size:20px; line-height:1; padding:8px 0;">↓</div>
+
+                                <!-- Node 2: Content Preparation -->
+                                <div class="workflow-node" id="node-prep" onclick="openNodeDetail('node_prep')" style="width:100%; background:#0B0F19; border:1px solid rgba(255,255,255,0.12); border-radius:12px; padding:18px 24px; text-align:center; cursor:pointer; transition:all 0.2s ease;">
+                                    <div style="font-size:22px; margin-bottom:4px;">✂️</div>
+                                    <div style="color:#fff; font-weight:800; font-size:15px;">Content Preparation</div>
+                                    <div style="color:var(--text-muted); font-size:12px; margin-top:2px;">Movie parts or season/episode queue</div>
+                                </div>
+
+                                <!-- Down Arrow -->
+                                <div style="color:var(--text-muted); font-size:20px; line-height:1; padding:8px 0;">↓</div>
+
+                                <!-- Node 3: Video Generation -->
+                                <div class="workflow-node" id="node-render" onclick="openNodeDetail('node_render')" style="width:100%; background:#0B0F19; border:1px solid rgba(255,255,255,0.12); border-radius:12px; padding:18px 24px; text-align:center; cursor:pointer; transition:all 0.2s ease;">
+                                    <div style="font-size:22px; margin-bottom:4px;">🎬</div>
+                                    <div style="color:#fff; font-weight:800; font-size:15px;">Video Generation</div>
+                                    <div style="color:var(--text-muted); font-size:12px; margin-top:2px;">Generate, review and track progress</div>
+                                </div>
+
+                                <!-- Down Arrow -->
+                                <div style="color:var(--text-muted); font-size:20px; line-height:1; padding:8px 0;">↓</div>
+
+                                <!-- Node 4: Scheduled Publishing -->
+                                <div class="workflow-node" id="node-schedule" onclick="openNodeDetail('node_schedule')" style="width:100%; background:#0B0F19; border:1px solid rgba(255,255,255,0.12); border-radius:12px; padding:18px 24px; text-align:center; cursor:pointer; transition:all 0.2s ease;">
+                                    <div style="font-size:22px; margin-bottom:4px;">📅</div>
+                                    <div style="color:#fff; font-weight:800; font-size:15px;">Scheduled Publishing</div>
+                                    <div style="color:var(--text-muted); font-size:12px; margin-top:2px;">10-minute interval • configurable</div>
+                                </div>
+
+                                <!-- Down Arrow -->
+                                <div style="color:var(--text-muted); font-size:20px; line-height:1; padding:8px 0;">↓</div>
+
+                                <!-- 3 Destination Cards (Facebook, YouTube, TikTok) Side-by-Side -->
+                                <div style="width:100%; display:grid; grid-template-columns:repeat(3, 1fr); gap:12px;">
+                                    <div class="workflow-node" id="node-fb" onclick="openNodeDetail('node_fb')" style="background:#0B0F19; border:1px solid rgba(255,255,255,0.12); border-radius:12px; padding:16px 10px; text-align:center; cursor:pointer; transition:all 0.2s ease;">
+                                        <div style="color:#1877F2; font-size:22px; margin-bottom:4px;">f</div>
+                                        <div style="color:#fff; font-weight:800; font-size:13.5px;">Facebook</div>
+                                    </div>
+                                    <div class="workflow-node" id="node-yt" onclick="openNodeDetail('node_yt')" style="background:#0B0F19; border:1px solid rgba(255,255,255,0.12); border-radius:12px; padding:16px 10px; text-align:center; cursor:pointer; transition:all 0.2s ease;">
+                                        <div style="color:#FF0000; font-size:22px; margin-bottom:4px;">▶</div>
+                                        <div style="color:#fff; font-weight:800; font-size:13.5px;">YouTube</div>
+                                    </div>
+                                    <div class="workflow-node" id="node-tt" onclick="openNodeDetail('node_tt')" style="background:#0B0F19; border:1px solid rgba(255,255,255,0.12); border-radius:12px; padding:16px 10px; text-align:center; cursor:pointer; transition:all 0.2s ease;">
+                                        <div style="color:#00F0FF; font-size:22px; margin-bottom:4px;">🎵</div>
+                                        <div style="color:#fff; font-weight:800; font-size:13.5px;">TikTok</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-
-                        <div class="form-group" style="margin-bottom:14px;">
-                            <label>Permanent Page Access Token (Never Expires)</label>
-                            <input type="text" id="fbPageToken" class="form-control" placeholder="EAAXgq...">
-                        </div>
-
-                        <div class="form-group" style="margin-bottom:14px;">
-                            <label>Auto-Comment Template (Contains Site & App Links)</label>
-                            <textarea id="fbCommentTemplate" class="form-control">🔍 Google Search: NXLY Stream (First result is the one!)
-
-🍿 Watch Full Movie/Show in 1080p HD:
-👉 {movie_url}
-
-📲 Download Free Official Android App:
-👉 https://nxly.online/download</textarea>
-                        </div>
-
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:var(--text-muted); cursor:pointer;">
-                                <input type="checkbox" id="fbAutoPilotToggle" checked style="accent-color:var(--accent-red); width:16px; height:16px;">
-                                Auto-Pilot Daemon Active (Posts a new Reel every 10 minutes automatically)
-                            </label>
-                            <button type="submit" class="btn-primary">💾 Save Facebook Settings</button>
-                        </div>
-                    </form>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <h2>🔑 Permanent Page Token Generator (Meta Graph API)</h2>
-                        <div class="subtitle">Convert short-lived user tokens into permanent page tokens</div>
-                    </div>
-                    <form onsubmit="handleExchangeToken(event)" class="form-grid">
-                        <div class="form-group">
-                            <label>App ID</label>
-                            <input type="text" id="fbAppId" class="form-control" placeholder="1654390072739197">
-                        </div>
-                        <div class="form-group">
-                            <label>App Secret</label>
-                            <input type="password" id="fbAppSecret" class="form-control" placeholder="d9ec6c6...">
-                        </div>
-                        <div class="form-group" style="grid-column: 1 / -1;">
-                            <label>User Token or Short Token</label>
-                            <input type="text" id="fbShortToken" class="form-control" placeholder="Paste short-lived token here...">
-                        </div>
-                        <div style="grid-column: 1 / -1;">
-                            <button type="submit" class="btn-secondary">🔄 Exchange for Permanent Page Token</button>
-                        </div>
-                    </form>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <h2>📜 Recent Facebook Posts & Reels</h2>
-                    </div>
-                    <div id="fbHistoryList" style="display:flex; flex-direction:column; gap:12px;">
-                        <p style="color:var(--text-muted);">No posts recorded yet.</p>
                     </div>
                 </div>
-            </section>
 
-            <!-- 3B. YOUTUBE SHORTS BOT ─────────────────────────────────────── -->
-            <section class="tab-panel" id="panel-youtube">
-                <div class="card">
-                    <div class="card-header">
-                        <div>
-                            <h2>🔴 YouTube Shorts Auto-Pilot Bot (API v3)</h2>
-                            <div class="subtitle">Automatically publishes viral vertical clips as YouTube Shorts with #Shorts and pinned 1st comments</div>
-                        </div>
-                        <div id="ytChannelBadge" style="display:inline-flex; align-items:center; gap:8px; padding:6px 14px; border-radius:var(--radius-sm); background:rgba(255,0,0,0.1); border:1px solid rgba(255,0,0,0.3); font-size:12.5px; font-weight:700; color:#FF4D4D;">
-                            🔴 Not Connected
-                        </div>
-                    </div>
-
-                    <form onsubmit="handleSaveYouTubeConfig(event)">
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label>Google OAuth Client ID</label>
-                                <input type="text" id="ytClientId" class="form-control" placeholder="123456789-abc.apps.googleusercontent.com">
+                <!-- ═══════════════════════════════════════════════════════════════════ -->
+                <!-- VIEW 3: ACTIVE QUEUE                                                -->
+                <!-- ═══════════════════════════════════════════════════════════════════ -->
+                <div class="auto-subview" id="autoView-queue" style="display:none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <h2>📋 Active Automation Queue</h2>
+                                <div class="subtitle">Movies and series currently undergoing sequential slicing and multi-platform posting</div>
                             </div>
-                            <div class="form-group">
-                                <label>Client Secret</label>
-                                <input type="password" id="ytClientSecret" class="form-control" placeholder="GOCSPX-...">
-                            </div>
-                        </div>
-
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label>OAuth2 Refresh Token (Long-Lived)</label>
-                                <input type="password" id="ytRefreshToken" class="form-control" placeholder="1//04abc...">
-                            </div>
-                            <div class="form-group">
-                                <label>Default Video Privacy</label>
-                                <select id="ytPrivacy" class="form-control">
-                                    <option value="public">Public (Published directly)</option>
-                                    <option value="unlisted">Unlisted</option>
-                                    <option value="private">Private (Draft)</option>
+                            <div style="display:flex; gap:10px;">
+                                <select id="filterQueueType" class="form-control" style="width:130px;" onchange="renderQueueList()">
+                                    <option value="">All Types</option>
+                                    <option value="movie">Movies</option>
+                                    <option value="series">Series</option>
                                 </select>
+                                <button type="button" class="btn-primary" onclick="openAddContentWizard()">+ Add Content</button>
                             </div>
                         </div>
 
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">
-                            <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:var(--text-muted); cursor:pointer;">
-                                <input type="checkbox" id="ytAutoPilotToggle" style="accent-color:#FF0000; width:16px; height:16px;">
-                                Auto-Distribute generated reels to YouTube Shorts automatically
-                            </label>
-                            <button type="submit" class="btn-primary" style="background:linear-gradient(135deg, #FF0000, #CC0000);">💾 Save YouTube Settings</button>
+                        <div id="activeQueueContainer" style="display:flex; flex-direction:column; gap:14px; margin-top:8px;">
+                            <p style="color:var(--text-muted);">Loading active queue...</p>
                         </div>
-                    </form>
+                    </div>
                 </div>
 
-                <div class="card">
-                    <div class="card-header">
-                        <h2>📜 Recent YouTube Shorts Uploads</h2>
+                <!-- ═══════════════════════════════════════════════════════════════════ -->
+                <!-- VIEW 4: PUBLISHING CALENDAR                                         -->
+                <!-- ═══════════════════════════════════════════════════════════════════ -->
+                <div class="auto-subview" id="autoView-calendar" style="display:none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <h2>📅 Chronological Publishing Schedule</h2>
+                                <div class="subtitle">Timeline of scheduled automated posts across Facebook Reels, YouTube Shorts, and TikTok</div>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Target Content</th>
+                                        <th>Scheduled Time</th>
+                                        <th>Countdown</th>
+                                        <th>Platforms</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="calendarTableBody">
+                                    <tr><td colspan="6" style="text-align:center; padding:30px; color:var(--text-muted);">Loading calendar schedule...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                    <div id="ytHistoryList" style="display:flex; flex-direction:column; gap:12px;">
-                        <p style="color:var(--text-muted);">No YouTube uploads recorded yet.</p>
+                </div>
+
+                <!-- ═══════════════════════════════════════════════════════════════════ -->
+                <!-- VIEW 5: FINISHED ARCHIVE                                            -->
+                <!-- ═══════════════════════════════════════════════════════════════════ -->
+                <div class="auto-subview" id="autoView-finished" style="display:none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <h2>✅ Finished Content Archive</h2>
+                                <div class="subtitle">Movies and full series that have completed all scheduled parts and publishing tasks</div>
+                            </div>
+                        </div>
+
+                        <div id="finishedListContainer" style="display:flex; flex-direction:column; gap:14px; margin-top:8px;">
+                            <p style="color:var(--text-muted);">No finished jobs yet.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══════════════════════════════════════════════════════════════════ -->
+                <!-- VIEW 6: LIVE TERMINAL                                               -->
+                <!-- ═══════════════════════════════════════════════════════════════════ -->
+                <div class="auto-subview" id="autoView-terminal" style="display:none;">
+                    <div class="card" style="padding:0; overflow:hidden; border: 1px solid rgba(0, 240, 255, 0.35); box-shadow: 0 10px 30px rgba(0,0,0,0.6); margin-bottom:24px;">
+                        <div style="background:#090D16; padding:12px 18px; border-bottom:1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#FF5F56;"></span>
+                                <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#FFBD2E;"></span>
+                                <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#27C93F;"></span>
+                                <strong style="color:#fff; font-family:'Fira Code', monospace; font-size:13px; margin-left:8px;">nxly-bot-terminal@nxly.online:~ (Live Output)</strong>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <label style="display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text-muted); cursor:pointer;">
+                                    <input type="checkbox" id="terminalAutoScroll" checked style="accent-color:var(--accent-cyan);"> Auto-scroll
+                                </label>
+                                <button type="button" class="btn-secondary" style="font-size:11.5px; padding:4px 10px;" onclick="fetchBotTerminalLogs()">🔄 Refresh</button>
+                                <button type="button" class="btn-secondary" style="font-size:11.5px; padding:4px 10px;" onclick="clearBotTerminal()">🗑 Clear</button>
+                                <button type="button" class="btn-primary" style="font-size:12px; padding:5px 14px;" id="btnTerminalRun" onclick="triggerAutomationCycleNow()">⚡ Run Cycle Now</button>
+                            </div>
+                        </div>
+                        <pre id="botTerminalOutput" style="background:#05070D; color:#00F0FF; font-family:'Fira Code', 'Courier New', monospace; font-size:12px; line-height:1.65; padding:18px; margin:0; height:360px; overflow-y:auto; white-space:pre-wrap; word-break:break-all; border-radius:0 0 var(--radius-md) var(--radius-md);">[Initializing NXLY Content Automation Live Terminal stream...]</pre>
                     </div>
                 </div>
             </section>
 
-            <!-- 3C. TIKTOK BOT ──────────────────────────────────────────────── -->
-            <section class="tab-panel" id="panel-tiktok">
-                <div class="card">
-                    <div class="card-header">
-                        <div>
-                            <h2>🎵 TikTok Video Auto-Pilot Bot (Content API v2)</h2>
-                            <div class="subtitle">Directly posts vertical 9:16 clips to TikTok with automated trending hashtags and Google Search prompt</div>
-                        </div>
-                        <div id="ttAccountBadge" style="display:inline-flex; align-items:center; gap:8px; padding:6px 14px; border-radius:var(--radius-sm); background:rgba(0,240,255,0.1); border:1px solid rgba(0,240,255,0.3); font-size:12.5px; font-weight:700; color:var(--accent-cyan);">
-                            🎵 Not Connected
-                        </div>
-                    </div>
-
-                    <form onsubmit="handleSaveTikTokConfig(event)">
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label>TikTok Client Key</label>
-                                <input type="text" id="ttClientKey" class="form-control" placeholder="aw123456...">
-                            </div>
-                            <div class="form-group">
-                                <label>TikTok Client Secret</label>
-                                <input type="password" id="ttClientSecret" class="form-control" placeholder="Secret Key">
-                            </div>
-                        </div>
-
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label>TikTok User Access Token</label>
-                                <input type="password" id="ttAccessToken" class="form-control" placeholder="act.123...">
-                            </div>
-                            <div class="form-group">
-                                <label>Privacy Level</label>
-                                <select id="ttPrivacy" class="form-control">
-                                    <option value="PUBLIC_TO_EVERYONE">Public (Everyone)</option>
-                                    <option value="MUTUAL_FOLLOW_FRIENDS">Friends Only</option>
-                                    <option value="SELF_ONLY">Private (Only Me)</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">
-                            <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:var(--text-muted); cursor:pointer;">
-                                <input type="checkbox" id="ttAutoPilotToggle" style="accent-color:var(--accent-cyan); width:16px; height:16px;">
-                                Auto-Distribute generated reels to TikTok automatically
-                            </label>
-                            <button type="submit" class="btn-primary" style="background:linear-gradient(135deg, #00F0FF, #0088FF); color:#000;">💾 Save TikTok Settings</button>
-                        </div>
-                    </form>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <h2>📜 Recent TikTok Video Uploads</h2>
-                    </div>
-                    <div id="ttHistoryList" style="display:flex; flex-direction:column; gap:12px;">
-                        <p style="color:var(--text-muted);">No TikTok uploads recorded yet.</p>
-                    </div>
-                </div>
-            </section>
+            
 
             <!-- 4. APP USERS & DEVICES ────────────────────────────────────── -->
             <section class="tab-panel" id="panel-app-users">
@@ -1395,6 +1497,304 @@
         </main>
     </div>
 
+    <!-- ── CONTENT AUTOMATION WIZARD MODAL ──────────────────────────────────── -->
+    <div class="modal-overlay" id="addContentModal" style="display:none; z-index:9999;">
+        <div class="card" style="width:100%; max-width:680px; max-height:90vh; overflow-y:auto; background:#0B0F19; border:1px solid rgba(0,240,255,0.3); box-shadow:0 14px 40px rgba(0,0,0,0.8); border-radius:var(--radius-md);">
+            <div class="card-header" style="border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:14px; margin-bottom:18px;">
+                <div>
+                    <h2 style="font-size:18px; color:#fff;" id="wizardModalTitle">✨ Add Content to Automation Queue</h2>
+                    <div class="subtitle">Step-by-step wizard for sequential multi-platform publishing</div>
+                </div>
+                <button type="button" class="btn-secondary" style="font-size:11px; padding:4px 10px;" onclick="closeAddContentWizard()">✕ Close</button>
+            </div>
+
+            <!-- Step Progress Indicator -->
+            <div style="display:flex; justify-content:space-between; margin-bottom:20px; position:relative;">
+                <div style="position:absolute; top:12px; left:10%; right:10%; height:2px; background:rgba(255,255,255,0.1); z-index:1;"></div>
+                <div class="wizard-step-bullet active" id="wizBullet1" style="position:relative; z-index:2; text-align:center; flex:1;">
+                    <div style="width:26px; height:26px; border-radius:50%; background:var(--accent-cyan); color:#000; font-weight:800; font-size:12px; line-height:26px; margin:0 auto 4px;">1</div>
+                    <span style="font-size:11px; color:#fff;">Select</span>
+                </div>
+                <div class="wizard-step-bullet" id="wizBullet2" style="position:relative; z-index:2; text-align:center; flex:1;">
+                    <div style="width:26px; height:26px; border-radius:50%; background:#1E293B; color:#fff; font-weight:800; font-size:12px; line-height:26px; margin:0 auto 4px;">2</div>
+                    <span style="font-size:11px; color:var(--text-muted);">Configure</span>
+                </div>
+                <div class="wizard-step-bullet" id="wizBullet3" style="position:relative; z-index:2; text-align:center; flex:1;">
+                    <div style="width:26px; height:26px; border-radius:50%; background:#1E293B; color:#fff; font-weight:800; font-size:12px; line-height:26px; margin:0 auto 4px;">3</div>
+                    <span style="font-size:11px; color:var(--text-muted);">Video</span>
+                </div>
+                <div class="wizard-step-bullet" id="wizBullet4" style="position:relative; z-index:2; text-align:center; flex:1;">
+                    <div style="width:26px; height:26px; border-radius:50%; background:#1E293B; color:#fff; font-weight:800; font-size:12px; line-height:26px; margin:0 auto 4px;">4</div>
+                    <span style="font-size:11px; color:var(--text-muted);">Publish</span>
+                </div>
+            </div>
+
+            <!-- STEP 1: SELECT TITLES -->
+            <div id="wizStep1" class="wizard-step-pane">
+                <div class="form-group" style="margin-bottom:14px;">
+                    <label>Search Movies & Series in Library</label>
+                    <input type="text" id="wizSearchInput" class="form-control" placeholder="Type title (e.g. Dune, Breaking Bad, Loki)..." oninput="handleWizardSearch(this.value)">
+                </div>
+
+                <!-- Selected Titles Chips -->
+                <div id="wizSelectedChipsContainer" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;"></div>
+
+                <!-- Search Results List -->
+                <div id="wizSearchResultsBox" style="background:#06080F; border:1px solid var(--border-subtle); border-radius:var(--radius-sm); max-height:240px; overflow-y:auto; padding:6px;">
+                    <div style="padding:16px; text-align:center; color:var(--text-muted); font-size:12.5px;">Type a title above to search and select multiple items</div>
+                </div>
+            </div>
+
+            <!-- STEP 2: CONFIGURE CONTENT -->
+            <div id="wizStep2" class="wizard-step-pane" style="display:none;">
+                <div style="background:rgba(0,240,255,0.06); border:1px solid rgba(0,240,255,0.2); border-radius:var(--radius-sm); padding:12px; margin-bottom:16px; font-size:12.5px; color:#fff;">
+                    ⚙️ <strong>Sequential Slicing Rules:</strong> Movies will be cut into sequential high-retention parts. Series will be processed sequentially one episode at a time in season and episode order.
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Parts Per Movie</label>
+                        <input type="number" id="wizMovieParts" class="form-control" value="8" min="2" max="25">
+                    </div>
+                    <div class="form-group">
+                        <label>Parts Per Series Episode</label>
+                        <input type="number" id="wizSeriesPartsPerEp" class="form-control" value="3" min="1" max="10">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Starting Offset (Seconds into movie/episode to start first part)</label>
+                    <input type="number" id="wizStartOffset" class="form-control" value="600" step="30">
+                    <span style="font-size:11px; color:var(--text-muted);">Default 600s (10 min) skips opening studio credits directly into action</span>
+                </div>
+            </div>
+
+            <!-- STEP 3: VIDEO CONFIGURATION -->
+            <div id="wizStep3" class="wizard-step-pane" style="display:none;">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Target Clip Duration</label>
+                        <select id="wizPartDuration" class="form-control">
+                            <option value="60">60 Seconds</option>
+                            <option value="75" selected>75 Seconds (Recommended for Shorts/Reels)</option>
+                            <option value="90">90 Seconds</option>
+                            <option value="120">120 Seconds</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Aspect Ratio</label>
+                        <select class="form-control" disabled>
+                            <option selected>9:16 Vertical (1080x1920 HD)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label style="display:flex; align-items:center; gap:8px; font-weight:700; color:#fff; cursor:pointer;">
+                        <input type="checkbox" id="wizAntiCopyright" checked style="accent-color:var(--accent-cyan); width:16px; height:16px;">
+                        Enable Anti-Copyright Engine (Dynamic micro-zoom, audio pitch shift, safe borders)
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>Bottom Banner Search Prompt (Mandatory Google Search & Website)</label>
+                    <input type="text" id="wizBottomBannerText" class="form-control" value="FULL DEKHAR JONNE GOOGLE SEARCH: &quot;NXLY STREAM&quot;">
+                </div>
+            </div>
+
+            <!-- STEP 4: PUBLISHING & REVIEW -->
+            <div id="wizStep4" class="wizard-step-pane" style="display:none;">
+                <div style="margin-bottom:16px;">
+                    <label style="font-weight:700; color:#fff; margin-bottom:10px; display:block;">Select Publishing Destinations (Switches)</label>
+                    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:12px;">
+                        <div style="background:var(--bg-card); border:1px solid rgba(24,119,242,0.3); padding:12px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-size:13px; font-weight:700; color:#fff;">📘 Facebook</span>
+                            <label class="switch-toggle">
+                                <input type="checkbox" id="wizPlatformFb" checked>
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <div style="background:var(--bg-card); border:1px solid rgba(255,0,0,0.3); padding:12px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-size:13px; font-weight:700; color:#fff;">🔴 YouTube</span>
+                            <label class="switch-toggle">
+                                <input type="checkbox" id="wizPlatformYt" checked>
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <div style="background:var(--bg-card); border:1px solid rgba(0,240,255,0.3); padding:12px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-size:13px; font-weight:700; color:#fff;">🎵 TikTok</span>
+                            <label class="switch-toggle">
+                                <input type="checkbox" id="wizPlatformTt" checked>
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom:18px;">
+                    <label>Publishing Interval Between Videos (Minutes)</label>
+                    <input type="number" id="wizPublishInterval" class="form-control" value="10" min="2" max="1440">
+                    <span style="font-size:11px; color:var(--text-muted);">Default: 10 minutes (Optimal engagement spacing for viral algorithms)</span>
+                </div>
+
+                <!-- Final Review Box -->
+                <div style="background:#06080F; border:1px solid rgba(255,255,255,0.08); border-radius:var(--radius-sm); padding:14px; font-size:12.5px; line-height:1.7;">
+                    <div style="font-weight:800; color:#fff; margin-bottom:4px;">📋 Summary Review:</div>
+                    <div>• Titles Selected: <strong id="wizReviewCount" style="color:var(--accent-cyan);">0</strong></div>
+                    <div>• Planned Videos: <strong id="wizReviewVideos" style="color:var(--accent-green);">0 parts</strong></div>
+                    <div>• Branding: <strong style="color:var(--accent-yellow);">GOOGLE SEARCH: "NXLY STREAM" &amp; NXLY.ONLINE</strong></div>
+                </div>
+            </div>
+
+            <!-- Modal Footer Buttons -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; border-top:1px solid rgba(255,255,255,0.08); padding-top:14px;">
+                <button type="button" class="btn-secondary" id="btnWizPrev" onclick="prevWizardStep()" style="display:none;">← Previous</button>
+                <div style="margin-left:auto; display:flex; gap:10px;">
+                    <button type="button" class="btn-secondary" onclick="closeAddContentWizard()">Cancel</button>
+                    <button type="button" class="btn-primary" id="btnWizNext" onclick="nextWizardStep()">Next Step →</button>
+                    <button type="button" class="btn-primary" id="btnWizSubmit" onclick="submitAddContentWizard()" style="display:none; background:linear-gradient(135deg, var(--accent-green), #00AA55); color:#000; font-weight:800;">🚀 Start Automation</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── PLATFORM SETTINGS & CONNECTION GUIDE MODAL ────────────────────────── -->
+    <div class="modal-overlay" id="platformSettingsModal" style="display:none; z-index:9999;">
+        <div class="card" style="width:100%; max-width:680px; max-height:90vh; overflow-y:auto; background:#0B0F19; border:1px solid rgba(0,240,255,0.3); border-radius:var(--radius-md);">
+            <div class="card-header" style="border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:14px; margin-bottom:16px;">
+                <div>
+                    <h2 style="font-size:18px; color:#fff;">⚙️ Platform Connections & Setup Guides</h2>
+                    <div class="subtitle">Connect social media accounts for automated publishing</div>
+                </div>
+                <button type="button" class="btn-secondary" style="font-size:11px; padding:4px 10px;" onclick="closePlatformSettingsModal()">✕ Close</button>
+            </div>
+
+            <!-- Tab Switcher for Platforms -->
+            <div style="display:flex; gap:8px; margin-bottom:16px; border-bottom:1px solid var(--border-subtle); padding-bottom:10px;">
+                <button type="button" class="btn-secondary auto-plat-tab active" id="btnPlatTab-fb" onclick="switchPlatTab('fb')">📘 Facebook Page</button>
+                <button type="button" class="btn-secondary auto-plat-tab" id="btnPlatTab-yt" onclick="switchPlatTab('yt')">🔴 YouTube Shorts</button>
+                <button type="button" class="btn-secondary auto-plat-tab" id="btnPlatTab-tt" onclick="switchPlatTab('tt')">🎵 TikTok API v2</button>
+            </div>
+
+            <!-- FACEBOOK TAB -->
+            <div id="platPane-fb" class="plat-settings-pane">
+                <div style="background:rgba(24,119,242,0.08); border:1px solid rgba(24,119,242,0.25); border-radius:var(--radius-sm); padding:14px; margin-bottom:16px; font-size:12.5px; line-height:1.6; color:#fff;">
+                    <strong>📖 How to Connect Facebook Page:</strong>
+                    <ol style="margin:6px 0 0 18px; padding:0;">
+                        <li>Open <a href="https://developers.facebook.com/tools/explorer" target="_blank" style="color:var(--accent-cyan);">Meta Graph API Explorer ↗</a></li>
+                        <li>Select your Facebook App, choose your Page under <strong>User or Page</strong>, and grant <code>pages_manage_posts</code>, <code>pages_show_list</code>.</li>
+                        <li>Copy the generated Token and paste Page ID & Token below.</li>
+                    </ol>
+                </div>
+                <form onsubmit="handleSaveFacebookConfig(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Facebook Page ID</label>
+                            <input type="text" id="fbPageId" class="form-control" placeholder="1367186939808744">
+                        </div>
+                        <div class="form-group">
+                            <label>Default Interval (Minutes)</label>
+                            <input type="number" id="fbIntervalMinutes" class="form-control" value="10">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Permanent Page Access Token</label>
+                        <input type="password" id="fbPageToken" class="form-control" placeholder="EAA...">
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:#fff; cursor:pointer;">
+                            <input type="checkbox" id="fbAutoPilotToggle" checked style="accent-color:var(--accent-green); width:16px; height:16px;">
+                            Enable Facebook Auto-Pilot
+                        </label>
+                        <button type="submit" class="btn-primary" style="background:#1877F2; color:#fff;">💾 Save Facebook Credentials</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- YOUTUBE TAB -->
+            <div id="platPane-yt" class="plat-settings-pane" style="display:none;">
+                <div style="background:rgba(255,0,0,0.08); border:1px solid rgba(255,0,0,0.25); border-radius:var(--radius-sm); padding:14px; margin-bottom:16px; font-size:12.5px; line-height:1.6; color:#fff;">
+                    <strong>📖 How to Connect YouTube Shorts:</strong>
+                    <ol style="margin:6px 0 0 18px; padding:0;">
+                        <li>Open <a href="https://console.cloud.google.com" target="_blank" style="color:var(--accent-cyan);">Google Cloud Console ↗</a> and enable <strong>YouTube Data API v3</strong>.</li>
+                        <li>Create OAuth 2.0 Client ID (Web/Desktop).</li>
+                        <li>In OAuth Playground, authorize <code>https://www.googleapis.com/auth/youtube.upload</code> and copy Refresh Token.</li>
+                        <li>Paste Client ID, Secret, and Refresh Token below.</li>
+                    </ol>
+                </div>
+                <form onsubmit="handleSaveYouTubeConfig(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Google OAuth Client ID</label>
+                            <input type="text" id="ytClientId" class="form-control" placeholder="123456...apps.googleusercontent.com">
+                        </div>
+                        <div class="form-group">
+                            <label>Client Secret</label>
+                            <input type="password" id="ytClientSecret" class="form-control" placeholder="GOCSPX-...">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>OAuth2 Refresh Token</label>
+                        <input type="password" id="ytRefreshToken" class="form-control" placeholder="1//04...">
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:#fff; cursor:pointer;">
+                            <input type="checkbox" id="ytAutoPilotToggle" checked style="accent-color:#FF0000; width:16px; height:16px;">
+                            Enable YouTube Shorts Auto-Pilot
+                        </label>
+                        <button type="submit" class="btn-primary" style="background:#FF0000; color:#fff;">💾 Save YouTube Credentials</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- TIKTOK TAB -->
+            <div id="platPane-tt" class="plat-settings-pane" style="display:none;">
+                <div style="background:rgba(0,240,255,0.08); border:1px solid rgba(0,240,255,0.25); border-radius:var(--radius-sm); padding:14px; margin-bottom:16px; font-size:12.5px; line-height:1.6; color:#fff;">
+                    <strong>📖 How to Connect TikTok API:</strong>
+                    <ol style="margin:6px 0 0 18px; padding:0;">
+                        <li>Open <a href="https://developers.tiktok.com" target="_blank" style="color:var(--accent-cyan);">TikTok for Developers ↗</a> and create an App.</li>
+                        <li>Enable <strong>Content Posting API</strong> (Video direct publish v2).</li>
+                        <li>Paste Client Key, Client Secret, and User Access Token below.</li>
+                    </ol>
+                </div>
+                <form onsubmit="handleSaveTikTokConfig(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>TikTok Client Key</label>
+                            <input type="text" id="ttClientKey" class="form-control" placeholder="aw123...">
+                        </div>
+                        <div class="form-group">
+                            <label>TikTok Client Secret</label>
+                            <input type="password" id="ttClientSecret" class="form-control" placeholder="Secret Key">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>User Access Token</label>
+                        <input type="password" id="ttAccessToken" class="form-control" placeholder="act.123...">
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:#fff; cursor:pointer;">
+                            <input type="checkbox" id="ttAutoPilotToggle" checked style="accent-color:var(--accent-cyan); width:16px; height:16px;">
+                            Enable TikTok Auto-Pilot
+                        </label>
+                        <button type="submit" class="btn-primary" style="background:linear-gradient(135deg, #00F0FF, #0088FF); color:#000;">💾 Save TikTok Credentials</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── N8N NODE DETAIL DRAWER ────────────────────────────────────────────── -->
+    <div id="nodeDetailDrawer" style="display:none; position:fixed; top:0; right:0; width:100%; max-width:440px; height:100vh; background:#0B0E17; border-left:1px solid rgba(0,240,255,0.3); box-shadow:-10px 0 30px rgba(0,0,0,0.8); z-index:10000; padding:24px; overflow-y:auto;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:12px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span id="drawerNodeIcon" style="font-size:22px;">⚙️</span>
+                <h3 id="drawerNodeTitle" style="color:#fff; font-size:16px; margin:0;">Node Details</h3>
+            </div>
+            <button type="button" class="btn-secondary" style="font-size:11px; padding:3px 8px;" onclick="closeNodeDetailDrawer()">✕ Close</button>
+        </div>
+        <div id="drawerNodeBody" style="font-size:13px; line-height:1.7; color:var(--text-muted);">
+            <!-- Populated dynamically via JS -->
+        </div>
+    </div>
+
+
     <!-- ── LOGIN MODAL ────────────────────────────────────────────────────── -->
     <div class="modal-overlay" id="loginModal">
         <div class="login-card">
@@ -1504,6 +1904,7 @@
             // Update top title
             const titles = {
                 dashboard: ['Dashboard Overview', 'Real-time telemetry, app traffic, and quick actions'],
+                automation: ['Content Automation', 'Unified visual workflow, multi-select queue, and social publishing'],
                 reels: ['Reels & Shorts Creator', 'AI vertical video cutter with anti-copyright filters'],
                 facebook: ['Facebook Auto-Pilot Bot', 'Automated 10-minute posting cycle with 1st comment link'],
                 youtube: ['YouTube Shorts Bot', 'Automated Shorts upload via YouTube Data API v3'],
@@ -1545,6 +1946,7 @@
         function loadTabData(tabName) {
             switch(tabName) {
                 case 'dashboard': loadDashboardStats(); break;
+                case 'automation': loadAutomationTab(); break;
                 case 'reels': loadReelsTab(); break;
                 case 'facebook': loadFacebookTab(); break;
                 case 'youtube': loadYouTubeTab(); break;
@@ -2344,6 +2746,851 @@
                 alert('Error saving version: ' + err);
             }
         }
+
+        // ═════════════════════════════════════════════════════════════════════
+        // UNIFIED CONTENT AUTOMATION JAVASCRIPT CONTROLLER
+        // ═════════════════════════════════════════════════════════════════════
+        let currentAutoSubTab = 'overview';
+        let _autoPollInterval = null;
+        let wizardCurrentStep = 1;
+        let wizardSelectedItems = [];
+        let wizardSearchTimeout = null;
+
+        function loadAutomationTab() {
+            fetchAutomationOverview();
+            fetchPlatformStatuses();
+            if (!_autoPollInterval) {
+                _autoPollInterval = setInterval(() => {
+                    if (currentTab === 'automation') {
+                        if (currentAutoSubTab === 'overview') fetchAutomationOverview();
+                        else if (currentAutoSubTab === 'workflow') fetchAutomationWorkflow();
+                        else if (currentAutoSubTab === 'queue') renderQueueList();
+                        else if (currentAutoSubTab === 'calendar') renderCalendar();
+                        else if (currentAutoSubTab === 'finished') renderFinishedList();
+                        else if (currentAutoSubTab === 'terminal') fetchBotTerminalLogs();
+                    }
+                }, 5000);
+            }
+        }
+
+        function switchAutoSubTab(subTab) {
+            currentAutoSubTab = subTab;
+            document.querySelectorAll('.auto-tab-btn').forEach(btn => btn.classList.remove('active'));
+            const activeBtn = document.getElementById(`btnAutoTab-${subTab}`);
+            if (activeBtn) activeBtn.classList.add('active');
+
+            document.querySelectorAll('.auto-subview').forEach(v => v.style.display = 'none');
+            const targetView = document.getElementById(`autoView-${subTab}`);
+            if (targetView) targetView.style.display = 'block';
+
+            if (subTab === 'overview') fetchAutomationOverview();
+            else if (subTab === 'workflow') fetchAutomationWorkflow();
+            else if (subTab === 'queue') renderQueueList();
+            else if (subTab === 'calendar') renderCalendar();
+            else if (subTab === 'finished') renderFinishedList();
+            else if (subTab === 'terminal') fetchBotTerminalLogs();
+        }
+
+        // Global Platform Toggle Switch (Facebook, YouTube, TikTok)
+        async function togglePlatformGlobal(platform, enabled) {
+            try {
+                const res = await fetch('/api/admin/automation/platforms/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ platform: platform, enabled: enabled })
+                });
+                const d = await res.json();
+                if (d.code === 0) {
+                    showToast(`${platform.toUpperCase()} auto-pilot turned ${enabled ? 'ON' : 'OFF'}!`);
+                    const statusEl = document.getElementById(`globalSwitch${platform === 'facebook' ? 'Fb' : (platform === 'youtube' ? 'Yt' : 'Tt')}Status`);
+                    if (statusEl) {
+                        statusEl.innerText = enabled ? 'ON' : 'OFF';
+                        statusEl.style.color = enabled ? 'var(--accent-green)' : 'var(--text-muted)';
+                    }
+                    fetchPlatformStatuses();
+                } else {
+                    showToast('Failed to toggle platform: ' + (d.detail || d.message));
+                }
+            } catch (err) {
+                showToast('Error toggling switch: ' + err);
+            }
+        }
+
+        // Fetch Overview & Metrics
+        async function fetchAutomationOverview() {
+            try {
+                const res = await fetch('/api/admin/automation/overview', { headers: { 'Authorization': `Bearer ${token}` } });
+                const d = await res.json();
+                if (d.code === 0) {
+                    const m = d.metrics || {};
+                    document.getElementById('autoMetricTotal').innerText = m.total_jobs || 0;
+                    document.getElementById('autoMetricQueue').innerText = m.in_queue || 0;
+                    document.getElementById('autoMetricProcessing').innerText = m.processing || 0;
+                    document.getElementById('autoMetricReady').innerText = m.ready_to_publish || 0;
+                    document.getElementById('autoMetricScheduled').innerText = m.scheduled || 0;
+                    document.getElementById('autoMetricPublishing').innerText = m.publishing || 0;
+                    document.getElementById('autoMetricFailed').innerText = m.failed || 0;
+                    document.getElementById('autoMetricFinished').innerText = m.finished || 0;
+
+                    document.getElementById('liveSubQueueCount').innerText = m.in_queue || 0;
+                    document.getElementById('liveSubProcessingCount').innerText = m.processing || 0;
+                    document.getElementById('liveSubFinishedCount').innerText = m.finished || 0;
+                    document.getElementById('autoQueueCountBadge').innerText = m.in_queue || 0;
+                    document.getElementById('autoFinishedCountBadge').innerText = m.finished || 0;
+
+                    // Daemon Badge
+                    const daemonBadge = document.getElementById('autoDaemonRunningBadge');
+                    if (d.daemon && d.daemon.auto_pilot_enabled) {
+                        daemonBadge.innerHTML = '<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--accent-green); box-shadow:0 0 10px var(--accent-green);"></span> Running';
+                        daemonBadge.style.color = 'var(--accent-green)';
+                    } else {
+                        daemonBadge.innerHTML = '<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#EF4444;"></span> Paused';
+                        daemonBadge.style.color = '#EF4444';
+                    }
+
+                    // Render Active Pipeline Cards Container (Screenshot 2 Match)
+                    const activeContainer = document.getElementById('liveActivePipelineContainer');
+                    const activeItem = d.active_item;
+                    if (!activeItem) {
+                        activeContainer.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-muted); font-size:13px;">No content in active processing queue. Click \'✨ Add Content\' to begin automation.</div>';
+                    } else {
+                        const isSeries = activeItem.type === 'series';
+                        const totalCalc = isSeries ? ((activeItem.total_episodes || 1) * (activeItem.parts_per_episode || 3)) : (activeItem.total_parts || 8);
+                        const completedCalc = activeItem.completed_parts_count || 0;
+                        const pct = Math.min(100, Math.round((completedCalc / totalCalc) * 100));
+                        const subText = isSeries ? `Series • S${activeItem.current_season||1} E${activeItem.current_episode||1} of ${activeItem.total_episodes||1} eps` : `Movie • ${activeItem.total_parts || 8} parts planned`;
+                        const statusNote = d.daemon ? d.daemon.next_post_display : 'Scheduled';
+
+                        activeContainer.innerHTML = `
+                            <div style="background:#0D1321; border:1px solid rgba(0,240,255,0.25); border-radius:10px; padding:18px; display:flex; gap:18px; align-items:center;">
+                                <img src="${activeItem.cover || 'https://via.placeholder.com/80x120'}" style="width:70px; height:105px; border-radius:6px; object-fit:cover; border:1px solid rgba(255,255,255,0.1);">
+                                <div style="flex:1;">
+                                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+                                        <div>
+                                            <h3 style="color:#fff; font-size:17px; margin:0; font-weight:800;">${activeItem.title}</h3>
+                                            <div style="font-size:12.5px; color:var(--text-muted); margin-top:2px;">${subText}</div>
+                                        </div>
+                                        <div style="text-align:right;">
+                                            <span class="badge-pill" style="color:var(--accent-cyan); border-color:rgba(0,240,255,0.3); font-size:11px;">Next post: ${statusNote}</span>
+                                        </div>
+                                    </div>
+                                    <div style="display:flex; justify-content:space-between; font-size:11.5px; margin-bottom:6px; color:var(--text-muted);">
+                                        <span>Progress: ${completedCalc}/${totalCalc} parts</span>
+                                        <span style="color:var(--accent-cyan); font-weight:700;">${pct}%</span>
+                                    </div>
+                                    <div style="height:6px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden;">
+                                        <div style="height:100%; width:${pct}%; background:linear-gradient(90deg, var(--accent-cyan), var(--accent-green));"></div>
+                                    </div>
+                                    <div style="display:flex; gap:8px; margin-top:10px;">
+                                        <button class="btn-secondary" style="font-size:11px; padding:3px 8px;" onclick="handleTogglePlatformOnJob('${activeItem.id}', 'facebook')">📘 FB: ${activeItem.platforms?.facebook !== false ? 'ON' : 'OFF'}</button>
+                                        <button class="btn-secondary" style="font-size:11px; padding:3px 8px;" onclick="handleTogglePlatformOnJob('${activeItem.id}', 'youtube')">🔴 YT: ${activeItem.platforms?.youtube ? 'ON' : 'OFF'}</button>
+                                        <button class="btn-secondary" style="font-size:11px; padding:3px 8px;" onclick="handleTogglePlatformOnJob('${activeItem.id}', 'tiktok')">🎵 TT: ${activeItem.platforms?.tiktok ? 'ON' : 'OFF'}</button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+            } catch(e) {}
+        }
+
+        // Fetch Platform Connections and Set Switches
+        async function fetchPlatformStatuses() {
+            try {
+                const res = await fetch('/api/admin/automation/platforms', { headers: { 'Authorization': `Bearer ${token}` } });
+                const d = await res.json();
+                if (d.code === 0 && d.platforms) {
+                    const p = d.platforms;
+                    
+                    // FB
+                    const fbSwitch = document.getElementById('globalSwitchFb');
+                    const fbStatus = document.getElementById('globalSwitchFbStatus');
+                    const isFbOn = p.facebook?.auto_pilot_enabled !== false;
+                    if (fbSwitch) fbSwitch.checked = isFbOn;
+                    if (fbStatus) {
+                        fbStatus.innerText = isFbOn ? 'ON' : 'OFF';
+                        fbStatus.style.color = isFbOn ? 'var(--accent-green)' : 'var(--text-muted)';
+                    }
+                    const badgeFb = document.getElementById('badgeFbStatus');
+                    const infoFb = document.getElementById('infoFbStatus');
+                    if (badgeFb) {
+                        badgeFb.innerText = p.facebook?.connected ? 'Connected' : 'Action Required';
+                        badgeFb.style.color = p.facebook?.connected ? 'var(--accent-green)' : '#EF4444';
+                    }
+                    if (infoFb) infoFb.innerText = p.facebook?.connected ? `Connected Page: ${p.facebook.name}` : (p.facebook?.error || 'Page ID or Access Token missing');
+
+                    // YT
+                    const ytSwitch = document.getElementById('globalSwitchYt');
+                    const ytStatus = document.getElementById('globalSwitchYtStatus');
+                    const isYtOn = !!p.youtube?.auto_pilot_enabled;
+                    if (ytSwitch) ytSwitch.checked = isYtOn;
+                    if (ytStatus) {
+                        ytStatus.innerText = isYtOn ? 'ON' : 'OFF';
+                        ytStatus.style.color = isYtOn ? 'var(--accent-green)' : 'var(--text-muted)';
+                    }
+                    const badgeYt = document.getElementById('badgeYtStatus');
+                    const infoYt = document.getElementById('infoYtStatus');
+                    if (badgeYt) {
+                        badgeYt.innerText = p.youtube?.connected ? 'Connected' : 'Not Connected';
+                        badgeYt.style.color = p.youtube?.connected ? 'var(--accent-green)' : 'var(--text-muted)';
+                    }
+                    if (infoYt) infoYt.innerText = p.youtube?.connected ? `Channel: ${p.youtube.channel_title}` : 'Google OAuth v3 credentials needed';
+
+                    // TT
+                    const ttSwitch = document.getElementById('globalSwitchTt');
+                    const ttStatus = document.getElementById('globalSwitchTtStatus');
+                    const isTtOn = !!p.tiktok?.auto_pilot_enabled;
+                    if (ttSwitch) ttSwitch.checked = isTtOn;
+                    if (ttStatus) {
+                        ttStatus.innerText = isTtOn ? 'ON' : 'OFF';
+                        ttStatus.style.color = isTtOn ? 'var(--accent-green)' : 'var(--text-muted)';
+                    }
+                    const badgeTt = document.getElementById('badgeTtStatus');
+                    const infoTt = document.getElementById('infoTtStatus');
+                    if (badgeTt) {
+                        badgeTt.innerText = p.tiktok?.connected ? 'Connected' : 'Not Connected';
+                        badgeTt.style.color = p.tiktok?.connected ? 'var(--accent-green)' : 'var(--text-muted)';
+                    }
+                    if (infoTt) infoTt.innerText = p.tiktok?.connected ? `Account: ${p.tiktok.username}` : 'TikTok Content API v2 token needed';
+                }
+            } catch(e) {}
+        }
+
+        // Fetch & Highlight Visual Workflow Nodes (Matches Screenshot 1)
+        async function fetchAutomationWorkflow() {
+            try {
+                const res = await fetch('/api/admin/automation/workflow', { headers: { 'Authorization': `Bearer ${token}` } });
+                const d = await res.json();
+                if (d.code === 0 && d.nodes) {
+                    d.nodes.forEach(n => {
+                        const el = document.getElementById(n.id.replace('node_', 'node-'));
+                        if (el) {
+                            el.style.border = '1px solid rgba(255,255,255,0.12)';
+                            el.style.boxShadow = 'none';
+                            if (n.status === 'running') {
+                                el.style.border = '2px solid var(--accent-cyan)';
+                                el.style.boxShadow = '0 0 16px rgba(0,240,255,0.4)';
+                            } else if (n.status === 'completed') {
+                                el.style.border = '1px solid var(--accent-green)';
+                            } else if (n.status === 'failed') {
+                                el.style.border = '1px solid #EF4444)';
+                            }
+                        }
+                    });
+                }
+            } catch(e) {}
+        }
+
+        // Render Active Queue List
+        async function renderQueueList() {
+            try {
+                const typeFilter = document.getElementById('filterQueueType')?.value || '';
+                const url = typeFilter ? `/api/admin/automation/jobs?type=${typeFilter}` : '/api/admin/automation/jobs';
+                const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+                const d = await res.json();
+                const container = document.getElementById('activeQueueContainer');
+                if (!container) return;
+
+                if (!d.jobs || d.jobs.length === 0) {
+                    container.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-muted);">Queue is empty. Click "+ Add Content" to queue movies and series.</div>';
+                    return;
+                }
+
+                container.innerHTML = d.jobs.map((j, idx) => {
+                    const isSeries = j.type === 'series';
+                    const totalParts = isSeries ? ((j.total_episodes || 1) * (j.parts_per_episode || 3)) : (j.total_parts || 8);
+                    const completed = j.completed_parts_count || 0;
+                    const pct = Math.min(100, Math.round((completed / totalParts) * 100));
+
+                    return `
+                        <div style="background:#0D1321; border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:16px; display:flex; gap:16px; align-items:center;">
+                            <span style="font-size:13px; font-weight:800; color:var(--text-muted); width:20px;">#${idx+1}</span>
+                            <img src="${j.cover || 'https://via.placeholder.com/60x90'}" style="width:50px; height:75px; border-radius:6px; object-fit:cover;">
+                            <div style="flex:1;">
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <strong style="color:#fff; font-size:15px;">${j.title}</strong>
+                                    <span class="badge-pill" style="color:${j.status === 'paused' ? '#EF4444' : 'var(--accent-cyan)'};">${j.status.toUpperCase()}</span>
+                                </div>
+                                <div style="font-size:12px; color:var(--text-muted); margin:4px 0;">
+                                    ${isSeries ? `Series • S${j.current_season||1} E${j.current_episode||1}` : `Movie • ${j.total_parts||8} parts`} | Completed: ${completed}/${totalParts} (${pct}%)
+                                </div>
+                                <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+                                    <button class="btn-secondary" style="font-size:10.5px; padding:2px 8px;" onclick="handleTogglePlatformOnJob('${j.id}', 'facebook')">📘 FB: ${j.platforms?.facebook !== false ? 'ON' : 'OFF'}</button>
+                                    <button class="btn-secondary" style="font-size:10.5px; padding:2px 8px;" onclick="handleTogglePlatformOnJob('${j.id}', 'youtube')">🔴 YT: ${j.platforms?.youtube ? 'ON' : 'OFF'}</button>
+                                    <button class="btn-secondary" style="font-size:10.5px; padding:2px 8px;" onclick="handleTogglePlatformOnJob('${j.id}', 'tiktok')">🎵 TT: ${j.platforms?.tiktok ? 'ON' : 'OFF'}</button>
+                                    <span style="margin-left:auto; display:flex; gap:6px;">
+                                        <button class="btn-secondary" style="font-size:11px; padding:2px 7px;" onclick="handleJobAction('${j.id}', 'reorder', 'up')" ${idx === 0 ? 'disabled' : ''}>▲</button>
+                                        <button class="btn-secondary" style="font-size:11px; padding:2px 7px;" onclick="handleJobAction('${j.id}', 'reorder', 'down')" ${idx === d.jobs.length - 1 ? 'disabled' : ''}>▼</button>
+                                        <button class="btn-secondary" style="font-size:11px; padding:2px 8px;" onclick="handleJobAction('${j.id}', '${j.status === 'paused' ? 'resume' : 'pause'}')">${j.status === 'paused' ? '▶ Resume' : '⏸ Pause'}</button>
+                                        <button class="btn-danger" style="font-size:11px; padding:2px 8px;" onclick="handleJobAction('${j.id}', 'delete')">🗑 Delete</button>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch(e) {}
+        }
+
+        // Toggle Platform On Individual Job
+        async function handleTogglePlatformOnJob(jobId, platform) {
+            try {
+                const res = await fetch(`/api/admin/automation/jobs/${jobId}/action`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ action: 'toggle_platform', direction: platform })
+                });
+                const d = await res.json();
+                if (d.code === 0) {
+                    showToast(`Updated ${platform.toUpperCase()} for this job!`);
+                    renderQueueList();
+                    fetchAutomationOverview();
+                }
+            } catch(err) {
+                showToast('Error: ' + err);
+            }
+        }
+
+        async function handleJobAction(jobId, action, direction) {
+            try {
+                const res = await fetch(`/api/admin/automation/jobs/${jobId}/action`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ action: action, direction: direction })
+                });
+                const d = await res.json();
+                showToast(d.message || 'Action executed');
+                renderQueueList();
+                fetchAutomationOverview();
+            } catch(err) {
+                alert('Action failed: ' + err);
+            }
+        }
+
+        // Render Calendar Schedule
+        async function renderCalendar() {
+            try {
+                const res = await fetch('/api/admin/automation/calendar', { headers: { 'Authorization': `Bearer ${token}` } });
+                const d = await res.json();
+                const tbody = document.getElementById('calendarTableBody');
+                if (!tbody) return;
+
+                if (!d.calendar || d.calendar.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; color:var(--text-muted);">No posts scheduled in timeline.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = d.calendar.map(item => `
+                    <tr>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <img src="${item.cover || 'https://via.placeholder.com/30x45'}" style="width:28px; height:40px; border-radius:4px; object-fit:cover;">
+                                <div>
+                                    <strong style="color:#fff;">${item.title}</strong>
+                                    <div style="font-size:11px; color:var(--accent-cyan);">${item.part_label}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>${item.scheduled_date} at <strong>${item.scheduled_time}</strong></td>
+                        <td><span style="color:var(--accent-yellow); font-weight:700;">${item.countdown_display}</span></td>
+                        <td>
+                            <span style="font-size:12px;">
+                                ${item.platforms?.facebook !== false ? '📘' : ''}
+                                ${item.platforms?.youtube ? '🔴' : ''}
+                                ${item.platforms?.tiktok ? '🎵' : ''}
+                            </span>
+                        </td>
+                        <td><span class="badge-pill" style="color:var(--accent-cyan);">Scheduled</span></td>
+                        <td>
+                            <button class="btn-secondary" style="font-size:11px; padding:3px 8px;" onclick="triggerAutomationCycleNow()">⚡ Run Now</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch(e) {}
+        }
+
+        // Render Finished List
+        async function renderFinishedList() {
+            try {
+                const res = await fetch('/api/admin/automation/finished', { headers: { 'Authorization': `Bearer ${token}` } });
+                const d = await res.json();
+                const container = document.getElementById('finishedListContainer');
+                if (!container) return;
+
+                if (!d.finished || d.finished.length === 0) {
+                    container.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-muted);">No finished jobs in archive yet. Completed series and movies will appear here.</div>';
+                    return;
+                }
+
+                container.innerHTML = d.finished.map(f => `
+                    <div style="background:#0D1321; border:1px solid rgba(0,255,136,0.2); border-radius:10px; padding:16px; display:flex; justify-content:space-between; align-items:center;">
+                        <div style="display:flex; align-items:center; gap:14px;">
+                            <img src="${f.cover || 'https://via.placeholder.com/50x75'}" style="width:45px; height:68px; border-radius:6px; object-fit:cover;">
+                            <div>
+                                <h4 style="color:#fff; margin:0 0 4px;">${f.title}</h4>
+                                <div style="font-size:12px; color:var(--text-muted);">
+                                    Finished: ${f.finished_at || 'Recently'} • Total Parts Published: <span style="color:var(--accent-green); font-weight:700;">${f.completed_parts_count || f.total_parts}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:10px;">
+                            <button class="btn-primary" style="font-size:11px; padding:4px 10px; background:linear-gradient(135deg, var(--accent-cyan), #0088FF); color:#000; font-weight:800;" onclick="requeueFinishedJob('${f.id}')">🔄 Requeue Content</button>
+                            <button class="btn-danger" style="font-size:11px; padding:4px 10px;" onclick="deleteFinishedJob('${f.id}')">🗑 Remove</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch(e) {}
+        }
+
+        async function requeueFinishedJob(jobId) {
+            try {
+                const res = await fetch('/api/admin/automation/finished/requeue', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ job_id: jobId })
+                });
+                const d = await res.json();
+                if (d.success) {
+                    showToast('Job requeued to active queue!');
+                    renderFinishedList();
+                    fetchAutomationOverview();
+                }
+            } catch(err) {
+                alert('Failed to requeue: ' + err);
+            }
+        }
+
+        async function deleteFinishedJob(jobId) {
+            if (!confirm('Remove from finished archive?')) return;
+            try {
+                const res = await fetch(`/api/admin/automation/finished/delete?job_id=${jobId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const d = await res.json();
+                if (d.success) {
+                    showToast('Removed from finished archive');
+                    renderFinishedList();
+                    fetchAutomationOverview();
+                }
+            } catch(err) {
+                alert('Delete error: ' + err);
+            }
+        }
+
+        // Live Bot Terminal
+        async function fetchBotTerminalLogs() {
+            try {
+                const res = await fetch('/api/admin/facebook/logs', { headers: { 'Authorization': `Bearer ${token}` } });
+                const d = await res.json();
+                const term = document.getElementById('botTerminalOutput');
+                if (term) {
+                    term.innerText = d.logs || '[Terminal standby. Ready for execution...]';
+                    if (document.getElementById('terminalAutoScroll')?.checked) {
+                        term.scrollTop = term.scrollHeight;
+                    }
+                }
+            } catch(e) {}
+        }
+
+        function clearBotTerminal() {
+            const term = document.getElementById('botTerminalOutput');
+            if (term) term.innerText = '[Terminal cleared]';
+        }
+
+        async function triggerAutomationCycleNow() {
+            const btn = document.getElementById('btnAutoRunNow');
+            if (btn) { btn.disabled = true; btn.innerText = '⚡ Starting...'; }
+            try {
+                const res = await fetch('/api/admin/automation/run-now', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const d = await res.json();
+                showToast(d.message || 'Auto-pilot cycle triggered!');
+                setTimeout(() => {
+                    fetchAutomationOverview();
+                    fetchAutomationWorkflow();
+                    fetchBotTerminalLogs();
+                    if (btn) { btn.disabled = false; btn.innerText = '⚡ Run Cycle Now'; }
+                }, 1500);
+            } catch(err) {
+                alert('Trigger failed: ' + err);
+                if (btn) { btn.disabled = false; btn.innerText = '⚡ Run Cycle Now'; }
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        // ADD CONTENT WIZARD CONTROLLER
+        // ═════════════════════════════════════════════════════════════════════
+        function openAddContentWizard() {
+            wizardCurrentStep = 1;
+            wizardSelectedItems = [];
+            updateWizardStepUI();
+            renderWizardSelectedChips();
+            document.getElementById('wizSearchInput').value = '';
+            document.getElementById('wizSearchResultsBox').innerHTML = '<div style="padding:16px; text-align:center; color:var(--text-muted); font-size:12.5px;">Type a title above to search and select multiple items</div>';
+            document.getElementById('addContentModal').style.display = 'flex';
+        }
+
+        function closeAddContentWizard() {
+            document.getElementById('addContentModal').style.display = 'none';
+        }
+
+        function updateWizardStepUI() {
+            for (let i = 1; i <= 4; i++) {
+                const pane = document.getElementById(`wizStep${i}`);
+                const bullet = document.getElementById(`wizBullet${i}`);
+                if (pane) pane.style.display = (i === wizardCurrentStep) ? 'block' : 'none';
+                if (bullet) {
+                    const circle = bullet.querySelector('div');
+                    if (i === wizardCurrentStep) {
+                        circle.style.background = 'var(--accent-cyan)';
+                        circle.style.color = '#000';
+                    } else if (i < wizardCurrentStep) {
+                        circle.style.background = 'var(--accent-green)';
+                        circle.style.color = '#000';
+                    } else {
+                        circle.style.background = '#1E293B';
+                        circle.style.color = '#fff';
+                    }
+                }
+            }
+            document.getElementById('btnWizPrev').style.display = (wizardCurrentStep > 1) ? 'inline-flex' : 'none';
+            document.getElementById('btnWizNext').style.display = (wizardCurrentStep < 4) ? 'inline-flex' : 'none';
+            document.getElementById('btnWizSubmit').style.display = (wizardCurrentStep === 4) ? 'inline-flex' : 'none';
+
+            if (wizardCurrentStep === 4) {
+                const movieParts = parseInt(document.getElementById('wizMovieParts')?.value || 8);
+                const epParts = parseInt(document.getElementById('wizSeriesPartsPerEp')?.value || 3);
+                let totalPartsCalc = 0;
+                wizardSelectedItems.forEach(it => {
+                    if (it.type === 'series') totalPartsCalc += (it.total_episodes || 1) * epParts;
+                    else totalPartsCalc += movieParts;
+                });
+                document.getElementById('wizReviewCount').innerText = `${wizardSelectedItems.length} Title(s)`;
+                document.getElementById('wizReviewVideos').innerText = `${totalPartsCalc} Parts Planned`;
+            }
+        }
+
+        function nextWizardStep() {
+            if (wizardCurrentStep === 1 && wizardSelectedItems.length === 0) {
+                alert('Please select at least one movie or series first!');
+                return;
+            }
+            if (wizardCurrentStep < 4) {
+                wizardCurrentStep++;
+                updateWizardStepUI();
+            }
+        }
+
+        function prevWizardStep() {
+            if (wizardCurrentStep > 1) {
+                wizardCurrentStep--;
+                updateWizardStepUI();
+            }
+        }
+
+        function handleWizardSearch(val) {
+            clearTimeout(wizardSearchTimeout);
+            const query = val.trim();
+            if (!query) {
+                document.getElementById('wizSearchResultsBox').innerHTML = '<div style="padding:16px; text-align:center; color:var(--text-muted); font-size:12.5px;">Type a title above to search</div>';
+                return;
+            }
+            wizardSearchTimeout = setTimeout(async () => {
+                try {
+                    const res = await fetch(`/api/search?keyword=${encodeURIComponent(query)}`);
+                    const d = await res.json();
+                    const list = d.data?.list || [];
+                    const box = document.getElementById('wizSearchResultsBox');
+                    if (list.length === 0) {
+                        box.innerHTML = '<div style="padding:16px; text-align:center; color:var(--text-muted); font-size:12.5px;">No titles found for \'' + query + '\'</div>';
+                        return;
+                    }
+                    box.innerHTML = list.map(item => {
+                        const isSel = wizardSelectedItems.some(x => x.id === (item.id || item.subjectId));
+                        const isSeries = item.type === 'series' || item.subjectType === 2 || (item.episodes && item.episodes.length > 1);
+                        return `
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.05); cursor:pointer;" onclick="toggleWizardTitleSelection(${JSON.stringify(item).replace(/"/g, '&quot;')})">
+                                <div style="display:flex; align-items:center; gap:10px;">
+                                    <img src="${item.cover || item.poster || 'https://via.placeholder.com/30x45'}" style="width:28px; height:42px; border-radius:4px; object-fit:cover;">
+                                    <div>
+                                        <strong style="color:#fff; font-size:13px;">${item.title || item.name}</strong>
+                                        <div style="font-size:11px; color:var(--text-muted);">${isSeries ? '📺 Series' : '🎬 Movie'} • ${item.year || ''}</div>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn-${isSel ? 'danger' : 'primary'}" style="font-size:11px; padding:3px 10px;">
+                                    ${isSel ? '✓ Added' : '+ Add'}
+                                </button>
+                            </div>
+                        `;
+                    }).join('');
+                } catch(e) {}
+            }, 300);
+        }
+
+        function toggleWizardTitleSelection(item) {
+            const itemId = item.id || item.subjectId;
+            const idx = wizardSelectedItems.findIndex(x => x.id === itemId);
+            if (idx !== -1) {
+                wizardSelectedItems.splice(idx, 1);
+            } else {
+                const isSeries = item.type === 'series' || item.subjectType === 2 || (item.episodes && item.episodes.length > 1);
+                wizardSelectedItems.push({
+                    id: itemId,
+                    title: item.title || item.name,
+                    type: isSeries ? 'series' : 'movie',
+                    cover: item.cover || item.poster || '',
+                    detail_path: item.detailPath || item.detail_path || '',
+                    total_episodes: item.totalEpisodes || (item.episodes ? item.episodes.length : 1),
+                    seasons: [1]
+                });
+            }
+            renderWizardSelectedChips();
+            handleWizardSearch(document.getElementById('wizSearchInput').value);
+        }
+
+        function renderWizardSelectedChips() {
+            const container = document.getElementById('wizSelectedChipsContainer');
+            if (!container) return;
+            if (wizardSelectedItems.length === 0) {
+                container.innerHTML = '<span style="font-size:11.5px; color:var(--text-muted);">No items selected yet. Select one or more below.</span>';
+                return;
+            }
+            container.innerHTML = wizardSelectedItems.map(item => `
+                <div style="background:rgba(0,240,255,0.1); border:1px solid rgba(0,240,255,0.3); border-radius:20px; padding:4px 10px; display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#fff;">
+                    <span>${item.type === 'series' ? '📺' : '🎬'} ${item.title}</span>
+                    <button type="button" onclick="removeWizardChip('${item.id}')" style="background:none; border:none; color:var(--accent-red); cursor:pointer; font-weight:bold; font-size:12px;">✕</button>
+                </div>
+            `).join('');
+        }
+
+        function removeWizardChip(itemId) {
+            wizardSelectedItems = wizardSelectedItems.filter(x => x.id !== itemId);
+            renderWizardSelectedChips();
+            handleWizardSearch(document.getElementById('wizSearchInput').value);
+        }
+
+        async function submitAddContentWizard() {
+            const btn = document.getElementById('btnWizSubmit');
+            btn.disabled = true;
+            btn.innerText = 'Creating Queue Jobs...';
+
+            const payload = {
+                items: wizardSelectedItems,
+                config: {
+                    movie_parts: parseInt(document.getElementById('wizMovieParts').value || 8),
+                    series_parts_per_ep: parseInt(document.getElementById('wizSeriesPartsPerEp').value || 3),
+                    start_offset: parseInt(document.getElementById('wizStartOffset').value || 600),
+                    part_duration: parseInt(document.getElementById('wizPartDuration').value || 75),
+                    anti_copyright: document.getElementById('wizAntiCopyright').checked,
+                    bottom_banner_text: document.getElementById('wizBottomBannerText').value.trim(),
+                    platforms: {
+                        facebook: document.getElementById('wizPlatformFb').checked,
+                        youtube: document.getElementById('wizPlatformYt').checked,
+                        tiktok: document.getElementById('wizPlatformTt').checked
+                    },
+                    publish_interval_minutes: parseInt(document.getElementById('wizPublishInterval').value || 10)
+                }
+            };
+
+            try {
+                const res = await fetch('/api/admin/automation/jobs/bulk-create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(payload)
+                });
+                const d = await res.json();
+                if (d.code === 0) {
+                    showToast(`Successfully added ${d.added_count} title(s) to automation queue!`);
+                    closeAddContentWizard();
+                    switchAutoSubTab('queue');
+                    fetchAutomationOverview();
+                } else {
+                    alert('Error creating jobs: ' + (d.message || 'Unknown error'));
+                }
+            } catch(err) {
+                alert('Submit failed: ' + err);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = '🚀 Start Automation';
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        // PLATFORM SETTINGS MODAL & GUIDES
+        // ═════════════════════════════════════════════════════════════════════
+        function openPlatformSettingsModal() {
+            document.getElementById('platformSettingsModal').style.display = 'flex';
+            loadPlatformSettingsValues();
+        }
+
+        function closePlatformSettingsModal() {
+            document.getElementById('platformSettingsModal').style.display = 'none';
+        }
+
+        function switchPlatTab(plat) {
+            document.querySelectorAll('.auto-plat-tab').forEach(b => b.classList.remove('active'));
+            document.getElementById(`btnPlatTab-${plat}`).classList.add('active');
+            document.querySelectorAll('.plat-settings-pane').forEach(p => p.style.display = 'none');
+            document.getElementById(`platPane-${plat}`).style.display = 'block';
+        }
+
+        function openPlatformGuide(platform) {
+            openPlatformSettingsModal();
+            const tabKey = platform === 'facebook' ? 'fb' : (platform === 'youtube' ? 'yt' : 'tt');
+            switchPlatTab(tabKey);
+        }
+
+        async function loadPlatformSettingsValues() {
+            try {
+                const fbRes = await fetch('/api/admin/facebook/config', { headers: { 'Authorization': `Bearer ${token}` } });
+                const fbData = await fbRes.json();
+                if (fbData.code === 0 && fbData.config) {
+                    document.getElementById('fbPageId').value = fbData.config.page_id || '';
+                    document.getElementById('fbIntervalMinutes').value = fbData.config.post_interval_minutes || 10;
+                    document.getElementById('fbAutoPilotToggle').checked = fbData.config.auto_pilot_enabled !== false;
+                }
+                const ytRes = await fetch('/api/admin/youtube/config', { headers: { 'Authorization': `Bearer ${token}` } });
+                const ytData = await ytRes.json();
+                if (ytData.code === 0 && ytData.config) {
+                    document.getElementById('ytClientId').value = ytData.config.client_id || '';
+                    document.getElementById('ytAutoPilotToggle').checked = !!ytData.config.auto_pilot_enabled;
+                }
+                const ttRes = await fetch('/api/admin/tiktok/config', { headers: { 'Authorization': `Bearer ${token}` } });
+                const ttData = await ttRes.json();
+                if (ttData.code === 0 && ttData.config) {
+                    document.getElementById('ttClientKey').value = ttData.config.client_key || '';
+                    document.getElementById('ttAutoPilotToggle').checked = !!ttData.config.auto_pilot_enabled;
+                }
+            } catch(e) {}
+        }
+
+        async function handleSaveFacebookConfig(e) {
+            e.preventDefault();
+            const payload = {
+                page_id: document.getElementById('fbPageId').value.trim(),
+                page_token: document.getElementById('fbPageToken').value.trim(),
+                post_interval_minutes: parseInt(document.getElementById('fbIntervalMinutes').value || 10),
+                auto_pilot_enabled: document.getElementById('fbAutoPilotToggle').checked
+            };
+            try {
+                const res = await fetch('/api/admin/facebook/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(payload)
+                });
+                const d = await res.json();
+                showToast(d.message || 'Facebook settings saved!');
+                fetchPlatformStatuses();
+            } catch(err) {
+                alert('Save failed: ' + err);
+            }
+        }
+
+        async function handleSaveYouTubeConfig(e) {
+            e.preventDefault();
+            const payload = {
+                client_id: document.getElementById('ytClientId').value.trim(),
+                client_secret: document.getElementById('ytClientSecret').value.trim(),
+                refresh_token: document.getElementById('ytRefreshToken').value.trim(),
+                auto_pilot_enabled: document.getElementById('ytAutoPilotToggle').checked
+            };
+            try {
+                const res = await fetch('/api/admin/youtube/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(payload)
+                });
+                const d = await res.json();
+                showToast(d.message || 'YouTube settings saved!');
+                fetchPlatformStatuses();
+            } catch(err) {
+                alert('Save failed: ' + err);
+            }
+        }
+
+        async function handleSaveTikTokConfig(e) {
+            e.preventDefault();
+            const payload = {
+                client_key: document.getElementById('ttClientKey').value.trim(),
+                client_secret: document.getElementById('ttClientSecret').value.trim(),
+                access_token: document.getElementById('ttAccessToken').value.trim(),
+                auto_pilot_enabled: document.getElementById('ttAutoPilotToggle').checked
+            };
+            try {
+                const res = await fetch('/api/admin/tiktok/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(payload)
+                });
+                const d = await res.json();
+                showToast(d.message || 'TikTok settings saved!');
+                fetchPlatformStatuses();
+            } catch(err) {
+                alert('Save failed: ' + err);
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        // N8N NODE DETAIL DRAWER
+        // ═════════════════════════════════════════════════════════════════════
+        function openNodeDetail(nodeId) {
+            const drawer = document.getElementById('nodeDetailDrawer');
+            const titleEl = document.getElementById('drawerNodeTitle');
+            const iconEl = document.getElementById('drawerNodeIcon');
+            const bodyEl = document.getElementById('drawerNodeBody');
+
+            const nodeDetails = {
+                node_input: {
+                    title: 'Movie / Series Input Node',
+                    icon: '🎞️',
+                    body: '<p><strong>Node Type:</strong> Ingestion & Multi-Select Queue</p><p>Accepts multiple movies and TV series into a persistent queue. Automatically structures movies for sequential parts slicing and series for sequential season/episode progression.</p><button class="btn-primary" style="margin-top:12px; width:100%;" onclick="openAddContentWizard()">+ Add Content</button>'
+                },
+                node_prep: {
+                    title: 'Content Preparation Node',
+                    icon: '✂️',
+                    body: '<p><strong>Node Type:</strong> Slicer & Episode Sequencer</p><p>Calculates video timestamps, skips intro credits (default 600s), and prepares direct streaming links from NXLY video resources.</p>'
+                },
+                node_render: {
+                    title: 'Video Generation Node',
+                    icon: '🎬',
+                    body: '<p><strong>Node Type:</strong> Anti-Copyright Safe Engine</p><p>Slices 75-second 1080x1920 HD vertical video clips using FFmpeg. Applies subtle audio pitch adjustment, dynamic zoom filters, and renders mandatory Google Search: &quot;NXLY STREAM&quot; &amp; nxly.online branded banners.</p>'
+                },
+                node_schedule: {
+                    title: 'Scheduled Publishing Node',
+                    icon: '📅',
+                    body: '<p><strong>Node Type:</strong> 10-Minute Interval Auto-Scheduler</p><p>Maintains high viral algorithm velocity by spacing releases every 10 minutes. Triggers multi-platform distribution synchronously across connected destinations.</p>'
+                },
+                node_fb: {
+                    title: 'Facebook Reels Node',
+                    icon: '📘',
+                    body: '<p><strong>Node Type:</strong> Meta Graph API v19.0 Destination</p><p>Uploads vertical video directly to the official Facebook Page via chunked upload session. Automatically publishes direct stream link as the #1 pinned comment.</p>'
+                },
+                node_yt: {
+                    title: 'YouTube Shorts Node',
+                    icon: '🔴',
+                    body: '<p><strong>Node Type:</strong> YouTube Data API v3 Destination</p><p>Uploads video with #Shorts hashtag and appends direct website watch link in description.</p>'
+                },
+                node_tt: {
+                    title: 'TikTok Auto-Pilot Node',
+                    icon: '🎵',
+                    body: '<p><strong>Node Type:</strong> TikTok Content Posting API v2 Destination</p><p>Direct publishing to TikTok profile with trending movie hashtags and Google search prompt.</p>'
+                }
+            };
+
+            const info = nodeDetails[nodeId] || { title: 'Node Details', icon: '⚙️', body: 'No details available.' };
+            titleEl.innerText = info.title;
+            iconEl.innerText = info.icon;
+            bodyEl.innerHTML = info.body;
+            drawer.style.display = 'block';
+        }
+
+        function closeNodeDetailDrawer() {
+            document.getElementById('nodeDetailDrawer').style.display = 'none';
+        }
+
     </script>
 </body>
 </html>

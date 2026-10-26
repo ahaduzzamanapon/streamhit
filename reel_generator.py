@@ -262,20 +262,36 @@ def generate_overlay_image(
         b1_text = bottom_text_custom.replace("{title}", clean_title).replace("{part_num}", str(part_num))
         b1_text = re.sub(r'[^\x00-\x7F]+', '', b1_text).strip()
     else:
-        b1_text = 'GOOGLE SEARCH: "NXLY STREAM"'
-    b2_text = "1ST RESULT IS THE ONE • WATCH FREE"
+        b1_text = 'FULL DEKHAR JONNE GOOGLE SEARCH: "NXLY STREAM"'
+    
+    b2_text = "OR VISIT: NXLY.ONLINE"
 
-    font_b1 = get_font(52, bold=True)
+    # Line 1 with auto-scaling to fit box perfectly
+    font_size_b1 = 36
+    font_b1 = get_font(font_size_b1, bold=True)
     b1_box = draw.textbbox((0, 0), b1_text, font=font_b1)
     b1_w = b1_box[2] - b1_box[0]
+    while b1_w > 960 and font_size_b1 > 22:
+        font_size_b1 -= 2
+        font_b1 = get_font(font_size_b1, bold=True)
+        b1_box = draw.textbbox((0, 0), b1_text, font=font_b1)
+        b1_w = b1_box[2] - b1_box[0]
+
     b1_x = (1080 - b1_w) // 2
     draw.text((b1_x + 3, 1335 + 3), b1_text, fill=(0, 0, 0, 220), font=font_b1)
     draw.text((b1_x, 1335), b1_text, fill=(255, 225, 40), font=font_b1)
 
-    # Line 2: App Branding (Electric Cyan)
-    font_b2 = get_font(40, bold=True)
+    # Line 2: App Branding & Website (Electric Cyan with auto-scaling)
+    font_size_b2 = 38
+    font_b2 = get_font(font_size_b2, bold=True)
     b2_box = draw.textbbox((0, 0), b2_text, font=font_b2)
     b2_w = b2_box[2] - b2_box[0]
+    while b2_w > 960 and font_size_b2 > 22:
+        font_size_b2 -= 2
+        font_b2 = get_font(font_size_b2, bold=True)
+        b2_box = draw.textbbox((0, 0), b2_text, font=font_b2)
+        b2_w = b2_box[2] - b2_box[0]
+
     b2_x = (1080 - b2_w) // 2
     draw.text((b2_x + 3, 1425 + 3), b2_text, fill=(0, 0, 0, 220), font=font_b2)
     draw.text((b2_x, 1425), b2_text, fill=(0, 240, 255), font=font_b2)
@@ -293,10 +309,11 @@ def generate_captions(title: str, part_num: int, total_parts: int = 1) -> Dict[s
     caption = (
         f"🔥 {title} • PART {part_num} 🎬🍿\n"
         f"━━━━━━━━━━━━━━━━━━\n"
-        f"🔍 Google-এ Search করুন: NXLY Stream\n"
+        f"🔍 Full দেখার জন্য Google-এ Search করুন: NXLY Stream\n"
+        f"🌐 অথবা Visit করুন: nxly.online\n"
         f"👉 ১ম যে ওয়েবসাইট আসবে সেটাই! (First result is the one)\n\n"
         f"💬 Full Movie / Series link is in 1st comment! 👇\n"
-        f"📲 Watch all movies & web series in Full HD for FREE on NXLY Stream App!\n\n"
+        f"📲 Watch all movies & web series in Full HD for FREE on NXLY Stream!\n\n"
         f"#reels #shorts #viral #fyp #movie #nxlystream #trending #part{part_num} #{slug}"
     )
     
