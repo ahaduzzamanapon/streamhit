@@ -52,18 +52,47 @@ def get_job_state(job_id: str) -> Optional[Dict[str, Any]]:
     return all_jobs.get(job_id)
 
 def get_latest_or_active_job() -> Optional[Dict[str, Any]]:
-    # Check in-memory first for active
-    for j in active_reel_jobs.values():
+    now = time.time()
+    # Check in-memory first for active (expire zombie jobs older than 15 mins)
+    for j in list(active_reel_jobs.values()):
         if j.get("status") in ("processing", "pending"):
-            return j
+            if now - j.get("created_at", 0) > 900:
+                j["status"] = "failed"
+                j["error"] = "Job timed out after 15 minutes"
+                save_job_state(j["job_id"], j)
+            else:
+                return j
     all_jobs = load_jobs_state()
-    for j in all_jobs.values():
+    for j in list(all_jobs.values()):
         if j.get("status") in ("processing", "pending"):
-            return j
+            if now - j.get("created_at", 0) > 900:
+                j["status"] = "failed"
+                j["error"] = "Job timed out after 15 minutes"
+                save_job_state(j["job_id"], j)
+            else:
+                return j
     if all_jobs:
         sorted_jobs = sorted(all_jobs.values(), key=lambda x: x.get("created_at", 0), reverse=True)
         return sorted_jobs[0]
     return None
+
+def cancel_all_active_jobs() -> Dict[str, Any]:
+    global active_reel_jobs
+    all_jobs = load_jobs_state()
+    cancelled_count = 0
+    for j in all_jobs.values():
+        if j.get("status") in ("processing", "pending"):
+            j["status"] = "cancelled"
+            j["current_step"] = "Cancelled by admin"
+            j["error"] = "Cancelled by admin"
+            cancelled_count += 1
+    active_reel_jobs = {}
+    try:
+        with open(JOBS_FILE, "w", encoding="utf-8") as f:
+            json.dump(all_jobs, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"Error resetting jobs file: {e}")
+    return {"code": 0, "cancelled": cancelled_count, "message": "All active jobs cleared successfully!"}
 
 try:
     from PIL import Image, ImageDraw, ImageFont
@@ -224,8 +253,9 @@ def generate_overlay_image(
     draw.text((p_x, p_y), part_text, fill=(255, 255, 255), font=font_part)
 
     # ── BOTTOM BANNER ───────────────────────────────────────────────────────
-    # Container box: Y: 1560 to 1860 (Height 300px)
-    draw.rounded_rectangle([40, 1560, 1040, 1860], radius=32, fill=(10, 14, 24, 245), outline=(255, 42, 84, 240), width=6)
+    # Positioned at Y: 1290 to 1510 (Height 220px) — completely ABOVE Facebook Reels
+    # page name, title, follow button, caption, and progress bar (which cover Y >= 1500)
+    draw.rounded_rectangle([40, 1290, 1040, 1510], radius=28, fill=(10, 14, 24, 245), outline=(255, 42, 84, 240), width=6)
 
     # Line 1: Call to Action (Big Bold Golden Yellow)
     if bottom_text_custom:
@@ -235,20 +265,20 @@ def generate_overlay_image(
         b1_text = "FULL MOVIE LINK IN 1ST COMMENT"
     b2_text = "Watch Free in 1080p HD on NXLY App"
 
-    font_b1 = get_font(54, bold=True)
+    font_b1 = get_font(52, bold=True)
     b1_box = draw.textbbox((0, 0), b1_text, font=font_b1)
     b1_w = b1_box[2] - b1_box[0]
     b1_x = (1080 - b1_w) // 2
-    draw.text((b1_x + 3, 1615 + 3), b1_text, fill=(0, 0, 0, 220), font=font_b1)
-    draw.text((b1_x, 1615), b1_text, fill=(255, 225, 40), font=font_b1)
+    draw.text((b1_x + 3, 1335 + 3), b1_text, fill=(0, 0, 0, 220), font=font_b1)
+    draw.text((b1_x, 1335), b1_text, fill=(255, 225, 40), font=font_b1)
 
     # Line 2: App Branding (Electric Cyan)
-    font_b2 = get_font(42, bold=True)
+    font_b2 = get_font(40, bold=True)
     b2_box = draw.textbbox((0, 0), b2_text, font=font_b2)
     b2_w = b2_box[2] - b2_box[0]
     b2_x = (1080 - b2_w) // 2
-    draw.text((b2_x + 3, 1725 + 3), b2_text, fill=(0, 0, 0, 220), font=font_b2)
-    draw.text((b2_x, 1725), b2_text, fill=(0, 240, 255), font=font_b2)
+    draw.text((b2_x + 3, 1425 + 3), b2_text, fill=(0, 0, 0, 220), font=font_b2)
+    draw.text((b2_x, 1425), b2_text, fill=(0, 240, 255), font=font_b2)
 
     if not output_path:
         output_path = os.path.join(REELS_DIR, f"overlay_p{part_num}_{int(time.time()*1000)}.png")
@@ -325,8 +355,11 @@ async def render_single_reel_part(
     """
     clean_url = stream_url.strip()
     if "source_url=" in clean_url:
+        if clean_url.startswith("/fetch"):
+            clean_url = "https://nxly.online" + clean_url
+    elif "hakunaymatata.com" in clean_url or "aoneroom.com" in clean_url:
         import urllib.parse
-        clean_url = urllib.parse.unquote(clean_url.split("source_url=")[-1])
+        clean_url = f"https://nxly.online/fetch?source_url={urllib.parse.quote(clean_url)}"
     elif clean_url.startswith("/fetch"):
         clean_url = "https://nxly.online" + clean_url
 
@@ -375,41 +408,47 @@ async def render_single_reel_part(
 
     print(f"[ReelEngine] Running FFmpeg for {output_mp4_path} from {start_seconds}s for {duration_seconds}s...")
     
-    def _run_sync():
-        return subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    def _run_sync(cmd_to_run):
+        try:
+            return subprocess.run(cmd_to_run, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=240)
+        except subprocess.TimeoutExpired:
+            print("[ReelEngine] FFmpeg process timed out after 240 seconds!")
+            return None
+        except Exception as ex:
+            print(f"[ReelEngine] FFmpeg execution error: {ex}")
+            return None
 
-    res = await asyncio.to_thread(_run_sync)
+    res = await asyncio.to_thread(_run_sync, cmd)
     
-    if res.returncode != 0:
-        err_msg = res.stderr[-800:] if res.stderr else "Unknown error"
+    if res is None or res.returncode != 0:
+        err_msg = res.stderr[-800:] if (res and res.stderr) else "Timeout or Unknown error"
         print(f"[ReelEngine] FFmpeg error: {err_msg}")
-        # Try fallback without audio filter in case audio stream was missing/corrupt
-        if anti_copyright and "afinal" in err_msg:
-            print("[ReelEngine] Retrying with fallback audio filter...")
-            fallback_fc = (
-                "[0:v]scale=360:640:force_original_aspect_ratio=increase,crop=360:640,boxblur=10:1,scale=1080:1920,eq=brightness=-0.15:contrast=1.08[bg];"
-                "[0:v]crop=trunc(in_w*0.94/2)*2:trunc(in_h*0.94/2)*2,scale=1080:-2:flags=bicubic,eq=contrast=1.06:saturation=1.10[fg];"
-                "[bg][fg]overlay=(W-w)/2:(H-h)/2[merged];"
-                "[merged][1:v]overlay=0:0[vfinal]"
-            )
-            fallback_cmd = [
-                get_ffmpeg_path(), "-y", "-nostdin",
-                "-headers", headers_str,
-                "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
-                "-ss", str(start_seconds),
-                "-t", str(duration_seconds),
-                "-i", clean_url,
-                "-loop", "1", "-t", str(duration_seconds), "-i", overlay_png_path,
-                "-filter_complex", fallback_fc,
-                "-map", "[vfinal]", "-map", "0:a?",
-                "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
-                "-c:a", "aac", "-b:a", "128k",
-                "-t", str(duration_seconds), "-movflags", "+faststart",
-                output_mp4_path
-            ]
-            fallback_res = await asyncio.to_thread(lambda: subprocess.run(fallback_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True))
-            if fallback_res.returncode == 0 and os.path.exists(output_mp4_path) and os.path.getsize(output_mp4_path) > 1000:
-                return True
+        # Try fallback without audio filter in case audio stream was missing/corrupt or rate-shifted
+        print("[ReelEngine] Retrying with fallback audio filter...")
+        fallback_fc = (
+            "[0:v]scale=360:640:force_original_aspect_ratio=increase,crop=360:640,boxblur=10:1,scale=1080:1920,eq=brightness=-0.15:contrast=1.08[bg];"
+            "[0:v]crop=trunc(in_w*0.94/2)*2:trunc(in_h*0.94/2)*2,scale=1080:-2:flags=bicubic,eq=contrast=1.06:saturation=1.10[fg];"
+            "[bg][fg]overlay=(W-w)/2:(H-h)/2[merged];"
+            "[merged][1:v]overlay=0:0[vfinal]"
+        )
+        fallback_cmd = [
+            get_ffmpeg_path(), "-y", "-nostdin",
+            "-headers", headers_str,
+            "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
+            "-ss", str(start_seconds),
+            "-t", str(duration_seconds),
+            "-i", clean_url,
+            "-loop", "1", "-t", str(duration_seconds), "-i", overlay_png_path,
+            "-filter_complex", fallback_fc,
+            "-map", "[vfinal]", "-map", "0:a?",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
+            "-c:a", "aac", "-b:a", "128k",
+            "-t", str(duration_seconds), "-movflags", "+faststart",
+            output_mp4_path
+        ]
+        fallback_res = await asyncio.to_thread(_run_sync, fallback_cmd)
+        if fallback_res and fallback_res.returncode == 0 and os.path.exists(output_mp4_path) and os.path.getsize(output_mp4_path) > 1000:
+            return True
         return False
         
     return os.path.exists(output_mp4_path) and os.path.getsize(output_mp4_path) > 1000

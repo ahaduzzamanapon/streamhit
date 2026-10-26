@@ -27,7 +27,8 @@ def load_fb_config() -> Dict[str, Any]:
         "page_token": DEFAULT_PAGE_TOKEN,
         "page_name": "NXLY",
         "auto_pilot_enabled": True,
-        "post_interval_hours": 6,
+        "post_interval_minutes": 10,
+        "post_interval_hours": 0.166,
         "last_post_time": 0,
         "auto_comment_template": "🍿 Watch Full Movie/Show in 1080p HD on NXLY Stream:\n👉 {movie_url}\n\n📲 Download Free Official Android App:\n👉 https://nxly.online/download"
     }
@@ -262,24 +263,46 @@ async def upload_reel_to_facebook(
                 "copyright_blocked": True
             }
 
-        # Phase 5: Wait and post 1st Comment with watch & download links
+        # Phase 5: Wait and post 1st Comment once the Reel is fully published
         comment_id = None
         if comment_text:
-            print("[FacebookBot] Posting auto-comment with links...")
-            try:
-                comment_url = f"https://graph.facebook.com/v19.0/{video_id}/comments"
-                c_resp = await client.post(comment_url, data={
-                    "access_token": page_token,
-                    "message": comment_text
-                })
-                c_data = c_resp.json()
-                if "id" in c_data:
-                    comment_id = c_data["id"]
-                    print(f"[FacebookBot] Auto-comment posted: {comment_id}")
-                else:
-                    print(f"[FacebookBot] Comment note: {c_data}")
-            except Exception as ce:
-                print(f"[FacebookBot] Comment exception: {ce}")
+            print(f"[FacebookBot] Waiting for Reel {video_id} to finish processing before posting auto-comment...")
+            # Try for up to 90 seconds (15 attempts * 6 seconds) to ensure video is ready for comments
+            for comment_attempt in range(15):
+                await asyncio.sleep(6)
+                try:
+                    # Attempt 1: Post to /{video_id}/comments
+                    c_resp = await client.post(
+                        f"https://graph.facebook.com/v19.0/{video_id}/comments",
+                        data={"access_token": page_token, "message": comment_text}
+                    )
+                    c_data = c_resp.json()
+                    if "id" in c_data:
+                        comment_id = c_data["id"]
+                        print(f"[FacebookBot] ✅ Auto-comment successfully posted on video {video_id}: {comment_id}")
+                        break
+                    
+                    err_msg = c_data.get("error", {}).get("message", "")
+                    print(f"[FacebookBot] Comment attempt {comment_attempt+1} note: {err_msg or c_data}")
+
+                    # Attempt 2: Post to /{page_id}_{video_id}/comments (feed post ID)
+                    fb_post_id = f"{page_id}_{video_id}"
+                    c_resp2 = await client.post(
+                        f"https://graph.facebook.com/v19.0/{fb_post_id}/comments",
+                        data={"access_token": page_token, "message": comment_text}
+                    )
+                    c_data2 = c_resp2.json()
+                    if "id" in c_data2:
+                        comment_id = c_data2["id"]
+                        print(f"[FacebookBot] ✅ Auto-comment successfully posted on post {fb_post_id}: {comment_id}")
+                        break
+
+                    # If token is invalid or expired, stop immediately and log
+                    if c_data.get("error", {}).get("code") == 190:
+                        print(f"[FacebookBot] ❌ Token expired or invalid! Cannot comment: {err_msg}")
+                        break
+                except Exception as ce:
+                    print(f"[FacebookBot] Comment attempt {comment_attempt+1} exception: {ce}")
 
         return {
             "success": True,
@@ -398,8 +421,8 @@ async def trigger_auto_trending_reel(custom_title: Optional[str] = None, custom_
     target_title = ""
     subject_id = ""
 
-    # Try candidates until one renders successfully
-    for candidate in candidates[:6]:
+    # Try candidates until one renders successfully (try up to 12 candidates)
+    for candidate in candidates[:12]:
         target_title = candidate["title"]
         subject_id = candidate.get("subject_id", "")
         detail_path = candidate.get("detail_path", "")
@@ -417,17 +440,20 @@ async def trigger_auto_trending_reel(custom_title: Optional[str] = None, custom_
         stream_candidates = []
         for r_item in res_list:
             u = r_item.get("url") or r_item.get("resourceLink") or ""
+            # Preserve /fetch proxy routing so Cloudflare/CDN rate limits are bypassed
             if "source_url=" in u:
+                if u.startswith("/fetch"):
+                    u = "https://nxly.online" + u
+            elif "hakunaymatata.com" in u or "aoneroom.com" in u:
                 import urllib.parse
-                u = urllib.parse.unquote(u.split("source_url=")[-1])
+                u = f"https://nxly.online/fetch?source_url={urllib.parse.quote(u)}"
+            elif u.startswith("/fetch"):
+                u = "https://nxly.online" + u
             if u and u not in stream_candidates:
                 stream_candidates.append(u)
 
         if not stream_candidates:
             continue
-
-        # Prioritize reliable H.264 streams over rate-limited H.265 CDN streams
-        stream_candidates.sort(key=lambda u: (1 if "h265" in u.lower() else 0, 0 if "vegamovies" in u.lower() else 1))
 
         slug = "".join(c for c in target_title if c.isalnum() or c in (" ", "_")).strip().replace(" ", "_")[:25]
         timestamp = int(time.time())
@@ -447,12 +473,12 @@ async def trigger_auto_trending_reel(custom_title: Optional[str] = None, custom_
 
         is_tv = (candidate.get("subject_type") == 2)
         if is_tv:
-            start_seconds = random.randint(720, 1320)
+            start_seconds = random.randint(600, 1200)
         else:
-            start_seconds = random.randint(1800, 3000)
-        duration_seconds = 120
+            start_seconds = random.randint(1200, 2400)
+        duration_seconds = 75  # 1m 15s optimal high-retention reel duration
         min_label = f"{start_seconds // 60}:{start_seconds % 60:02d}"
-        print(f"[FacebookBot] Attempting 2-minute (120s) reel for '{target_title}' starting at {min_label} ({start_seconds}s)...")
+        print(f"[FacebookBot] Attempting {duration_seconds}s reel for '{target_title}' starting at {min_label} ({start_seconds}s)...")
 
         for s_url in stream_candidates:
             print(f"[FacebookBot] Slicing from stream: {s_url[:80]}...")
@@ -465,7 +491,7 @@ async def trigger_auto_trending_reel(custom_title: Optional[str] = None, custom_
                 anti_copyright=True
             )
             if success and os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
-                print(f"[FacebookBot] Successfully rendered 2m reel with stream: {s_url[:60]}")
+                print(f"[FacebookBot] Successfully rendered reel with stream: {s_url[:60]}")
                 break
 
         if os.path.exists(overlay_path):
@@ -603,10 +629,10 @@ async def cleanup_copyrighted_videos():
 
 # Background auto-pilot scheduler loop
 async def fb_auto_pilot_loop():
-    print("[FacebookBot] Auto-Pilot background daemon initialized.")
+    print("[FacebookBot] Auto-Pilot background daemon initialized (10-minute cycle).")
     while True:
         try:
-            await asyncio.sleep(120) # check every 2 mins
+            await asyncio.sleep(30)  # check every 30s
             cfg = load_fb_config()
             
             # Periodically scan and clean up any newly claimed videos
@@ -615,13 +641,25 @@ async def fb_auto_pilot_loop():
             if not cfg.get("auto_pilot_enabled", False):
                 continue
 
-            interval_sec = int(cfg.get("post_interval_hours", 6)) * 3600
+            interval_mins = cfg.get("post_interval_minutes")
+            if interval_mins is not None:
+                interval_sec = max(60, int(interval_mins) * 60)
+            else:
+                interval_sec = int(cfg.get("post_interval_hours", 0.166) * 3600)
+                if interval_sec <= 0:
+                    interval_sec = 600
+
             now = int(time.time())
             last_post = int(cfg.get("last_post_time", 0))
 
             if now - last_post >= interval_sec:
-                print("[FacebookBot] Triggering scheduled Auto-Pilot Reel...")
-                await trigger_auto_trending_reel()
+                print(f"[FacebookBot] Triggering scheduled Auto-Pilot Reel (Interval: {interval_sec // 60}m)...")
+                res = await trigger_auto_trending_reel()
+                if not res.get("success"):
+                    print(f"[FacebookBot] Scheduled reel attempt failed: {res.get('error')}. Retrying in 90s...")
+                    # Set last_post so next retry happens in 90s instead of waiting a full cycle
+                    cfg["last_post_time"] = now - interval_sec + 90
+                    save_fb_config(cfg)
         except Exception as e:
             print(f"[FacebookBot] Auto-pilot loop error: {e}")
-            await asyncio.sleep(60)
+            await asyncio.sleep(30)

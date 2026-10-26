@@ -850,6 +850,13 @@ async def admin_reels_active_job(request: Request):
         "job": job
     }
 
+@router.post("/api/admin/reels/cancel-job")
+async def admin_reels_cancel_job(request: Request):
+    check_admin_auth(request)
+    rg = _get_reel_generator()
+    res = rg.cancel_all_active_jobs()
+    return res
+
 @router.get("/api/admin/reels/job-status")
 async def admin_reels_job_status(request: Request, job_id: str):
     check_admin_auth(request)
@@ -1098,7 +1105,8 @@ async def admin_facebook_get_config(request: Request):
             "masked_token": masked_token,
             "app_id": cfg.get("app_id", ""),
             "auto_pilot_enabled": cfg.get("auto_pilot_enabled", True),
-            "post_interval_hours": cfg.get("post_interval_hours", 6),
+            "post_interval_minutes": cfg.get("post_interval_minutes", 10),
+            "post_interval_hours": cfg.get("post_interval_hours", 0.166),
             "last_post_time": cfg.get("last_post_time", 0),
             "auto_comment_template": cfg.get("auto_comment_template", "")
         },
@@ -1116,8 +1124,12 @@ async def admin_facebook_save_config(data: dict, request: Request):
         cfg["page_token"] = str(data["page_token"]).strip()
     if "auto_pilot_enabled" in data:
         cfg["auto_pilot_enabled"] = bool(data["auto_pilot_enabled"])
-    if "post_interval_hours" in data:
-        cfg["post_interval_hours"] = max(1, int(data["post_interval_hours"]))
+    if "post_interval_minutes" in data:
+        cfg["post_interval_minutes"] = max(1, int(data["post_interval_minutes"]))
+        cfg["post_interval_hours"] = round(cfg["post_interval_minutes"] / 60, 2)
+    elif "post_interval_hours" in data:
+        cfg["post_interval_hours"] = max(0.1, float(data["post_interval_hours"]))
+        cfg["post_interval_minutes"] = max(1, int(cfg["post_interval_hours"] * 60))
     if "auto_comment_template" in data:
         cfg["auto_comment_template"] = str(data["auto_comment_template"])
 
