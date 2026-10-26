@@ -2943,6 +2943,85 @@ async def serve_data_deletion():
             return HTMLResponse(content=f.read())
     raise HTTPException(status_code=404, detail="Data deletion page not found")
 
+@app.get("/fb-callback", response_class=HTMLResponse)
+@app.get("/fb-callback.html", response_class=HTMLResponse)
+async def serve_fb_callback():
+    path = os.path.join(base_dir, "public", "fb-callback.html")
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    raise HTTPException(status_code=404, detail="Callback page not found")
+
+@app.post("/api/facebook/exchange-user-token")
+async def exchange_facebook_user_token(request: Request):
+    try:
+        body = await request.json()
+        user_token = body.get("user_token", "").strip()
+        if not user_token:
+            raise HTTPException(status_code=400, detail="Missing user_token")
+        
+        import facebook_bot
+        import requests
+        cfg = facebook_bot.load_fb_config()
+        app_id = cfg.get("app_id") or "1814477826460376"
+        app_secret = cfg.get("app_secret") or "d20b3446cb2fc0c2b099aa5af16db89e"
+        
+        # 1. Exchange for long-lived user token
+        exchange_url = "https://graph.facebook.com/v19.0/oauth/access_token"
+        r = requests.get(exchange_url, params={
+            "grant_type": "fb_exchange_token",
+            "client_id": app_id,
+            "client_secret": app_secret,
+            "fb_exchange_token": user_token
+        }, timeout=15)
+        ex_data = r.json()
+        long_lived_user_token = ex_data.get("access_token") or user_token
+        
+        # 2. Fetch Page Accounts
+        acc_url = "https://graph.facebook.com/v19.0/me/accounts"
+        r_acc = requests.get(acc_url, params={
+            "access_token": long_lived_user_token
+        }, timeout=15)
+        acc_data = r_acc.json()
+        pages = acc_data.get("data", [])
+        
+        target_page = None
+        target_page_id = cfg.get("page_id") or "1367186939808744"
+        for p in pages:
+            if str(p.get("id")) == str(target_page_id) or p.get("name", "").lower() == "nxly":
+                target_page = p
+                break
+        
+        if not target_page and pages:
+            target_page = pages[0]
+            
+        if not target_page:
+            return JSONResponse({
+                "success": False,
+                "detail": "No Facebook Pages found for this user. Ensure NXLY page is linked."
+            }, status_code=400)
+            
+        page_token = target_page.get("access_token")
+        page_name = target_page.get("name")
+        page_id = target_page.get("id")
+        
+        cfg["page_token"] = page_token
+        cfg["page_id"] = page_id
+        cfg["page_name"] = page_name
+        cfg["user_token"] = long_lived_user_token
+        cfg["app_id"] = app_id
+        cfg["app_secret"] = app_secret
+        facebook_bot.save_fb_config(cfg)
+        
+        facebook_bot.bot_log(f"[Auth] 🔑 Successfully connected Page: {page_name} ({page_id}) with permanent token!")
+        return {
+            "success": True,
+            "page_name": page_name,
+            "page_id": page_id
+        }
+    except Exception as e:
+        return JSONResponse({"success": False, "detail": str(e)}, status_code=500)
+
 @app.api_route("/api/facebook/data-deletion", methods=["GET", "POST"])
 async def facebook_data_deletion_callback(request: Request):
     """

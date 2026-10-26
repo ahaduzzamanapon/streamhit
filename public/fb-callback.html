@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facebook Authorization — NXLY Stream</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon-nxly.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-body: #07090e;
+            --bg-card: rgba(18, 22, 34, 0.85);
+            --border-card: rgba(255, 255, 255, 0.1);
+            --primary: #1877f2;
+            --primary-glow: rgba(24, 119, 242, 0.4);
+            --success: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.35);
+            --accent-cyan: #00e5ff;
+            --text-main: #f0f3fa;
+            --text-muted: #94a3b8;
+            --font-display: 'Outfit', sans-serif;
+            --font-body: 'Plus Jakarta Sans', sans-serif;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            font-family: var(--font-body);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background-image: 
+                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(24, 119, 242, 0.2), transparent),
+                radial-gradient(circle at 80% 80%, rgba(0, 229, 255, 0.08), transparent);
+        }
+        .container {
+            max-width: 680px;
+            width: 100%;
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: 20px;
+            padding: 40px 32px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(16px);
+            text-align: center;
+        }
+        .icon-badge {
+            width: 76px;
+            height: 76px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(24, 119, 242, 0.2), rgba(0, 229, 255, 0.15));
+            border: 1px solid var(--primary-glow);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            color: var(--primary);
+            margin-bottom: 24px;
+            box-shadow: 0 0 30px var(--primary-glow);
+        }
+        .icon-badge.success {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(0, 229, 255, 0.15));
+            border-color: var(--success-glow);
+            color: var(--success);
+            box-shadow: 0 0 30px var(--success-glow);
+        }
+        h1 {
+            font-family: var(--font-display);
+            font-size: 26px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #fff;
+        }
+        p {
+            color: var(--text-muted);
+            font-size: 15px;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+        .token-box {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-card);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: left;
+            margin-bottom: 24px;
+            position: relative;
+        }
+        .token-box label {
+            display: block;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .token-input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: var(--accent-cyan);
+            font-family: monospace;
+            font-size: 13px;
+            resize: none;
+            outline: none;
+            word-break: break-all;
+        }
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #1877f2, #0d62d9);
+            color: #fff;
+            box-shadow: 0 4px 18px rgba(24, 119, 242, 0.4);
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 22px rgba(24, 119, 242, 0.5);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: #fff;
+            box-shadow: 0 4px 18px rgba(16, 185, 129, 0.4);
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .status-loading { background: rgba(0, 229, 255, 0.15); color: var(--accent-cyan); border: 1px solid rgba(0, 229, 255, 0.3); }
+        .status-success { background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); }
+        .status-error { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="iconBadge" class="icon-badge">
+            <i class="fab fa-facebook-f"></i>
+        </div>
+        <h1 id="title">Connecting to Facebook...</h1>
+        <div id="statusBadge" class="status-badge status-loading">Reading Authorization Data...</div>
+        <p id="description">Please wait while we receive your Facebook access credentials.</p>
+
+        <div id="tokenSection" class="token-box" style="display: none;">
+            <label>Facebook Access Token</label>
+            <textarea id="tokenText" class="token-input" rows="4" readonly></textarea>
+        </div>
+
+        <div class="btn-group">
+            <button id="copyBtn" class="btn btn-primary" style="display: none;" onclick="copyToken()">
+                <i class="fas fa-copy"></i> Copy Token
+            </button>
+            <a href="/admin" class="btn btn-success" style="display: none;" id="adminBtn">
+                <i class="fas fa-arrow-right"></i> Open Bot Admin
+            </a>
+        </div>
+    </div>
+
+    <script>
+        function parseHashParams() {
+            var hash = window.location.hash.substring(1);
+            var params = {};
+            if (!hash) {
+                var search = window.location.search.substring(1);
+                if (search) hash = search;
+            }
+            if (hash) {
+                var pairs = hash.split('&');
+                for (var i = 0; i < pairs.length; i++) {
+                    var parts = pairs[i].split('=');
+                    params[decodeURIComponent(parts[0])] = decodeURIComponent(parts[1] || '');
+                }
+            }
+            return params;
+        }
+
+        async function processToken() {
+            var params = parseHashParams();
+            var token = params['access_token'];
+            var error = params['error'] || params['error_description'];
+
+            var titleEl = document.getElementById('title');
+            var descEl = document.getElementById('description');
+            var statusEl = document.getElementById('statusBadge');
+            var iconEl = document.getElementById('iconBadge');
+            var tokenSection = document.getElementById('tokenSection');
+            var tokenText = document.getElementById('tokenText');
+            var copyBtn = document.getElementById('copyBtn');
+            var adminBtn = document.getElementById('adminBtn');
+
+            if (error) {
+                titleEl.textContent = 'Authorization Error';
+                statusEl.className = 'status-badge status-error';
+                statusEl.textContent = 'Failed';
+                descEl.textContent = error;
+                return;
+            }
+
+            if (!token) {
+                titleEl.textContent = 'No Access Token Detected';
+                statusEl.className = 'status-badge status-error';
+                statusEl.textContent = 'Missing Token';
+                descEl.textContent = 'The URL did not contain an access token. Please trigger the login dialog again.';
+                return;
+            }
+
+            // Display token
+            tokenSection.style.display = 'block';
+            tokenText.value = token;
+            copyBtn.style.display = 'inline-flex';
+
+            statusEl.className = 'status-badge status-loading';
+            statusEl.textContent = 'Configuring NXLY Page Access...';
+            descEl.textContent = 'Exchanging token for a permanent Page Token and saving configuration...';
+
+            try {
+                var res = await fetch('/api/facebook/exchange-user-token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_token: token })
+                });
+                var data = await res.json();
+                if (res.ok && data.success) {
+                    iconEl.className = 'icon-badge success';
+                    iconEl.innerHTML = '<i class="fas fa-check"></i>';
+                    titleEl.textContent = 'Facebook Connected Successfully!';
+                    statusEl.className = 'status-badge status-success';
+                    statusEl.textContent = 'Page Token Active';
+                    descEl.innerHTML = 'Successfully connected to Facebook Page: <strong>' + (data.page_name || 'NXLY') + '</strong>! Your bot is ready for 100% public posting.';
+                    adminBtn.style.display = 'inline-flex';
+                } else {
+                    statusEl.className = 'status-badge status-error';
+                    statusEl.textContent = 'Auto-Save Issue';
+                    descEl.textContent = (data.detail || data.error || 'Could not auto-save token.') + ' You can still copy the token below and send it.';
+                }
+            } catch (err) {
+                statusEl.className = 'status-badge status-success';
+                statusEl.textContent = 'Token Ready';
+                descEl.textContent = 'Copy the token below and paste it in chat.';
+            }
+        }
+
+        function copyToken() {
+            var tokenText = document.getElementById('tokenText');
+            tokenText.select();
+            tokenText.setSelectionRange(0, 99999);
+            navigator.clipboard.writeText(tokenText.value).then(function() {
+                var btn = document.getElementById('copyBtn');
+                btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                setTimeout(function() {
+                    btn.innerHTML = '<i class="fas fa-copy"></i> Copy Token';
+                }, 2500);
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', processToken);
+    </script>
+</body>
+</html>
