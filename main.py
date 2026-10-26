@@ -1002,12 +1002,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 # ── Active User Tracking ───────────────────────────────────────────────────
 import sqlite3
 
-_ACTIVE_DB_PATH = "/tmp/streamhit_active_users.db"
-try:
-    if not os.path.exists("/tmp") or not os.access("/tmp", os.W_OK):
-        _ACTIVE_DB_PATH = os.path.join(base_dir, "active_users.db")
-except Exception:
-    _ACTIVE_DB_PATH = os.path.join(base_dir, "active_users.db")
+_ACTIVE_DB_PATH = os.path.join(base_dir, "active_users.db")
 
 import datetime
 

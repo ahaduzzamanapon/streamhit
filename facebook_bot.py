@@ -188,21 +188,39 @@ async def exchange_for_permanent_page_token(
             return {"success": False, "error": p_data["error"].get("message", "Page token fetch failed")}
 
         permanent_page_token = p_data.get("access_token")
+        page_name = p_data.get("name", "NXLY")
+
         if not permanent_page_token:
-            return {"success": False, "error": f"No page token returned for Page ID {target_page_id}. Ensure you are an Admin of this Page."}
+            # Fallback: check /me/accounts with the long-lived user token
+            try:
+                acc_resp = await client.get("https://graph.facebook.com/v19.0/me/accounts", params={
+                    "access_token": long_lived_user_token
+                })
+                acc_data = acc_resp.json()
+                for acc in acc_data.get("data", []):
+                    if str(acc.get("id")) == str(target_page_id) or not target_page_id:
+                        permanent_page_token = acc.get("access_token")
+                        page_name = acc.get("name", page_name)
+                        target_page_id = str(acc.get("id"))
+                        break
+            except Exception:
+                pass
+
+        if not permanent_page_token:
+            return {"success": False, "error": f"No page token returned for Page ID {target_page_id}. Ensure you are an Admin of this Page and granted 'pages_manage_posts' permission."}
 
         # Save to config automatically
         cfg["page_token"] = permanent_page_token
         cfg["app_id"] = app_id.strip()
         cfg["app_secret"] = app_secret.strip()
         cfg["page_id"] = target_page_id
-        cfg["page_name"] = p_data.get("name", "NXLY")
+        cfg["page_name"] = page_name
         save_fb_config(cfg)
 
         return {
             "success": True,
-            "message": f"Successfully generated & saved Permanent Never-Expiring Page Token for '{p_data.get('name')}'!",
-            "page_name": p_data.get("name"),
+            "message": f"Successfully generated & saved Permanent Never-Expiring Page Token for '{page_name}'!",
+            "page_name": page_name,
             "token_preview": permanent_page_token[:15] + "..." + permanent_page_token[-10:]
         }
 

@@ -33,7 +33,6 @@ jobs:
             touch tmp/restart.txt
             chmod +x streamhitupdate.sh
             ./streamhitupdate.sh || true
-            rm -f /tmp/streamhit_active_users.db* ~/active_users.db* ~/streamhit.lc-synergy.ltd/active_users.db* 2>/dev/null || true
 
             echo "=== 2. Finding all other Python/Passenger apps (including nxly.online) ==="
             find ~ -maxdepth 3 \( -name "main.py" -o -name "passenger_wsgi.py" \) 2>/dev/null | while read -r filepath; do

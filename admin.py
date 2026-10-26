@@ -1269,6 +1269,45 @@ async def admin_facebook_exchange_token(data: dict, request: Request):
         raise HTTPException(status_code=400, detail=res.get("error", "Token exchange failed"))
     return {"code": 0, "success": True, "message": res.get("message"), "token_preview": res.get("token_preview")}
 
+@router.post("/api/admin/facebook/test-connection")
+async def admin_facebook_test_connection(data: dict, request: Request):
+    check_admin_auth(request)
+    import facebook_bot
+    cfg = facebook_bot.load_fb_config()
+    page_id = (data.get("page_id") or cfg.get("page_id", facebook_bot.DEFAULT_PAGE_ID)).strip()
+    page_token = (data.get("page_token") or cfg.get("page_token", "")).strip()
+
+    if not page_id or not page_token:
+        return {"code": 400, "success": False, "error": "Both Facebook Page ID and Access Token are required to test connection."}
+
+    async with httpx.AsyncClient(timeout=12.0) as client:
+        try:
+            resp = await client.get(f"https://graph.facebook.com/v19.0/{page_id}?fields=id,name,link,is_published&access_token={page_token}")
+            p_data = resp.json()
+            if "error" in p_data:
+                err = p_data["error"]
+                msg = err.get("message", "Token validation failed")
+                code = err.get("code")
+                return {
+                    "code": 400,
+                    "success": False,
+                    "error_code": code,
+                    "error": msg,
+                    "is_expired": code == 190 or "expired" in msg.lower()
+                }
+
+            page_name = p_data.get("name", "NXLY")
+            return {
+                "code": 0,
+                "success": True,
+                "page_name": page_name,
+                "page_id": p_data.get("id"),
+                "link": p_data.get("link", f"https://www.facebook.com/{page_id}"),
+                "message": f"Successfully connected to Facebook Page '{page_name}' (ID: {page_id})! Token is valid and ready to publish."
+            }
+        except Exception as e:
+            return {"code": 500, "success": False, "error": f"Network error testing connection: {e}"}
+
 @router.post("/api/admin/facebook/post-poster")
 async def admin_facebook_post_poster(request: Request):
     check_admin_auth(request)

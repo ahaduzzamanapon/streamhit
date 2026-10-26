@@ -1683,14 +1683,18 @@
 
             <!-- FACEBOOK TAB -->
             <div id="platPane-fb" class="plat-settings-pane">
-                <div style="background:rgba(24,119,242,0.08); border:1px solid rgba(24,119,242,0.25); border-radius:var(--radius-sm); padding:14px; margin-bottom:16px; font-size:12.5px; line-height:1.6; color:#fff;">
-                    <strong>📖 How to Connect Facebook Page:</strong>
-                    <ol style="margin:6px 0 0 18px; padding:0;">
-                        <li>Open <a href="https://developers.facebook.com/tools/explorer" target="_blank" style="color:var(--accent-cyan);">Meta Graph API Explorer ↗</a></li>
-                        <li>Select your Facebook App, choose your Page under <strong>User or Page</strong>, and grant <code>pages_manage_posts</code>, <code>pages_show_list</code>.</li>
-                        <li>Copy the generated Token and paste Page ID & Token below.</li>
-                    </ol>
+                <!-- Live Connection Status Box -->
+                <div id="fbConnectionStatusBar" style="background:#0F172A; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:12px 16px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <span id="fbLiveDot" style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#10B981;"></span>
+                        <div>
+                            <div id="fbLiveStatusTitle" style="font-size:13px; font-weight:700; color:#fff;">Facebook Page Status: Checking...</div>
+                            <div id="fbLiveStatusSub" style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">Verifying Page Token with Meta Graph API</div>
+                        </div>
+                    </div>
+                    <button type="button" id="btnTestFbConn" class="btn-secondary" style="font-size:11.5px; padding:6px 12px;" onclick="testFacebookConnectionLive()">⚡ Test Connection</button>
                 </div>
+
                 <form onsubmit="handleSaveFacebookConfig(event)">
                     <div class="form-grid">
                         <div class="form-group">
@@ -1703,7 +1707,10 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label>Permanent Page Access Token</label>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <label style="margin:0;">Page Access Token</label>
+                            <a href="javascript:void(0)" onclick="togglePasswordVisibility('fbPageToken')" style="font-size:11px; color:#60A5FA; text-decoration:underline;">Show/Hide Token</a>
+                        </div>
                         <input type="password" id="fbPageToken" class="form-control" placeholder="EAA...">
                     </div>
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">
@@ -1714,6 +1721,45 @@
                         <button type="submit" class="btn-primary" style="background:#1877F2; color:#fff;">💾 Save Facebook Credentials</button>
                     </div>
                 </form>
+
+                <!-- 🔑 PERMANENT (NEVER-EXPIRING) TOKEN GENERATOR TOOL -->
+                <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:16px; margin-top:22px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <h3 style="font-size:13.5px; font-weight:700; color:#60A5FA; display:flex; align-items:center; gap:6px; margin:0;">
+                            <span>🔑</span> Permanent (Never-Expiring) Page Token Generator
+                        </h3>
+                        <span class="badge-pill" style="background:rgba(96,165,250,0.15); color:#60A5FA; font-size:10.5px;">Meta Official Tool</span>
+                    </div>
+                    <div style="font-size:12px; color:var(--text-muted); line-height:1.6; margin-bottom:12px;">
+                        Convert your short-lived Meta user token into a Page Access Token that <strong>NEVER EXPIRES</strong> (আজীবনের জন্য ভ্যালিড):
+                        <ol style="margin:6px 0 0 16px; padding:0; color:#CBD5E1;">
+                            <li>Open <a href="https://developers.facebook.com/apps" target="_blank" style="color:var(--accent-cyan); text-decoration:underline;">Meta Developers Apps ↗</a> &gt; Select App &gt; <strong>App settings &gt; Basic</strong>. Copy <strong>App ID</strong> &amp; <strong>App Secret</strong>.</li>
+                            <li>Open <a href="https://developers.facebook.com/tools/explorer" target="_blank" style="color:var(--accent-cyan); text-decoration:underline;">Graph API Explorer ↗</a> &gt; Generate User Token with <code>pages_show_list, pages_manage_posts</code>.</li>
+                            <li>Paste them below and click <strong>Exchange for Permanent Token</strong>. Meta will generate &amp; save it automatically!</li>
+                        </ol>
+                    </div>
+                    <form onsubmit="handleExchangePermanentToken(event)">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Facebook App ID</label>
+                                <input type="text" id="fbExchangeAppId" class="form-control" placeholder="1654390072739197">
+                            </div>
+                            <div class="form-group">
+                                <label>Facebook App Secret</label>
+                                <input type="password" id="fbExchangeAppSecret" class="form-control" placeholder="d9ec6c6b...">
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-top:10px;">
+                            <label>User Token from Graph API Explorer</label>
+                            <input type="password" id="fbExchangeUserToken" class="form-control" placeholder="EAAXgq...">
+                        </div>
+                        <div style="margin-top:12px; display:flex; justify-content:flex-end;">
+                            <button type="submit" id="btnExchangeToken" class="btn-primary" style="background:linear-gradient(135deg, #2563EB, #1D4ED8); font-size:12.5px; padding:8px 16px;">
+                                🚀 Exchange &amp; Save Permanent Token
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
 
             <!-- YOUTUBE TAB -->
@@ -3594,14 +3640,119 @@
             switchPlatTab(tabKey);
         }
 
+        function togglePasswordVisibility(inputId) {
+            const el = document.getElementById(inputId);
+            if (el) {
+                el.type = el.type === 'password' ? 'text' : 'password';
+            }
+        }
+
+        async function testFacebookConnectionLive(silent = false) {
+            const btn = document.getElementById('btnTestFbConn');
+            const dot = document.getElementById('fbLiveDot');
+            const titleEl = document.getElementById('fbLiveStatusTitle');
+            const subEl = document.getElementById('fbLiveStatusSub');
+            if (btn && !silent) { btn.disabled = true; btn.innerText = '⚡ Testing...'; }
+            if (titleEl) titleEl.innerText = 'Testing connection with Meta Graph API...';
+
+            const pageId = document.getElementById('fbPageId')?.value?.trim();
+            const pageToken = document.getElementById('fbPageToken')?.value?.trim();
+
+            try {
+                const res = await fetch('/api/admin/facebook/test-connection', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ page_id: pageId, page_token: pageToken })
+                });
+                const d = await res.json();
+                if (d.success) {
+                    if (dot) dot.style.background = '#10B981';
+                    if (titleEl) {
+                        titleEl.innerText = `Connected: ${d.page_name} (ID: ${d.page_id})`;
+                        titleEl.style.color = '#10B981';
+                    }
+                    if (subEl) subEl.innerText = 'Permanent Page Access Token is valid, active, and ready!';
+                    if (!silent) showToast(`✅ Connected to Facebook Page: ${d.page_name}!`);
+                } else {
+                    if (dot) dot.style.background = '#EF4444';
+                    if (titleEl) {
+                        titleEl.innerText = d.is_expired ? '❌ Token Expired (Action Required)' : '❌ Connection Failed';
+                        titleEl.style.color = '#EF4444';
+                    }
+                    if (subEl) subEl.innerText = d.error || 'Token invalid or expired';
+                    if (!silent) alert(`Facebook Connection Check Failed:\n\n${d.error}\n\nPlease generate a permanent token using the tool below.`);
+                }
+            } catch(e) {
+                if (titleEl) titleEl.innerText = 'Connection test network error';
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerText = '⚡ Test Connection'; }
+                fetchPlatformStatuses();
+            }
+        }
+
+        async function handleExchangePermanentToken(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btnExchangeToken');
+            const appId = document.getElementById('fbExchangeAppId')?.value?.trim();
+            const appSecret = document.getElementById('fbExchangeAppSecret')?.value?.trim();
+            const userToken = document.getElementById('fbExchangeUserToken')?.value?.trim();
+            const pageId = document.getElementById('fbPageId')?.value?.trim();
+
+            if (!appId || !appSecret || !userToken) {
+                alert('Please fill in Facebook App ID, App Secret, and User Token.');
+                return;
+            }
+
+            if (btn) { btn.disabled = true; btn.innerText = '🚀 Exchanging with Meta...'; }
+
+            try {
+                const res = await fetch('/api/admin/facebook/exchange-token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({
+                        app_id: appId,
+                        app_secret: appSecret,
+                        token: userToken,
+                        page_id: pageId
+                    })
+                });
+                const d = await res.json();
+                if (d.code === 0 && d.success) {
+                    showToast(d.message || 'Permanent token generated & saved!');
+                    alert(`🎉 SUCCESS!\n\n${d.message}\nToken Preview: ${d.token_preview}\n\nYour Page Token is now permanent and will NEVER EXPIRE!`);
+                    loadPlatformSettingsValues();
+                    fetchPlatformStatuses();
+                } else {
+                    alert('Token Exchange Failed:\n\n' + (d.detail || d.error || 'Unknown error'));
+                }
+            } catch(err) {
+                alert('Token exchange network error: ' + err);
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerText = '🚀 Exchange & Save Permanent Token'; }
+            }
+        }
+
         async function loadPlatformSettingsValues() {
             try {
                 const fbRes = await fetch('/api/admin/facebook/config', { headers: { 'Authorization': `Bearer ${token}` } });
                 const fbData = await fbRes.json();
                 if (fbData.code === 0 && fbData.config) {
-                    document.getElementById('fbPageId').value = fbData.config.page_id || '';
-                    document.getElementById('fbIntervalMinutes').value = fbData.config.post_interval_minutes || 10;
-                    document.getElementById('fbAutoPilotToggle').checked = fbData.config.auto_pilot_enabled !== false;
+                    const c = fbData.config;
+                    document.getElementById('fbPageId').value = c.page_id || '';
+                    document.getElementById('fbIntervalMinutes').value = c.post_interval_minutes || 10;
+                    document.getElementById('fbAutoPilotToggle').checked = c.auto_pilot_enabled !== false;
+                    if (c.page_token) {
+                        document.getElementById('fbPageToken').value = c.page_token;
+                    }
+                    if (c.app_id) {
+                        const el = document.getElementById('fbExchangeAppId');
+                        if (el) el.value = c.app_id;
+                    }
+                    if (c.app_secret) {
+                        const el = document.getElementById('fbExchangeAppSecret');
+                        if (el) el.value = c.app_secret;
+                    }
+                    testFacebookConnectionLive(true);
                 }
                 const ytRes = await fetch('/api/admin/youtube/config', { headers: { 'Authorization': `Bearer ${token}` } });
                 const ytData = await ytRes.json();

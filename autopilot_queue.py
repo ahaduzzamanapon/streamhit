@@ -45,6 +45,25 @@ def load_queue_data() -> Dict[str, Any]:
                             j["total_planned_parts"] = 374 * int(j.get("parts_per_episode") or 3)
                         elif j.get("total_planned_parts", 0) <= 3 and j.get("total_episodes_in_season", 0) > 1:
                             j["total_planned_parts"] = j["total_episodes_in_season"] * int(j.get("parts_per_episode") or 3)
+
+                    # Auto-recovery: If job has unposted history items (fb_url is None), move them to pending_uploads
+                    unposted = [h for h in j.get("history", []) if not h.get("fb_url") and not h.get("yt_url")]
+                    if unposted and not j.get("pending_uploads"):
+                        p_list = []
+                        for u in unposted:
+                            p_list.append({
+                                "part_label": u.get("part_label"),
+                                "video_filename": u.get("video_filename"),
+                                "caption": f"🍿 Watch {j.get('title')} - {u.get('part_label')} on NXLY Stream!\n\n👉 Full details in 1st comment below.",
+                                "comment_text": "🔍 Google Search: NXLY Stream\n🍿 Watch in 1080p HD: https://nxly.online",
+                                "file_size_mb": u.get("file_size_mb", 0),
+                                "status": "waiting_upload"
+                            })
+                        j["pending_uploads"] = p_list
+                        j["history"] = [h for h in j.get("history", []) if h.get("fb_url") or h.get("yt_url")]
+                        j["completed_parts_count"] = len(j["history"])
+                        j["current_part"] = 1
+                        j["status"] = "waiting_upload"
                 return d
         except Exception:
             pass
@@ -664,6 +683,54 @@ def get_publishing_calendar() -> List[Dict[str, Any]]:
 
     return timeline
 
+def advance_job_progression(active_job: Dict[str, Any], is_series: bool, data: Dict[str, Any], active_idx: int, now_str: str) -> bool:
+    from facebook_bot import bot_log
+    title = active_job.get("title", "Unknown Title")
+    job_finished = False
+
+    if is_series:
+        active_job["current_part"] += 1
+        if active_job["current_part"] > active_job.get("parts_per_episode", 3):
+            active_job["current_part"] = 1
+            active_job["current_episode"] += 1
+            bot_log(f"[AutoPilot] 📌 '{title}' completed episode! Advancing to Episode {active_job['current_episode']}.")
+
+            s_map = active_job.get("season_episodes_map") or {}
+            total_eps_this_season = s_map.get(str(active_job["current_season"]), active_job.get("total_episodes_in_season", 10))
+
+            if active_job["current_episode"] > total_eps_this_season:
+                seasons = active_job.get("seasons") or [1]
+                try:
+                    curr_s_idx = seasons.index(active_job["current_season"])
+                except ValueError:
+                    curr_s_idx = -1
+
+                if curr_s_idx != -1 and curr_s_idx + 1 < len(seasons):
+                    next_season = seasons[curr_s_idx + 1]
+                    active_job["current_season"] = next_season
+                    active_job["current_episode"] = 1
+                    active_job["total_episodes_in_season"] = s_map.get(str(next_season), 10)
+                    bot_log(f"[AutoPilot] 🌟 '{title}' advanced to Season {next_season} (Episodes: {active_job['total_episodes_in_season']})!")
+                else:
+                    job_finished = True
+    else:
+        active_job["current_part"] += 1
+        if active_job["current_part"] > active_job.get("total_parts", 8):
+            job_finished = True
+
+    if job_finished:
+        bot_log(f"[AutoPilot] 🏆 ALL PLANNED VIDEOS COMPLETED for '{title}'! Moving to Finished List.")
+        active_job["status"] = "finished"
+        active_job["finished_at"] = now_str
+        data["finished"].insert(0, active_job)
+        if 0 <= active_idx < len(data["jobs"]):
+            data["jobs"].pop(active_idx)
+    else:
+        active_job["status"] = "queued"
+        bot_log(f"[AutoPilot] 📊 Progress for '{title}': {active_job['completed_parts_count']}/{active_job.get('total_planned_parts', 1)} parts completed.")
+
+    return job_finished
+
 # ── CORE SCHEDULER EXECUTION CYCLE ────────────────────────────────────────────
 async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[str, Any]:
     """Extracts next due video part, cuts clip with FFmpeg, renders Google Search safe zone, and auto-posts."""
@@ -675,6 +742,10 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
 
     data = load_queue_data()
     jobs = data["jobs"]
+
+    fb_cfg = load_fb_config()
+    yt_cfg = youtube_bot.load_yt_config()
+    tt_cfg = tiktok_bot.load_tt_config()
 
     active_job = None
     active_idx = -1
@@ -688,7 +759,7 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
 
     if not active_job:
         for i, j in enumerate(jobs):
-            if j.get("status") in ("queued", "active", "processing"):
+            if j.get("status") in ("queued", "active", "processing", "waiting_upload", "waiting"):
                 active_job = j
                 active_idx = i
                 break
@@ -700,6 +771,95 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
     title = active_job.get("title", "Unknown Title")
     is_series = active_job.get("type") == "series"
     part_duration = active_job.get("part_duration_seconds", 75)
+    platforms_cfg = active_job.get("platforms") or {"facebook": True, "youtube": True, "tiktok": True}
+    fb_is_active = platforms_cfg.get("facebook", True) and fb_cfg.get("auto_pilot_enabled", True)
+    yt_is_active = platforms_cfg.get("youtube", True) and yt_cfg.get("auto_pilot_enabled", False)
+    tt_is_active = platforms_cfg.get("tiktok", True) and tt_cfg.get("auto_pilot_enabled", False)
+
+    now_ts = int(time.time())
+
+    # ── 0. CHECK FOR PENDING RENDERED VIDEOS WAITING FOR PUBLISH ─────────────────
+    pending_uploads = active_job.get("pending_uploads") or []
+    if pending_uploads:
+        pending_item = pending_uploads[0]
+        p_label = pending_item.get("part_label", "Video")
+        p_filename = pending_item.get("video_filename", "")
+        p_path = os.path.join(BASE_DIR, "public", "reels", p_filename)
+
+        bot_log(f"[AutoPilot] ⏳ Found pending video waiting to publish: '{p_label}' ({p_filename}). Checking Facebook connection...")
+
+        if fb_is_active:
+            from facebook_bot import check_fb_token_validity
+            fb_valid, fb_err = await check_fb_token_validity(fb_cfg.get("page_token", ""), fb_cfg.get("page_id", ""))
+            if not fb_valid:
+                bot_log(f"[FacebookBot] ⏸️ Facebook connection not ready ({fb_err}).")
+                bot_log(f"[AutoPilot] ⏳ Waiting for Facebook token: '{p_label}' remains saved in queue without re-rendering.")
+                active_job["status"] = "waiting_upload"
+                data["state"]["is_busy"] = False
+                data["state"]["step"] = "idle"
+                data["state"]["step_label"] = f"Waiting to publish {p_label} (FB Token Needed)"
+                data["state"]["progress_percent"] = 0
+                data["state"]["next_run_timestamp"] = int(time.time()) + (int(fb_cfg.get("post_interval_minutes", 10)) * 60)
+                save_queue_data(data)
+                return {"success": False, "waiting": True, "reason": "fb_token_expired"}
+
+        # Token is valid! Re-upload immediately
+        if os.path.exists(p_path):
+            bot_log(f"[AutoPilot] 🚀 Facebook is READY! Re-uploading pending video: '{p_label}' ({p_filename})...")
+            data["state"]["is_busy"] = True
+            data["state"]["busy_since"] = now_ts
+            data["state"]["step"] = "distributing"
+            data["state"]["progress_percent"] = 85
+            data["state"]["step_label"] = f"Re-uploading {p_label} to Facebook..."
+            save_queue_data(data)
+
+            fb_res = await upload_reel_to_facebook(
+                video_path=p_path,
+                caption=pending_item.get("caption", ""),
+                comment_text=pending_item.get("comment_text", "")
+            )
+
+            if fb_res.get("success"):
+                bot_log(f"[FacebookBot] 🎉 Successfully published pending Reel: {fb_res.get('reel_url')}!")
+                pending_uploads.pop(0)
+                active_job["pending_uploads"] = pending_uploads
+                now_str = time.strftime("%Y-%m-%d %H:%M:%S")
+                active_job["last_posted_at"] = now_str
+                active_job["completed_parts_count"] = active_job.get("completed_parts_count", 0) + 1
+                active_job["history"].append({
+                    "part_label": p_label,
+                    "posted_at": now_str,
+                    "video_filename": p_filename,
+                    "fb_url": fb_res.get("reel_url"),
+                    "yt_url": None,
+                    "file_size_mb": pending_item.get("file_size_mb", 0)
+                })
+                advance_job_progression(active_job, is_series, data, active_idx, now_str)
+
+                fb_cfg["last_post_time"] = int(time.time())
+                save_fb_config(fb_cfg)
+                data["state"]["is_busy"] = False
+                data["state"]["step"] = "idle"
+                data["state"]["progress_percent"] = 100
+                data["state"]["step_label"] = f"Published {p_label} successfully"
+                data["state"]["last_run_timestamp"] = int(time.time())
+                data["state"]["next_run_timestamp"] = int(time.time()) + (int(fb_cfg.get("post_interval_minutes", 10)) * 60)
+                save_queue_data(data)
+                return {"success": True, "reuploaded": True, "reel_url": fb_res.get("reel_url")}
+            else:
+                bot_log(f"[FacebookBot] ❌ Re-upload failed: {fb_res.get('error')}. Video remains in pending queue.")
+                active_job["status"] = "waiting_upload"
+                data["state"]["is_busy"] = False
+                data["state"]["step"] = "idle"
+                data["state"]["step_label"] = f"Upload failed: {fb_res.get('error')}"
+                save_queue_data(data)
+                return {"success": False, "error": fb_res.get("error")}
+        else:
+            bot_log(f"[AutoPilot] ⚠️ Video file '{p_filename}' not found on disk. Removing from pending list.")
+            pending_uploads.pop(0)
+            active_job["pending_uploads"] = pending_uploads
+            save_queue_data(data)
+
     active_job["status"] = "processing"
 
     if is_series:
@@ -726,7 +886,6 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
         se_arg = 0
         ep_arg = 0
 
-    now_ts = int(time.time())
     bot_log(f"[AutoPilot] ⚡ Step 1: Processing Job ({active_idx+1}/{len(jobs)}): '{title}' [{part_label}]")
     data["state"]["is_busy"] = True
     data["state"]["busy_since"] = now_ts
@@ -739,11 +898,7 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
     save_queue_data(data)
 
     try:
-        # 0. Pre-flight Check: Validate Platform Credentials before heavy work
-        fb_is_active = platforms_cfg.get("facebook", True) and fb_cfg.get("auto_pilot_enabled", True)
-        yt_is_active = platforms_cfg.get("youtube", True) and yt_cfg.get("auto_pilot_enabled", False)
-        tt_is_active = platforms_cfg.get("tiktok", True) and tt_cfg.get("auto_pilot_enabled", False)
-
+        # Pre-flight Check: Validate Platform Credentials before heavy ffmpeg work
         if fb_is_active:
             from facebook_bot import check_fb_token_validity
             fb_valid, fb_err = await check_fb_token_validity(fb_cfg.get("page_token", ""), fb_cfg.get("page_id", ""))
@@ -751,7 +906,7 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
                 bot_log(f"[FacebookBot] ❌ Pre-flight check failed: {fb_err}")
                 bot_log("[FacebookBot] 🔑 Facebook Access Token has EXPIRED! Please go to Admin -> Platforms -> Facebook and update your Page Access Token.")
                 if not yt_is_active and not tt_is_active:
-                    active_job["status"] = "queued"
+                    active_job["status"] = "waiting_upload"
                     data["state"]["is_busy"] = False
                     data["state"]["step"] = "idle"
                     data["state"]["step_label"] = "Facebook Token Expired (Action Required)"
@@ -936,16 +1091,34 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
         active_platforms_count = sum([1 for act in [fb_is_active, yt_is_active, tt_is_active] if act])
 
         if active_platforms_count > 0 and not any_success:
-            bot_log(f"[AutoPilot] ⚠️ Video rendered, but publish failed on all active platforms.")
-            bot_log(f"[AutoPilot] 🔄 Retrying Part {part} on the next cycle after platform credentials are corrected.")
-            active_job["status"] = "queued"
+            bot_log(f"[AutoPilot] ❌ Upload failed on all active platforms ({fb_res.get('error') or 'Disconnect'}).")
+            bot_log(f"[AutoPilot] ⏳ Video '{output_filename}' saved to waiting queue.")
+            bot_log(f"[AutoPilot] 📌 Job will stay in waiting queue and automatically re-upload Part {part} once Facebook is connected!")
+
+            pending_list = active_job.get("pending_uploads") or []
+            pending_list.append({
+                "part_label": part_label,
+                "season": season if is_series else 1,
+                "episode": episode if is_series else 1,
+                "part": part,
+                "video_filename": output_filename,
+                "caption": caption,
+                "comment_text": comment_msg,
+                "file_size_mb": file_size_mb,
+                "rendered_at": now_str,
+                "status": "waiting_upload",
+                "reason": fb_res.get("error") or "Upload failed"
+            })
+            active_job["pending_uploads"] = pending_list
+            active_job["status"] = "waiting_upload"
+
             data["state"]["is_busy"] = False
             data["state"]["step"] = "idle"
-            data["state"]["step_label"] = "Publish failed - will retry next cycle"
+            data["state"]["step_label"] = f"Waiting: {part_label} pending publish (Facebook Token Expired)"
             data["state"]["progress_percent"] = 0
             data["state"]["next_run_timestamp"] = int(time.time()) + (int(fb_cfg.get("post_interval_minutes", 10)) * 60)
             save_queue_data(data)
-            return {"success": False, "error": "Publish failed on all active platforms"}
+            return {"success": False, "waiting_upload": True, "error": "Upload failed, saved to pending queue"}
 
         now_str = time.strftime("%Y-%m-%d %H:%M:%S")
         active_job["last_posted_at"] = now_str
@@ -959,47 +1132,7 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
             "file_size_mb": file_size_mb
         })
 
-        job_finished = False
-
-        if is_series:
-            active_job["current_part"] += 1
-            if active_job["current_part"] > active_job.get("parts_per_episode", 3):
-                active_job["current_part"] = 1
-                active_job["current_episode"] += 1
-                bot_log(f"[AutoPilot] 📌 '{title}' completed episode! Advancing to Episode {active_job['current_episode']}.")
-
-                s_map = active_job.get("season_episodes_map") or {}
-                total_eps_this_season = s_map.get(str(active_job["current_season"]), active_job.get("total_episodes_in_season", 10))
-
-                if active_job["current_episode"] > total_eps_this_season:
-                    seasons = active_job.get("seasons") or [1]
-                    try:
-                        curr_s_idx = seasons.index(active_job["current_season"])
-                    except ValueError:
-                        curr_s_idx = -1
-
-                    if curr_s_idx != -1 and curr_s_idx + 1 < len(seasons):
-                        next_season = seasons[curr_s_idx + 1]
-                        active_job["current_season"] = next_season
-                        active_job["current_episode"] = 1
-                        active_job["total_episodes_in_season"] = s_map.get(str(next_season), 10)
-                        bot_log(f"[AutoPilot] 🌟 '{title}' advanced to Season {next_season} (Episodes: {active_job['total_episodes_in_season']})!")
-                    else:
-                        job_finished = True
-        else:
-            active_job["current_part"] += 1
-            if active_job["current_part"] > active_job.get("total_parts", 8):
-                job_finished = True
-
-        if job_finished:
-            bot_log(f"[AutoPilot] 🏆 ALL PLANNED VIDEOS COMPLETED for '{title}'! Moving to Finished List.")
-            active_job["status"] = "finished"
-            active_job["finished_at"] = now_str
-            data["finished"].insert(0, active_job)
-            data["jobs"].pop(active_idx)
-        else:
-            active_job["status"] = "queued"
-            bot_log(f"[AutoPilot] 📊 Progress for '{title}': {active_job['completed_parts_count']}/{active_job.get('total_planned_parts', 1)} parts completed.")
+        job_finished = advance_job_progression(active_job, is_series, data, active_idx, now_str)
 
         # Save state & update last post timestamp
         fb_cfg = load_fb_config()
