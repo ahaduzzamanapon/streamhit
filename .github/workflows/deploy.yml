@@ -25,7 +25,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             echo "=== 0. Killing stale background processes to free CPU ==="
-            killall -9 cp 2>/dev/null || true
+            pkill -9 -f "cp -r" 2>/dev/null || true
             pkill -f "sitemap_generator.py" 2>/dev/null || true
 
             echo "=== 1. Updating streamhit.lc-synergy.ltd ==="
@@ -39,18 +39,25 @@ jobs:
             ./streamhitupdate.sh || true
             rm -f /tmp/streamhit_active_users.db* ~/active_users.db* ~/streamhit.lc-synergy.ltd/active_users.db* 2>/dev/null || true
 
-            echo "=== 2. Syncing apps (including nxly.online) ==="
-            for appdir in "$HOME/nxly.online"; do
-              if [ -d "$appdir" ]; then
+            echo "=== 2. Finding and Syncing all Python/Passenger apps (including nxly.online) ==="
+            find ~ -maxdepth 3 \( -name "main.py" -o -name "passenger_wsgi.py" \) 2>/dev/null | while read -r filepath; do
+              appdir=$(dirname "$filepath")
+              if [ "$appdir" != "$HOME/streamhit.lc-synergy.ltd" ]; then
                 echo "Fast syncing to $appdir..."
-                cp -f ~/streamhit.lc-synergy.ltd/*.py "$appdir/" 2>/dev/null || true
-                mkdir -p "$appdir/public"
-                cp -f ~/streamhit.lc-synergy.ltd/public/*.html ~/streamhit.lc-synergy.ltd/public/*.css ~/streamhit.lc-synergy.ltd/public/*.js ~/streamhit.lc-synergy.ltd/public/*.svg ~/streamhit.lc-synergy.ltd/public/*.png ~/streamhit.lc-synergy.ltd/public/*.jpg "$appdir/public/" 2>/dev/null || true
+                if [ -d "$appdir/.git" ]; then
+                  cd "$appdir" && git fetch origin 2>/dev/null && git reset --hard origin/main 2>/dev/null || true
+                else
+                  cp -f ~/streamhit.lc-synergy.ltd/*.py "$appdir/" 2>/dev/null || true
+                  mkdir -p "$appdir/public"
+                  cp -f ~/streamhit.lc-synergy.ltd/public/*.html "$appdir/public/" 2>/dev/null || true
+                  cp -f ~/streamhit.lc-synergy.ltd/public/*.css "$appdir/public/" 2>/dev/null || true
+                  cp -f ~/streamhit.lc-synergy.ltd/public/*.js "$appdir/public/" 2>/dev/null || true
+                fi
                 touch "$appdir/passenger_wsgi.py" 2>/dev/null || true
                 mkdir -p "$appdir/tmp" 2>/dev/null || true
                 touch "$appdir/tmp/restart.txt" 2>/dev/null || true
               fi
             done
 
-            echo "=== 3. Clean finished ==="
-            killall -9 cp 2>/dev/null || true
+            echo "=== 3. Deployment successful ==="
+            exit 0
