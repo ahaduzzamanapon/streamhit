@@ -311,6 +311,91 @@ async def upload_reel_to_facebook(
             "comment_id": comment_id
         }
 
+async def post_photo_to_facebook(
+    image_path: str,
+    caption: str,
+    comment_text: str = ""
+) -> Dict[str, Any]:
+    """
+    Uploads a photo/poster to Facebook Page with caption and automatic 1st comment.
+    """
+    if not os.path.exists(image_path):
+        return {"success": False, "error": f"Image file not found: {image_path}"}
+
+    cfg = load_fb_config()
+    page_id = cfg.get("page_id", DEFAULT_PAGE_ID)
+    page_token = cfg.get("page_token", DEFAULT_PAGE_TOKEN)
+
+    if not page_token:
+        return {"success": False, "error": "Missing Facebook Page Access Token"}
+
+    print(f"[FacebookBot] Uploading photo poster to Page {page_id}...")
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        try:
+            with open(image_path, "rb") as f:
+                photo_bytes = f.read()
+
+            upload_url = f"https://graph.facebook.com/v19.0/{page_id}/photos"
+            files = {
+                "source": (os.path.basename(image_path), photo_bytes, "image/jpeg")
+            }
+            data = {
+                "caption": caption,
+                "access_token": page_token
+            }
+            resp = await client.post(upload_url, data=data, files=files)
+            resp_data = resp.json()
+
+            if "error" in resp_data:
+                err_msg = resp_data["error"].get("message", "Photo upload failed")
+                print(f"[FacebookBot] Photo upload error: {err_msg}")
+                return {"success": False, "error": err_msg}
+
+            photo_id = resp_data.get("id")
+            post_id = resp_data.get("post_id") or photo_id
+            post_url = f"https://www.facebook.com/{post_id}"
+            print(f"[FacebookBot] ✅ Photo published successfully: {post_url} (Photo ID: {photo_id})")
+
+            # Post 1st comment if provided
+            comment_id = None
+            if comment_text and post_id:
+                try:
+                    await asyncio.sleep(2)
+                    c_resp = await client.post(
+                        f"https://graph.facebook.com/v19.0/{post_id}/comments",
+                        data={"message": comment_text, "access_token": page_token}
+                    )
+                    c_data = c_resp.json()
+                    comment_id = c_data.get("id")
+                    if comment_id:
+                        print(f"[FacebookBot] ✅ Auto 1st comment posted on photo: {comment_id}")
+                except Exception as ce:
+                    print(f"[FacebookBot] Photo comment notice: {ce}")
+
+            history_entry = {
+                "title": "Meme Poster: Not All Heroes Stream",
+                "post_id": post_id,
+                "photo_id": photo_id,
+                "post_url": post_url,
+                "comment_id": comment_id,
+                "timestamp": int(time.time()),
+                "status": "published",
+                "type": "photo_poster"
+            }
+            save_fb_history(history_entry)
+
+            return {
+                "success": True,
+                "post_id": post_id,
+                "photo_id": photo_id,
+                "post_url": post_url,
+                "comment_id": comment_id
+            }
+        except Exception as e:
+            print(f"[FacebookBot] Photo upload exception: {e}")
+            return {"success": False, "error": str(e)}
+
 async def publish_existing_reel(
     filename: str,
     caption: str = "",

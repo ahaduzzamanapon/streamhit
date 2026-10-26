@@ -983,7 +983,10 @@
                             <h2>🤖 Facebook Page Auto-Pilot Bot (10m Cycle)</h2>
                             <div class="subtitle">Continuously slices and auto-posts viral movie clips every 10 minutes with 1st comment links</div>
                         </div>
-                        <button class="btn-primary" onclick="triggerFacebookAutoReel()">⚡ Post Trending Reel Now</button>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                            <button type="button" class="btn-secondary" onclick="triggerPostMemePoster()">🖼️ Post Meme Poster</button>
+                            <button type="button" class="btn-primary" onclick="triggerFacebookAutoReel()">⚡ Post Trending Reel Now</button>
+                        </div>
                     </div>
 
                     <form onsubmit="handleSaveFacebookConfig(event)">
@@ -1645,6 +1648,23 @@
                 loadFacebookTab();
             } catch(e) {
                 alert('Error triggering reel: ' + e);
+            }
+        }
+
+        async function triggerPostMemePoster() {
+            if (!confirm("Publish 'Not All Heroes Stream' Meme Poster to Facebook Page NXLY right now?")) return;
+            showToast("Publishing Meme Poster to Facebook Page...");
+            try {
+                const res = await fetch('/api/admin/facebook/post-poster', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+                const d = await res.json();
+                if (d.success) {
+                    showToast(d.message || 'Meme Poster successfully published to Facebook Page!');
+                    loadFacebookTab();
+                } else {
+                    alert('Error: ' + (d.error || 'Failed to post'));
+                }
+            } catch(e) {
+                alert('Error publishing poster: ' + e);
             }
         }
 

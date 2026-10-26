@@ -1243,6 +1243,50 @@ async def admin_facebook_exchange_token(data: dict, request: Request):
         raise HTTPException(status_code=400, detail=res.get("error", "Token exchange failed"))
     return {"code": 0, "success": True, "message": res.get("message"), "token_preview": res.get("token_preview")}
 
+@router.post("/api/admin/facebook/post-poster")
+async def admin_facebook_post_poster(request: Request):
+    check_admin_auth(request)
+    import facebook_bot
+    poster_path = os.path.join(base_dir, "public", "poster_nxly_meme.jpg")
+    if not os.path.exists(poster_path):
+        poster_path = os.path.join(base_dir, "public", "poster_nxly_clean.jpg")
+
+    caption = (
+        "NOT ALL HEROES STREAM. SOME DOWNLOAD. 😎🍿\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "Need Internet? Buffering? Data Gone? ❌\n"
+        "Download & Watch Offline in 1080p Anytime! ✔️\n\n"
+        "🔍 Google-এ Search করুন: NXLY Stream\n"
+        "👉 ১ম যে ওয়েবসাইট আসবে সেটাই! (First result is the one)\n\n"
+        "💬 সরাসরি ডাউনলোড ও দেখার লিংক ১ম কমেন্টে (1st Comment)! 👇\n"
+        "📲 Free Official Android App: https://nxly.online\n\n"
+        "#nxlystream #movies #offline #download #meme #viral #legends #trending"
+    )
+
+    comment = (
+        "🔍 Google Search: NXLY Stream (First result is the one!)\n\n"
+        "🍿 Watch & Download All Movies/Shows in 1080p HD:\n"
+        "👉 https://nxly.online\n\n"
+        "📲 Download Free Official Android App (APK):\n"
+        "👉 https://nxly.online/download"
+    )
+
+    res = await facebook_bot.post_photo_to_facebook(
+        image_path=poster_path,
+        caption=caption,
+        comment_text=comment
+    )
+    if not res.get("success"):
+        raise HTTPException(status_code=500, detail=res.get("error", "Photo upload failed"))
+    return {
+        "code": 0,
+        "success": True,
+        "message": "Meme Poster successfully published to Facebook Page NXLY!",
+        "post_url": res.get("post_url"),
+        "photo_id": res.get("photo_id")
+    }
+
+
 
 
 
