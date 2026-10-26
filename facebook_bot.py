@@ -18,8 +18,13 @@ LOCAL_LOG_FILE = os.path.join(BASE_DIR, "public", "reels", "facebook_bot.log")
 
 _LIVE_LOGS = []
 
+def get_bd_time(ts=None):
+    if ts is None:
+        ts = time.time()
+    return time.gmtime(ts + 6 * 3600)
+
 def bot_log(msg: str):
-    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = time.strftime("%Y-%m-%d %I:%M:%S %p", get_bd_time())
     formatted = f"[{timestamp}] {msg}"
     try:
         print(formatted, flush=True)
@@ -53,7 +58,7 @@ def get_live_logs() -> str:
                 pass
     if _LIVE_LOGS:
         return "\n".join(_LIVE_LOGS[-150:])
-    return f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [FacebookBot] Auto-Pilot daemon active (10m cycle). Waiting for trigger."
+    return f"[{time.strftime('%Y-%m-%d %I:%M:%S %p', get_bd_time())}] [FacebookBot] Auto-Pilot daemon active (10m cycle). Waiting for trigger."
 
 DEFAULT_PAGE_ID = os.environ.get("FB_PAGE_ID", "1367186939808744")
 DEFAULT_PAGE_TOKEN = os.environ.get("FB_PAGE_TOKEN", "")

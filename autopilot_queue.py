@@ -460,9 +460,10 @@ async def get_dashboard_summary() -> Dict[str, Any]:
             active_item = j
             break
 
-    # Format human readable next post string: "12:40 PM - In 10 min"
+    # Format human readable next post string in Bangladesh Time (UTC+6): "04:40 PM - In 10 min"
     mins_left = round(remaining_sec / 60)
-    next_post_time_str = time.strftime("%I:%M %p", time.localtime(next_post))
+    bd_next = time.gmtime(next_post + 6 * 3600)
+    next_post_time_str = time.strftime("%I:%M %p", bd_next)
     next_post_display = f"{next_post_time_str} - In {mins_left} min" if remaining_sec > 0 else "Due right now"
 
     return {
@@ -634,8 +635,9 @@ def get_publishing_calendar() -> List[Dict[str, Any]]:
                 while ep <= max_eps and projected < 25:
                     while p <= parts_per_ep and projected < 25:
                         part_label = f"S{s_num}E{ep} Part {p}"
-                        time_str = time.strftime("%I:%M %p", time.localtime(accum_time))
-                        date_str = time.strftime("%b %d", time.localtime(accum_time))
+                        bd_accum = time.gmtime(accum_time + 6 * 3600)
+                        time_str = time.strftime("%I:%M %p", bd_accum)
+                        date_str = time.strftime("%b %d", bd_accum)
                         countdown_sec = max(0, accum_time - now)
 
                         timeline.append({
@@ -663,8 +665,9 @@ def get_publishing_calendar() -> List[Dict[str, Any]]:
 
             for p in range(curr_p, total_p + 1):
                 part_label = f"Part {p} of {total_p}"
-                time_str = time.strftime("%I:%M %p", time.localtime(accum_time))
-                date_str = time.strftime("%b %d", time.localtime(accum_time))
+                bd_accum = time.gmtime(accum_time + 6 * 3600)
+                time_str = time.strftime("%I:%M %p", bd_accum)
+                date_str = time.strftime("%b %d", bd_accum)
                 countdown_sec = max(0, accum_time - now)
 
                 timeline.append({

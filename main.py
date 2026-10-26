@@ -999,6 +999,53 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
+# Auto-Pilot Background Thread (persists across Passenger idle cycles)
+import threading
+def _start_autopilot_daemon_thread():
+    import asyncio
+    def _run():
+        import facebook_bot
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(facebook_bot.fb_auto_pilot_loop())
+        except Exception as _e:
+            print(f"[AutoPilot] Background thread error: {_e}")
+    
+    t = threading.Thread(target=_run, name="AutoPilotDaemon", daemon=True)
+    t.start()
+
+try:
+    _start_autopilot_daemon_thread()
+except Exception as _dte:
+    print(f"[AutoPilot] Daemon launch notice: {_dte}")
+
+# Auto-Pilot Request-Driven Due Check (executes next queue job if 10m elapsed and not busy)
+_last_autopilot_check = 0
+
+@app.middleware("http")
+async def check_autopilot_due_middleware(request: Request, call_next):
+    global _last_autopilot_check
+    now = time.time()
+    if now - _last_autopilot_check > 30:
+        _last_autopilot_check = now
+        try:
+            import facebook_bot
+            cfg = facebook_bot.load_fb_config()
+            if cfg.get("auto_pilot_enabled", True):
+                interval_min = int(cfg.get("post_interval_minutes", 10))
+                interval_sec = interval_min * 60
+                last_post = int(cfg.get("last_post_time", 0))
+                if now - last_post >= interval_sec:
+                    import autopilot_queue
+                    q_data = autopilot_queue.load_queue_data()
+                    st = q_data.get("state", {})
+                    if not st.get("is_busy"):
+                        asyncio.create_task(autopilot_queue.process_next_queue_job())
+        except Exception:
+            pass
+    return await call_next(request)
+
 # ── Active User Tracking ───────────────────────────────────────────────────
 import sqlite3
 
