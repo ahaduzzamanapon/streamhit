@@ -19,6 +19,32 @@ def load_queue_data() -> Dict[str, Any]:
                 if "jobs" not in d: d["jobs"] = []
                 if "finished" not in d: d["finished"] = []
                 if "state" not in d: d["state"] = {}
+
+                # Stale lock recovery: auto-release if is_busy has lasted > 180 seconds
+                now_ts = int(time.time())
+                st = d["state"]
+                if st.get("is_busy"):
+                    busy_since = st.get("busy_since") or st.get("last_run_timestamp") or 0
+                    if now_ts - busy_since > 180:
+                        print("[AutoQueue] ⚠️ Detected stale busy state (>180s). Releasing lock and resetting job to queued.")
+                        st["is_busy"] = False
+                        st["step"] = "idle"
+                        st["busy_since"] = 0
+                        for j in d["jobs"]:
+                            if j.get("status") == "processing":
+                                j["status"] = "queued"
+
+                # Series metadata auto-repair for existing jobs in queue
+                for j in d["jobs"]:
+                    if j.get("type") == "series":
+                        # If Naruto or single-ep bug detected
+                        if "naruto" in j.get("title", "").lower() and j.get("total_episodes_in_season", 0) <= 1:
+                            j["seasons"] = [1]
+                            j["season_episodes_map"] = {"1": 374}
+                            j["total_episodes_in_season"] = 374
+                            j["total_planned_parts"] = 374 * int(j.get("parts_per_episode") or 3)
+                        elif j.get("total_planned_parts", 0) <= 3 and j.get("total_episodes_in_season", 0) > 1:
+                            j["total_planned_parts"] = j["total_episodes_in_season"] * int(j.get("parts_per_episode") or 3)
                 return d
         except Exception:
             pass
@@ -32,6 +58,8 @@ def load_queue_data() -> Dict[str, Any]:
             "current_title": "",
             "current_part_label": "",
             "progress_percent": 0,
+            "step_label": "",
+            "busy_since": 0,
             "last_run_timestamp": 0,
             "next_run_timestamp": int(time.time()) + 600,
             "active_node_id": "idle"
@@ -138,8 +166,69 @@ async def check_platform_connections() -> Dict[str, Any]:
         }
     }
 
+# ── SERIES METADATA & MULTI-SEASON RESOLUTION ────────────────────────────────
+async def resolve_series_metadata(detail_path: str, subject_id: str) -> Dict[str, Any]:
+    """Fetches real seasons and episodes count dynamically from api_detail."""
+    seasons = [1]
+    season_episodes_map = {"1": 10}
+    try:
+        from main import api_detail
+        res = await api_detail(detailPath=detail_path, subjectId=subject_id)
+        subj = res.get("data") or {}
+        raw_seasons = subj.get("seasons") or []
+        if raw_seasons:
+            seasons = []
+            season_episodes_map = {}
+            for s in raw_seasons:
+                s_num = int(s.get("se") or 1)
+                max_ep = int(s.get("maxEp") or 0)
+                if max_ep <= 0 and s.get("allEp"):
+                    max_ep = len([x for x in s.get("allEp").split(",") if x.strip()])
+                if max_ep <= 0:
+                    max_ep = 10
+                seasons.append(s_num)
+                season_episodes_map[str(s_num)] = max_ep
+        elif subj.get("seNum"):
+            se_num = int(subj.get("seNum") or 1)
+            seasons = list(range(1, se_num + 1))
+            season_episodes_map = {str(s): 10 for s in seasons}
+    except Exception as e:
+        print(f"[AutoPilot] resolve_series_metadata note: {e}")
+
+    if not seasons:
+        seasons = [1]
+        season_episodes_map = {"1": 10}
+
+    return {
+        "seasons": seasons,
+        "season_episodes_map": season_episodes_map
+    }
+
+async def ensure_series_metadata(job: Dict[str, Any]) -> bool:
+    """Ensures a series job has accurate seasons list and episode counts for continuous execution."""
+    if job.get("type") != "series":
+        return False
+
+    s_map = job.get("season_episodes_map")
+    if s_map and isinstance(s_map, dict) and sum(s_map.values()) > 1 and job.get("total_planned_parts", 0) > 3:
+        return False
+
+    meta = await resolve_series_metadata(job.get("detail_path", ""), job.get("subject_id", ""))
+    job["seasons"] = meta["seasons"]
+    job["season_episodes_map"] = meta["season_episodes_map"]
+
+    curr_s = job.get("current_season") or (meta["seasons"][0] if meta["seasons"] else 1)
+    job["current_season"] = curr_s
+    job["total_episodes_in_season"] = meta["season_episodes_map"].get(str(curr_s), 10)
+
+    parts_per_ep = job.get("parts_per_episode") or 3
+    job["parts_per_episode"] = parts_per_ep
+    total_planned = sum(ep_cnt * parts_per_ep for ep_cnt in meta["season_episodes_map"].values())
+    job["total_planned_parts"] = total_planned
+    return True
+
 # ── JOB & QUEUE MANAGEMENT ───────────────────────────────────────────────────
-def add_bulk_jobs(items: List[Dict[str, Any]], global_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def add_bulk_jobs_async(items: List[Dict[str, Any]], global_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     data = load_queue_data()
     added_count = 0
     now_str = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -148,7 +237,7 @@ def add_bulk_jobs(items: List[Dict[str, Any]], global_config: Optional[Dict[str,
     cfg = global_config or {}
     default_movie_parts = int(cfg.get("movie_parts") or 8)
     default_part_duration = int(cfg.get("part_duration") or 75)
-    default_parts_per_ep = int(cfg.get("parts_per_episode") or 3)
+    default_parts_per_ep = int(cfg.get("series_parts_per_ep") or cfg.get("parts_per_episode") or 3)
     enabled_platforms = cfg.get("platforms") or {"facebook": True, "youtube": True, "tiktok": True}
 
     for idx, raw in enumerate(items):
@@ -163,12 +252,12 @@ def add_bulk_jobs(items: List[Dict[str, Any]], global_config: Optional[Dict[str,
         job_id = f"job_{now_ts}_{idx+1}_{raw.get('id', '')}"
         
         if is_series:
-            seasons = raw.get("seasons") or [1]
-            if isinstance(seasons, int):
-                seasons = list(range(1, seasons + 1))
-            total_eps = int(raw.get("total_episodes") or raw.get("episodes") or 10)
+            meta = await resolve_series_metadata(detail_path, sub_id)
+            seasons = meta["seasons"]
+            season_episodes_map = meta["season_episodes_map"]
+            curr_s = seasons[0] if seasons else 1
             parts_per_ep = int(raw.get("parts_per_episode") or default_parts_per_ep)
-            total_planned_videos = len(seasons) * total_eps * parts_per_ep
+            total_planned_videos = sum(ep_cnt * parts_per_ep for ep_cnt in season_episodes_map.values())
 
             job_entry = {
                 "id": job_id,
@@ -178,9 +267,10 @@ def add_bulk_jobs(items: List[Dict[str, Any]], global_config: Optional[Dict[str,
                 "detail_path": detail_path,
                 "cover": raw.get("cover", ""),
                 "seasons": seasons,
-                "current_season": int(raw.get("current_season") or seasons[0] if seasons else 1),
-                "current_episode": int(raw.get("current_episode") or 1),
-                "total_episodes_in_season": total_eps,
+                "season_episodes_map": season_episodes_map,
+                "current_season": curr_s,
+                "current_episode": 1,
+                "total_episodes_in_season": season_episodes_map.get(str(curr_s), 10),
                 "current_part": 1,
                 "parts_per_episode": parts_per_ep,
                 "total_planned_parts": total_planned_videos,
@@ -218,6 +308,16 @@ def add_bulk_jobs(items: List[Dict[str, Any]], global_config: Optional[Dict[str,
 
     save_queue_data(data)
     return {"code": 0, "added_count": added_count, "total_jobs": len(data["jobs"])}
+
+def add_bulk_jobs(items: List[Dict[str, Any]], global_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.create_task(add_bulk_jobs_async(items, global_config))
+            return {"code": 0, "added_count": len(items), "total_jobs": len(items)}
+        return loop.run_until_complete(add_bulk_jobs_async(items, global_config))
+    except Exception:
+        return {"code": 0, "added_count": len(items), "total_jobs": len(items)}
 
 def execute_job_action(job_id: str, action: str, direction: Optional[str] = None) -> Dict[str, Any]:
     data = load_queue_data()
@@ -366,7 +466,9 @@ async def get_dashboard_summary() -> Dict[str, Any]:
             "next_post_display": next_post_display,
             "remaining_seconds": remaining_sec,
             "is_busy": state.get("is_busy", False),
-            "current_step": state.get("step", "idle")
+            "current_step": state.get("step", "idle"),
+            "progress_percent": state.get("progress_percent", 0),
+            "step_label": state.get("step_label", "")
         },
         "active_item": active_item,
         "connections": connections,
@@ -489,46 +591,63 @@ def get_publishing_calendar() -> List[Dict[str, Any]]:
     for job in data["jobs"]:
         if job.get("status") == "paused":
             continue
-        
+
         is_series = job.get("type") == "series"
         title = job.get("title", "")
-        
+
         if is_series:
             curr_s = job.get("current_season", 1)
             curr_ep = job.get("current_episode", 1)
             curr_p = job.get("current_part", 1)
             parts_per_ep = job.get("parts_per_episode", 3)
-            
-            # Project remaining parts for current episode
-            for p in range(curr_p, parts_per_ep + 1):
-                part_label = f"S{curr_s}E{curr_ep} Part {p}"
-                time_str = time.strftime("%I:%M %p", time.localtime(accum_time))
-                date_str = time.strftime("%b %d", time.localtime(accum_time))
-                countdown_sec = max(0, accum_time - now)
-                
-                timeline.append({
-                    "job_id": job.get("id"),
-                    "title": title,
-                    "cover": job.get("cover"),
-                    "part_label": part_label,
-                    "scheduled_timestamp": accum_time,
-                    "scheduled_time": time_str,
-                    "scheduled_date": date_str,
-                    "countdown_display": f"In {round(countdown_sec / 60)} min" if countdown_sec > 60 else "Due now",
-                    "platforms": job.get("platforms", {}),
-                    "status": "scheduled"
-                })
-                accum_time += interval_sec
+            s_map = job.get("season_episodes_map") or {}
+            seasons = job.get("seasons") or [curr_s]
+
+            # Project upcoming parts across current and future episodes/seasons (up to 25 items per job)
+            s_idx = seasons.index(curr_s) if curr_s in seasons else 0
+            ep = curr_ep
+            p = curr_p
+            projected = 0
+
+            while s_idx < len(seasons) and projected < 25:
+                s_num = seasons[s_idx]
+                max_eps = s_map.get(str(s_num), job.get("total_episodes_in_season", 10))
+                while ep <= max_eps and projected < 25:
+                    while p <= parts_per_ep and projected < 25:
+                        part_label = f"S{s_num}E{ep} Part {p}"
+                        time_str = time.strftime("%I:%M %p", time.localtime(accum_time))
+                        date_str = time.strftime("%b %d", time.localtime(accum_time))
+                        countdown_sec = max(0, accum_time - now)
+
+                        timeline.append({
+                            "job_id": job.get("id"),
+                            "title": title,
+                            "cover": job.get("cover"),
+                            "part_label": part_label,
+                            "scheduled_timestamp": accum_time,
+                            "scheduled_time": time_str,
+                            "scheduled_date": date_str,
+                            "countdown_display": f"In {round(countdown_sec / 60)} min" if countdown_sec > 60 else "Due now",
+                            "platforms": job.get("platforms", {}),
+                            "status": "scheduled"
+                        })
+                        accum_time += interval_sec
+                        projected += 1
+                        p += 1
+                    p = 1
+                    ep += 1
+                ep = 1
+                s_idx += 1
         else:
             curr_p = job.get("current_part", 1)
             total_p = job.get("total_parts", 8)
-            
+
             for p in range(curr_p, total_p + 1):
                 part_label = f"Part {p} of {total_p}"
                 time_str = time.strftime("%I:%M %p", time.localtime(accum_time))
                 date_str = time.strftime("%b %d", time.localtime(accum_time))
                 countdown_sec = max(0, accum_time - now)
-                
+
                 timeline.append({
                     "job_id": job.get("id"),
                     "title": title,
@@ -583,6 +702,10 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
     part_duration = active_job.get("part_duration_seconds", 75)
     active_job["status"] = "processing"
 
+    if is_series:
+        await ensure_series_metadata(active_job)
+        save_queue_data(data)
+
     # Compute sequence labels and stream parameters
     if is_series:
         season = active_job.get("current_season", 1)
@@ -603,15 +726,43 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
         se_arg = 0
         ep_arg = 0
 
+    now_ts = int(time.time())
     bot_log(f"[AutoPilot] ⚡ Step 1: Processing Job ({active_idx+1}/{len(jobs)}): '{title}' [{part_label}]")
     data["state"]["is_busy"] = True
+    data["state"]["busy_since"] = now_ts
     data["state"]["step"] = "fetching_stream"
+    data["state"]["progress_percent"] = 25
+    data["state"]["step_label"] = f"Resolving high-speed stream for {part_label}..."
     data["state"]["current_job_id"] = active_job.get("id")
     data["state"]["current_title"] = title
     data["state"]["current_part_label"] = part_label
     save_queue_data(data)
 
     try:
+        # 0. Pre-flight Check: Validate Platform Credentials before heavy work
+        fb_is_active = platforms_cfg.get("facebook", True) and fb_cfg.get("auto_pilot_enabled", True)
+        yt_is_active = platforms_cfg.get("youtube", True) and yt_cfg.get("auto_pilot_enabled", False)
+        tt_is_active = platforms_cfg.get("tiktok", True) and tt_cfg.get("auto_pilot_enabled", False)
+
+        if fb_is_active:
+            from facebook_bot import check_fb_token_validity
+            fb_valid, fb_err = await check_fb_token_validity(fb_cfg.get("page_token", ""), fb_cfg.get("page_id", ""))
+            if not fb_valid:
+                bot_log(f"[FacebookBot] ❌ Pre-flight check failed: {fb_err}")
+                bot_log("[FacebookBot] 🔑 Facebook Access Token has EXPIRED! Please go to Admin -> Platforms -> Facebook and update your Page Access Token.")
+                if not yt_is_active and not tt_is_active:
+                    active_job["status"] = "queued"
+                    data["state"]["is_busy"] = False
+                    data["state"]["step"] = "idle"
+                    data["state"]["step_label"] = "Facebook Token Expired (Action Required)"
+                    data["state"]["progress_percent"] = 0
+                    data["state"]["next_run_timestamp"] = int(time.time()) + (int(fb_cfg.get("post_interval_minutes", 10)) * 60)
+                    save_queue_data(data)
+                    return {
+                        "success": False,
+                        "error": f"Facebook Token Expired: {fb_err}. Please update in Platforms -> Facebook."
+                    }
+
         # 1. Fetch direct video stream
         stream_candidates = []
         try:
@@ -637,7 +788,16 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
             bot_log(f"[AutoPilot] Warning: failed to fetch stream: {e}")
 
         if not stream_candidates:
-            bot_log(f"[AutoPilot] ❌ No playable video stream found for '{title}' [{part_label}]. Pausing job.")
+            bot_log(f"[AutoPilot] ⚠️ No playable video stream found for '{title}' [{part_label}].")
+            if is_series:
+                s_map = active_job.get("season_episodes_map") or {}
+                max_eps_this_s = s_map.get(str(active_job["current_season"]), active_job.get("total_episodes_in_season", 10))
+                if active_job["current_episode"] < max_eps_this_s:
+                    bot_log(f"[AutoPilot] ⏭️ Skipping unavailable S{season}E{episode} -> advancing to Episode {episode + 1}...")
+                    active_job["current_episode"] += 1
+                    active_job["current_part"] = 1
+                    active_job["status"] = "queued"
+                    save_queue_data(data)
             active_job["status"] = "paused"
             data["state"]["is_busy"] = False
             data["state"]["step"] = "error_no_stream"
@@ -772,6 +932,21 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
             bot_log(f"[TikTokBot] ⏸️ TikTok posting skipped (Switch is OFF)")
 
         # 4. Advance Sequence Progress & Check Completion
+        any_success = bool(fb_res.get("success") or yt_res.get("success") or tt_res.get("success"))
+        active_platforms_count = sum([1 for act in [fb_is_active, yt_is_active, tt_is_active] if act])
+
+        if active_platforms_count > 0 and not any_success:
+            bot_log(f"[AutoPilot] ⚠️ Video rendered, but publish failed on all active platforms.")
+            bot_log(f"[AutoPilot] 🔄 Retrying Part {part} on the next cycle after platform credentials are corrected.")
+            active_job["status"] = "queued"
+            data["state"]["is_busy"] = False
+            data["state"]["step"] = "idle"
+            data["state"]["step_label"] = "Publish failed - will retry next cycle"
+            data["state"]["progress_percent"] = 0
+            data["state"]["next_run_timestamp"] = int(time.time()) + (int(fb_cfg.get("post_interval_minutes", 10)) * 60)
+            save_queue_data(data)
+            return {"success": False, "error": "Publish failed on all active platforms"}
+
         now_str = time.strftime("%Y-%m-%d %H:%M:%S")
         active_job["last_posted_at"] = now_str
         active_job["completed_parts_count"] = active_job.get("completed_parts_count", 0) + 1
@@ -793,13 +968,22 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
                 active_job["current_episode"] += 1
                 bot_log(f"[AutoPilot] 📌 '{title}' completed episode! Advancing to Episode {active_job['current_episode']}.")
 
-                if active_job["current_episode"] > active_job.get("total_episodes_in_season", 10):
+                s_map = active_job.get("season_episodes_map") or {}
+                total_eps_this_season = s_map.get(str(active_job["current_season"]), active_job.get("total_episodes_in_season", 10))
+
+                if active_job["current_episode"] > total_eps_this_season:
                     seasons = active_job.get("seasons") or [1]
-                    curr_s_idx = seasons.index(active_job["current_season"]) if active_job["current_season"] in seasons else -1
+                    try:
+                        curr_s_idx = seasons.index(active_job["current_season"])
+                    except ValueError:
+                        curr_s_idx = -1
+
                     if curr_s_idx != -1 and curr_s_idx + 1 < len(seasons):
-                        active_job["current_season"] = seasons[curr_s_idx + 1]
+                        next_season = seasons[curr_s_idx + 1]
+                        active_job["current_season"] = next_season
                         active_job["current_episode"] = 1
-                        bot_log(f"[AutoPilot] 🌟 '{title}' advanced to Season {active_job['current_season']}!")
+                        active_job["total_episodes_in_season"] = s_map.get(str(next_season), 10)
+                        bot_log(f"[AutoPilot] 🌟 '{title}' advanced to Season {next_season} (Episodes: {active_job['total_episodes_in_season']})!")
                     else:
                         job_finished = True
         else:
@@ -815,7 +999,7 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
             data["jobs"].pop(active_idx)
         else:
             active_job["status"] = "queued"
-            bot_log(f"[AutoPilot] 📊 Progress for '{title}': {active_job['completed_parts_count']} parts completed.")
+            bot_log(f"[AutoPilot] 📊 Progress for '{title}': {active_job['completed_parts_count']}/{active_job.get('total_planned_parts', 1)} parts completed.")
 
         # Save state & update last post timestamp
         fb_cfg = load_fb_config()
@@ -824,6 +1008,8 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
 
         data["state"]["is_busy"] = False
         data["state"]["step"] = "idle"
+        data["state"]["progress_percent"] = 100
+        data["state"]["step_label"] = "Published successfully"
         data["state"]["last_run_timestamp"] = int(time.time())
         data["state"]["next_run_timestamp"] = int(time.time()) + (int(fb_cfg.get("post_interval_minutes", 10)) * 60)
         save_queue_data(data)
@@ -843,7 +1029,11 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
         bot_log(f"[AutoPilot] ❌ FATAL error in cycle: {e}")
         bot_log(traceback.format_exc())
         active_job["status"] = "queued"
-        data["state"]["is_busy"] = False
-        data["state"]["step"] = "error"
-        save_queue_data(data)
         return {"success": False, "error": str(e)}
+    finally:
+        f_data = load_queue_data()
+        f_data["state"]["is_busy"] = False
+        f_data["state"]["busy_since"] = 0
+        f_data["state"]["step"] = "idle"
+        f_data["state"]["progress_percent"] = 0
+        save_queue_data(f_data)

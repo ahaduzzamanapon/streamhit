@@ -1447,7 +1447,7 @@ async def admin_automation_jobs_bulk_create(data: dict, request: Request):
     import autopilot_queue
     items = data.get("items", [])
     config = data.get("config", {})
-    res = autopilot_queue.add_bulk_jobs(items, config)
+    res = await autopilot_queue.add_bulk_jobs_async(items, config)
     return res
 
 @router.post("/api/admin/automation/jobs/{job_id}/action")

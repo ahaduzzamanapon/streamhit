@@ -6,7 +6,7 @@ import asyncio
 import httpx
 import urllib.parse
 import aiomysql
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 
 import tempfile
 
@@ -82,6 +82,34 @@ def save_fb_config(cfg: Dict[str, Any]):
             json.dump(cfg, f, indent=2, ensure_ascii=False)
     except Exception as e:
         print(f"[FacebookBot] Error saving config: {e}")
+
+async def check_fb_token_validity(page_token: str = "", page_id: str = "") -> Tuple[bool, str]:
+    """
+    Fast pre-flight check to verify if the Meta Graph API Page Access Token is valid.
+    Returns (True, page_name) if valid, or (False, error_reason) if expired or invalid.
+    """
+    cfg = load_fb_config()
+    target_token = (page_token or cfg.get("page_token", "")).strip()
+    target_page_id = (page_id or cfg.get("page_id", DEFAULT_PAGE_ID)).strip()
+
+    if not target_token:
+        return False, "Missing Facebook Page Access Token"
+
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.get(f"https://graph.facebook.com/v19.0/{target_page_id}?fields=id,name&access_token={target_token}")
+            data = resp.json()
+            if "error" in data:
+                err = data["error"]
+                msg = err.get("message", "Invalid Token")
+                code = err.get("code")
+                if code == 190 or "expired" in msg.lower():
+                    return False, "Facebook Access Token has EXPIRED"
+                return False, f"Facebook API Error: {msg}"
+            return True, data.get("name", "OK")
+    except Exception as e:
+        return False, f"Network check failed: {e}"
+
 
 def load_fb_history() -> list:
     if os.path.exists(FB_HISTORY_FILE):
@@ -207,34 +235,43 @@ async def upload_reel_to_facebook(
         init_data = init_resp.json()
         if "error" in init_data:
             err_msg = init_data["error"].get("message", "Init failed")
-            bot_log(f"[FacebookBot] Upload init failed: {err_msg}")
+            code = init_data["error"].get("code")
+            bot_log(f"[FacebookBot] ❌ Upload init failed: {err_msg}")
+            if code == 190 or "expired" in err_msg.lower():
+                bot_log("[FacebookBot] 🔑 Facebook Access Token has EXPIRED! Please go to Admin -> Platforms -> Facebook and update your Page Access Token.")
             return {"success": False, "error": err_msg}
 
         video_id = init_data.get("video_id")
         upload_url = init_data.get("upload_url")
         if not video_id or not upload_url:
-            bot_log("[FacebookBot] Invalid init response from Facebook")
+            bot_log("[FacebookBot] ❌ Invalid init response from Facebook")
             return {"success": False, "error": "Invalid init response from Facebook"}
 
         bot_log(f"[FacebookBot] Initialized video_id: {video_id}")
 
         # Phase 2: Upload Binary
+        bot_log(f"[FacebookBot] Phase 2: Uploading {round(file_size/(1024*1024), 2)} MB binary video to Facebook...")
         with open(video_path, "rb") as vf:
             video_bytes = vf.read()
 
         headers = {
             "Authorization": f"OAuth {page_token}",
             "offset": "0",
-            "file_size": str(file_size)
+            "file_size": str(file_size),
+            "Content-Type": "application/octet-stream"
         }
-        upload_resp = await client.post(upload_url, headers=headers, content=video_bytes)
-        if upload_resp.status_code not in (200, 201):
-            bot_log(f"[FacebookBot] Binary upload failed: {upload_resp.text[:300]}")
-            return {"success": False, "error": f"Binary upload failed: {upload_resp.text[:300]}"}
-
-        bot_log("[FacebookBot] Binary uploaded successfully.")
+        try:
+            upload_resp = await client.post(upload_url, headers=headers, content=video_bytes)
+            if upload_resp.status_code not in (200, 201):
+                bot_log(f"[FacebookBot] ❌ Binary upload failed: {upload_resp.text[:300]}")
+                return {"success": False, "error": f"Binary upload failed: {upload_resp.text[:300]}"}
+            bot_log("[FacebookBot] ✅ Binary uploaded successfully.")
+        except Exception as ue:
+            bot_log(f"[FacebookBot] ❌ Binary upload network error: {ue}")
+            return {"success": False, "error": f"Binary upload network error: {ue}"}
 
         # Phase 3: Finish and Publish
+        bot_log(f"[FacebookBot] Phase 3: Finalizing publish for video {video_id}...")
         finish_resp = await client.post(init_url, data={
             "upload_phase": "finish",
             "access_token": page_token,
@@ -245,11 +282,11 @@ async def upload_reel_to_facebook(
         finish_data = finish_resp.json()
         if "error" in finish_data:
             err_msg = finish_data["error"].get("message", "Finish failed")
-            bot_log(f"[FacebookBot] Finish publish failed: {err_msg}")
+            bot_log(f"[FacebookBot] ❌ Finish publish failed: {err_msg}")
             return {"success": False, "error": err_msg}
 
         reel_url = f"https://www.facebook.com/reel/{video_id}"
-        bot_log(f"[FacebookBot] ✅ Reel published successfully: {reel_url}")
+        bot_log(f"[FacebookBot] 🚀 Reel published successfully: {reel_url}")
 
         # Phase 4: Copyright Verification & Instant Auto-Delete Guard
         bot_log(f"[FacebookBot] Verifying copyright compliance for Reel {video_id}...")
@@ -285,20 +322,20 @@ async def upload_reel_to_facebook(
                     break
 
                 if cp_check.get("status") == "complete" and cp_check.get("matches_found") is False:
-                    print(f"[FacebookBot] Copyright check passed for {video_id} (0 matches)")
+                    bot_log(f"[FacebookBot] Copyright check passed for {video_id} (0 matches)")
                     break
             except Exception as se:
-                print(f"[FacebookBot] Copyright check note ({check_idx+1}): {se}")
+                bot_log(f"[FacebookBot] Copyright check note ({check_idx+1}): {se}")
 
         if has_copyright_violation:
-            print(f"[FacebookBot] ⚠️ COPYRIGHT DETECTED for {video_id} ({copyright_reason})!")
-            print(f"[FacebookBot] 🗑️ AUTO-DELETING REEL {video_id} IMMEDIATELY FROM FACEBOOK...")
+            bot_log(f"[FacebookBot] ⚠️ COPYRIGHT DETECTED for {video_id} ({copyright_reason})!")
+            bot_log(f"[FacebookBot] 🗑️ AUTO-DELETING REEL {video_id} IMMEDIATELY FROM FACEBOOK...")
             try:
                 del_url = f"https://graph.facebook.com/v19.0/{video_id}?access_token={page_token}"
                 del_resp = await client.delete(del_url)
-                print(f"[FacebookBot] Deleted from FB: {del_resp.text}")
+                bot_log(f"[FacebookBot] Deleted from FB: {del_resp.text}")
             except Exception as de:
-                print(f"[FacebookBot] Delete call exception: {de}")
+                bot_log(f"[FacebookBot] Delete call exception: {de}")
             
             # Clean up local video file
             if os.path.exists(video_path):
@@ -315,10 +352,10 @@ async def upload_reel_to_facebook(
         # Phase 5: Wait and post 1st Comment once the Reel is fully published
         comment_id = None
         if comment_text:
-            print(f"[FacebookBot] Waiting for Reel {video_id} to finish processing before posting auto-comment...")
-            # Try for up to 90 seconds (15 attempts * 6 seconds) to ensure video is ready for comments
-            for comment_attempt in range(15):
-                await asyncio.sleep(6)
+            bot_log(f"[FacebookBot] Posting auto-comment to Reel {video_id}...")
+            # Try up to 5 attempts * 3 seconds to avoid blocking the workflow
+            for comment_attempt in range(5):
+                await asyncio.sleep(3)
                 try:
                     # Attempt 1: Post to /{video_id}/comments
                     c_resp = await client.post(
@@ -328,11 +365,10 @@ async def upload_reel_to_facebook(
                     c_data = c_resp.json()
                     if "id" in c_data:
                         comment_id = c_data["id"]
-                        print(f"[FacebookBot] ✅ Auto-comment successfully posted on video {video_id}: {comment_id}")
+                        bot_log(f"[FacebookBot] ✅ Auto-comment successfully posted on video {video_id}: {comment_id}")
                         break
                     
                     err_msg = c_data.get("error", {}).get("message", "")
-                    print(f"[FacebookBot] Comment attempt {comment_attempt+1} note: {err_msg or c_data}")
 
                     # Attempt 2: Post to /{page_id}_{video_id}/comments (feed post ID)
                     fb_post_id = f"{page_id}_{video_id}"
@@ -343,15 +379,15 @@ async def upload_reel_to_facebook(
                     c_data2 = c_resp2.json()
                     if "id" in c_data2:
                         comment_id = c_data2["id"]
-                        print(f"[FacebookBot] ✅ Auto-comment successfully posted on post {fb_post_id}: {comment_id}")
+                        bot_log(f"[FacebookBot] ✅ Auto-comment successfully posted on post {fb_post_id}: {comment_id}")
                         break
 
                     # If token is invalid or expired, stop immediately and log
                     if c_data.get("error", {}).get("code") == 190:
-                        print(f"[FacebookBot] ❌ Token expired or invalid! Cannot comment: {err_msg}")
+                        bot_log(f"[FacebookBot] ❌ Token expired or invalid! Cannot comment: {err_msg}")
                         break
                 except Exception as ce:
-                    print(f"[FacebookBot] Comment attempt {comment_attempt+1} exception: {ce}")
+                    bot_log(f"[FacebookBot] Comment attempt {comment_attempt+1} note: {ce}")
 
         return {
             "success": True,
@@ -378,7 +414,7 @@ async def post_photo_to_facebook(
     if not page_token:
         return {"success": False, "error": "Missing Facebook Page Access Token"}
 
-    print(f"[FacebookBot] Uploading photo poster to Page {page_id}...")
+    bot_log(f"[FacebookBot] Uploading photo poster to Page {page_id}...")
 
     async with httpx.AsyncClient(timeout=60.0) as client:
         try:
@@ -398,13 +434,13 @@ async def post_photo_to_facebook(
 
             if "error" in resp_data:
                 err_msg = resp_data["error"].get("message", "Photo upload failed")
-                print(f"[FacebookBot] Photo upload error: {err_msg}")
+                bot_log(f"[FacebookBot] Photo upload error: {err_msg}")
                 return {"success": False, "error": err_msg}
 
             photo_id = resp_data.get("id")
             post_id = resp_data.get("post_id") or photo_id
             post_url = f"https://www.facebook.com/{post_id}"
-            print(f"[FacebookBot] ✅ Photo published successfully: {post_url} (Photo ID: {photo_id})")
+            bot_log(f"[FacebookBot] ✅ Photo published successfully: {post_url} (Photo ID: {photo_id})")
 
             # Post 1st comment if provided
             comment_id = None
@@ -418,9 +454,9 @@ async def post_photo_to_facebook(
                     c_data = c_resp.json()
                     comment_id = c_data.get("id")
                     if comment_id:
-                        print(f"[FacebookBot] ✅ Auto 1st comment posted on photo: {comment_id}")
+                        bot_log(f"[FacebookBot] ✅ Auto 1st comment posted on photo: {comment_id}")
                 except Exception as ce:
-                    print(f"[FacebookBot] Photo comment notice: {ce}")
+                    bot_log(f"[FacebookBot] Photo comment notice: {ce}")
 
             history_entry = {
                 "title": "Meme Poster: Not All Heroes Stream",
@@ -442,7 +478,7 @@ async def post_photo_to_facebook(
                 "comment_id": comment_id
             }
         except Exception as e:
-            print(f"[FacebookBot] Photo upload exception: {e}")
+            bot_log(f"[FacebookBot] Photo upload exception: {e}")
             return {"success": False, "error": str(e)}
 
 async def publish_existing_reel(
@@ -804,7 +840,7 @@ async def cleanup_copyrighted_videos():
                 cp = st.get("copyright_check_status", {})
                 pub = st.get("publishing_phase", {})
                 if cp.get("matches_found") is True or pub.get("publish_status") in ("blocked", "rejected"):
-                    print(f"[FacebookBot] Background Guard: Auto-deleting claimed video {vid}...")
+                    bot_log(f"[FacebookBot] Background Guard: Auto-deleting claimed video {vid}...")
                     del_res = await client.delete(f"https://graph.facebook.com/v19.0/{vid}?access_token={page_token}")
                     bot_log(f"[FacebookBot] Background Guard delete response for {vid}: {del_res.text}")
     except Exception as e:

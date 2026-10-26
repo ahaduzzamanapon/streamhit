@@ -34,6 +34,15 @@
             --font-body: 'Plus Jakarta Sans', sans-serif;
         }
 
+        @keyframes progress-pulse {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        @keyframes progress-glow {
+            0%, 100% { opacity: 0.85; filter: drop-shadow(0 0 6px #00FF88); }
+            50% { opacity: 1; filter: drop-shadow(0 0 12px #00F0FF); }
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
@@ -2798,6 +2807,11 @@
                 _botTerminalTimer = null;
             }
         }
+        function switchAutomationSubtab(subTab) {
+            switchAutoSubTab(subTab);
+        }
+        window.switchAutomationSubtab = switchAutoSubTab;
+        window.switchAutoSubTab = switchAutoSubTab;
 
         // Global Platform Toggle Switch (Facebook, YouTube, TikTok)
         async function togglePlatformGlobal(platform, enabled) {
@@ -2863,12 +2877,28 @@
                         activeContainer.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-muted); font-size:13px;">No content in active processing queue. Click \'✨ Add Content\' to begin automation.</div>';
                     } else {
                         const isSeries = activeItem.type === 'series';
-                        const totalCalc = isSeries ? ((activeItem.total_episodes || 1) * (activeItem.parts_per_episode || 3)) : (activeItem.total_parts || 8);
+                        const totalCalc = activeItem.total_planned_parts || (isSeries ? ((activeItem.total_episodes_in_season || 1) * (activeItem.parts_per_episode || 3)) : (activeItem.total_parts || 8));
                         const completedCalc = activeItem.completed_parts_count || 0;
-                        const pct = Math.min(100, Math.round((completedCalc / totalCalc) * 100));
-                        const subText = isSeries ? `Series • S${activeItem.current_season||1} E${activeItem.current_episode||1} of ${activeItem.total_episodes||1} eps` : `Movie • ${activeItem.total_parts || 8} parts planned`;
+                        const overallPct = Math.min(100, Math.round((completedCalc / totalCalc) * 100));
+
                         const isBusy = d.daemon && d.daemon.is_busy;
                         const currentStep = d.daemon && d.daemon.current_step;
+                        const stepPct = isBusy ? (d.daemon.progress_percent || (currentStep === 'fetching_stream' ? 25 : (currentStep === 'rendering' ? 65 : (currentStep === 'distributing' ? 90 : 45)))) : overallPct;
+                        const stepLabel = (isBusy && d.daemon.step_label) ? d.daemon.step_label : '';
+
+                        let subText = '';
+                        if (isSeries) {
+                            const sCount = (activeItem.seasons && activeItem.seasons.length > 1) ? `Season ${activeItem.current_season||1} of ${activeItem.seasons.length}` : `Season ${activeItem.current_season||1}`;
+                            const epCount = activeItem.total_episodes_in_season || activeItem.total_episodes || 1;
+                            subText = `Series • ${sCount} (${epCount} Episodes) • ${totalCalc} Parts Total`;
+                        } else {
+                            subText = `Movie • ${totalCalc} parts planned`;
+                        }
+
+                        const targetText = isSeries 
+                            ? `S${activeItem.current_season||1} E${activeItem.current_episode||1} • Part ${activeItem.current_part||1} of ${activeItem.parts_per_episode||3}` 
+                            : `Part ${activeItem.current_part||1} of ${totalCalc}`;
+
                         const statusNote = isBusy ? `⚙️ Rendering Part ${activeItem.current_part||1}...` : (d.daemon ? d.daemon.next_post_display : 'Scheduled');
 
                         activeContainer.innerHTML = `
@@ -2885,24 +2915,34 @@
                                         </div>
                                     </div>
                                     <div style="font-size:12px; color:#00F0FF; margin-bottom:6px;">
-                                        🎬 Target: ${isSeries ? `S${activeItem.current_season||1} E${activeItem.current_episode||1} • Part ${activeItem.current_part||1}` : `Part ${activeItem.current_part||1}`} (75s clip) • Search banner: <em>"NXLY STREAM"</em>
+                                        🎬 Target: <strong>${targetText}</strong> (${activeItem.part_duration_seconds || 75}s vertical clip) • Search banner: <em>"NXLY STREAM"</em>
                                     </div>
                                     <div style="display:flex; justify-content:space-between; font-size:11.5px; margin-bottom:6px; color:var(--text-muted);">
-                                        <span>Progress: ${completedCalc}/${totalCalc} parts</span>
-                                        <span style="color:var(--accent-cyan); font-weight:700;">${pct}%</span>
+                                        <span>${isBusy ? `<span style="color:#00FF88; font-weight:700;">⚡ Active Progress: ${stepLabel || 'Creating safe vertical video...'}</span>` : `Series Progress: <strong style="color:#fff;">${completedCalc}</strong> of ${totalCalc} parts completed`}</span>
+                                        <span style="color:${isBusy ? '#00FF88' : 'var(--accent-cyan)'}; font-weight:700;">${isBusy ? stepPct + '%' : overallPct + '%'}</span>
                                     </div>
-                                    <div style="height:6px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden;">
-                                        <div style="height:100%; width:${pct}%; background:linear-gradient(90deg, var(--accent-cyan), var(--accent-green));"></div>
+                                    <div style="height:7px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden;">
+                                        <div style="height:100%; width:${isBusy ? stepPct + '%' : overallPct + '%'}; background:${isBusy ? 'linear-gradient(90deg, #00FF88, #00F0FF, #00FF88)' : 'linear-gradient(90deg, var(--accent-cyan), var(--accent-green))'}; background-size:200% 100%; ${isBusy ? 'animation: progress-pulse 1.5s linear infinite;' : ''} transition: width 0.4s ease;"></div>
                                     </div>
+                                    ${isBusy ? `
+                                        <div style="display:flex; justify-content:space-between; font-size:11px; margin-top:5px; color:var(--text-muted);">
+                                            <span>Overall Series Progress: <strong style="color:#fff;">${completedCalc}/${totalCalc}</strong> parts (${overallPct}%)</span>
+                                            <span style="color:#00F0FF; font-weight:600;">Continuous 10m auto-pilot</span>
+                                        </div>
+                                    ` : ''}
                                     <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
                                         <button class="btn-secondary" style="font-size:11px; padding:3px 8px;" onclick="handleTogglePlatformOnJob('${activeItem.id}', 'facebook')">📘 FB: ${activeItem.platforms?.facebook !== false ? 'ON' : 'OFF'}</button>
                                         <button class="btn-secondary" style="font-size:11px; padding:3px 8px;" onclick="handleTogglePlatformOnJob('${activeItem.id}', 'youtube')">🔴 YT: ${activeItem.platforms?.youtube ? 'ON' : 'OFF'}</button>
                                         <button class="btn-secondary" style="font-size:11px; padding:3px 8px;" onclick="handleTogglePlatformOnJob('${activeItem.id}', 'tiktok')">🎵 TT: ${activeItem.platforms?.tiktok ? 'ON' : 'OFF'}</button>
-                                        <button class="btn-primary" style="margin-left:auto; font-size:11px; padding:4px 12px; background:linear-gradient(135deg, #00FF88, #00CC66); color:#000; font-weight:800;" onclick="handleRunJobNow('${activeItem.id}')">⚡ Generate Part ${activeItem.current_part||1} Now</button>
+                                        <span style="margin-left:auto; font-size:11.5px; color:#00FF88; font-weight:700;">🤖 10m Continuous Auto-Pilot</span>
                                     </div>
                                 </div>
                             </div>
                         `;
+
+                        if (isBusy && currentTab === 'automation' && currentAutoSubTab === 'overview') {
+                            setTimeout(fetchAutomationOverview, 1500);
+                        }
                     }
                 }
             } catch(e) {}
@@ -2931,7 +2971,15 @@
                         badgeFb.innerText = p.facebook?.connected ? 'Connected' : 'Action Required';
                         badgeFb.style.color = p.facebook?.connected ? 'var(--accent-green)' : '#EF4444';
                     }
-                    if (infoFb) infoFb.innerText = p.facebook?.connected ? `Connected Page: ${p.facebook.name}` : (p.facebook?.error || 'Page ID or Access Token missing');
+                    if (infoFb) {
+                        if (p.facebook?.connected) {
+                            infoFb.innerText = `Connected Page: ${p.facebook.name}`;
+                            infoFb.style.color = 'var(--text-muted)';
+                        } else {
+                            const err = p.facebook?.error || 'Page ID or Access Token missing';
+                            infoFb.innerHTML = `<span style="color:#EF4444; font-weight:600;">⚠️ ${err}</span><br><a href="javascript:void(0)" onclick="openPlatformSettingsModal()" style="color:#60A5FA; text-decoration:underline; font-size:11px; margin-top:4px; display:inline-block;">⚙️ Click here to update Facebook Token &rarr;</a>`;
+                        }
+                    }
 
                     // YT
                     const ytSwitch = document.getElementById('globalSwitchYt');
@@ -3010,13 +3058,27 @@
                     return;
                 }
 
+                let hasProcessing = false;
                 container.innerHTML = d.jobs.map((j, idx) => {
                     const isSeries = j.type === 'series';
-                    const totalParts = isSeries ? ((j.total_episodes || 1) * (j.parts_per_episode || 3)) : (j.total_parts || 8);
+                    const totalParts = j.total_planned_parts || (isSeries ? ((j.total_episodes_in_season || 1) * (j.parts_per_episode || 3)) : (j.total_parts || 8));
                     const completed = j.completed_parts_count || 0;
                     const pct = Math.min(100, Math.round((completed / totalParts) * 100));
                     const isProcessing = j.status === 'processing';
+                    if (isProcessing) hasProcessing = true;
                     const isPaused = j.status === 'paused';
+
+                    let seriesInfo = '';
+                    if (isSeries) {
+                        const sNum = j.current_season || 1;
+                        const epNum = j.current_episode || 1;
+                        const maxEps = j.total_episodes_in_season || 1;
+                        const pNum = j.current_part || 1;
+                        const pPerEp = j.parts_per_episode || 3;
+                        seriesInfo = `S${sNum} E${epNum}/${maxEps} eps • Part ${pNum}/${pPerEp}`;
+                    } else {
+                        seriesInfo = `Part ${j.current_part || 1} of ${totalParts}`;
+                    }
 
                     return `
                         <div style="background:#0D1321; border:1px solid ${isProcessing ? 'var(--accent-green)' : 'rgba(255,255,255,0.08)'}; border-radius:10px; padding:16px; display:flex; gap:16px; align-items:center;">
@@ -3038,7 +3100,10 @@
                                     `)}
                                 </div>
                                 <div style="font-size:12px; color:#A0AEC0; margin-bottom:4px;">
-                                    🎬 <strong>Next Target:</strong> ${isSeries ? `S${j.current_season||1} E${j.current_episode||1} • Part ${j.current_part||1}` : `Part ${j.current_part||1} of ${totalParts}`} (${j.part_duration_seconds || 75}s vertical clip) | Completed: <span style="color:#fff; font-weight:700;">${completed}/${totalParts}</span> (${pct}%)
+                                    🎬 <strong>Next Target:</strong> ${seriesInfo} (${j.part_duration_seconds || 75}s vertical clip) | Completed: <span style="color:#fff; font-weight:700;">${completed}/${totalParts}</span> (${pct}%)
+                                </div>
+                                <div style="height:6px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden; margin:6px 0 8px 0;">
+                                    <div style="height:100%; width:${isProcessing ? '100%' : pct + '%'}; background:${isProcessing ? 'linear-gradient(90deg, #00FF88, #00F0FF, #00FF88)' : 'linear-gradient(90deg, var(--accent-cyan), var(--accent-green))'}; background-size:200% 100%; ${isProcessing ? 'animation: progress-pulse 1.5s linear infinite;' : ''} transition: width 0.3s ease;"></div>
                                 </div>
                                 <div style="font-size:11px; color:#00F0FF; margin-bottom:8px;">
                                     🔍 <strong>Overlay Banner:</strong> FULL DEKHAR JONNE GOOGLE SEARCH: "NXLY STREAM" • OR VISIT: NXLY.ONLINE
@@ -3048,7 +3113,7 @@
                                     <button class="btn-secondary" style="font-size:10.5px; padding:2px 8px;" onclick="handleTogglePlatformOnJob('${j.id}', 'youtube')">🔴 YT: ${j.platforms?.youtube ? 'ON' : 'OFF'}</button>
                                     <button class="btn-secondary" style="font-size:10.5px; padding:2px 8px;" onclick="handleTogglePlatformOnJob('${j.id}', 'tiktok')">🎵 TT: ${j.platforms?.tiktok ? 'ON' : 'OFF'}</button>
                                     <span style="margin-left:auto; display:flex; gap:6px; align-items:center;">
-                                        <button class="btn-primary" style="font-size:11px; padding:3px 10px; background:linear-gradient(135deg, #00FF88, #00CC66); color:#000; font-weight:800;" onclick="handleRunJobNow('${j.id}')">⚡ Generate Part ${j.current_part||1} Now</button>
+                                        <span style="font-size:11px; color:#00FF88; font-weight:700; margin-right:4px;">🤖 10m Auto-Pilot</span>
                                         <button class="btn-secondary" style="font-size:11px; padding:2px 7px;" onclick="handleJobAction('${j.id}', 'reorder', 'up')" ${idx === 0 ? 'disabled' : ''}>▲</button>
                                         <button class="btn-secondary" style="font-size:11px; padding:2px 7px;" onclick="handleJobAction('${j.id}', 'reorder', 'down')" ${idx === d.jobs.length - 1 ? 'disabled' : ''}>▼</button>
                                         <button class="btn-secondary" style="font-size:11px; padding:2px 8px;" onclick="handleJobAction('${j.id}', '${isPaused ? 'resume' : 'pause'}')">${isPaused ? '▶ Resume' : '⏸ Pause'}</button>
@@ -3059,6 +3124,10 @@
                         </div>
                     `;
                 }).join('');
+
+                if (hasProcessing && currentTab === 'automation' && currentAutoSubTab === 'queue') {
+                    setTimeout(renderQueueList, 2000);
+                }
             } catch(e) {}
         }
 
