@@ -3291,33 +3291,56 @@
             }
         }
 
+        let _wizardSearchResults = [];
+
         function handleWizardSearch(val) {
             clearTimeout(wizardSearchTimeout);
             const query = val.trim();
             if (!query) {
-                document.getElementById('wizSearchResultsBox').innerHTML = '<div style="padding:16px; text-align:center; color:var(--text-muted); font-size:12.5px;">Type a title above to search</div>';
+                document.getElementById('wizSearchResultsBox').innerHTML = '<div style="padding:16px; text-align:center; color:var(--text-muted); font-size:12.5px;">Type a title above to search and select multiple items</div>';
                 return;
             }
+            document.getElementById('wizSearchResultsBox').innerHTML = '<div style="padding:16px; text-align:center; color:var(--accent-cyan); font-size:12.5px;">🔍 Searching library for &quot;' + query + '&quot;...</div>';
+
             wizardSearchTimeout = setTimeout(async () => {
                 try {
-                    const res = await fetch(`/api/search?keyword=${encodeURIComponent(query)}`);
-                    const d = await res.json();
-                    const list = d.data?.list || [];
+                    let list = [];
+                    try {
+                        const res = await fetch('/api/search', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ keyword: query })
+                        });
+                        const d = await res.json();
+                        list = d.data?.items || d.data?.list || [];
+                    } catch(pe) {
+                        const res2 = await fetch(`/api/search?keyword=${encodeURIComponent(query)}`);
+                        const d2 = await res2.json();
+                        list = d2.data?.items || d2.data?.list || [];
+                    }
+
+                    _wizardSearchResults = list;
                     const box = document.getElementById('wizSearchResultsBox');
                     if (list.length === 0) {
-                        box.innerHTML = '<div style="padding:16px; text-align:center; color:var(--text-muted); font-size:12.5px;">No titles found for \'' + query + '\'</div>';
+                        box.innerHTML = '<div style="padding:16px; text-align:center; color:var(--text-muted); font-size:12.5px;">No titles found for &quot;' + query + '&quot;</div>';
                         return;
                     }
-                    box.innerHTML = list.map(item => {
-                        const isSel = wizardSelectedItems.some(x => x.id === (item.id || item.subjectId));
-                        const isSeries = item.type === 'series' || item.subjectType === 2 || (item.episodes && item.episodes.length > 1);
+
+                    box.innerHTML = list.map((item, idx) => {
+                        const itemId = String(item.subjectId || item.id || '');
+                        const isSel = wizardSelectedItems.some(x => String(x.id) === itemId);
+                        const isSeries = item.subjectType === 2 || item.type === 'series' || (item.episodes && item.episodes.length > 1);
+                        const coverImg = (typeof item.cover === 'object' && item.cover?.url) ? item.cover.url : (typeof item.cover === 'string' && item.cover ? item.cover : 'https://via.placeholder.com/30x45');
+                        const itemTitle = item.title || item.name || 'Untitled';
+                        const year = item.releaseDate ? item.releaseDate.substring(0, 4) : (item.year || '');
+
                         return `
-                            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.05); cursor:pointer;" onclick="toggleWizardTitleSelection(${JSON.stringify(item).replace(/"/g, '&quot;')})">
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.05); cursor:pointer;" onclick="selectWizardResultByIndex(${idx})">
                                 <div style="display:flex; align-items:center; gap:10px;">
-                                    <img src="${item.cover || item.poster || 'https://via.placeholder.com/30x45'}" style="width:28px; height:42px; border-radius:4px; object-fit:cover;">
+                                    <img src="${coverImg}" style="width:28px; height:42px; border-radius:4px; object-fit:cover;">
                                     <div>
-                                        <strong style="color:#fff; font-size:13px;">${item.title || item.name}</strong>
-                                        <div style="font-size:11px; color:var(--text-muted);">${isSeries ? '📺 Series' : '🎬 Movie'} • ${item.year || ''}</div>
+                                        <strong style="color:#fff; font-size:13px;">${itemTitle}</strong>
+                                        <div style="font-size:11px; color:var(--text-muted);">${isSeries ? '📺 Series' : '🎬 Movie'} ${year ? '• ' + year : ''}</div>
                                     </div>
                                 </div>
                                 <button type="button" class="btn-${isSel ? 'danger' : 'primary'}" style="font-size:11px; padding:3px 10px;">
@@ -3326,22 +3349,27 @@
                             </div>
                         `;
                     }).join('');
-                } catch(e) {}
-            }, 300);
+                } catch(e) {
+                    document.getElementById('wizSearchResultsBox').innerHTML = '<div style="padding:16px; text-align:center; color:#EF4444; font-size:12.5px;">Search error: ' + e + '</div>';
+                }
+            }, 250);
         }
 
-        function toggleWizardTitleSelection(item) {
-            const itemId = item.id || item.subjectId;
-            const idx = wizardSelectedItems.findIndex(x => x.id === itemId);
-            if (idx !== -1) {
-                wizardSelectedItems.splice(idx, 1);
+        function selectWizardResultByIndex(idx) {
+            const item = _wizardSearchResults[idx];
+            if (!item) return;
+            const itemId = String(item.subjectId || item.id || '');
+            const existingIdx = wizardSelectedItems.findIndex(x => String(x.id) === itemId);
+            if (existingIdx !== -1) {
+                wizardSelectedItems.splice(existingIdx, 1);
             } else {
-                const isSeries = item.type === 'series' || item.subjectType === 2 || (item.episodes && item.episodes.length > 1);
+                const isSeries = item.subjectType === 2 || item.type === 'series' || (item.episodes && item.episodes.length > 1);
+                const coverImg = (typeof item.cover === 'object' && item.cover?.url) ? item.cover.url : (typeof item.cover === 'string' && item.cover ? item.cover : '');
                 wizardSelectedItems.push({
                     id: itemId,
                     title: item.title || item.name,
                     type: isSeries ? 'series' : 'movie',
-                    cover: item.cover || item.poster || '',
+                    cover: coverImg,
                     detail_path: item.detailPath || item.detail_path || '',
                     total_episodes: item.totalEpisodes || (item.episodes ? item.episodes.length : 1),
                     seasons: [1]

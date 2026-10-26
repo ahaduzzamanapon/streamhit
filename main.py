@@ -2074,13 +2074,26 @@ async def api_filter(request: Request):
     _filter_cache_time[cache_key] = now
     return res
 
+@app.get("/api/search")
 @app.post("/api/search")
 async def api_search(request: Request):
-    payload = await request.json()
-    keyword = payload.get("keyword", "")
-    page = payload.get("page", 1)
-    perPage = payload.get("perPage", 24)
-    subjectType = payload.get("subjectType", 0)
+    if request.method == "POST":
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = {}
+        keyword = payload.get("keyword", "")
+        page = payload.get("page", 1)
+        perPage = payload.get("perPage", 24)
+        subjectType = payload.get("subjectType", 0)
+    else:
+        keyword = request.query_params.get("keyword", "") or request.query_params.get("q", "")
+        try: page = int(request.query_params.get("page", 1))
+        except Exception: page = 1
+        try: perPage = int(request.query_params.get("perPage", 24))
+        except Exception: perPage = 24
+        try: subjectType = int(request.query_params.get("subjectType", 0))
+        except Exception: subjectType = 0
 
     # 1. Primary: Official MovieBox Mobile Gateway (contains all latest releases)
     try:
