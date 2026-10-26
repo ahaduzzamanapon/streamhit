@@ -7,6 +7,7 @@ from urllib.parse import urlparse, parse_qsl
 import asyncio
 import random
 import time
+import datetime
 import base64
 import hashlib
 import hmac
@@ -780,6 +781,21 @@ async def init_db():
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
+                await cur.execute("""
+                    CREATE TABLE IF NOT EXISTS stream_resources (
+                        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                        subject_id VARCHAR(50) NOT NULL,
+                        season_num INT NOT NULL DEFAULT 1,
+                        episode_num INT NOT NULL DEFAULT 1,
+                        detail_path VARCHAR(255) DEFAULT '',
+                        resources_json MEDIUMTEXT NOT NULL,
+                        captions_json MEDIUMTEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        expires_at TIMESTAMP NOT NULL,
+                        UNIQUE KEY uniq_sub_se_ep (subject_id, season_num, episode_num),
+                        INDEX idx_expires (subject_id, season_num, episode_num, expires_at)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
                 # Seed default admin if table is empty
                 await cur.execute("SELECT COUNT(*) FROM admins")
                 row = await cur.fetchone()
@@ -809,6 +825,108 @@ async def get_db_pool():
             _db_init_attempted = True
             await init_db()
     return db_pool
+
+async def db_get_stream_resource(subject_id: str, season: int = 1, episode: int = 1) -> dict:
+    pool = await get_db_pool()
+    if not pool or not subject_id:
+        return None
+    try:
+        async with pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+                await cur.execute("""
+                    SELECT resources_json, captions_json, expires_at 
+                    FROM stream_resources 
+                    WHERE subject_id = %s AND season_num = %s AND episode_num = %s
+                    LIMIT 1
+                """, (str(subject_id), int(season), int(episode)))
+                row = await cur.fetchone()
+                if row:
+                    expires_at = row.get("expires_at")
+                    now = datetime.datetime.now()
+                    if expires_at and expires_at > now:
+                        res_list = json.loads(row.get("resources_json") or "[]")
+                        cap_list = json.loads(row.get("captions_json") or "[]") if row.get("captions_json") else []
+                        if res_list and not any(is_deprecated_or_dummy_url(it.get("url", "")) or is_deprecated_or_dummy_url(it.get("resourceLink", "")) for it in res_list):
+                            return {
+                                "resources": res_list,
+                                "captions": cap_list
+                            }
+    except Exception as e:
+        print(f"[DB Resource Read Error] {e}")
+    return None
+
+async def db_save_stream_resource(subject_id: str, season: int = 1, episode: int = 1, detail_path: str = "", resources: list = None, captions: list = None, ttl_hours: float = 24.0):
+    pool = await get_db_pool()
+    if not pool or not subject_id:
+        return
+    try:
+        res_json = json.dumps(resources or [])
+        cap_json = json.dumps(captions or []) if captions is not None else None
+        
+        hours = ttl_hours if (resources and len(resources) > 0) else 0.05
+        expires_at = datetime.datetime.now() + datetime.timedelta(hours=hours)
+
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                if cap_json is not None:
+                    await cur.execute("""
+                        INSERT INTO stream_resources (subject_id, season_num, episode_num, detail_path, resources_json, captions_json, expires_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        ON DUPLICATE KEY UPDATE
+                            detail_path = VALUES(detail_path),
+                            resources_json = VALUES(resources_json),
+                            captions_json = VALUES(captions_json),
+                            expires_at = VALUES(expires_at),
+                            created_at = CURRENT_TIMESTAMP
+                    """, (str(subject_id), int(season), int(episode), detail_path or "", res_json, cap_json, expires_at))
+                else:
+                    await cur.execute("""
+                        INSERT INTO stream_resources (subject_id, season_num, episode_num, detail_path, resources_json, expires_at)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        ON DUPLICATE KEY UPDATE
+                            detail_path = VALUES(detail_path),
+                            resources_json = VALUES(resources_json),
+                            expires_at = VALUES(expires_at),
+                            created_at = CURRENT_TIMESTAMP
+                    """, (str(subject_id), int(season), int(episode), detail_path or "", res_json, expires_at))
+    except Exception as e:
+        print(f"[DB Resource Save Error] {e}")
+
+async def db_update_captions(subject_id: str, season: int = 1, episode: int = 1, captions: list = None):
+    pool = await get_db_pool()
+    if not pool or not subject_id or not captions:
+        return
+    try:
+        cap_json = json.dumps(captions)
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("""
+                    UPDATE stream_resources 
+                    SET captions_json = %s 
+                    WHERE subject_id = %s AND season_num = %s AND episode_num = %s
+                """, (cap_json, str(subject_id), int(season), int(episode)))
+    except Exception as e:
+        print(f"[DB Captions Update Error] {e}")
+
+async def db_save_subject_meta(subject_id: str, title: str, subject_type: int = 1, cover: str = "", detail_path: str = ""):
+    pool = await get_db_pool()
+    if not pool or not subject_id or not title:
+        return
+    try:
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("""
+                    INSERT INTO subjects (subject_id, title, subject_type, cover, detail_path)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON DUPLICATE KEY UPDATE
+                        title = VALUES(title),
+                        subject_type = VALUES(subject_type),
+                        cover = COALESCE(NULLIF(VALUES(cover), ''), cover),
+                        detail_path = COALESCE(NULLIF(VALUES(detail_path), ''), detail_path),
+                        updated_at = CURRENT_TIMESTAMP
+                """, (str(subject_id), str(title), int(subject_type or 1), str(cover or ""), str(detail_path or "")))
+    except Exception:
+        pass
 
 def _is_process_alive(pid: int) -> bool:
     try:
@@ -2014,6 +2132,17 @@ async def api_search(request: Request):
                     "hasResource": bool(it.get("hasResource", True)),
                     "isCam": bool(it.get("isCam", False))
                 })
+
+            for ci in cleaned_items:
+                c_url = ci.get("cover", {}).get("url", "") if isinstance(ci.get("cover"), dict) else str(ci.get("cover") or "")
+                asyncio.create_task(db_save_subject_meta(
+                    subject_id=ci.get("subjectId", ""),
+                    title=ci.get("title", ""),
+                    subject_type=ci.get("subjectType", 1),
+                    cover=c_url,
+                    detail_path=ci.get("detailPath", "")
+                ))
+
             return {"code": 0, "data": {"items": cleaned_items, "pager": {"hasMore": len(cleaned_items) >= perPage}}}
     except Exception as e:
         print(f"Mobile search error: {e}")
@@ -2430,13 +2559,24 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
 
     cache_key = f"{subjectId}_{se}_{ep}_{detailPath}"
     now = time.time()
+
+    # 1. In-memory fast cache (Instant: < 0.001s)
     if cache_key in _resource_cache and (now - _resource_cache_time.get(cache_key, 0) < 7200):
         cached_val = _resource_cache[cache_key]
         cached_list = cached_val.get("data", {}).get("list") or []
         if not any(is_deprecated_or_dummy_url(it.get("url", "")) or is_deprecated_or_dummy_url(it.get("resourceLink", "")) for it in cached_list):
             return cached_val
 
-    # Request coalescing (single-flight): if already being fetched by another worker/coroutine, await that task!
+    # 2. Database persistent cache (Super fast: < 0.005s)
+    db_data = await db_get_stream_resource(subjectId, se, ep)
+    if db_data and db_data.get("resources"):
+        items = db_data["resources"]
+        res = {"code": 0, "data": {"list": items, "isUpcoming": False}}
+        _resource_cache[cache_key] = res
+        _resource_cache_time[cache_key] = now
+        return res
+
+    # 3. Single-flight request coalescing for upstream fetch
     if cache_key in _resource_inflight:
         try:
             return await _resource_inflight[cache_key]
@@ -2446,7 +2586,11 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
     task = asyncio.create_task(_do_fetch_resource(subjectId, se, ep, detailPath, cache_key))
     _resource_inflight[cache_key] = task
     try:
-        return await task
+        res = await task
+        items = res.get("data", {}).get("list") or []
+        if items:
+            asyncio.create_task(db_save_stream_resource(subjectId, se, ep, detailPath, items, ttl_hours=24.0))
+        return res
     finally:
         _resource_inflight.pop(cache_key, None)
  
@@ -2530,6 +2674,15 @@ async def api_captions(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
     if cap_cache_key in _captions_cache and (now - _captions_cache_time.get(cap_cache_key, 0) < 43200):
         return _captions_cache[cap_cache_key]
 
+    # 1. Database persistent captions check (< 0.005s)
+    db_data = await db_get_stream_resource(subjectId, se, ep)
+    if db_data and db_data.get("captions"):
+        db_caps = db_data["captions"]
+        res = {"code": 0, "data": {"list": db_caps}}
+        _captions_cache[cap_cache_key] = res
+        _captions_cache_time[cap_cache_key] = now
+        return res
+
     # Resolve resourceId if not supplied
     if not resourceId:
         for ck, cv in _resource_cache.items():
@@ -2538,6 +2691,10 @@ async def api_captions(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
                 if c_list and c_list[0].get("resourceId"):
                     resourceId = str(c_list[0].get("resourceId"))
                     break
+        if not resourceId and db_data and db_data.get("resources"):
+            c_list = db_data["resources"]
+            if c_list and c_list[0].get("resourceId"):
+                resourceId = str(c_list[0].get("resourceId"))
         if not resourceId:
             try:
                 res_obj = await api_resource(se=se, ep=ep, detailPath=detailPath, subjectId=subjectId)
@@ -2582,6 +2739,8 @@ async def api_captions(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
     if formatted:
         _captions_cache[cap_cache_key] = result
         _captions_cache_time[cap_cache_key] = now
+        # Update captions in database!
+        asyncio.create_task(db_update_captions(subjectId, se, ep, formatted))
     return result
 
 CDN_CANDIDATE_HEADERS = [
