@@ -3186,10 +3186,12 @@ async def serve_tiktok_site_verification_old():
     return "tiktok-developers-site-verification=NTqeb08BaARdLz5iiOUzMfzMoV9qKI3R"
 
 @app.get("/tiktok8ERMyMc1w1RVxSA9OuIdVCYUZ79ZQoHi.txt", response_class=PlainTextResponse)
+@app.get("/tjeh5JkBR3KjozRrcGQkHTh019x6e70s.txt", response_class=PlainTextResponse)
+@app.get("/tiktotjeh5JkBR3KjozRrcGQkHTh019x6e70s.txt", response_class=PlainTextResponse)
 @app.get("/tiktok-developers-site-verification", response_class=PlainTextResponse)
 @app.get("/tiktok-developers-site-verification.txt", response_class=PlainTextResponse)
 async def serve_tiktok_site_verification():
-    return "tiktok-developers-site-verification=8ERMyMc1w1RVxSA9OuIdVCYUZ79ZQoHi"
+    return "tiktok-developers-site-verification=tjeh5JkBR3KjozRrcGQkHTh019x6e70s"
 
 app.mount("/", StaticFiles(directory=os.path.join(base_dir, "public"), html=True), name="public")
 
