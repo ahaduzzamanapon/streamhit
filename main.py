@@ -2544,15 +2544,14 @@ def is_deprecated_or_dummy_url(url: str) -> bool:
     # Filter out ad / redirect landing domains (not playable MP4 streams)
     if any(ad_domain in u_lower for ad_domain in ["vegamovies.pet", "vegamovies.cx", "asiafilm.org", "fzmovies", "southfreak"]):
         return True
-    # Invalidate expired signed URLs (e.g. ?sign=...&t=1793083970)
+    # Invalidate expired signed URLs (tokens are valid for 2 hours = 7200s from creation timestamp t)
     if ("&t=" in u_lower or "?t=" in u_lower) and "sign=" in u_lower:
         try:
             parsed = urllib.parse.urlparse(url)
             qs = urllib.parse.parse_qs(parsed.query)
             if "t" in qs:
                 t_val = int(qs["t"][0])
-                # Consider expired if current time passed t_val
-                if time.time() > t_val:
+                if (time.time() - t_val) > 7200:
                     return True
         except Exception:
             pass
