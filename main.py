@@ -945,10 +945,8 @@ def _is_process_alive(pid: int) -> bool:
         return False
 
 async def run_sitemap_generator_background():
-    enable_startup = os.getenv("ENABLE_STARTUP_SITEMAP", "false").strip().lower() in ("true", "1", "yes")
-    if not enable_startup:
-        print("[Sitemap] Startup sitemap generation skipped (handled by daily cron). Set ENABLE_STARTUP_SITEMAP=true to enable.")
-        return
+    # Permanently disabled to protect CloudLinux process limits
+    return
 
     pid_file = os.path.join(base_dir, ".sitemap_generator.pid")
     tmp_pid_file = "/tmp/sitemap_generator.pid"
