@@ -829,6 +829,11 @@ async def trigger_auto_trending_reel(custom_title: Optional[str] = None, custom_
     except Exception as tte:
         print(f"[FacebookBot] TikTok distribution notice: {tte}")
 
+    # Clean up local video file after distribution
+    if os.path.exists(output_path):
+        try: os.remove(output_path)
+        except Exception: pass
+
     return {
         "success": upload_res.get("success", False) or yt_res.get("success", False) or tt_res.get("success", False),
         "title": target_title,

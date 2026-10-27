@@ -998,6 +998,13 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
                     )
                 except Exception as _ge:
                     bot_log(f"[FacebookBot] Group share note: {_ge}")
+                p_path = os.path.join(reel_generator.REELS_DIR, p_filename)
+                if os.path.exists(p_path):
+                    try:
+                        os.remove(p_path)
+                        bot_log(f"[AutoPilot] 🧹 Cleaned up published video file: {p_filename}")
+                    except Exception:
+                        pass
                 pending_uploads.pop(0)
                 active_job["pending_uploads"] = pending_uploads
                 now_str = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -1169,6 +1176,9 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
             except Exception: pass
 
         if not render_success or not os.path.exists(output_path) or os.path.getsize(output_path) < 1000:
+            if os.path.exists(output_path):
+                try: os.remove(output_path)
+                except Exception: pass
             retry_count = active_job.get("retry_count", 0) + 1
             active_job["retry_count"] = retry_count
             active_job["last_error"] = f"Render failed at {part_label}"
@@ -1321,6 +1331,14 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
         })
 
         job_finished = advance_job_progression(active_job, is_series, data, active_idx, now_str)
+
+        # Clean up local video file immediately upon successful distribution
+        if os.path.exists(output_path):
+            try:
+                os.remove(output_path)
+                bot_log(f"[AutoPilot] 🧹 Cleaned up published video file: {output_filename}")
+            except Exception as _ce:
+                bot_log(f"[AutoPilot] Note on video cleanup: {_ce}")
 
         # Save state & update last post timestamp
         fb_cfg = load_fb_config()
