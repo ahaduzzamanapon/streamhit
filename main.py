@@ -2539,12 +2539,10 @@ def is_deprecated_or_dummy_url(url: str) -> bool:
     if not url:
         return True
     u_lower = str(url).lower()
-    if "multiembed" in u_lower or "vidsrc" in u_lower or "2embed" in u_lower:
-        return False
     if any(bad in u_lower for bad in DEPRECATED_VIDEO_HASHES):
         return True
     # Filter out ad / redirect landing domains (not playable MP4 streams)
-    if any(ad_domain in u_lower for ad_domain in ["vegamovies.pet", "vegamovies.cx", "asiafilm.org", "fzmovies", "southfreak", "ailok.pe"]):
+    if any(ad_domain in u_lower for ad_domain in ["vegamovies.pet", "vegamovies.cx", "asiafilm.org", "fzmovies", "southfreak"]):
         return True
     # Invalidate expired signed URLs (tokens are valid for 2 hours = 7200s from creation timestamp t)
     if ("&t=" in u_lower or "?t=" in u_lower) and "sign=" in u_lower:
@@ -2593,50 +2591,6 @@ _resource_inflight = {}
 _captions_cache = {}
 _captions_cache_time = {}
 _tts_cache = {}
-_imdb_cache = {}
-
-async def resolve_imdb_id_for_subject(raw_title: str = "", detail_path: str = "") -> str:
-    query = raw_title or ""
-    if not query and detail_path:
-        slug = detail_path.split("/")[-1]
-        slug = re.sub(r'-[0-9]{15,}$', '', slug).replace("-", " ")
-        query = slug
-    
-    clean = re.sub(r'\[.*?\]|\(.*?\)', '', query or "").strip()
-    clean = re.sub(r'\s+S\d+.*$', '', clean, flags=re.IGNORECASE).strip()
-    clean = re.sub(r'\s+Season\s+\d+.*$', '', clean, flags=re.IGNORECASE).strip()
-    clean = re.sub(r'\b(hindi|dual audio|english|dubbed|complete)\b', '', clean, flags=re.IGNORECASE).strip()
-    
-    if not clean:
-        return ""
-        
-    cache_key = clean.lower()
-    if cache_key in _imdb_cache:
-        return _imdb_cache[cache_key]
-
-    try:
-        async with httpx.AsyncClient(timeout=4.0) as client:
-            s_url = f"https://v3-cinemeta.strem.io/catalog/series/top/search={urllib.parse.quote(clean)}.json"
-            resp = await client.get(s_url)
-            if resp.status_code == 200:
-                metas = resp.json().get("metas") or []
-                if metas and metas[0].get("imdb_id"):
-                    imdb_id = str(metas[0]["imdb_id"])
-                    _imdb_cache[cache_key] = imdb_id
-                    return imdb_id
-
-            m_url = f"https://v3-cinemeta.strem.io/catalog/movie/top/search={urllib.parse.quote(clean)}.json"
-            resp_m = await client.get(m_url)
-            if resp_m.status_code == 200:
-                metas = resp_m.json().get("metas") or []
-                if metas and metas[0].get("imdb_id"):
-                    imdb_id = str(metas[0]["imdb_id"])
-                    _imdb_cache[cache_key] = imdb_id
-                    return imdb_id
-    except Exception as e:
-        print(f"Cinemeta IMDb resolution error for {clean}: {e}")
-        
-    return ""
 
 async def _do_fetch_resource(subjectId: str, se: int, ep: int, detailPath: str, cache_key: str) -> dict:
     now = time.time()
@@ -2750,52 +2704,6 @@ async def _do_fetch_resource(subjectId: str, se: int, ep: int, detailPath: str, 
                                 break
             except Exception as se:
                 print(f"Fallback cleaned title search error: {se}")
-
-    # 3. Fallback: Embed streaming servers (MultiEmbed Multi-Audio / Hindi, VidSrc, 2Embed)
-    if not items:
-        raw_title = (mob_subj.get("title", "") if isinstance(mob_subj, dict) else "") or detailPath
-        imdb_id = await resolve_imdb_id_for_subject(raw_title, detailPath)
-        if imdb_id:
-            s_num = se if se > 0 else 1
-            e_num = ep if ep > 0 else 1
-            is_tv = (se > 0 or "tv/" in str(detailPath).lower() or (isinstance(mob_subj, dict) and (mob_subj.get("subjectType") == 2 or (mob_subj.get("seNum") or 0) > 0)))
-            
-            if is_tv:
-                multiembed_url = f"https://multiembed.mov/?video_id={imdb_id}&s={s_num}&e={e_num}"
-                vidsrc_url = f"https://vidsrc.me/embed/tv?imdb={imdb_id}&season={s_num}&episode={e_num}"
-                twoembed_url = f"https://www.2embed.cc/embedtv/{imdb_id}&s={s_num}&e={e_num}"
-            else:
-                multiembed_url = f"https://multiembed.mov/?video_id={imdb_id}"
-                vidsrc_url = f"https://vidsrc.me/embed/movie?imdb={imdb_id}"
-                twoembed_url = f"https://www.2embed.cc/embed/{imdb_id}"
-
-            items.append({
-                "resourceId": "embed_multiembed",
-                "resolution": 1080,
-                "size": 0,
-                "url": multiembed_url,
-                "resourceLink": multiembed_url,
-                "isEmbed": True,
-                "serverName": "Server 1 (Multi-Audio • Hindi)"
-            })
-            items.append({
-                "resourceId": "embed_vidsrc",
-                "resolution": 1080,
-                "size": 0,
-                "url": vidsrc_url,
-                "resourceLink": vidsrc_url,
-                "isEmbed": True,
-                "serverName": "Server 2 (VidSrc)"
-            })
-            items.append({
-                "resourceId": "embed_2embed",
-                "resolution": 720,
-                "size": 0,
-                "url": twoembed_url,
-                "resourceLink": twoembed_url,
-                "isEmbed": True,
-                "serverName": "Server 3 (2Embed)"
-            })
 
     res = {"code": 0, "data": {"list": items, "isUpcoming": len(items) == 0}}
     _resource_cache[cache_key] = res

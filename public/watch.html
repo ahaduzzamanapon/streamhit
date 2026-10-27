@@ -91,9 +91,6 @@
             <!-- Plyr Video -->
             <video id="player" playsinline></video>
 
-            <!-- Embed Player Iframe (Fallback for multi-server / alternative streams) -->
-            <iframe id="embedPlayerFrame" style="display:none;width:100%;height:100%;border:0;position:absolute;top:0;left:0;z-index:2;background:#000;" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture"></iframe>
-
             <!-- Loading Overlay -->
             <div class="player-loader-overlay" id="playerLoaderOverlay">
               <div class="player-spinner"></div>
@@ -189,14 +186,6 @@
               <button class="resume-toast-btn secondary" id="resumeToastStartOverBtn">Start Over</button>
               <button class="resume-toast-btn" id="resumeToastDismissBtn">OK</button>
             </div>
-          </div>
-
-          <!-- Watch Server Selector Strip -->
-          <div class="watch-server-strip" id="watchServerStrip" style="display:none;align-items:center;gap:10px;padding:10px 14px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:10px;margin-bottom:12px;flex-wrap:wrap;">
-            <span style="font-size:12px;font-weight:700;color:#9ca3af;display:inline-flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:0.5px;">
-              <i class="fa-solid fa-server" style="color:var(--accent,#00e676);"></i> Streaming Server:
-            </span>
-            <div id="watchServerButtons" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
           </div>
 
           <!-- TV Quick Prev/Next Episode Bar (Below Player) -->
