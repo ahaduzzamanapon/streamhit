@@ -2534,8 +2534,6 @@ DEPRECATED_VIDEO_HASHES = [
     "/other/2026/10/10/",
     "service_update",
     "discontinued",
-    "vegamovies",
-    "asiafilm",
     "480p-tran-audio-channel"
 ]
 

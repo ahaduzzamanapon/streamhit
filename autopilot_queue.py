@@ -1118,7 +1118,10 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
                     active_job["current_part"] = 1
                     active_job["status"] = "queued"
                     save_queue_data(data)
-            active_job["status"] = "paused"
+                else:
+                    active_job["status"] = "paused"
+            else:
+                active_job["status"] = "paused"
             data["state"]["is_busy"] = False
             data["state"]["step"] = "error_no_stream"
             save_queue_data(data)
