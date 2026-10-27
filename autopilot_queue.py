@@ -1274,6 +1274,7 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
         any_success = bool(fb_res.get("success") or yt_res.get("success") or tt_res.get("success"))
         active_platforms_count = sum([1 for act in [fb_is_active, yt_is_active, tt_is_active] if act])
 
+        now_str = time.strftime("%Y-%m-%d %H:%M:%S")
         if active_platforms_count > 0 and not any_success:
             bot_log(f"[AutoPilot] ❌ Upload failed on all active platforms ({fb_res.get('error') or 'Disconnect'}).")
             bot_log(f"[AutoPilot] ⏳ Video '{output_filename}' saved to waiting queue.")
