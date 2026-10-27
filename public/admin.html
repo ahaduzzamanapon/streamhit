@@ -1225,7 +1225,7 @@
                         <div class="card-header">
                             <div>
                                 <h2>📋 Active Automation Queue</h2>
-                                <div class="subtitle">Movies and series currently undergoing sequential slicing and multi-platform posting</div>
+                                <div class="subtitle">Movies and series rotated randomly every 10m for dynamic multi-title publishing</div>
                             </div>
                             <div style="display:flex; gap:10px;">
                                 <select id="filterQueueType" class="form-control" style="width:130px;" onchange="renderQueueList()">
@@ -1618,7 +1618,7 @@
                 </div>
                 <div class="form-group">
                     <label>Bottom Banner Search Prompt (Mandatory Google Search & Website)</label>
-                    <input type="text" id="wizBottomBannerText" class="form-control" value="FULL DEKHAR JONNE GOOGLE SEARCH: &quot;NXLY STREAM&quot;">
+                    <input type="text" id="wizBottomBannerText" class="form-control" value="TO WATCH FULL SEARCH GOOGLE: &quot;NXLY STREAM&quot;">
                 </div>
             </div>
 
@@ -3184,14 +3184,14 @@
                                     <div style="height:100%; width:${isProcessing ? '100%' : pct + '%'}; background:${isProcessing ? 'linear-gradient(90deg, #00FF88, #00F0FF, #00FF88)' : 'linear-gradient(90deg, var(--accent-cyan), var(--accent-green))'}; background-size:200% 100%; ${isProcessing ? 'animation: progress-pulse 1.5s linear infinite;' : ''} transition: width 0.3s ease;"></div>
                                 </div>
                                 <div style="font-size:11px; color:#00F0FF; margin-bottom:8px;">
-                                    🔍 <strong>Overlay Banner:</strong> FULL DEKHAR JONNE GOOGLE SEARCH: "NXLY STREAM" • OR VISIT: NXLY.ONLINE
+                                    🔍 <strong>Overlay Banner:</strong> TO WATCH FULL SEARCH GOOGLE: "NXLY STREAM" • OR VISIT: NXLY.ONLINE
                                 </div>
                                 <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                                     <button class="btn-secondary" style="font-size:10.5px; padding:2px 8px;" onclick="handleTogglePlatformOnJob('${j.id}', 'facebook')">📘 FB: ${j.platforms?.facebook !== false ? 'ON' : 'OFF'}</button>
                                     <button class="btn-secondary" style="font-size:10.5px; padding:2px 8px;" onclick="handleTogglePlatformOnJob('${j.id}', 'youtube')">🔴 YT: ${j.platforms?.youtube ? 'ON' : 'OFF'}</button>
                                     <button class="btn-secondary" style="font-size:10.5px; padding:2px 8px;" onclick="handleTogglePlatformOnJob('${j.id}', 'tiktok')">🎵 TT: ${j.platforms?.tiktok ? 'ON' : 'OFF'}</button>
                                     <span style="margin-left:auto; display:flex; gap:6px; align-items:center;">
-                                        <span style="font-size:11px; color:#00FF88; font-weight:700; margin-right:4px;">🤖 10m Auto-Pilot</span>
+                                        <span style="font-size:11px; color:#00FF88; font-weight:700; margin-right:4px;">🎲 10m Random Auto-Pilot</span>
                                         <button class="btn-secondary" style="font-size:11px; padding:2px 7px;" onclick="handleJobAction('${j.id}', 'reorder', 'up')" ${idx === 0 ? 'disabled' : ''}>▲</button>
                                         <button class="btn-secondary" style="font-size:11px; padding:2px 7px;" onclick="handleJobAction('${j.id}', 'reorder', 'down')" ${idx === d.jobs.length - 1 ? 'disabled' : ''}>▼</button>
                                         <button class="btn-secondary" style="font-size:11px; padding:2px 8px;" onclick="handleJobAction('${j.id}', '${isPaused ? 'resume' : 'pause'}')">${isPaused ? '▶ Resume' : '⏸ Pause'}</button>

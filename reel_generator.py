@@ -262,7 +262,11 @@ def generate_overlay_image(
         b1_text = bottom_text_custom.replace("{title}", clean_title).replace("{part_num}", str(part_num))
         b1_text = re.sub(r'[^\x00-\x7F]+', '', b1_text).strip()
     else:
-        b1_text = 'FULL DEKHAR JONNE GOOGLE SEARCH: "NXLY STREAM"'
+        b1_text = 'TO WATCH FULL SEARCH GOOGLE: "NXLY STREAM"'
+    
+    # Ensure video banner text is always 100% English (no Banglish)
+    if "FULL DEKHAR" in b1_text.upper() or "JONNE" in b1_text.upper():
+        b1_text = 'TO WATCH FULL SEARCH GOOGLE: "NXLY STREAM"'
     
     b2_text = "OR VISIT: NXLY.ONLINE"
 

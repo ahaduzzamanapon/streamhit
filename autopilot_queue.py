@@ -906,11 +906,30 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
                 break
 
     if not active_job:
-        for i, j in enumerate(jobs):
-            if j.get("status") in ("queued", "active", "processing", "waiting_upload", "waiting"):
-                active_job = j
-                active_idx = i
-                break
+        # First priority: check if any active job has pending rendered uploads that need publishing
+        pending_candidates = [
+            (i, j) for i, j in enumerate(jobs)
+            if j.get("status") in ("queued", "active", "processing", "waiting_upload", "waiting")
+            and (j.get("pending_uploads") or [])
+        ]
+        if pending_candidates:
+            import random
+            active_idx, active_job = random.choice(pending_candidates)
+            bot_log(f"[AutoPilot] 📦 Found pending rendered uploads for '{active_job.get('title')}'. Resuming publish first.")
+        else:
+            # Pick randomly from all active queued jobs (so page alternates variety instead of staying stuck on #1)
+            eligible_candidates = [
+                (i, j) for i, j in enumerate(jobs)
+                if j.get("status") in ("queued", "active", "processing", "waiting_upload", "waiting")
+            ]
+            if eligible_candidates:
+                import random
+                last_job_id = data.get("state", {}).get("current_job_id")
+                # Avoid picking the exact same title consecutively if other active queue items are available
+                different_candidates = [c for c in eligible_candidates if c[1].get("id") != last_job_id]
+                selection_pool = different_candidates if different_candidates else eligible_candidates
+                active_idx, active_job = random.choice(selection_pool)
+                bot_log(f"[AutoPilot] 🎲 Random Queue Dispatcher selected job #{active_idx + 1}: '{active_job.get('title')}' (from {len(eligible_candidates)} active titles in queue).")
 
     if not active_job:
         bot_log("[AutoPilot] ℹ️ Queue is empty or all titles paused. Standing by for content.")
@@ -1122,7 +1141,7 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
                 part_num=part,
                 total_parts=total_p_calc,
                 top_text_custom=top_text,
-                bottom_text_custom='FULL DEKHAR JONNE GOOGLE SEARCH: "NXLY STREAM"',
+                bottom_text_custom='TO WATCH FULL SEARCH GOOGLE: "NXLY STREAM"',
                 output_path=overlay_path
             )
         except Exception as oe:
