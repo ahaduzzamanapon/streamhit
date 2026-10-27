@@ -2539,7 +2539,21 @@ def is_deprecated_or_dummy_url(url: str) -> bool:
     if not url:
         return True
     u_lower = str(url).lower()
-    return any(bad in u_lower for bad in DEPRECATED_VIDEO_HASHES)
+    if any(bad in u_lower for bad in DEPRECATED_VIDEO_HASHES):
+        return True
+    # Invalidate expired signed URLs (e.g. ?sign=...&t=1793083970)
+    if ("&t=" in u_lower or "?t=" in u_lower) and "sign=" in u_lower:
+        try:
+            parsed = urllib.parse.urlparse(url)
+            qs = urllib.parse.parse_qs(parsed.query)
+            if "t" in qs:
+                t_val = int(qs["t"][0])
+                # Consider expired if current time passed t_val
+                if time.time() > t_val:
+                    return True
+        except Exception:
+            pass
+    return False
 
 def _extract_playable_detectors(detectors: list) -> list:
     mob_items = []
