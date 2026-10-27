@@ -444,6 +444,7 @@ async def render_single_reel_part(
     cmd = [
         get_ffmpeg_path(), "-y", "-nostdin",
         "-headers", headers_str,
+        "-rw_timeout", "15000000",
         "-reconnect", "1",
         "-reconnect_streamed", "1",
         "-reconnect_delay_max", "5",
@@ -470,9 +471,9 @@ async def render_single_reel_part(
     
     def _run_sync(cmd_to_run):
         try:
-            return subprocess.run(cmd_to_run, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=120)
+            return subprocess.run(cmd_to_run, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=90)
         except subprocess.TimeoutExpired:
-            print("[ReelEngine] FFmpeg process timed out after 480 seconds!")
+            print("[ReelEngine] FFmpeg process timed out after 90 seconds!")
             return None
         except Exception as ex:
             print(f"[ReelEngine] FFmpeg execution error: {ex}")
@@ -495,6 +496,7 @@ async def render_single_reel_part(
         fallback_cmd = [
             get_ffmpeg_path(), "-y", "-nostdin",
             "-headers", headers_str,
+            "-rw_timeout", "15000000",
             "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
             "-ss", str(start_seconds),
             "-t", str(duration_seconds),
