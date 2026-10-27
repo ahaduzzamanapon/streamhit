@@ -460,7 +460,7 @@ async def render_single_reel_part(
         "-b:a", "128k",
         "-ac", "2",
         "-ar", "44100",
-        "-threads", "0",
+        "-threads", "2",
         "-t", str(duration_seconds),
         "-movflags", "+faststart",
         output_mp4_path
@@ -470,7 +470,7 @@ async def render_single_reel_part(
     
     def _run_sync(cmd_to_run):
         try:
-            return subprocess.run(cmd_to_run, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=480)
+            return subprocess.run(cmd_to_run, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=120)
         except subprocess.TimeoutExpired:
             print("[ReelEngine] FFmpeg process timed out after 480 seconds!")
             return None
@@ -504,7 +504,7 @@ async def render_single_reel_part(
             "-map", "[vfinal]", "-map", "[afinal]",
             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
             "-c:a", "aac", "-b:a", "128k",
-            "-threads", "0",
+            "-threads", "2",
             "-t", str(duration_seconds), "-movflags", "+faststart",
             output_mp4_path
         ]
