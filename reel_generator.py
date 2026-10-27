@@ -421,6 +421,8 @@ async def render_single_reel_part(
             clean_url = urllib.parse.unquote(clean_url.split("source_url=")[-1])
         except Exception:
             pass
+    import urllib.parse
+    clean_url = urllib.parse.quote(clean_url, safe=":/=&?~#+!$,;'()*[]@%")
 
     if anti_copyright:
         filter_complex = (
