@@ -14,7 +14,7 @@ import hmac
 import aiomysql
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, HTTPException, Query, Response
-from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, RedirectResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
@@ -3180,6 +3180,10 @@ async def facebook_data_deletion_callback(request: Request):
         },
         status_code=200
     )
+
+@app.get("/tiktokNTqeb08BaARdLz5iiOUzMfzMoV9qKI3R.txt", response_class=PlainTextResponse)
+async def serve_tiktok_site_verification():
+    return "tiktok-developers-site-verification=NTqeb08BaARdLz5iiOUzMfzMoV9qKI3R"
 
 app.mount("/", StaticFiles(directory=os.path.join(base_dir, "public"), html=True), name="public")
 
