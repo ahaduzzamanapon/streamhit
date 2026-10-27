@@ -704,13 +704,15 @@ async def trigger_auto_trending_reel(custom_title: Optional[str] = None, custom_
 
         overlay_filename = f"fb_overlay_{slug}_{timestamp}.png"
         overlay_path = os.path.join(reel_generator.REELS_DIR, overlay_filename)
+        hook_msg = random.choice(reel_generator.VIRAL_HOOKS)
         reel_generator.generate_overlay_image(
             title=target_title,
             part_num=1,
             total_parts=1,
             top_text_custom="PART 1",
-            bottom_text_custom='GOOGLE SEARCH: "NXLY STREAM"',
-            output_path=overlay_path
+            bottom_text_custom='TO WATCH FULL SEARCH GOOGLE: "NXLY STREAM"',
+            output_path=overlay_path,
+            hook_text=hook_msg
         )
 
         is_tv = (candidate.get("subject_type") == 2)
@@ -718,7 +720,7 @@ async def trigger_auto_trending_reel(custom_title: Optional[str] = None, custom_
             start_seconds = random.randint(600, 1200)
         else:
             start_seconds = random.randint(1200, 2400)
-        duration_seconds = 75  # 1m 15s optimal high-retention reel duration
+        duration_seconds = 55  # 55s optimal high-retention viral duration
         min_label = f"{start_seconds // 60}:{start_seconds % 60:02d}"
         bot_log(f"[FacebookBot] Attempting {duration_seconds}s reel for '{target_title}' starting at {min_label} ({start_seconds}s)...")
 
@@ -747,14 +749,16 @@ async def trigger_auto_trending_reel(custom_title: Optional[str] = None, custom_
         return {"success": False, "error": "FFmpeg Reel generation failed for all candidates"}
 
     # Prepare Caption: SEO search prompt + High engagement (FB algorithm reach boost)
+    eng_question = random.choice(reel_generator.ENGAGEMENT_QUESTIONS)
     caption = (
         f"🔥 {target_title} 🎬🍿\n"
         f"━━━━━━━━━━━━━━━━━━\n"
-        f"🔍 Google-এ Search করুন: NXLY Stream\n"
+        f"❓ {eng_question}\n\n"
+        f"🍿 পুরো মুভি/সিরিজ দেখতে Google-এ Search করুন: NXLY Stream\n"
         f"👉 ১ম যে ওয়েবসাইট আসবে সেটাই! (First result is the one)\n\n"
         f"💬 ফুল ভিডিও ডিরেক্ট লিংক ১ম কমেন্টে দেওয়া আছে (1st Comment)! 👇\n"
         f"📲 Watch Free in 1080p Full HD on NXLY Stream!\n\n"
-        f"#reels #shorts #viral #movies #trending #nxly #{slug.lower()}"
+        f"#reels #shorts #viral #movies #trending #fyp #movieclips #nxlystream #{slug.lower()}"
     )
 
     # Prepare Comment: Contains ALL the links + Google Search hint

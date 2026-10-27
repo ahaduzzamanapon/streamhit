@@ -1610,10 +1610,11 @@
                     <div class="form-group">
                         <label>Target Clip Duration</label>
                         <select id="wizPartDuration" class="form-control">
+                            <option value="50">50 Seconds (High Viral Retention)</option>
+                            <option value="55" selected>55 Seconds (Recommended for Meta Reels / Explore)</option>
                             <option value="60">60 Seconds</option>
-                            <option value="75" selected>75 Seconds (Recommended for Shorts/Reels)</option>
+                            <option value="75">75 Seconds</option>
                             <option value="90">90 Seconds</option>
-                            <option value="120">120 Seconds</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -3066,7 +3067,7 @@
                                         </div>
                                     </div>
                                     <div style="font-size:12px; color:#00F0FF; margin-bottom:6px;">
-                                        🎬 Target: <strong>${targetText}</strong> (${activeItem.part_duration_seconds || 75}s vertical clip) • Search banner: <em>"NXLY STREAM"</em>
+                                        🎬 Target: <strong>${targetText}</strong> (${activeItem.part_duration_seconds || 55}s vertical clip) • Search banner: <em>"NXLY STREAM"</em>
                                     </div>
                                     <div style="display:flex; justify-content:space-between; font-size:11.5px; margin-bottom:6px; color:var(--text-muted);">
                                         <span>${isBusy ? `<span style="color:#00FF88; font-weight:700;">⚡ Active Progress: ${stepLabel || 'Creating safe vertical video...'}</span>` : `Series Progress: <strong style="color:#fff;">${completedCalc}</strong> of ${totalCalc} parts completed`}</span>
@@ -3251,7 +3252,7 @@
                                     `)}
                                 </div>
                                 <div style="font-size:12px; color:#A0AEC0; margin-bottom:4px;">
-                                    🎬 <strong>Next Target:</strong> ${seriesInfo} (${j.part_duration_seconds || 75}s vertical clip) | Completed: <span style="color:#fff; font-weight:700;">${completed}/${totalParts}</span> (${pct}%)
+                                    🎬 <strong>Next Target:</strong> ${seriesInfo} (${j.part_duration_seconds || 55}s vertical clip) | Completed: <span style="color:#fff; font-weight:700;">${completed}/${totalParts}</span> (${pct}%)
                                 </div>
                                 <div style="height:6px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden; margin:6px 0 8px 0;">
                                     <div style="height:100%; width:${isProcessing ? '100%' : pct + '%'}; background:${isProcessing ? 'linear-gradient(90deg, #00FF88, #00F0FF, #00FF88)' : 'linear-gradient(90deg, var(--accent-cyan), var(--accent-green))'}; background-size:200% 100%; ${isProcessing ? 'animation: progress-pulse 1.5s linear infinite;' : ''} transition: width 0.3s ease;"></div>
@@ -3707,7 +3708,7 @@
                 items: items,
                 config: {
                     auto_calculate: true,
-                    part_duration: 75,
+                    part_duration: 55,
                     anti_copyright: true,
                     publish_interval_minutes: 10,
                     platforms: {
@@ -3772,7 +3773,7 @@
                     movie_parts: parseInt(document.getElementById('wizMovieParts').value || 8),
                     series_parts_per_ep: parseInt(document.getElementById('wizSeriesPartsPerEp').value || 3),
                     start_offset: parseInt(document.getElementById('wizStartOffset').value || 600),
-                    part_duration: parseInt(document.getElementById('wizPartDuration').value || 75),
+                    part_duration: parseInt(document.getElementById('wizPartDuration').value || 55),
                     anti_copyright: document.getElementById('wizAntiCopyright').checked,
                     bottom_banner_text: document.getElementById('wizBottomBannerText').value.trim(),
                     platforms: {

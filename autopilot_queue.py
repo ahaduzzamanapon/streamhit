@@ -55,7 +55,7 @@ def load_queue_data() -> Dict[str, Any]:
                         "current_episode": r.get("current_episode") or 1,
                         "total_episodes_in_season": r.get("total_episodes_in_season") or 1,
                         "parts_per_episode": r.get("parts_per_episode") or 3,
-                        "part_duration_seconds": r.get("part_duration_seconds") or 75,
+                        "part_duration_seconds": r.get("part_duration_seconds") or 55,
                         "top_text": r.get("top_text") or "",
                         "retry_count": r.get("retry_count") or 0,
                         "last_error": r.get("last_error"),
@@ -199,7 +199,7 @@ def save_queue_data(data: Dict[str, Any]):
                         j.get("status", "queued"), j.get("current_part", 1), j.get("total_planned_parts", 40),
                         j.get("completed_parts_count", 0), j.get("current_season", 1), j.get("current_episode", 1),
                         j.get("total_episodes_in_season", 1), j.get("parts_per_episode", 3),
-                        j.get("part_duration_seconds", 75), j.get("top_text", ""),
+                        j.get("part_duration_seconds", 55), j.get("top_text", ""),
                         json.dumps(j.get("seasons", [1])), json.dumps(j.get("season_episodes_map", {"1": 1})),
                         json.dumps(j.get("platforms", {"facebook": True, "youtube": False, "tiktok": False})),
                         json.dumps(j.get("pending_uploads", [])), json.dumps(j.get("history", [])),
@@ -380,7 +380,7 @@ async def add_bulk_jobs_async(items: List[Dict[str, Any]], global_config: Option
 
     cfg = global_config or {}
     default_movie_parts = int(cfg.get("movie_parts") or 8)
-    default_part_duration = int(cfg.get("part_duration") or 75)
+    default_part_duration = int(cfg.get("part_duration") or 55)
     default_parts_per_ep = int(cfg.get("series_parts_per_ep") or cfg.get("parts_per_episode") or 3)
     enabled_platforms = cfg.get("platforms") or {"facebook": True, "youtube": True, "tiktok": True}
 
@@ -428,7 +428,7 @@ async def add_bulk_jobs_async(items: List[Dict[str, Any]], global_config: Option
             }
         else:
             auto_calc = cfg.get("auto_calculate", False) or not (raw.get("total_parts") or raw.get("parts"))
-            part_duration = int(raw.get("part_duration") or default_part_duration or 75)
+            part_duration = int(raw.get("part_duration") or default_part_duration or 55)
             
             total_parts = int(raw.get("total_parts") or raw.get("parts") or 0)
             if auto_calc or total_parts <= 0:
@@ -937,7 +937,7 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
 
     title = active_job.get("title", "Unknown Title")
     is_series = active_job.get("type") == "series"
-    part_duration = active_job.get("part_duration_seconds", 75)
+    part_duration = active_job.get("part_duration_seconds", 55)
     platforms_cfg = active_job.get("platforms") or {"facebook": True, "youtube": True, "tiktok": True}
     fb_is_active = platforms_cfg.get("facebook", True) and fb_cfg.get("auto_pilot_enabled", True)
     yt_is_active = platforms_cfg.get("youtube", True) and yt_cfg.get("auto_pilot_enabled", False)
@@ -1146,13 +1146,16 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
 
         try:
             total_p_calc = active_job.get("parts_per_episode", 3) if is_series else active_job.get("total_parts", 8)
+            import random
+            hook_msg = random.choice(reel_generator.VIRAL_HOOKS)
             reel_generator.generate_overlay_image(
                 title=title,
                 part_num=part,
                 total_parts=total_p_calc,
                 top_text_custom=top_text,
                 bottom_text_custom='TO WATCH FULL SEARCH GOOGLE: "NXLY STREAM"',
-                output_path=overlay_path
+                output_path=overlay_path,
+                hook_text=hook_msg
             )
         except Exception as oe:
             bot_log(f"[AutoPilot] Overlay generation note: {oe}")
@@ -1205,13 +1208,17 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
         save_queue_data(data)
 
         movie_web_url = f"https://nxly.online/movie/{active_job.get('detail_path')}" if active_job.get("detail_path") else "https://nxly.online"
+        import random
+        eng_question = random.choice(reel_generator.ENGAGEMENT_QUESTIONS)
         caption = (
             f"🔥 {top_text} 🎬🍿\n"
             f"━━━━━━━━━━━━━━━━━━\n"
+            f"❓ {eng_question}\n\n"
             f"🍿 পুরো মুভি/সিরিজ দেখতে Google-এ Search করুন: NXLY Stream\n"
-            f"👉 ১ম যে ওয়েবসাইট আসবে সেটাই!\n\n"
-            f"💬 ডিরেক্ট ওয়াচ লিংক ১ম কমেন্টে দেওয়া আছে (Check 1st Comment)! 👇\n\n"
-            f"#reels #shorts #viral #movies #trending #nxly"
+            f"👉 ১ম যে ওয়েবসাইট আসবে সেটাই! (First result is the one)\n\n"
+            f"💬 ডিরেক্ট ওয়াচ লিংক ১ম কমেন্টে দেওয়া আছে (Check 1st Comment)! 👇\n"
+            f"📲 Watch all movies & web series in Full HD for FREE on NXLY Stream!\n\n"
+            f"#reels #shorts #viral #movies #trending #fyp #movieclips #nxlystream"
         )
         comment_msg = (
             f"🍿 Full দেখার জন্য Google Search করুন: \"NXLY Stream\" অথবা সরাসরি Visit করুন: https://nxly.online\n\n"

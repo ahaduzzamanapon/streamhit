@@ -184,19 +184,46 @@ def format_seconds_to_time(secs: int) -> str:
         return f"{h:02d}:{m:02d}:{s:02d}"
     return f"{m:02d}:{s:02d}"
 
+VIRAL_HOOKS = [
+    "WAIT TILL THE END!",
+    "THIS SCENE GAVE ME CHILLS!",
+    "HE DID NOT EXPECT THIS!",
+    "BRO REGRETTED IMMEDIATELY!",
+    "NEVER UNDERESTIMATE HIM!",
+    "PURE GOOSEBUMPS MOMENT!",
+    "COLDEST SCENE EVER!",
+    "HE UNLEASHED HIS REAL POWER!",
+    "EVERYONE WAS SHOCKED!",
+    "UNSTOPPABLE BEAST MODE!"
+]
+
+ENGAGEMENT_QUESTIONS = [
+    "Rate this epic scene from 1 to 10! 👇🔥",
+    "Did he take it too far or was it justified? Comment below! 👇",
+    "Who was right in this situation? Let me know in the comments! 👇",
+    "Would you do the same in this situation? Drop your thoughts! 👇",
+    "Drop a 🔥 if you felt goosebumps in this scene!",
+    "What would you do if you were in his place? Tell us below! 👇",
+    "Tag a friend who needs to watch this masterpiece! 👇🍿",
+    "Tell us your favorite dialogue from this scene! 👇"
+]
+
 def generate_overlay_image(
     title: str,
     part_num: int,
     total_parts: int = 1,
     top_text_custom: str = "",
     bottom_text_custom: str = "",
-    output_path: str = ""
+    output_path: str = "",
+    hook_text: str = ""
 ) -> str:
     """
     Generates a high-impact, crisp 1080x1920 transparent PNG with bold
     top & bottom banners tailored for Reels / TikTok / Shorts.
-    Uses large, readable TrueType fonts with high contrast and zero emoji glitches.
+    Includes a 3-second viral curiosity hook pill, large title, part badge,
+    and bottom Google Search CTA banner.
     """
+    import random
     if not output_path:
         output_path = os.path.join(REELS_DIR, f"overlay_p{part_num}_{int(time.time()*1000)}.png")
 
@@ -209,52 +236,67 @@ def generate_overlay_image(
     draw = ImageDraw.Draw(img)
 
     clean_title = (title or "FEATURED MOVIE").upper().strip()
-    # Strip any emojis/non-ascii to avoid box □ glyph artifacts
     clean_title = re.sub(r'[^\x00-\x7F]+', '', clean_title).strip()
-    if len(clean_title) > 32:
-        clean_title = clean_title[:29] + "..."
+    if len(clean_title) > 30:
+        clean_title = clean_title[:27] + "..."
 
-    # ── TOP BANNER ──────────────────────────────────────────────────────────
-    # Container box: Y: 60 to 360 (Height 300px)
-    draw.rounded_rectangle([40, 60, 1040, 360], radius=32, fill=(10, 14, 24, 245), outline=(0, 210, 255, 240), width=6)
+    hook = (hook_text or random.choice(VIRAL_HOOKS)).upper().strip()
+    hook = re.sub(r'[^\x00-\x7F]+', '', hook).strip()
 
-    # Large bold title font (72px down to 48px depending on length)
-    font_size = 72 if len(clean_title) < 20 else (60 if len(clean_title) < 28 else 48)
+    # ── TOP BANNER CONTAINER (Y: 45 to 385, height 340px) ────────────────────
+    draw.rounded_rectangle([40, 45, 1040, 385], radius=32, fill=(10, 14, 24, 245), outline=(0, 210, 255, 240), width=6)
+
+    # 1. VIRAL HOOK PILL (Y: 65 to 135)
+    font_hook = get_font(34, bold=True)
+    h_box = draw.textbbox((0, 0), hook, font=font_hook)
+    h_w = h_box[2] - h_box[0]
+    h_h = h_box[3] - h_box[1]
+    
+    pill_w = max(340, h_w + 60)
+    pill_x1 = max(60, (1080 - pill_w) // 2)
+    pill_x2 = min(1020, pill_x1 + pill_w)
+    draw.rounded_rectangle([pill_x1, 65, pill_x2, 135], radius=18, fill=(245, 158, 11, 240), outline=(254, 240, 138, 240), width=3)
+    
+    h_x = (1080 - h_w) // 2
+    h_y = 65 + (70 - h_h) // 2 - 2
+    draw.text((h_x + 2, h_y + 2), hook, fill=(0, 0, 0, 200), font=font_hook)
+    draw.text((h_x, h_y), hook, fill=(255, 255, 255), font=font_hook)
+
+    # 2. MOVIE TITLE (Y: 155 to 250)
+    font_size = 64 if len(clean_title) < 20 else (52 if len(clean_title) < 28 else 44)
     font_title = get_font(font_size, bold=True)
     t_box = draw.textbbox((0, 0), clean_title, font=font_title)
     t_width = t_box[2] - t_box[0]
     t_x = (1080 - t_width) // 2
-    # Crisp drop shadow
-    draw.text((t_x + 4, 105 + 4), clean_title, fill=(0, 0, 0, 230), font=font_title)
-    draw.text((t_x, 105), clean_title, fill=(255, 255, 255), font=font_title)
+    t_y = 160
+    draw.text((t_x + 3, t_y + 3), clean_title, fill=(0, 0, 0, 230), font=font_title)
+    draw.text((t_x, t_y), clean_title, fill=(255, 255, 255), font=font_title)
 
-    # Part badge (clean text without missing emoji glyphs)
+    # 3. PART BADGE (Y: 265 to 355)
     if top_text_custom:
         part_text = top_text_custom.replace("{title}", clean_title).replace("{part_num}", str(part_num)).replace("{total_parts}", str(total_parts))
         part_text = re.sub(r'[^\x00-\x7F]+', '', part_text).strip()
     else:
         part_text = f"PART {part_num}" if total_parts <= 1 else f"PART {part_num} / {total_parts}"
     
-    font_part = get_font(52, bold=True)
+    font_part = get_font(48, bold=True)
     p_box = draw.textbbox((0, 0), part_text, font=font_part)
     p_width = p_box[2] - p_box[0]
     p_height = p_box[3] - p_box[1]
     
-    badge_w = max(360, p_width + 80)
+    badge_w = max(340, p_width + 80)
     badge_x1 = max(60, (1080 - badge_w) // 2)
     badge_x2 = min(1020, badge_x1 + badge_w)
-    badge_y1 = 225
-    badge_y2 = 315
-    draw.rounded_rectangle([badge_x1, badge_y1, badge_x2, badge_y2], radius=24, fill=(255, 38, 78, 255), outline=(255, 130, 155, 240), width=4)
+    badge_y1 = 265
+    badge_y2 = 355
+    draw.rounded_rectangle([badge_x1, badge_y1, badge_x2, badge_y2], radius=22, fill=(255, 38, 78, 255), outline=(255, 130, 155, 240), width=4)
     
     p_x = (1080 - p_width) // 2
-    p_y = badge_y1 + (badge_y2 - badge_y1 - p_height) // 2 - 3
+    p_y = badge_y1 + (badge_y2 - badge_y1 - p_height) // 2 - 2
     draw.text((p_x + 2, p_y + 2), part_text, fill=(0, 0, 0, 180), font=font_part)
     draw.text((p_x, p_y), part_text, fill=(255, 255, 255), font=font_part)
 
-    # ── BOTTOM BANNER ───────────────────────────────────────────────────────
-    # Positioned at Y: 1290 to 1510 (Height 220px) — completely ABOVE Facebook Reels
-    # page name, title, follow button, caption, and progress bar (which cover Y >= 1500)
+    # ── BOTTOM BANNER (Y: 1290 to 1510) ─────────────────────────────────────
     draw.rounded_rectangle([40, 1290, 1040, 1510], radius=28, fill=(10, 14, 24, 245), outline=(255, 42, 84, 240), width=6)
 
     # Line 1: Call to Action (Big Bold Golden Yellow)
@@ -264,13 +306,11 @@ def generate_overlay_image(
     else:
         b1_text = 'TO WATCH FULL SEARCH GOOGLE: "NXLY STREAM"'
     
-    # Ensure video banner text is always 100% English (no Banglish)
     if "FULL DEKHAR" in b1_text.upper() or "JONNE" in b1_text.upper():
         b1_text = 'TO WATCH FULL SEARCH GOOGLE: "NXLY STREAM"'
     
     b2_text = "OR VISIT: NXLY.ONLINE"
 
-    # Line 1 with auto-scaling to fit box perfectly
     font_size_b1 = 36
     font_b1 = get_font(font_size_b1, bold=True)
     b1_box = draw.textbbox((0, 0), b1_text, font=font_b1)
@@ -285,7 +325,7 @@ def generate_overlay_image(
     draw.text((b1_x + 3, 1335 + 3), b1_text, fill=(0, 0, 0, 220), font=font_b1)
     draw.text((b1_x, 1335), b1_text, fill=(255, 225, 40), font=font_b1)
 
-    # Line 2: App Branding & Website (Electric Cyan with auto-scaling)
+    # Line 2: App Branding & Website (Electric Cyan)
     font_size_b2 = 38
     font_b2 = get_font(font_size_b2, bold=True)
     b2_box = draw.textbbox((0, 0), b2_text, font=font_b2)
@@ -300,25 +340,24 @@ def generate_overlay_image(
     draw.text((b2_x + 3, 1425 + 3), b2_text, fill=(0, 0, 0, 220), font=font_b2)
     draw.text((b2_x, 1425), b2_text, fill=(0, 240, 255), font=font_b2)
 
-    if not output_path:
-        output_path = os.path.join(REELS_DIR, f"overlay_p{part_num}_{int(time.time()*1000)}.png")
-    
     img.save(output_path, "PNG")
     return output_path
 
 def generate_captions(title: str, part_num: int, total_parts: int = 1) -> Dict[str, str]:
+    import random
     slug = re.sub(r"[^a-zA-Z0-9]+", "", title.lower())
     title_short = f"🔥 {title} - PART {part_num} 🎬🍿"
+    question = random.choice(ENGAGEMENT_QUESTIONS)
     
     caption = (
         f"🔥 {title} • PART {part_num} 🎬🍿\n"
         f"━━━━━━━━━━━━━━━━━━\n"
-        f"🔍 Full দেখার জন্য Google-এ Search করুন: NXLY Stream\n"
-        f"🌐 অথবা Visit করুন: nxly.online\n"
+        f"❓ {question}\n\n"
+        f"🍿 পুরো মুভি/সিরিজ দেখতে Google-এ Search করুন: NXLY Stream\n"
         f"👉 ১ম যে ওয়েবসাইট আসবে সেটাই! (First result is the one)\n\n"
         f"💬 Full Movie / Series link is in 1st comment! 👇\n"
         f"📲 Watch all movies & web series in Full HD for FREE on NXLY Stream!\n\n"
-        f"#reels #shorts #viral #fyp #movie #nxlystream #trending #part{part_num} #{slug}"
+        f"#reels #shorts #viral #fyp #movie #movieclips #nxlystream #trending #part{part_num} #{slug}"
     )
     
     return {
