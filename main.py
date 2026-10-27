@@ -3203,6 +3203,45 @@ async def serve_privacy():
 async def serve_terms():
     return FileResponse(os.path.join(base_dir, "public", "terms-of-service.html"))
 
+@app.get("/api/tiktok/callback")
+async def tiktok_oauth_callback(code: str = Query(None), state: str = Query(None), error: str = Query(None)):
+    if error:
+        return HTMLResponse(f"<div style='font-family:sans-serif;padding:30px;text-align:center;'><h2>❌ Authorization Error</h2><p>{error}</p></div>")
+    if not code:
+        return HTMLResponse("<div style='font-family:sans-serif;padding:30px;text-align:center;'><h2>⚠️ Missing Code</h2><p>No authorization code received from TikTok.</p></div>")
+        
+    try:
+        from tiktok_bot import load_tt_config, save_tt_config
+        cfg = load_tt_config()
+        client_key = cfg.get("client_key", "").strip() or "aw4fx5rmwdzq4w9sg"
+        client_secret = cfg.get("client_secret", "").strip()
+        redirect_uri = "https://nxly.online/api/tiktok/callback"
+        
+        async with httpx.AsyncClient(timeout=25.0) as client:
+            token_url = "https://open.tiktokapis.com/v2/oauth/token/"
+            headers = {"Content-Type": "application/x-www-form-urlencoded"}
+            data = {
+                "client_key": client_key,
+                "client_secret": client_secret,
+                "code": code,
+                "grant_type": "authorization_code",
+                "redirect_uri": redirect_uri
+            }
+            resp = await client.post(token_url, headers=headers, data=data)
+            res_json = resp.json()
+            if "access_token" in res_json:
+                cfg["client_key"] = client_key
+                cfg["access_token"] = res_json["access_token"]
+                cfg["refresh_token"] = res_json.get("refresh_token", "")
+                cfg["token_expiry"] = int(time.time()) + int(res_json.get("expires_in", 86400))
+                cfg["auto_pilot_enabled"] = True
+                save_tt_config(cfg)
+                return HTMLResponse("<div style='font-family:sans-serif;padding:40px;text-align:center;color:#059669;'><h2>✅ TikTok Connected Successfully!</h2><p>Auto-pilot bot is now authorized to publish reels directly. You can close this tab.</p></div>")
+            else:
+                return HTMLResponse(f"<div style='font-family:sans-serif;padding:30px;'><h2>⚠️ Token Exchange Failed</h2><pre>{json.dumps(res_json, indent=2)}</pre></div>")
+    except Exception as e:
+        return HTMLResponse(f"<div style='font-family:sans-serif;padding:30px;'><h2>⚠️ Server Error</h2><p>{e}</p></div>")
+
 app.mount("/", StaticFiles(directory=os.path.join(base_dir, "public"), html=True), name="public")
 
 if __name__ == "__main__":
