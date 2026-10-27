@@ -3182,8 +3182,14 @@ async def facebook_data_deletion_callback(request: Request):
     )
 
 @app.get("/tiktokNTqeb08BaARdLz5iiOUzMfzMoV9qKI3R.txt", response_class=PlainTextResponse)
-async def serve_tiktok_site_verification():
+async def serve_tiktok_site_verification_old():
     return "tiktok-developers-site-verification=NTqeb08BaARdLz5iiOUzMfzMoV9qKI3R"
+
+@app.get("/tiktok8ERMyMc1w1RVxSA9OuIdVCYUZ79ZQoHi.txt", response_class=PlainTextResponse)
+@app.get("/tiktok-developers-site-verification", response_class=PlainTextResponse)
+@app.get("/tiktok-developers-site-verification.txt", response_class=PlainTextResponse)
+async def serve_tiktok_site_verification():
+    return "tiktok-developers-site-verification=8ERMyMc1w1RVxSA9OuIdVCYUZ79ZQoHi"
 
 app.mount("/", StaticFiles(directory=os.path.join(base_dir, "public"), html=True), name="public")
 
