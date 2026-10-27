@@ -2968,6 +2968,11 @@ async function loadPlayResources(subjectId, season = null, episode = null) {
             try { _vid.load(); } catch(e) {}
         }
     }
+    const embedFrame = document.getElementById("embedPlayerFrame");
+    if (embedFrame) {
+        embedFrame.style.display = "none";
+        embedFrame.removeAttribute("src");
+    }
     state.availableResources = [];
     state.availableCaptions = [];
 
@@ -3065,26 +3070,32 @@ async function loadPlayResources(subjectId, season = null, episode = null) {
     if (result && result.data && result.data.list && result.data.list.length > 0) {
         state.availableResources = result.data.list;
 
-        // Auto select highest resolution for subtitle fetching
-        const bestResource = state.availableResources.reduce((prev, current) => {
-            return (prev.resolution > current.resolution) ? prev : current;
-        });
+        const hasEmbed = state.availableResources.some(r => r.isEmbed);
+        if (hasEmbed) {
+            playEmbedResources();
+        } else {
+            hideEmbedPlayer();
+            // Auto select highest resolution for subtitle fetching
+            const bestResource = state.availableResources.reduce((prev, current) => {
+                return (prev.resolution > current.resolution) ? prev : current;
+            });
 
-        // Feed all resources to Play player first to play video immediately
-        playResources();
+            // Feed all resources to Play player first to play video immediately
+            playResources();
 
-        // Load subtitles in the background after 10 seconds of delay to avoid interfering with playback start
-        setTimeout(() => {
-            if (state.selectedSubject && state.availableResources && state.availableResources.length > 0) {
-                const bestRes = state.availableResources.reduce((prev, current) => {
-                    return (prev.resolution > current.resolution) ? prev : current;
-                });
-                console.log("[Player] Loading subtitles in background after playback start delay...");
-                loadSubtitles(state.selectedSubject.subjectId, bestRes.resourceId).catch(err => {
-                    console.error("[Player] Failed to load subtitles:", err);
-                });
-            }
-        }, 10000);
+            // Load subtitles in the background after 10 seconds of delay to avoid interfering with playback start
+            setTimeout(() => {
+                if (state.selectedSubject && state.availableResources && state.availableResources.length > 0) {
+                    const bestRes = state.availableResources.reduce((prev, current) => {
+                        return (prev.resolution > current.resolution) ? prev : current;
+                    });
+                    console.log("[Player] Loading subtitles in background after playback start delay...");
+                    loadSubtitles(state.selectedSubject.subjectId, bestRes.resourceId).catch(err => {
+                        console.error("[Player] Failed to load subtitles:", err);
+                    });
+                }
+            }, 10000);
+        }
     } else {
         console.error("No play resources found for this item");
         if (loaderOverlay) {
@@ -3285,6 +3296,96 @@ async function playResources() {
 
     // Always apply any cached/loaded subtitles to the media element
     updatePlayerSubtitles();
+}
+
+function playEmbedResources() {
+    const embedFrame = document.getElementById("embedPlayerFrame");
+    const videoEl = document.getElementById("player");
+    const loaderOverlay = document.getElementById("playerLoaderOverlay");
+    const serverStrip = document.getElementById("watchServerStrip");
+    const serverButtons = document.getElementById("watchServerButtons");
+    const pWrap = document.getElementById("playerWrapperEl");
+
+    if (playerInstance) {
+        try { playerInstance.pause(); } catch(e){}
+    }
+    if (videoEl) {
+        try { videoEl.pause(); } catch(e){}
+    }
+
+    if (loaderOverlay) {
+        loaderOverlay.classList.remove("visible");
+    }
+    if (pWrap) {
+        pWrap.classList.remove("is-loading");
+    }
+
+    const embedList = (state.availableResources || []).filter(r => r && r.isEmbed);
+    if (!embedList.length) return;
+
+    if (embedFrame) {
+        embedFrame.style.display = "block";
+        const currentSrc = embedFrame.getAttribute("src");
+        if (currentSrc !== embedList[0].url) {
+            embedFrame.src = embedList[0].url;
+        }
+    }
+
+    // Render server switcher buttons
+    if (serverStrip && serverButtons) {
+        serverStrip.style.display = "flex";
+        serverButtons.innerHTML = "";
+        embedList.forEach((srv, idx) => {
+            const btn = document.createElement("button");
+            btn.className = `server-btn ${idx === 0 ? "active" : ""}`;
+            btn.style.cssText = `
+                padding: 7px 16px;
+                border-radius: 8px;
+                border: 1px solid ${idx === 0 ? "var(--accent,#00e676)" : "rgba(255,255,255,0.18)"};
+                background: ${idx === 0 ? "rgba(0,230,118,0.22)" : "rgba(255,255,255,0.06)"};
+                color: ${idx === 0 ? "var(--accent,#00e676)" : "#fff"};
+                font-size: 13px;
+                font-weight: 700;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+            `;
+            btn.innerHTML = `<i class="fa-solid fa-play" style="font-size:10px;"></i> ${srv.serverName || ('Server ' + (idx + 1))}`;
+            btn.onclick = () => {
+                if (embedFrame) embedFrame.src = srv.url;
+                Array.from(serverButtons.children).forEach(c => {
+                    c.style.borderColor = "rgba(255,255,255,0.18)";
+                    c.style.background = "rgba(255,255,255,0.06)";
+                    c.style.color = "#fff";
+                });
+                btn.style.borderColor = "var(--accent,#00e676)";
+                btn.style.background = "rgba(0,230,118,0.22)";
+                btn.style.color = "var(--accent,#00e676)";
+            };
+            serverButtons.appendChild(btn);
+        });
+    }
+
+    // Hide direct download button because this is an embedded source
+    const dlBtn = document.getElementById("watchDownloadBtn") || document.getElementById("downloadBtn");
+    if (dlBtn) {
+        dlBtn.style.display = "none";
+    }
+}
+
+function hideEmbedPlayer() {
+    const embedFrame = document.getElementById("embedPlayerFrame");
+    const serverStrip = document.getElementById("watchServerStrip");
+
+    if (embedFrame) {
+        embedFrame.style.display = "none";
+        embedFrame.removeAttribute("src");
+    }
+    if (serverStrip) {
+        serverStrip.style.display = "none";
+    }
 }
 
 async function loadSubtitles(subjectId, resourceId) {
