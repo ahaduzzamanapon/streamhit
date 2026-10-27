@@ -373,13 +373,11 @@ async def render_single_reel_part(
     """
     clean_url = stream_url.strip()
     if "source_url=" in clean_url:
-        if clean_url.startswith("/fetch"):
-            clean_url = "https://nxly.online" + clean_url
-    elif "hakunaymatata.com" in clean_url or "aoneroom.com" in clean_url:
         import urllib.parse
-        clean_url = f"https://nxly.online/fetch?source_url={urllib.parse.quote(clean_url)}"
-    elif clean_url.startswith("/fetch"):
-        clean_url = "https://nxly.online" + clean_url
+        try:
+            clean_url = urllib.parse.unquote(clean_url.split("source_url=")[-1])
+        except Exception:
+            pass
 
     if anti_copyright:
         filter_complex = (

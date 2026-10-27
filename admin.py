@@ -1218,6 +1218,15 @@ async def admin_facebook_terminal_log(request: Request):
         "last_post_time": cfg.get("last_post_time", 0)
     }
 
+@router.post("/api/admin/facebook/terminal-clear")
+@router.post("/api/admin/automation/terminal-clear")
+async def admin_facebook_terminal_clear(request: Request):
+    check_admin_auth(request)
+    import facebook_bot
+    facebook_bot.clear_live_logs()
+    return {"code": 0, "success": True, "message": "Live terminal logs cleared successfully."}
+
+
 @router.post("/api/admin/facebook/terminal-run")
 async def admin_facebook_terminal_run(request: Request):
     check_admin_auth(request)

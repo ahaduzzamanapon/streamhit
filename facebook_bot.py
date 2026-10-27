@@ -60,6 +60,17 @@ def get_live_logs() -> str:
         return "\n".join(_LIVE_LOGS[-150:])
     return f"[{time.strftime('%Y-%m-%d %I:%M:%S %p', get_bd_time())}] [FacebookBot] Auto-Pilot daemon active (10m cycle). Waiting for trigger."
 
+def clear_live_logs():
+    global _LIVE_LOGS
+    _LIVE_LOGS.clear()
+    for log_path in (TEMP_LOG_FILE, LOCAL_LOG_FILE):
+        try:
+            if os.path.exists(log_path):
+                with open(log_path, "w", encoding="utf-8") as f:
+                    f.write("")
+        except Exception:
+            pass
+
 DEFAULT_PAGE_ID = os.environ.get("FB_PAGE_ID", "1367186939808744")
 DEFAULT_PAGE_TOKEN = os.environ.get("FB_PAGE_TOKEN", "")
 

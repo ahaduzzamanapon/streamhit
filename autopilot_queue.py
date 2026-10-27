@@ -11,7 +11,111 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 QUEUE_FILE = os.path.join(BASE_DIR, "public", "reels", "autopilot_queue.json")
 CONFIG_FILE = os.path.join(BASE_DIR, "facebook_config.json")
 
+def get_db():
+    try:
+        import pymysql
+        from dotenv import load_dotenv
+        env_path = os.path.join(BASE_DIR, ".env")
+        if os.path.exists(env_path):
+            load_dotenv(env_path)
+        host = os.getenv("DB_HOST", "127.0.0.1")
+        port = int(os.getenv("DB_PORT", "3306"))
+        user = os.getenv("DB_USER", "lcsyxfen_streamhit")
+        password = os.getenv("DB_PASSWORD", "lcsyxfen_streamhit")
+        db = os.getenv("DB_NAME", "lcsyxfen_streamhit")
+        return pymysql.connect(
+            host=host, port=port, user=user, password=password, database=db,
+            autocommit=True, connect_timeout=4, cursorclass=pymysql.cursors.DictCursor
+        )
+    except Exception:
+        return None
+
 def load_queue_data() -> Dict[str, Any]:
+    # 1. Try MySQL First
+    conn = get_db()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM automation_jobs ORDER BY sort_order ASC, created_at ASC")
+                rows = cur.fetchall()
+                jobs = []
+                for r in rows:
+                    j = {
+                        "id": r["id"],
+                        "subject_id": r["subject_id"],
+                        "title": r["title"],
+                        "type": r["type"],
+                        "cover": r.get("cover") or "",
+                        "detail_path": r.get("detail_path") or "",
+                        "status": r.get("status") or "queued",
+                        "current_part": r.get("current_part") or 1,
+                        "total_planned_parts": r.get("total_planned_parts") or 40,
+                        "completed_parts_count": r.get("completed_parts_count") or 0,
+                        "current_season": r.get("current_season") or 1,
+                        "current_episode": r.get("current_episode") or 1,
+                        "total_episodes_in_season": r.get("total_episodes_in_season") or 1,
+                        "parts_per_episode": r.get("parts_per_episode") or 3,
+                        "part_duration_seconds": r.get("part_duration_seconds") or 75,
+                        "top_text": r.get("top_text") or "",
+                        "retry_count": r.get("retry_count") or 0,
+                        "last_error": r.get("last_error"),
+                        "seasons": json.loads(r["seasons_json"]) if r.get("seasons_json") else [1],
+                        "season_episodes_map": json.loads(r["season_episodes_map_json"]) if r.get("season_episodes_map_json") else {"1": 1},
+                        "platforms": json.loads(r["platforms_json"]) if r.get("platforms_json") else {"facebook": True, "youtube": False, "tiktok": False},
+                        "pending_uploads": json.loads(r["pending_uploads_json"]) if r.get("pending_uploads_json") else [],
+                        "history": json.loads(r["history_json"]) if r.get("history_json") else [],
+                        "sort_order": r.get("sort_order") or 0
+                    }
+                    jobs.append(j)
+
+                # Fetch state
+                cur.execute("SELECT v FROM automation_state WHERE k='state'")
+                st_row = cur.fetchone()
+                st = json.loads(st_row["v"]) if st_row and st_row.get("v") else {}
+                default_state = {
+                    "is_busy": False,
+                    "step": "idle",
+                    "current_job_id": None,
+                    "current_title": "",
+                    "current_part_label": "",
+                    "progress_percent": 0,
+                    "step_label": "",
+                    "busy_since": 0,
+                    "last_run_timestamp": 0,
+                    "next_run_timestamp": int(time.time()) + 600,
+                    "active_node_id": "idle"
+                }
+                default_state.update(st)
+                
+                # Check stale busy (> 180s)
+                now_ts = int(time.time())
+                if default_state.get("is_busy"):
+                    busy_since = default_state.get("busy_since") or default_state.get("last_run_timestamp") or 0
+                    if now_ts - busy_since > 180:
+                        default_state["is_busy"] = False
+                        default_state["step"] = "idle"
+                        default_state["busy_since"] = 0
+                        cur.execute("REPLACE INTO automation_state (k, v) VALUES ('state', %s)", (json.dumps(default_state),))
+                        cur.execute("UPDATE automation_jobs SET status='queued' WHERE status='processing'")
+                        for j in jobs:
+                            if j.get("status") == "processing":
+                                j["status"] = "queued"
+
+                data = {"jobs": jobs, "finished": [], "state": default_state}
+                # Sync mirror file
+                try:
+                    os.makedirs(os.path.dirname(QUEUE_FILE), exist_ok=True)
+                    with open(QUEUE_FILE, "w", encoding="utf-8") as f:
+                        json.dump(data, f, indent=2, ensure_ascii=False)
+                except Exception:
+                    pass
+                return data
+        except Exception as e:
+            print(f"[AutoQueue] MySQL read notice: {e}")
+        finally:
+            conn.close()
+
+    # 2. Fallback to JSON file if MySQL offline
     if os.path.exists(QUEUE_FILE):
         try:
             with open(QUEUE_FILE, "r", encoding="utf-8") as f:
@@ -19,54 +123,10 @@ def load_queue_data() -> Dict[str, Any]:
                 if "jobs" not in d: d["jobs"] = []
                 if "finished" not in d: d["finished"] = []
                 if "state" not in d: d["state"] = {}
-
-                # Stale lock recovery: auto-release if is_busy has lasted > 180 seconds
-                now_ts = int(time.time())
-                st = d["state"]
-                if st.get("is_busy"):
-                    busy_since = st.get("busy_since") or st.get("last_run_timestamp") or 0
-                    if now_ts - busy_since > 180:
-                        print("[AutoQueue] ⚠️ Detected stale busy state (>180s). Releasing lock and resetting job to queued.")
-                        st["is_busy"] = False
-                        st["step"] = "idle"
-                        st["busy_since"] = 0
-                        for j in d["jobs"]:
-                            if j.get("status") == "processing":
-                                j["status"] = "queued"
-
-                # Series metadata auto-repair for existing jobs in queue
-                for j in d["jobs"]:
-                    if j.get("type") == "series":
-                        # If Naruto or single-ep bug detected
-                        if "naruto" in j.get("title", "").lower() and j.get("total_episodes_in_season", 0) <= 1:
-                            j["seasons"] = [1]
-                            j["season_episodes_map"] = {"1": 374}
-                            j["total_episodes_in_season"] = 374
-                            j["total_planned_parts"] = 374 * int(j.get("parts_per_episode") or 3)
-                        elif j.get("total_planned_parts", 0) <= 3 and j.get("total_episodes_in_season", 0) > 1:
-                            j["total_planned_parts"] = j["total_episodes_in_season"] * int(j.get("parts_per_episode") or 3)
-
-                    # Auto-recovery: If job has unposted history items (fb_url is None), move them to pending_uploads
-                    unposted = [h for h in j.get("history", []) if not h.get("fb_url") and not h.get("yt_url")]
-                    if unposted and not j.get("pending_uploads"):
-                        p_list = []
-                        for u in unposted:
-                            p_list.append({
-                                "part_label": u.get("part_label"),
-                                "video_filename": u.get("video_filename"),
-                                "caption": f"🍿 Watch {j.get('title')} - {u.get('part_label')} on NXLY Stream!\n\n👉 Full details in 1st comment below.",
-                                "comment_text": "🔍 Google Search: NXLY Stream\n🍿 Watch in 1080p HD: https://nxly.online",
-                                "file_size_mb": u.get("file_size_mb", 0),
-                                "status": "waiting_upload"
-                            })
-                        j["pending_uploads"] = p_list
-                        j["history"] = [h for h in j.get("history", []) if h.get("fb_url") or h.get("yt_url")]
-                        j["completed_parts_count"] = len(j["history"])
-                        j["current_part"] = 1
-                        j["status"] = "waiting_upload"
                 return d
         except Exception:
             pass
+
     return {
         "jobs": [],
         "finished": [],
@@ -86,12 +146,77 @@ def load_queue_data() -> Dict[str, Any]:
     }
 
 def save_queue_data(data: Dict[str, Any]):
+    # 1. Update MySQL
+    conn = get_db()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                # Save state
+                if "state" in data:
+                    cur.execute("REPLACE INTO automation_state (k, v) VALUES ('state', %s)", (json.dumps(data["state"]),))
+                
+                # Upsert jobs
+                jobs = data.get("jobs", [])
+                job_ids = [j.get("id") for j in jobs if j.get("id")]
+                if job_ids:
+                    format_strings = ','.join(['%s'] * len(job_ids))
+                    cur.execute(f"DELETE FROM automation_jobs WHERE id NOT IN ({format_strings})", tuple(job_ids))
+                else:
+                    cur.execute("DELETE FROM automation_jobs")
+
+                for idx, j in enumerate(jobs):
+                    cur.execute("""
+                        INSERT INTO automation_jobs (
+                            id, subject_id, title, type, cover, detail_path, status,
+                            current_part, total_planned_parts, completed_parts_count,
+                            current_season, current_episode, total_episodes_in_season,
+                            parts_per_episode, part_duration_seconds, top_text,
+                            seasons_json, season_episodes_map_json, platforms_json,
+                            pending_uploads_json, history_json, last_error, retry_count, sort_order
+                        ) VALUES (
+                            %s, %s, %s, %s, %s, %s, %s,
+                            %s, %s, %s,
+                            %s, %s, %s,
+                            %s, %s, %s,
+                            %s, %s, %s,
+                            %s, %s, %s, %s, %s
+                        ) ON DUPLICATE KEY UPDATE
+                            status=VALUES(status),
+                            current_part=VALUES(current_part),
+                            total_planned_parts=VALUES(total_planned_parts),
+                            completed_parts_count=VALUES(completed_parts_count),
+                            current_season=VALUES(current_season),
+                            current_episode=VALUES(current_episode),
+                            total_episodes_in_season=VALUES(total_episodes_in_season),
+                            pending_uploads_json=VALUES(pending_uploads_json),
+                            history_json=VALUES(history_json),
+                            last_error=VALUES(last_error),
+                            retry_count=VALUES(retry_count),
+                            sort_order=VALUES(sort_order)
+                    """, (
+                        j.get("id"), str(j.get("subject_id", "0")), j.get("title", "Unknown"),
+                        j.get("type", "movie"), j.get("cover", ""), j.get("detail_path", ""),
+                        j.get("status", "queued"), j.get("current_part", 1), j.get("total_planned_parts", 40),
+                        j.get("completed_parts_count", 0), j.get("current_season", 1), j.get("current_episode", 1),
+                        j.get("total_episodes_in_season", 1), j.get("parts_per_episode", 3),
+                        j.get("part_duration_seconds", 75), j.get("top_text", ""),
+                        json.dumps(j.get("seasons", [1])), json.dumps(j.get("season_episodes_map", {"1": 1})),
+                        json.dumps(j.get("platforms", {"facebook": True, "youtube": False, "tiktok": False})),
+                        json.dumps(j.get("pending_uploads", [])), json.dumps(j.get("history", [])),
+                        j.get("last_error"), j.get("retry_count", 0), idx
+                    ))
+        except Exception as e:
+            print(f"[AutoQueue] MySQL save notice: {e}")
+        finally:
+            conn.close()
+
+    # 2. Mirror to JSON file
     try:
         os.makedirs(os.path.dirname(QUEUE_FILE), exist_ok=True)
         with open(QUEUE_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
     except Exception as e:
-        print(f"[AutoQueue] Error saving queue: {e}")
+        print(f"[AutoQueue] Error saving queue to file: {e}")
 
 # ── PLATFORM HEALTH & CONNECTION VERIFICATION ─────────────────────────────────
 async def check_platform_connections() -> Dict[str, Any]:
@@ -302,7 +427,26 @@ async def add_bulk_jobs_async(items: List[Dict[str, Any]], global_config: Option
                 "history": []
             }
         else:
-            total_parts = int(raw.get("total_parts") or raw.get("parts") or default_movie_parts)
+            auto_calc = cfg.get("auto_calculate", False) or not (raw.get("total_parts") or raw.get("parts"))
+            part_duration = int(raw.get("part_duration") or default_part_duration or 75)
+            
+            total_parts = int(raw.get("total_parts") or raw.get("parts") or 0)
+            if auto_calc or total_parts <= 0:
+                movie_duration_seconds = 0
+                try:
+                    from main import api_detail
+                    res = await api_detail(detailPath=detail_path, subjectId=sub_id)
+                    d = res.get("data") or {}
+                    movie_duration_seconds = int(d.get("duration") or 0)
+                except Exception:
+                    pass
+                
+                if movie_duration_seconds > 600:
+                    usable_seconds = max(600, movie_duration_seconds - 900)
+                    total_parts = max(6, int(usable_seconds // part_duration))
+                else:
+                    total_parts = int(cfg.get("movie_parts") or 50)
+
             job_entry = {
                 "id": job_id,
                 "type": "movie",
@@ -314,7 +458,7 @@ async def add_bulk_jobs_async(items: List[Dict[str, Any]], global_config: Option
                 "total_planned_parts": total_parts,
                 "current_part": 1,
                 "completed_parts_count": 0,
-                "part_duration_seconds": int(raw.get("part_duration") or default_part_duration),
+                "part_duration_seconds": part_duration,
                 "status": "queued",
                 "platforms": enabled_platforms,
                 "added_at": now_str,
@@ -718,7 +862,8 @@ def advance_job_progression(active_job: Dict[str, Any], is_series: bool, data: D
                     job_finished = True
     else:
         active_job["current_part"] += 1
-        if active_job["current_part"] > active_job.get("total_parts", 8):
+        max_parts = active_job.get("total_planned_parts") or active_job.get("total_parts", 40)
+        if active_job["current_part"] > max_parts:
             job_finished = True
 
     if job_finished:
@@ -1014,12 +1159,23 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
             except Exception: pass
 
         if not render_success or not os.path.exists(output_path) or os.path.getsize(output_path) < 1000:
-            bot_log(f"[AutoPilot] ❌ Video rendering failed for '{title}' [{part_label}].")
-            active_job["status"] = "failed"
+            retry_count = active_job.get("retry_count", 0) + 1
+            active_job["retry_count"] = retry_count
+            active_job["last_error"] = f"Render failed at {part_label}"
+            
+            if retry_count < 3:
+                active_job["status"] = "queued"
+                bot_log(f"[AutoPilot] ⚠️ Video rendering failed for '{title}' [{part_label}] (Attempt {retry_count}/3). Retrying in next scheduled cycle...")
+            else:
+                bot_log(f"[AutoPilot] ❌ Video rendering failed 3 times for '{title}' [{part_label}]. Skipping part to keep queue active...")
+                active_job["retry_count"] = 0
+                active_job["status"] = "queued"
+                advance_job_progression(active_job, is_series, data, active_idx, time.strftime("%Y-%m-%d %H:%M:%S"))
+
             data["state"]["is_busy"] = False
-            data["state"]["step"] = "error_render_failed"
+            data["state"]["step"] = "idle"
             save_queue_data(data)
-            return {"success": False, "error": "Rendering failed"}
+            return {"success": False, "error": f"Rendering failed for {title}"}
 
         file_size_mb = round(os.path.getsize(output_path) / (1024 * 1024), 2)
         bot_log(f"[AutoPilot] ✅ Render complete: {output_filename} ({file_size_mb} MB)")
