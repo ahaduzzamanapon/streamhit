@@ -2541,6 +2541,9 @@ def is_deprecated_or_dummy_url(url: str) -> bool:
     u_lower = str(url).lower()
     if any(bad in u_lower for bad in DEPRECATED_VIDEO_HASHES):
         return True
+    # Filter out ad / redirect landing domains (not playable MP4 streams)
+    if any(ad_domain in u_lower for ad_domain in ["vegamovies.pet", "vegamovies.cx", "asiafilm.org", "fzmovies", "southfreak"]):
+        return True
     # Invalidate expired signed URLs (e.g. ?sign=...&t=1793083970)
     if ("&t=" in u_lower or "?t=" in u_lower) and "sign=" in u_lower:
         try:
@@ -2557,12 +2560,13 @@ def is_deprecated_or_dummy_url(url: str) -> bool:
 
 def _extract_playable_detectors(detectors: list) -> list:
     mob_items = []
+    bad_hosts = ["fzmovies", "southfreak", "vegamovies", "asiafilm"]
     for det in detectors:
         res_list = det.get("resolutionList", [])
         if res_list:
             for r in res_list:
                 r_link = r.get("resourceLink") or r.get("url")
-                if r_link and not any(bad in r_link.lower() for bad in ["fzmovies", "southfreak"]) and not is_deprecated_or_dummy_url(r_link):
+                if r_link and not any(bad in r_link.lower() for bad in bad_hosts) and not is_deprecated_or_dummy_url(r_link):
                     fetch_link = f"https://nxly.online/fetch?source_url={urllib.parse.quote(r_link)}" if r_link.startswith("http") else r_link
                     mob_items.append({
                         "resourceId": str(r.get("resourceId") or r.get("id") or "0"),
@@ -2571,7 +2575,7 @@ def _extract_playable_detectors(detectors: list) -> list:
                         "url": fetch_link,
                         "resourceLink": fetch_link
                     })
-        elif det.get("resourceLink") and not any(bad in det.get("resourceLink", "").lower() for bad in ["fzmovies", "southfreak"]):
+        elif det.get("resourceLink") and not any(bad in det.get("resourceLink", "").lower() for bad in bad_hosts):
             r_link = det["resourceLink"]
             if not is_deprecated_or_dummy_url(r_link):
                 fetch_link = f"https://nxly.online/fetch?source_url={urllib.parse.quote(r_link)}" if r_link.startswith("http") else r_link

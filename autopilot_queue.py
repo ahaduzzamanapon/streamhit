@@ -1110,7 +1110,9 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
                     except Exception:
                         pass
                 if link:
-                    stream_candidates.append(link)
+                    link_low = link.lower()
+                    if not any(bad in link_low for bad in ["vegamovies.pet", "vegamovies.cx", "asiafilm.org", "fzmovies", "southfreak"]):
+                        stream_candidates.append(link)
         except Exception as e:
             bot_log(f"[AutoPilot] Warning: failed to fetch stream: {e}")
 
