@@ -3213,8 +3213,8 @@ async def tiktok_oauth_callback(code: str = Query(None), state: str = Query(None
     try:
         from tiktok_bot import load_tt_config, save_tt_config
         cfg = load_tt_config()
-        client_key = cfg.get("client_key", "").strip() or "aw4fx5rmwdzq4w9sg"
-        client_secret = cfg.get("client_secret", "").strip()
+        client_key = cfg.get("client_key", "").strip() or "aw69bfwowhdgo50g"
+        client_secret = cfg.get("client_secret", "").strip() or "flifzYThQOFbyp1dwX6NJingXfl3OFhw"
         redirect_uri = "https://nxly.online/api/tiktok/callback"
         
         async with httpx.AsyncClient(timeout=25.0) as client:
