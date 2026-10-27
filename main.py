@@ -14,7 +14,7 @@ import hmac
 import aiomysql
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, HTTPException, Query, Response
-from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, RedirectResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, RedirectResponse, PlainTextResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
@@ -3192,6 +3192,16 @@ async def serve_tiktok_site_verification_old():
 @app.get("/tiktok-developers-site-verification.txt", response_class=PlainTextResponse)
 async def serve_tiktok_site_verification():
     return "tiktok-developers-site-verification=tjeh5JkBR3KjozRrcGQkHTh019x6e70s"
+
+@app.get("/privacy")
+@app.get("/privacy-policy")
+async def serve_privacy():
+    return FileResponse(os.path.join(base_dir, "public", "privacy-policy.html"))
+
+@app.get("/terms")
+@app.get("/terms-of-service")
+async def serve_terms():
+    return FileResponse(os.path.join(base_dir, "public", "terms-of-service.html"))
 
 app.mount("/", StaticFiles(directory=os.path.join(base_dir, "public"), html=True), name="public")
 
