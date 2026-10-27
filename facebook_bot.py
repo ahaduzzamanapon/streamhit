@@ -320,12 +320,15 @@ async def upload_reel_to_facebook(
 
         # Phase 3: Finish and Publish
         bot_log(f"[FacebookBot] Phase 3: Finalizing publish for video {video_id}...")
+        import re
+        safe_caption = re.sub(r'https?://\S+', '', caption or '').strip()
+        safe_caption = re.sub(r'(👉|🔗|Link:)\s*\n', '', safe_caption).strip()
         finish_resp = await client.post(init_url, data={
             "upload_phase": "finish",
             "access_token": page_token,
             "video_id": video_id,
             "video_state": "PUBLISHED",
-            "description": caption
+            "description": safe_caption
         })
         finish_data = finish_resp.json()
         if "error" in finish_data:

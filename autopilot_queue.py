@@ -592,7 +592,7 @@ async def get_dashboard_summary() -> Dict[str, Any]:
     state = data.get("state", {})
 
     total_jobs = len(jobs) + len(finished)
-    in_queue_count = sum(1 for j in jobs if j.get("status") in ("queued", "active"))
+    in_queue_count = sum(1 for j in jobs if j.get("status") not in ("finished", "paused"))
     processing_count = sum(1 for j in jobs if j.get("status") == "processing") or (1 if state.get("is_busy") else 0)
     failed_count = sum(1 for j in jobs if j.get("status") == "failed")
     finished_count = len(finished)
@@ -600,7 +600,7 @@ async def get_dashboard_summary() -> Dict[str, Any]:
     # Active running item details for live card
     active_item = None
     for j in jobs:
-        if j.get("status") in ("processing", "active", "queued"):
+        if j.get("status") in ("processing", "active", "queued", "waiting_upload", "waiting"):
             active_item = j
             break
 
@@ -805,7 +805,7 @@ def get_publishing_calendar() -> List[Dict[str, Any]]:
                 s_idx += 1
         else:
             curr_p = job.get("current_part", 1)
-            total_p = job.get("total_parts", 8)
+            total_p = job.get("total_planned_parts") or job.get("total_parts", 132)
 
             for p in range(curr_p, total_p + 1):
                 part_label = f"Part {p} of {total_p}"
@@ -1037,7 +1037,7 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
         ep_arg = episode
     else:
         part = active_job.get("current_part", 1)
-        total_parts = active_job.get("total_parts", 8)
+        total_parts = active_job.get("total_planned_parts") or active_job.get("total_parts", 132)
         part_label = f"Part {part}/{total_parts}"
         top_text = f"{title} • Part {part}"
         start_seconds = (part - 1) * part_duration + 600
@@ -1058,23 +1058,11 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
     try:
         # Pre-flight Check: Validate Platform Credentials before heavy ffmpeg work
         if fb_is_active:
-            from facebook_bot import check_fb_token_validity
+            from facebook_bot import check_fb_token_validity, load_fb_config
+            fb_cfg = load_fb_config()
             fb_valid, fb_err = await check_fb_token_validity(fb_cfg.get("page_token", ""), fb_cfg.get("page_id", ""))
             if not fb_valid:
-                bot_log(f"[FacebookBot] ❌ Pre-flight check failed: {fb_err}")
-                bot_log("[FacebookBot] 🔑 Facebook Access Token has EXPIRED! Please go to Admin -> Platforms -> Facebook and update your Page Access Token.")
-                if not yt_is_active and not tt_is_active:
-                    active_job["status"] = "waiting_upload"
-                    data["state"]["is_busy"] = False
-                    data["state"]["step"] = "idle"
-                    data["state"]["step_label"] = "Facebook Token Expired (Action Required)"
-                    data["state"]["progress_percent"] = 0
-                    data["state"]["next_run_timestamp"] = int(time.time()) + (int(fb_cfg.get("post_interval_minutes", 10)) * 60)
-                    save_queue_data(data)
-                    return {
-                        "success": False,
-                        "error": f"Facebook Token Expired: {fb_err}. Please update in Platforms -> Facebook."
-                    }
+                bot_log(f"[FacebookBot] ⚠️ Pre-flight notice: {fb_err}. Continuing with upload attempt...")
 
         # 1. Fetch direct video stream
         stream_candidates = []
@@ -1188,11 +1176,9 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
         caption = (
             f"🔥 {top_text} 🎬🍿\n"
             f"━━━━━━━━━━━━━━━━━━\n"
-            f"🍿 Full Movie/Episode Watch Link:\n"
-            f"👉 {movie_web_url}\n\n"
-            f"🔍 অথবা Google-এ Search করুন: NXLY Stream\n"
-            f"🌐 Website: https://nxly.online\n"
-            f"📲 Free Official Android App: https://nxly.online/download\n\n"
+            f"🍿 পুরো মুভি/সিরিজ দেখতে Google-এ Search করুন: NXLY Stream\n"
+            f"👉 ১ম যে ওয়েবসাইট আসবে সেটাই!\n\n"
+            f"💬 ডিরেক্ট ওয়াচ লিংক ১ম কমেন্টে দেওয়া আছে (Check 1st Comment)! 👇\n\n"
             f"#reels #shorts #viral #movies #trending #nxly"
         )
         comment_msg = (
