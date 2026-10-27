@@ -1326,13 +1326,19 @@
                 <div class="card">
                     <div class="card-header">
                         <div>
-                            <h2>📱 Registered Android Devices & Live Activity</h2>
-                            <div class="subtitle" id="usersCountSub">Showing active installs</div>
+                            <h2>📱 App Users & 🌐 Web Visitors Activity</h2>
+                            <div class="subtitle" id="usersCountSub">Showing active installs & web visitors</div>
                         </div>
                         <div style="display:flex; gap:10px;">
-                            <input type="text" id="usersFilterInput" class="form-control" placeholder="Search Model or IP..." style="width:200px;" oninput="onFilterUsers(this.value)">
+                            <input type="text" id="usersFilterInput" class="form-control" placeholder="Search Device, Browser or IP..." style="width:230px;" oninput="onFilterUsers(this.value)">
                             <button class="btn-danger" onclick="clearAppUsersData()">Clear All Data</button>
                         </div>
+                    </div>
+
+                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:14px;">
+                        <button type="button" class="btn-secondary active" id="btnFilterAll" onclick="setUserTypeFilter('all')">👥 All Users (<span id="userStatAll">0</span>)</button>
+                        <button type="button" class="btn-secondary" id="btnFilterApp" onclick="setUserTypeFilter('app')">📱 App (<span id="userStatApp">0</span>)</button>
+                        <button type="button" class="btn-secondary" id="btnFilterWeb" onclick="setUserTypeFilter('web')">🌐 Web (<span id="userStatWeb">0</span>)</button>
                     </div>
 
                     <div class="table-responsive">
@@ -1341,9 +1347,9 @@
                                 <tr>
                                     <th>#</th>
                                     <th>Status</th>
-                                    <th>Device Model</th>
+                                    <th>Device / Platform & IP</th>
                                     <th>Current Activity</th>
-                                    <th>First Installed</th>
+                                    <th>First Visited</th>
                                     <th>Last Active</th>
                                     <th>Total Watch Time</th>
                                 </tr>
@@ -1425,11 +1431,14 @@
             <!-- 8. PUSH NOTIFICATIONS ─────────────────────────────────────── -->
             <section class="tab-panel" id="panel-notifications">
                 <div class="card">
-                    <div class="card-header">
+                    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
                         <div>
                             <h2>🔔 Firebase Cloud Messaging (FCM) Push</h2>
                             <div class="subtitle">Send instant alerts to all installed Android devices</div>
                         </div>
+                        <span id="fcmDeviceCountBadge" style="padding:6px 14px; background:rgba(16,185,129,0.15); color:#10b981; border-radius:16px; font-size:13px; font-weight:700;">
+                            📱 Checking devices...
+                        </span>
                     </div>
                     <form onsubmit="handleSendPushNotification(event)">
                         <div class="form-grid">
@@ -1440,6 +1449,10 @@
                             <div class="form-group">
                                 <label>Target Deep-Link Subject ID (Optional)</label>
                                 <input type="text" id="pushSubjectId" class="form-control" placeholder="e.g. 1511967966181605720">
+                            </div>
+                            <div class="form-group" style="grid-column: 1 / -1;">
+                                <label>Poster / Cover Image URL (Optional)</label>
+                                <input type="text" id="pushImage" class="form-control" placeholder="https://.../poster.jpg (shows rich big picture in Android notification)">
                             </div>
                         </div>
                         <div class="form-group" style="margin-bottom:14px;">
@@ -2033,6 +2046,7 @@
                 case 'sports': fetchSports(); break;
                 case 'tv': fetchTvChannels(); break;
                 case 'version': fetchAppVersion(); break;
+                case 'notifications': fetchPushStats(); break;
             }
         }
 
@@ -2524,16 +2538,33 @@
             }
         }
 
-        // ── APP USERS TAB (PAGINATED FOR ZERO FREEZING) ──────────────────────
+        // ── APP & WEB USERS TAB (PAGINATED FOR ZERO FREEZING) ───────────────
         let _allUsers = [];
         let _usersCurrentPage = 1;
+        let _userTypeFilter = 'all';
         const USERS_PAGE_SIZE = 25;
+
+        function setUserTypeFilter(type) {
+            _userTypeFilter = type;
+            const btnAll = document.getElementById('btnFilterAll');
+            const btnApp = document.getElementById('btnFilterApp');
+            const btnWeb = document.getElementById('btnFilterWeb');
+            if (btnAll) btnAll.classList.toggle('active', type === 'all');
+            if (btnApp) btnApp.classList.toggle('active', type === 'app');
+            if (btnWeb) btnWeb.classList.toggle('active', type === 'web');
+            renderUsersTablePage(1);
+        }
 
         async function fetchAppUsersPage(page = 1) {
             try {
                 const res = await fetch('/api/admin/app-users', { headers: { 'Authorization': `Bearer ${token}` } });
                 const d = await res.json();
                 _allUsers = d.users || [];
+                const appCount = d.app_count !== undefined ? d.app_count : _allUsers.filter(u => u.user_type === 'app').length;
+                const webCount = d.web_count !== undefined ? d.web_count : _allUsers.filter(u => u.user_type === 'web').length;
+                if (document.getElementById('userStatAll')) document.getElementById('userStatAll').innerText = _allUsers.length;
+                if (document.getElementById('userStatApp')) document.getElementById('userStatApp').innerText = appCount;
+                if (document.getElementById('userStatWeb')) document.getElementById('userStatWeb').innerText = webCount;
                 renderUsersTablePage(page);
             } catch(e) {}
         }
@@ -2542,17 +2573,25 @@
             _usersCurrentPage = page;
             const filterVal = (document.getElementById('usersFilterInput')?.value || '').toLowerCase().trim();
             let filtered = _allUsers;
-            if (filterVal) {
-                filtered = _allUsers.filter(u => (u.device_model || '').toLowerCase().includes(filterVal) || (u.ip || '').includes(filterVal));
+            if (_userTypeFilter !== 'all') {
+                filtered = filtered.filter(u => u.user_type === _userTypeFilter);
             }
-            document.getElementById('usersCountSub').innerText = `Total Recorded: ${_allUsers.length} Devices | Showing Page ${page}`;
+            if (filterVal) {
+                filtered = filtered.filter(u => 
+                    (u.device_model || '').toLowerCase().includes(filterVal) || 
+                    (u.os_version || '').toLowerCase().includes(filterVal) || 
+                    (u.ip || '').includes(filterVal) ||
+                    (u.current_watching || '').toLowerCase().includes(filterVal)
+                );
+            }
+            document.getElementById('usersCountSub').innerText = `Total Recorded: ${_allUsers.length} (${filtered.length} in view) | Showing Page ${page}`;
             const totalPages = Math.max(1, Math.ceil(filtered.length / USERS_PAGE_SIZE));
             const startIdx = (page - 1) * USERS_PAGE_SIZE;
             const pageItems = filtered.slice(startIdx, startIdx + USERS_PAGE_SIZE);
 
             const tbody = document.getElementById('usersTableBody');
             if (pageItems.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--text-muted);">No devices found.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--text-muted);">No users found for this filter.</td></tr>';
                 return;
             }
 
@@ -2566,12 +2605,21 @@
                 const firstSeen = u.first_seen ? new Date(u.first_seen * 1000).toLocaleDateString() : '–';
                 const lastSeen = u.last_seen ? new Date(u.last_seen * 1000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '–';
                 const durMin = Math.round((u.daily_active_seconds || 0) / 60);
+                const isWeb = u.user_type === 'web';
+                const typeBadge = isWeb
+                    ? `<span style="background:rgba(59,130,246,0.15); color:#60a5fa; font-size:10.5px; padding:2px 6px; border-radius:4px; font-weight:700; margin-left:6px;">🌐 Web</span>`
+                    : `<span style="background:rgba(16,185,129,0.15); color:#34d399; font-size:10.5px; padding:2px 6px; border-radius:4px; font-weight:700; margin-left:6px;">📱 App</span>`;
 
                 return `
                     <tr>
                         <td>${startIdx + i + 1}</td>
                         <td>${statusBadge}</td>
-                        <td><strong>${u.device_model || 'Android'}</strong> <div style="font-size:10.5px; color:var(--text-muted);">${u.os_version || 'Android'} (${u.ip || '–'})</div></td>
+                        <td>
+                            <strong>${u.device_model || (isWeb ? 'Web Browser' : 'Android Device')}</strong> ${typeBadge}
+                            <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">
+                                ${u.os_version || (isWeb ? 'Web' : 'Android')} • IP: <code style="color:var(--accent-cyan); font-size:11px;">${u.ip || '–'}</code>
+                            </div>
+                        </td>
                         <td>${watchTitle}</td>
                         <td>${firstSeen}</td>
                         <td>${lastSeen}</td>
@@ -2769,28 +2817,53 @@
         }
 
         // ── PUSH NOTIFICATIONS TAB ───────────────────────────────────────────
+        async function fetchPushStats() {
+            try {
+                const res = await fetch('/api/admin/push/stats', { headers: { 'Authorization': `Bearer ${token}` } });
+                const d = await res.json();
+                const badge = document.getElementById('fcmDeviceCountBadge');
+                if (badge) {
+                    const devCount = d.total_devices || 0;
+                    badge.innerHTML = `📱 <strong>${devCount}</strong> Android Devices Registered`;
+                    if (devCount > 0) {
+                        badge.style.background = 'rgba(16,185,129,0.15)';
+                        badge.style.color = '#10b981';
+                    } else {
+                        badge.style.background = 'rgba(239,68,68,0.15)';
+                        badge.style.color = '#ef4444';
+                    }
+                }
+            } catch(e) {}
+        }
+
         async function handleSendPushNotification(e) {
             e.preventDefault();
             const btn = document.getElementById('btnSendPush');
             btn.disabled = true;
-            btn.innerText = 'Broadcasting...';
+            btn.innerText = 'Broadcasting via Firebase...';
             try {
                 const payload = {
                     title: document.getElementById('pushTitle').value.trim(),
                     body: document.getElementById('pushBody').value.trim(),
-                    subjectId: document.getElementById('pushSubjectId').value.trim()
+                    subject_id: document.getElementById('pushSubjectId').value.trim(),
+                    image: (document.getElementById('pushImage')?.value || '').trim()
                 };
-                const res = await fetch('/api/admin/notifications', {
+                const res = await fetch('/api/admin/push/send', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify(payload)
                 });
                 const d = await res.json();
-                showToast(d.message || 'Notification broadcast sent!');
+                if (!res.ok) {
+                    throw new Error(d.detail || d.message || `Server returned status ${res.status}`);
+                }
+                showToast(d.message || `Push broadcast sent to ${d.sent_count || 0} device(s)!`);
                 document.getElementById('pushTitle').value = '';
                 document.getElementById('pushBody').value = '';
+                if (document.getElementById('pushImage')) document.getElementById('pushImage').value = '';
+                fetchPushStats();
             } catch(err) {
-                alert('Broadcast error: ' + err);
+                alert('Broadcast error: ' + (err.message || err));
             } finally {
                 btn.disabled = false;
                 btn.innerText = '🚀 Broadcast to All Devices';

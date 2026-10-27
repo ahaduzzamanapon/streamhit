@@ -1081,7 +1081,10 @@ def record_app_device(
         return
     now = time.time()
     today_str = datetime.datetime.fromtimestamp(now).strftime("%Y-%m-%d")
-    _active_app_users[device_id] = now
+    if device_id.startswith("web_"):
+        _active_web_users[device_id] = now
+    else:
+        _active_app_users[device_id] = now
     try:
         with sqlite3.connect(_ACTIVE_DB_PATH, timeout=2) as conn:
             conn.row_factory = sqlite3.Row
@@ -1155,12 +1158,65 @@ def record_app_device(
                 first_seen, session_start, now, daily_active_seconds, today_date,
                 c_watching, w_path, w_flag
             ))
+            u_type = "web" if device_id.startswith("web_") else "app"
             conn.execute(
                 "INSERT OR REPLACE INTO active_sessions (user_id, user_type, last_seen) VALUES (?, ?, ?)",
-                (device_id, "app", now)
+                (device_id, u_type, now)
             )
     except Exception:
         pass
+
+def parse_client_device(user_agent: str) -> tuple[str, str]:
+    if not user_agent:
+        return "Web Browser", "Web"
+    ua_lower = user_agent.lower()
+
+    # OS Detection
+    os_name = "Unknown OS"
+    if "windows nt 10.0" in ua_lower:
+        os_name = "Windows 10/11"
+    elif "windows nt 6.3" in ua_lower:
+        os_name = "Windows 8.1"
+    elif "windows nt 6.1" in ua_lower:
+        os_name = "Windows 7"
+    elif "macintosh" in ua_lower or "mac os x" in ua_lower:
+        os_name = "macOS"
+    elif "iphone" in ua_lower:
+        os_name = "iOS (iPhone)"
+    elif "ipad" in ua_lower:
+        os_name = "iPadOS"
+    elif "android" in ua_lower:
+        os_name = "Android"
+    elif "linux" in ua_lower:
+        os_name = "Linux"
+
+    # Browser Detection
+    browser = "Browser"
+    if "edg/" in ua_lower:
+        browser = "Edge"
+    elif "chrome/" in ua_lower and "chromium" not in ua_lower:
+        browser = "Chrome"
+    elif "firefox/" in ua_lower:
+        browser = "Firefox"
+    elif "safari/" in ua_lower and "chrome" not in ua_lower:
+        browser = "Safari"
+    elif "opera" in ua_lower or "opr/" in ua_lower:
+        browser = "Opera"
+
+    if "iphone" in ua_lower:
+        device_model = f"iPhone ({browser})"
+    elif "android" in ua_lower and "mobile" in ua_lower:
+        device_model = f"Android Phone ({browser})"
+    elif "ipad" in ua_lower:
+        device_model = f"iPad ({browser})"
+    elif "windows" in ua_lower:
+        device_model = f"PC ({browser})"
+    elif "macintosh" in ua_lower:
+        device_model = f"Mac ({browser})"
+    else:
+        device_model = f"Web ({browser})"
+
+    return device_model, os_name
 
 def record_active_user(request: Request):
     try:
@@ -1170,7 +1226,8 @@ def record_active_user(request: Request):
         if forwarded:
             client_ip = forwarded.split(",")[0].strip()
             
-        user_agent = request.headers.get("User-Agent", "").lower()
+        raw_ua = request.headers.get("User-Agent", "")
+        user_agent = raw_ua.lower()
         app_dev_id = request.headers.get("X-App-Device-Id") or request.headers.get("device_id")
         
         is_app = (app_dev_id is not None or 
@@ -1194,6 +1251,45 @@ def record_active_user(request: Request):
                 record_app_device(app_dev_id, client_ip, dev_model, dev_os, dev_ver)
         else:
             _active_web_users[user_id] = now
+            dev_model, dev_os = parse_client_device(raw_ua)
+            web_dev_id = f"web_{hashlib.md5((client_ip + raw_ua).encode()).hexdigest()[:12]}"
+            
+            # Detect current visiting page / movie
+            path = request.url.path
+            c_watching = ""
+            w_path = ""
+            is_watching = 0
+            if path.startswith("/movie/"):
+                w_path = path.replace("/movie/", "").strip()
+                c_watching = w_path.replace("-", " ").title()
+                is_watching = 1
+            elif path.startswith("/play"):
+                c_watching = "Playing Video"
+                is_watching = 1
+            elif path in ("/", "/index.html"):
+                c_watching = "Browsing Homepage"
+            elif path.startswith("/search"):
+                c_watching = "Searching Movies"
+            elif path.startswith("/sports"):
+                c_watching = "Live Sports"
+            elif path.startswith("/tv"):
+                c_watching = "Live TV"
+            elif path.startswith("/api/"):
+                c_watching = "Browsing Site"
+
+            # Record web device install telemetry throttled every 20s
+            if now - _last_db_sync.get(web_dev_id, 0) > 20:
+                _last_db_sync[web_dev_id] = now
+                record_app_device(
+                    device_id=web_dev_id,
+                    ip=client_ip,
+                    device_model=dev_model,
+                    os_version=dev_os,
+                    app_version="Web",
+                    current_watching=c_watching,
+                    watching_detail_path=w_path,
+                    is_watching=is_watching
+                )
 
         # Throttle DB writes to once every 20s per user to minimize disk I/O
         if now - _last_db_sync.get(user_id, 0) > 20:
@@ -1299,12 +1395,16 @@ def get_app_users_list():
             for row in cur.fetchall():
                 last = row["last_seen"] or 0
                 is_online = (last >= cutoff)
+                dev_id = str(row["device_id"] or "")
+                app_ver = str(row["app_version"] or "")
+                u_type = "web" if (dev_id.startswith("web_") or "web" in app_ver.lower()) else "app"
                 users.append({
-                    "device_id": row["device_id"],
+                    "device_id": dev_id,
                     "ip": row["ip"] or "",
-                    "device_model": row["device_model"] or "Android Device",
-                    "os_version": row["os_version"] or "Android",
-                    "app_version": row["app_version"] or "1.0.7",
+                    "device_model": row["device_model"] or ("Web Browser" if u_type == "web" else "Android Device"),
+                    "os_version": row["os_version"] or ("Web" if u_type == "web" else "Android"),
+                    "app_version": app_ver or ("Web" if u_type == "web" else "1.0.7"),
+                    "user_type": u_type,
                     "first_seen": row["first_seen"] or last,
                     "session_start": row["session_start"] or last,
                     "last_seen": last,
@@ -1316,8 +1416,19 @@ def get_app_users_list():
                 })
     except Exception:
         pass
+
+    web_count = sum(1 for u in users if u["user_type"] == "web")
+    app_count = sum(1 for u in users if u["user_type"] == "app")
+    web_live = sum(1 for u in users if u["user_type"] == "web" and u["is_online"])
+    app_live = sum(1 for u in users if u["user_type"] == "app" and u["is_online"])
+
     return {
         "total_installs": total_installs,
+        "total_users": len(users),
+        "web_count": web_count,
+        "app_count": app_count,
+        "web_live": web_live,
+        "app_live": app_live,
         "live_count": live_count,
         "watching_count": watching_count,
         "today_count": today_count,

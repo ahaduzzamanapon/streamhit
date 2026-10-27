@@ -385,17 +385,17 @@ async def render_single_reel_part(
 
     if anti_copyright:
         filter_complex = (
-            "[0:v]scale=360:640:force_original_aspect_ratio=increase,crop=360:640,boxblur=10:1,scale=1080:1920,eq=brightness=-0.15:contrast=1.08,setpts=PTS/1.03[bg];"
-            "[0:v]crop=trunc(in_w*0.94/2)*2:trunc(in_h*0.94/2)*2,scale=1080:-2:flags=bicubic,eq=contrast=1.07:brightness=0.01:saturation=1.12,noise=alls=4:allf=t+u,setpts=PTS/1.03[fg];"
+            "[0:v]scale=180:320:force_original_aspect_ratio=increase,crop=180:320,boxblur=4:1,scale=1080:1920,eq=brightness=-0.15:contrast=1.06,setpts=PTS/1.03[bg];"
+            "[0:v]crop=trunc(in_w*0.94/2)*2:trunc(in_h*0.94/2)*2,scale=1080:-2,eq=contrast=1.06:brightness=0.01:saturation=1.10,setpts=PTS/1.03[fg];"
             "[bg][fg]overlay=(W-w)/2:(H-h)/2[merged];"
             "[merged][1:v]overlay=0:0[vfinal];"
-            "[0:a]aformat=sample_rates=44100:channel_layouts=stereo,asetrate=44100*1.06,atempo=1.03/1.06,highpass=f=80,lowpass=f=12000,equalizer=f=1000:t=q:w=1.5:g=1.5[afinal]"
+            "[0:a]aformat=sample_rates=44100:channel_layouts=stereo,asetrate=44100*1.05,atempo=1.03/1.05,highpass=f=80,lowpass=f=12000[afinal]"
         )
         map_args = ["-map", "[vfinal]", "-map", "[afinal]"]
     else:
         filter_complex = (
-            "[0:v]scale=360:640:force_original_aspect_ratio=increase,crop=360:640,boxblur=8:1,scale=1080:1920,eq=brightness=-0.10[bg];"
-            "[0:v]scale=1080:-2:flags=bicubic[fg];"
+            "[0:v]scale=180:320:force_original_aspect_ratio=increase,crop=180:320,boxblur=4:1,scale=1080:1920,eq=brightness=-0.10[bg];"
+            "[0:v]scale=1080:-2[fg];"
             "[bg][fg]overlay=(W-w)/2:(H-h)/2[merged];"
             "[merged][1:v]overlay=0:0[vfinal]"
         )
@@ -415,12 +415,13 @@ async def render_single_reel_part(
         "-filter_complex", filter_complex,
         *map_args,
         "-c:v", "libx264",
-        "-preset", "veryfast",
-        "-crf", "22",
+        "-preset", "ultrafast",
+        "-crf", "23",
         "-c:a", "aac",
         "-b:a", "128k",
         "-ac", "2",
         "-ar", "44100",
+        "-threads", "0",
         "-t", str(duration_seconds),
         "-movflags", "+faststart",
         output_mp4_path
@@ -430,9 +431,9 @@ async def render_single_reel_part(
     
     def _run_sync(cmd_to_run):
         try:
-            return subprocess.run(cmd_to_run, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=240)
+            return subprocess.run(cmd_to_run, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=480)
         except subprocess.TimeoutExpired:
-            print("[ReelEngine] FFmpeg process timed out after 240 seconds!")
+            print("[ReelEngine] FFmpeg process timed out after 480 seconds!")
             return None
         except Exception as ex:
             print(f"[ReelEngine] FFmpeg execution error: {ex}")
@@ -446,8 +447,8 @@ async def render_single_reel_part(
         # Try fallback without audio filter in case audio stream was missing/corrupt or rate-shifted
         print("[ReelEngine] Retrying with fallback audio filter...")
         fallback_fc = (
-            "[0:v]scale=360:640:force_original_aspect_ratio=increase,crop=360:640,boxblur=10:1,scale=1080:1920,eq=brightness=-0.15:contrast=1.08[bg];"
-            "[0:v]crop=trunc(in_w*0.94/2)*2:trunc(in_h*0.94/2)*2,scale=1080:-2:flags=bicubic,eq=contrast=1.06:saturation=1.10[fg];"
+            "[0:v]scale=180:320:force_original_aspect_ratio=increase,crop=180:320,boxblur=4:1,scale=1080:1920,eq=brightness=-0.15:contrast=1.06[bg];"
+            "[0:v]crop=trunc(in_w*0.94/2)*2:trunc(in_h*0.94/2)*2,scale=1080:-2,eq=contrast=1.06:saturation=1.10[fg];"
             "[bg][fg]overlay=(W-w)/2:(H-h)/2[merged];"
             "[merged][1:v]overlay=0:0[vfinal];"
             "[0:a]aformat=sample_rates=44100:channel_layouts=stereo,asetrate=44100*1.05,atempo=1/1.05[afinal]"
@@ -462,8 +463,9 @@ async def render_single_reel_part(
             "-loop", "1", "-t", str(duration_seconds), "-i", overlay_png_path,
             "-filter_complex", fallback_fc,
             "-map", "[vfinal]", "-map", "[afinal]",
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
             "-c:a", "aac", "-b:a", "128k",
+            "-threads", "0",
             "-t", str(duration_seconds), "-movflags", "+faststart",
             output_mp4_path
         ]
