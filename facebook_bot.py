@@ -347,7 +347,7 @@ async def upload_reel_to_facebook(
         for check_idx in range(4):
             await asyncio.sleep(6)
             try:
-                status_url = f"https://graph.facebook.com/v19.0/{video_id}?fields=id,status,copyright_check_status&access_token={page_token}"
+                status_url = f"https://graph.facebook.com/v19.0/{video_id}?fields=id,status&access_token={page_token}"
                 s_resp = await client.get(status_url)
                 s_data = s_resp.json()
                 if "error" in s_data:
@@ -446,6 +446,13 @@ async def upload_reel_to_facebook(
                             bot_log(f"[FacebookBot] ⚠️ Comment could not be posted: {err_msg}")
                 except Exception as ce:
                     bot_log(f"[FacebookBot] Comment attempt {comment_attempt+1} note: {ce}")
+
+        # Phase 6: Enroll in 1-Hour Active Monitoring Guard
+        register_reel_for_monitoring(
+            video_id=video_id,
+            title=(safe_caption.split('\n')[0] if safe_caption else "Reel")[:80],
+            reel_url=reel_url
+        )
 
         return {
             "success": True,
@@ -876,33 +883,154 @@ async def share_reel_to_groups(reel_url: str, title: str, watch_url: str) -> lis
                 results.append({"group_id": grp_id, "success": False, "error": str(ge)})
     return results
 
-async def cleanup_copyrighted_videos():
+def register_reel_for_monitoring(video_id: str, title: str, reel_url: str):
+    """Enrolls newly published reel into 1-hour active surveillance list."""
+    try:
+        cfg = load_fb_config()
+        monitor_list = cfg.get("recent_reels_to_monitor", [])
+        now_ts = int(time.time())
+        # Retain only entries within 3600 seconds
+        monitor_list = [r for r in monitor_list if now_ts - r.get("published_at", 0) <= 3600]
+        monitor_list.append({
+            "video_id": str(video_id),
+            "title": str(title),
+            "published_at": now_ts,
+            "reel_url": str(reel_url)
+        })
+        cfg["recent_reels_to_monitor"] = monitor_list
+        save_fb_config(cfg)
+        exp_time = time.strftime('%H:%M:%S', time.localtime(now_ts + 3600))
+        bot_log(f"[FacebookBot] 🛡️ Reel {video_id} enrolled in 1-Hour Auto-Delete Monitor (active check until {exp_time}).")
+    except Exception as e:
+        bot_log(f"[FacebookBot] Note registering reel for monitoring: {e}")
+
+async def delete_facebook_reel(video_id: str) -> Dict[str, Any]:
+    """Deletes a video/reel and its feed post from Facebook Page immediately."""
+    try:
+        cfg = load_fb_config()
+        page_token = cfg.get("page_token", DEFAULT_PAGE_TOKEN)
+        clean_vid = str(video_id).strip().rstrip('/')
+        if "facebook.com/reel/" in clean_vid:
+            clean_vid = clean_vid.split("facebook.com/reel/")[-1].split('/')[0].split('?')[0]
+
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            del_url = f"https://graph.facebook.com/v19.0/{clean_vid}?access_token={page_token}"
+            resp = await client.delete(del_url)
+            data = resp.json()
+            if data.get("success") is True or "does not exist" in resp.text:
+                bot_log(f"[FacebookBot] 🗑️ Reel {clean_vid} successfully deleted from Facebook.")
+                return {"success": True, "video_id": clean_vid, "message": "Reel deleted successfully from Facebook."}
+            else:
+                err_msg = data.get("error", {}).get("message", resp.text)
+                return {"success": False, "video_id": clean_vid, "error": err_msg}
+    except Exception as e:
+        bot_log(f"[FacebookBot] Delete Reel exception for {video_id}: {e}")
+        return {"success": False, "error": str(e)}
+
+async def cleanup_copyrighted_videos() -> Dict[str, Any]:
     """
-    Scans recent page videos for any copyright matches or enforcements,
-    and immediately deletes them to protect the Facebook Page from strikes.
+    1-Hour Continuous Auto-Delete Monitor:
+    1. Audits all reels in recent_reels_to_monitor (within 1 hour of publishing).
+    2. Scans Facebook Page /video_reels created within the last 1 hour.
+    3. If any video is muted, audio/music rights claimed, restricted, or blocked,
+       it automatically deletes the reel from Facebook immediately to protect the Page.
     """
     try:
         cfg = load_fb_config()
         page_id = cfg.get("page_id", DEFAULT_PAGE_ID)
         page_token = cfg.get("page_token", DEFAULT_PAGE_TOKEN)
         if not page_token:
-            return
-        
+            return {"scanned": 0, "deleted": 0}
+
+        now_ts = int(time.time())
+        monitor_list = cfg.get("recent_reels_to_monitor", [])
+        active_tracked = []
+        deleted_count = 0
+
         async with httpx.AsyncClient(timeout=20.0) as client:
-            url = f"https://graph.facebook.com/v19.0/{page_id}/videos?fields=id,title,status&limit=10&access_token={page_token}"
-            r = await client.get(url)
-            data = r.json()
-            for v in data.get("data", []):
-                vid = v.get("id")
-                st = v.get("status", {})
-                cp = st.get("copyright_check_status", {})
-                pub = st.get("publishing_phase", {})
-                if cp.get("matches_found") is True or pub.get("publish_status") in ("blocked", "rejected"):
-                    bot_log(f"[FacebookBot] Background Guard: Auto-deleting claimed video {vid}...")
-                    del_res = await client.delete(f"https://graph.facebook.com/v19.0/{vid}?access_token={page_token}")
-                    bot_log(f"[FacebookBot] Background Guard delete response for {vid}: {del_res.text}")
+            # Check 1: Enrolled reels from the last 1 hour
+            for item in monitor_list:
+                vid = item.get("video_id")
+                pub_ts = item.get("published_at", 0)
+                age = now_ts - pub_ts
+                if age > 3600:
+                    # 1 hour surveillance window completed without incident
+                    continue
+
+                try:
+                    s_resp = await client.get(f"https://graph.facebook.com/v19.0/{vid}?fields=id,status&access_token={page_token}")
+                    s_data = s_resp.json()
+
+                    if "error" in s_data:
+                        err_msg = s_data["error"].get("message", "")
+                        if "does not exist" in err_msg or "cannot be loaded" in err_msg or "blocked" in err_msg.lower():
+                            bot_log(f"[FacebookBot] 🗑️ Tracked Reel {vid} already removed/blocked by Meta: {err_msg}")
+                            continue
+
+                    st = s_data.get("status", {})
+                    cp = st.get("copyright_check_status", {})
+                    pub = st.get("publishing_phase", {})
+                    vid_st = st.get("video_status", "")
+
+                    is_violation = False
+                    reason = ""
+
+                    if cp.get("matches_found") is True:
+                        is_violation = True
+                        reason = "Rights Manager music/audio match detected"
+                    elif pub.get("publish_status") in ("blocked", "rejected", "restricted", "copyright_violation"):
+                        is_violation = True
+                        reason = f"Publishing restricted: {pub.get('publish_status')}"
+                    elif vid_st in ("error", "rejected", "blocked"):
+                        is_violation = True
+                        reason = f"Video status: {vid_st}"
+
+                    if is_violation:
+                        bot_log(f"[FacebookBot] ⚠️ 1-HOUR MONITOR: Restriction detected for Reel {vid} ({item.get('title')}) - {reason}!")
+                        bot_log(f"[FacebookBot] 🗑️ AUTO-DELETING VIOLATING REEL {vid} IMMEDIATELY FROM FACEBOOK...")
+                        del_res = await client.delete(f"https://graph.facebook.com/v19.0/{vid}?access_token={page_token}")
+                        bot_log(f"[FacebookBot] Delete response for {vid}: {del_res.text}")
+                        deleted_count += 1
+                        continue
+
+                    active_tracked.append(item)
+                except Exception as ex:
+                    bot_log(f"[FacebookBot] Note checking {vid}: {ex}")
+                    active_tracked.append(item)
+
+            # Check 2: Query Page /video_reels for any Reel created within the last 3600 seconds
+            try:
+                reels_url = f"https://graph.facebook.com/v19.0/{page_id}/video_reels?fields=id,video_id,description,created_time,status&limit=15&access_token={page_token}"
+                r = await client.get(reels_url)
+                for vr in r.json().get("data", []):
+                    v_id = vr.get("id")
+                    c_time = vr.get("created_time")
+                    try:
+                        from datetime import datetime, timezone
+                        dt = datetime.strptime(c_time, "%Y-%m-%dT%H:%M:%S%z")
+                        vr_age = (datetime.now(timezone.utc) - dt).total_seconds()
+                    except Exception:
+                        vr_age = 0
+
+                    # If created within the last 60 minutes
+                    if 0 <= vr_age <= 3600:
+                        v_st = vr.get("status", {})
+                        v_cp = v_st.get("copyright_check_status", {})
+                        v_pub = v_st.get("publishing_phase", {})
+                        if v_cp.get("matches_found") is True or v_pub.get("publish_status") in ("blocked", "rejected", "restricted"):
+                            bot_log(f"[FacebookBot] ⚠️ 1-HOUR MONITOR: Auto-deleting violating Reel {v_id} posted {int(vr_age//60)}m ago...")
+                            del_res = await client.delete(f"https://graph.facebook.com/v19.0/{v_id}?access_token={page_token}")
+                            bot_log(f"[FacebookBot] Delete response for {v_id}: {del_res.text}")
+                            deleted_count += 1
+            except Exception as re:
+                bot_log(f"[FacebookBot] Error querying recent video_reels: {re}")
+
+        cfg["recent_reels_to_monitor"] = active_tracked
+        save_fb_config(cfg)
+        return {"scanned": len(monitor_list), "deleted": deleted_count}
     except Exception as e:
-        bot_log(f"[FacebookBot] Error in background copyright scan: {e}")
+        bot_log(f"[FacebookBot] Error in 1-hour monitor scan: {e}")
+        return {"error": str(e)}
 
 async def run_live_bot_cycle() -> Dict[str, Any]:
     bot_log("[Terminal] ⚡ Manually triggering immediate Auto-Pilot cycle...")

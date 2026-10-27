@@ -385,7 +385,7 @@ async def render_single_reel_part(
             "[0:v]crop=trunc(in_w*0.94/2)*2:trunc(in_h*0.94/2)*2,scale=1080:-2:flags=bicubic,eq=contrast=1.07:brightness=0.01:saturation=1.12,noise=alls=4:allf=t+u,setpts=PTS/1.03[fg];"
             "[bg][fg]overlay=(W-w)/2:(H-h)/2[merged];"
             "[merged][1:v]overlay=0:0[vfinal];"
-            "[0:a]asetrate=44100*1.045,atempo=1.03/1.045,highpass=f=80,lowpass=f=12500,equalizer=f=1000:t=q:w=1.5:g=1.5,aecho=0.8:0.9:25:0.12[afinal]"
+            "[0:a]aformat=sample_rates=44100:channel_layouts=stereo,asetrate=44100*1.06,atempo=1.03/1.06,highpass=f=80,lowpass=f=12000,equalizer=f=1000:t=q:w=1.5:g=1.5[afinal]"
         )
         map_args = ["-map", "[vfinal]", "-map", "[afinal]"]
     else:
@@ -445,7 +445,8 @@ async def render_single_reel_part(
             "[0:v]scale=360:640:force_original_aspect_ratio=increase,crop=360:640,boxblur=10:1,scale=1080:1920,eq=brightness=-0.15:contrast=1.08[bg];"
             "[0:v]crop=trunc(in_w*0.94/2)*2:trunc(in_h*0.94/2)*2,scale=1080:-2:flags=bicubic,eq=contrast=1.06:saturation=1.10[fg];"
             "[bg][fg]overlay=(W-w)/2:(H-h)/2[merged];"
-            "[merged][1:v]overlay=0:0[vfinal]"
+            "[merged][1:v]overlay=0:0[vfinal];"
+            "[0:a]aformat=sample_rates=44100:channel_layouts=stereo,asetrate=44100*1.05,atempo=1/1.05[afinal]"
         )
         fallback_cmd = [
             get_ffmpeg_path(), "-y", "-nostdin",
@@ -456,7 +457,7 @@ async def render_single_reel_part(
             "-i", clean_url,
             "-loop", "1", "-t", str(duration_seconds), "-i", overlay_png_path,
             "-filter_complex", fallback_fc,
-            "-map", "[vfinal]", "-map", "0:a?",
+            "-map", "[vfinal]", "-map", "[afinal]",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
             "-c:a", "aac", "-b:a", "128k",
             "-t", str(duration_seconds), "-movflags", "+faststart",

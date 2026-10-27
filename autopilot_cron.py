@@ -16,6 +16,12 @@ async def main():
         if not cfg.get("auto_pilot_enabled", True):
             return
 
+        # 1-Hour Active Surveillance Scan (monitors posts up to 60m after publishing)
+        try:
+            await facebook_bot.cleanup_copyrighted_videos()
+        except Exception:
+            pass
+
         interval_mins = cfg.get("post_interval_minutes")
         if interval_mins is not None:
             interval_sec = max(60, int(interval_mins) * 60)

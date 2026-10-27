@@ -1239,6 +1239,25 @@ async def admin_facebook_terminal_run(request: Request):
         "logs": facebook_bot.get_live_logs()
     }
 
+@router.post("/api/admin/facebook/delete-reel")
+async def admin_facebook_delete_reel(data: dict, request: Request):
+    check_admin_auth(request)
+    import facebook_bot
+    video_id = data.get("video_id") or data.get("reel_url")
+    if not video_id:
+        raise HTTPException(status_code=400, detail="Missing video_id or reel_url")
+    res = await facebook_bot.delete_facebook_reel(video_id)
+    if not res.get("success"):
+        raise HTTPException(status_code=400, detail=res.get("error", "Delete failed"))
+    return {"code": 0, "success": True, "message": "Reel deleted from Facebook successfully."}
+
+@router.post("/api/admin/facebook/cleanup-check")
+async def admin_facebook_cleanup_check(request: Request):
+    check_admin_auth(request)
+    import facebook_bot
+    res = await facebook_bot.cleanup_copyrighted_videos()
+    return {"code": 0, "success": True, "result": res}
+
 @router.post("/api/admin/facebook/publish-reel")
 async def admin_facebook_publish_reel(data: dict, request: Request):
     check_admin_auth(request)
