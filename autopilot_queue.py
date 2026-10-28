@@ -595,7 +595,7 @@ async def get_dashboard_summary() -> Dict[str, Any]:
     connections = await check_platform_connections()
 
     now = int(time.time())
-    interval_min = int(fb_cfg.get("post_interval_minutes", 10))
+    interval_min = int(fb_cfg.get("post_interval_minutes", 45))
     interval_sec = interval_min * 60
     last_post = int(fb_cfg.get("last_post_time", 0))
     next_post = last_post + interval_sec if last_post > 0 else (now + interval_sec)
@@ -716,7 +716,7 @@ def get_workflow_graph_state() -> Dict[str, Any]:
         {
             "id": "node_schedule",
             "title": "Scheduled Publishing",
-            "subtitle": f"{fb_cfg.get('post_interval_minutes', 10)}-minute interval • Auto Scheduler",
+            "subtitle": f"{fb_cfg.get('post_interval_minutes', 45)}-minute interval • Auto Scheduler",
             "status": get_node_status("node_schedule"),
             "details": f"Next cycle in {round(max(0, state.get('next_run_timestamp', 0) - time.time()) / 60)} min"
         },
@@ -759,7 +759,7 @@ def get_publishing_calendar() -> List[Dict[str, Any]]:
     data = load_queue_data()
 
     now = int(time.time())
-    interval_sec = int(fb_cfg.get("post_interval_minutes", 10)) * 60
+    interval_sec = int(fb_cfg.get("post_interval_minutes", 45)) * 60
     last_post = int(fb_cfg.get("last_post_time", 0))
     next_time = (last_post + interval_sec) if (last_post + interval_sec > now) else now
 
@@ -980,7 +980,7 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
                 data["state"]["step"] = "idle"
                 data["state"]["step_label"] = f"Waiting to publish {p_label} (FB Token Needed)"
                 data["state"]["progress_percent"] = 0
-                data["state"]["next_run_timestamp"] = int(time.time()) + (int(fb_cfg.get("post_interval_minutes", 10)) * 60)
+                data["state"]["next_run_timestamp"] = int(time.time()) + (int(fb_cfg.get("post_interval_minutes", 45)) * 60)
                 save_queue_data(data)
                 return {"success": False, "waiting": True, "reason": "fb_token_expired"}
 
@@ -1041,7 +1041,7 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
                 data["state"]["progress_percent"] = 100
                 data["state"]["step_label"] = f"Published {p_label} successfully"
                 data["state"]["last_run_timestamp"] = int(time.time())
-                data["state"]["next_run_timestamp"] = int(time.time()) + (int(fb_cfg.get("post_interval_minutes", 10)) * 60)
+                data["state"]["next_run_timestamp"] = int(time.time()) + (int(fb_cfg.get("post_interval_minutes", 45)) * 60)
                 save_queue_data(data)
                 return {"success": True, "reuploaded": True, "reel_url": fb_res.get("reel_url")}
             else:
@@ -1337,7 +1337,7 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
             data["state"]["step"] = "idle"
             data["state"]["step_label"] = f"Waiting: {part_label} pending publish (Facebook Token Expired)"
             data["state"]["progress_percent"] = 0
-            data["state"]["next_run_timestamp"] = int(time.time()) + (int(fb_cfg.get("post_interval_minutes", 10)) * 60)
+            data["state"]["next_run_timestamp"] = int(time.time()) + (int(fb_cfg.get("post_interval_minutes", 45)) * 60)
             save_queue_data(data)
             return {"success": False, "waiting_upload": True, "error": "Upload failed, saved to pending queue"}
 
@@ -1379,10 +1379,10 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
         data["state"]["progress_percent"] = 100
         data["state"]["step_label"] = "Published successfully"
         data["state"]["last_run_timestamp"] = int(time.time())
-        data["state"]["next_run_timestamp"] = int(time.time()) + (int(fb_cfg.get("post_interval_minutes", 10)) * 60)
+        data["state"]["next_run_timestamp"] = int(time.time()) + (int(fb_cfg.get("post_interval_minutes", 45)) * 60)
         save_queue_data(data)
 
-        bot_log(f"[AutoPilot] ⏱️ Next scheduled video post in {fb_cfg.get('post_interval_minutes', 10)} minutes.")
+        bot_log(f"[AutoPilot] ⏱️ Next scheduled video post in {fb_cfg.get('post_interval_minutes', 45)} minutes.")
 
         return {
             "success": True,

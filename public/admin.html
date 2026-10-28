@@ -2296,11 +2296,11 @@
                 if (d.config) {
                     const c = d.config;
                     document.getElementById('fbPageId').value = c.page_id || '';
-                    document.getElementById('fbIntervalMinutes').value = c.post_interval_minutes || 10;
+                    document.getElementById('fbIntervalMinutes').value = c.post_interval_minutes || 45;
                     document.getElementById('fbPageToken').value = c.masked_token || '';
                     document.getElementById('fbCommentTemplate').value = c.auto_comment_template || '';
                     document.getElementById('fbAutoPilotToggle').checked = c.auto_pilot_enabled !== false;
-                    document.getElementById('dashFbStatus').innerText = c.auto_pilot_enabled ? `Active (${c.post_interval_minutes || 10}m)` : 'Disabled';
+                    document.getElementById('dashFbStatus').innerText = c.auto_pilot_enabled ? `Active (${c.post_interval_minutes || 45}m)` : 'Disabled';
                 }
                 const hRes = await fetch('/api/admin/facebook/history', { headers: { 'Authorization': `Bearer ${token}` } });
                 const hData = await hRes.json();
@@ -3935,7 +3935,7 @@
                 if (fbData.code === 0 && fbData.config) {
                     const c = fbData.config;
                     document.getElementById('fbPageId').value = c.page_id || '1367186939808744';
-                    document.getElementById('fbIntervalMinutes').value = c.post_interval_minutes || 10;
+                    document.getElementById('fbIntervalMinutes').value = c.post_interval_minutes || 45;
                     document.getElementById('fbAutoPilotToggle').checked = c.auto_pilot_enabled !== false;
                     if (c.page_token) {
                         document.getElementById('fbPageToken').value = c.page_token;
@@ -3974,7 +3974,7 @@
             const payload = {
                 page_id: document.getElementById('fbPageId').value.trim(),
                 page_token: document.getElementById('fbPageToken').value.trim(),
-                post_interval_minutes: parseInt(document.getElementById('fbIntervalMinutes').value || 10),
+                post_interval_minutes: parseInt(document.getElementById('fbIntervalMinutes').value || 45),
                 auto_pilot_enabled: document.getElementById('fbAutoPilotToggle').checked,
                 target_groups: groupsStr.split(',').map(s => s.trim()).filter(Boolean)
             };

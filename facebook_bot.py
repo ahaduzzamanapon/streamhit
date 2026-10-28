@@ -86,8 +86,8 @@ def load_fb_config() -> Dict[str, Any]:
         "page_token": DEFAULT_PAGE_TOKEN,
         "page_name": "NXLY",
         "auto_pilot_enabled": True,
-        "post_interval_minutes": 10,
-        "post_interval_hours": 0.166,
+        "post_interval_minutes": 45,
+        "post_interval_hours": 0.75,
         "last_post_time": 0,
         "auto_comment_template": "🍿 Watch Full Movie/Show in 1080p HD on NXLY Stream:\n👉 {movie_url}\n\n📲 Download Free Official Android App:\n👉 https://nxly.online/download"
     }
