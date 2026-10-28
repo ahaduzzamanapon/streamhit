@@ -23,8 +23,11 @@ jobs:
         with:
           python-version: '3.10'
 
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
       - name: Install Dependencies
-        run: pip install httpx
+        run: pip install httpx Pillow
 
       - name: Run Cloud Publisher
         env:

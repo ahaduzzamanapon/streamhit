@@ -1653,6 +1653,112 @@ async def admin_automation_run_now(request: Request):
         "message": "Auto-Pilot cycle triggered! Watch live terminal and visual workflow."
     }
 
+@router.get("/api/admin/automation/cloud-task")
+async def admin_automation_cloud_task(request: Request):
+    check_admin_auth(request)
+    import autopilot_queue
+    from facebook_bot import load_fb_config, bot_log
+    
+    data = autopilot_queue.load_queue_data()
+    jobs = [j for j in data.get("jobs", []) if j.get("status") in ("queued", "processing", "ready")]
+    if not jobs:
+        return {"code": 0, "has_task": False, "message": "No pending jobs in queue"}
+
+    active_job = jobs[0]
+    title = active_job.get("title", "Untitled")
+    part = active_job.get("current_part", 1)
+    total_parts = active_job.get("total_planned_parts") or active_job.get("total_parts", 50)
+    part_duration = active_job.get("part_duration_seconds", 75)
+    start_seconds = (part - 1) * part_duration + 600
+
+    # Resolve direct stream URLs
+    stream_candidates = []
+    try:
+        from main import api_resource
+        res = await api_resource(
+            se=active_job.get("current_season", 0),
+            ep=active_job.get("current_episode", 0),
+            detailPath=active_job.get("detail_path", ""),
+            subjectId=active_job.get("subject_id", "")
+        )
+        items = res.get("data", {}).get("list") or []
+        for it in items:
+            for lk in [it.get("url"), it.get("resourceLink")]:
+                if lk and lk not in stream_candidates:
+                    stream_candidates.append(lk)
+    except Exception as e:
+        bot_log(f"[CloudAPI] Stream resolve notice: {e}")
+
+    fb_cfg = load_fb_config()
+    bot_log(f"[CloudAPI] ☁️ GitHub Actions requested task for '{title}' Part {part}/{total_parts}")
+    
+    return {
+        "code": 0,
+        "has_task": True,
+        "job_id": active_job.get("id"),
+        "title": title,
+        "detail_path": active_job.get("detail_path", ""),
+        "part": part,
+        "total_parts": total_parts,
+        "part_duration": part_duration,
+        "start_seconds": start_seconds,
+        "stream_candidates": stream_candidates,
+        "facebook": {
+            "page_id": fb_cfg.get("page_id", ""),
+            "page_token": fb_cfg.get("page_token", "")
+        }
+    }
+
+@router.post("/api/admin/automation/cloud-done")
+async def admin_automation_cloud_done(request: Request):
+    check_admin_auth(request)
+    import autopilot_queue
+    from facebook_bot import bot_log
+    
+    body = await request.json()
+    job_id = body.get("job_id")
+    part = body.get("part")
+    fb_url = body.get("fb_url")
+    file_size_mb = body.get("file_size_mb", 30.0)
+    
+    data = autopilot_queue.load_queue_data()
+    matched = None
+    for j in data.get("jobs", []):
+        if j.get("id") == job_id:
+            matched = j
+            break
+            
+    if matched:
+        total_parts = matched.get("total_planned_parts") or matched.get("total_parts", 50)
+        history_item = {
+            "part_label": f"Part {part}/{total_parts}",
+            "posted_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "video_filename": f"cloud_rendered_part_{part}.mp4",
+            "fb_url": fb_url,
+            "yt_url": None,
+            "file_size_mb": file_size_mb
+        }
+        matched.setdefault("history", []).append(history_item)
+        matched["completed_parts_count"] = len(matched["history"])
+        matched["current_part"] = part + 1
+        matched["retry_count"] = 0
+        matched["last_error"] = None
+        
+        if matched["current_part"] > total_parts:
+            matched["status"] = "finished"
+            data.setdefault("finished", []).append(matched)
+            data["jobs"] = [j for j in data["jobs"] if j.get("id") != job_id]
+        else:
+            matched["status"] = "queued"
+            
+        data["state"]["is_busy"] = False
+        data["state"]["step"] = "idle"
+        autopilot_queue.save_queue_data(data)
+        bot_log(f"[CloudAPI] ✅ GitHub Actions successfully finished Part {part} for '{matched.get('title')}' -> {fb_url}")
+        return {"code": 0, "success": True, "message": f"Part {part} recorded successfully"}
+        
+    return {"code": 1, "success": False, "message": "Job not found"}
+
 # Legacy aliases for backwards compatibility
 @router.get("/api/admin/autopilot/status")
 async def admin_autopilot_status(request: Request):
