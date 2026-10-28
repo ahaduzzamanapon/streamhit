@@ -1,0 +1,33 @@
+name: Cloud Video AutoPublisher
+
+on:
+  schedule:
+    # Runs every 45 minutes (Optimized for Facebook Reels viral algorithm)
+    - cron: '*/45 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: cloud-autopublisher
+  cancel-in-progress: false
+
+jobs:
+  publish_cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: pip install httpx
+
+      - name: Run Cloud Publisher
+        env:
+          SERVER_URL: 'https://nxly.online'
+          DEPLOY_SECRET: ${{ secrets.DEPLOY_SECRET || 'streamhit_secret_update_2026' }}
+        run: python cloud_publisher.py
