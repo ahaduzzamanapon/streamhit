@@ -1222,20 +1222,24 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
         movie_web_url = f"https://nxly.online/movie/{active_job.get('detail_path')}" if active_job.get("detail_path") else "https://nxly.online"
         import random
         eng_question = random.choice(reel_generator.ENGAGEMENT_QUESTIONS)
+
+        # Dynamic high-reach algorithm tags
+        clean_tag = re.sub(r'[^a-zA-Z0-9]', '', title.lower())
         caption = (
-            f"🔥 {top_text} 🎬🍿\n"
+            f"🔥 {title} • Part {part} 🎬🍿\n"
             f"━━━━━━━━━━━━━━━━━━\n"
-            f"❓ {eng_question}\n\n"
+            f"💬 {eng_question}\n\n"
             f"🍿 পুরো মুভি/সিরিজ দেখতে Google-এ Search করুন: NXLY Stream\n"
             f"👉 ১ম যে ওয়েবসাইট আসবে সেটাই! (First result is the one)\n\n"
-            f"💬 ডিরেক্ট ওয়াচ লিংক ১ম কমেন্টে দেওয়া আছে (Check 1st Comment)! 👇\n"
+            f"🔗 ডিরেক্ট ওয়াচ লিংক ১ম কমেন্টে দেওয়া আছে (Check 1st Comment)! 👇\n"
             f"📲 Watch all movies & web series in Full HD for FREE on NXLY Stream!\n\n"
-            f"#reels #shorts #viral #movies #trending #fyp #movieclips #nxlystream"
+            f"#reelsfb #reelsviral #viralreels #fbreels #fbviral #movieclips #hindidubbed #trendingreels #fyp #{clean_tag[:20]}"
         )
         comment_msg = (
-            f"🍿 Full দেখার জন্য Google Search করুন: \"NXLY Stream\" অথবা সরাসরি Visit করুন: https://nxly.online\n\n"
-            f"👉 ডিরেক্ট ওয়াচ লিংক:\n{movie_web_url}\n\n"
-            f"📲 Download Free Official Android App:\n👉 https://nxly.online/download"
+            f"🍿 পুরো মুভি/সিরিজ দেখতে Google-এ Search করুন: \"NXLY Stream\"\n"
+            f"🌐 অথবা সরাসরি লিঙ্ক: {movie_web_url}\n\n"
+            f"📲 Official Android App: https://nxly.online/download\n\n"
+            f"👇 এই দৃশ্যটি কেমন লাগলো? ১ থেকে ১০ এর মধ্যে রেটিং দিন! 🔥"
         )
 
         platforms_cfg = active_job.get("platforms") or {"facebook": True, "youtube": True, "tiktok": True}

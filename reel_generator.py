@@ -561,11 +561,13 @@ async def render_single_reel_part(
         safe_log("[ReelEngine] ✅ Tier 2 render succeeded!")
         return True
 
-    # ── TIER 3: Clean Aspect Ratio + Overlay (Universal Compatibility) ──
-    safe_log("[ReelEngine] ⚠️ Tier 2 failed. Attempting Tier 3 universal render...")
+    # ── TIER 3: Universal Widescreen Center (16:9) + Ambient Blurred BG (9:16) ──
+    safe_log("[ReelEngine] ⚠️ Tier 2 failed. Attempting Tier 3 universal widescreen render...")
     filter_complex_t3 = (
-        "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[bg];"
-        "[bg][1:v]overlay=0:0[vfinal]"
+        "[0:v]scale=180:320:force_original_aspect_ratio=increase,crop=180:320,boxblur=8:2,scale=1080:1920,eq=brightness=-0.15:contrast=1.06[bg];"
+        "[0:v]crop=trunc(in_w*0.96/2)*2:trunc(in_h*0.96/2)*2,scale=1080:-2,eq=contrast=1.08:brightness=0.01:saturation=1.12[fg];"
+        "[bg][fg]overlay=(W-w)/2:(H-h)/2[merged];"
+        "[merged][1:v]overlay=0:0[vfinal]"
     )
     cmd_t3 = [
         ffmpeg_bin, "-y", "-nostdin",
@@ -577,7 +579,7 @@ async def render_single_reel_part(
         "-filter_complex", filter_complex_t3,
         "-map", "[vfinal]", "-map", "0:a?",
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
-        "-c:a", "aac", "-b:a", "128k",
+        "-c:a", "aac", "-b:a", "128k", "-af", "volume=1.20",
         "-threads", "2",
         "-t", str(duration_seconds),
         "-movflags", "+faststart",
@@ -586,13 +588,13 @@ async def render_single_reel_part(
 
     res3 = await asyncio.to_thread(_run_sync, cmd_t3, 90)
     if res3 and res3.returncode == 0 and os.path.exists(output_mp4_path) and os.path.getsize(output_mp4_path) > 1000:
-        safe_log("[ReelEngine] ✅ Tier 3 universal render succeeded!")
+        safe_log("[ReelEngine] ✅ Tier 3 widescreen render succeeded!")
         return True
 
-    # ── TIER 4: Local High-Speed Proxy Fallback (Bypasses CDN block 100%) ──
+    # ── TIER 4: Local High-Speed Proxy Fallback (Guaranteed Widescreen 16:9 + Ambient Blur) ──
     if not is_proxy_url:
         import urllib.parse
-        safe_log("[ReelEngine] 🔄 Direct CDN connection failed. Switching to local streaming proxy fallback...")
+        safe_log("[ReelEngine] 🔄 Direct CDN connection failed. Switching to local streaming proxy fallback with widescreen layout...")
         proxy_url = f"https://nxly.online/fetch?source_url={urllib.parse.quote(clean_url)}"
         cmd_proxy = [
             ffmpeg_bin, "-y", "-nostdin",
@@ -605,7 +607,7 @@ async def render_single_reel_part(
             "-filter_complex", filter_complex_t3,
             "-map", "[vfinal]", "-map", "0:a?",
             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
-            "-c:a", "aac", "-b:a", "128k",
+            "-c:a", "aac", "-b:a", "128k", "-af", "volume=1.20",
             "-threads", "2",
             "-t", str(duration_seconds),
             "-movflags", "+faststart",
@@ -613,7 +615,7 @@ async def render_single_reel_part(
         ]
         res_proxy = await asyncio.to_thread(_run_sync, cmd_proxy, 120)
         if res_proxy and res_proxy.returncode == 0 and os.path.exists(output_mp4_path) and os.path.getsize(output_mp4_path) > 1000:
-            safe_log("[ReelEngine] ✅ Proxy streaming render succeeded!")
+            safe_log("[ReelEngine] ✅ Proxy streaming widescreen render succeeded!")
             return True
 
     err_msg3 = res3.stderr[-500:] if (res3 and res3.stderr) else "Unknown error"

@@ -323,13 +323,17 @@ async def upload_reel_to_facebook(
         import re
         safe_caption = re.sub(r'https?://\S+', '', caption or '').strip()
         safe_caption = re.sub(r'(👉|🔗|Link:)\s*\n', '', safe_caption).strip()
-        finish_resp = await client.post(init_url, data={
-            "upload_phase": "finish",
-            "access_token": page_token,
-            "video_id": video_id,
-            "video_state": "PUBLISHED",
-            "description": safe_caption
-        })
+        finish_resp = await client.post(
+            init_url,
+            data={
+                "upload_phase": "finish",
+                "access_token": page_token,
+                "video_id": video_id,
+                "video_state": "PUBLISHED",
+                "description": safe_caption
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded; charset=utf-8"}
+        )
         finish_data = finish_resp.json()
         if "error" in finish_data:
             err_msg = finish_data["error"].get("message", "Finish failed")
