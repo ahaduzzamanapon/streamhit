@@ -464,11 +464,26 @@ async def render_single_reel_part(
 
     ffmpeg_bin = get_ffmpeg_path()
 
-    # Pass user_agent and referer as direct ffmpeg CLI parameters so default Lavf UA never triggers 429
+    try:
+        from main import get_random_singapore_ip
+        fwd_ip = get_random_singapore_ip()
+    except Exception:
+        import random
+        fwd_ip = f"103.{random.randint(1, 250)}.{random.randint(1, 250)}.{random.randint(1, 250)}"
+
+    headers_str = (
+        "Origin: https://123movienow.cc\r\n"
+        f"X-Forwarded-For: {fwd_ip}\r\n"
+        f"CF-Connecting-IP: {fwd_ip}\r\n"
+        f"X-Real-IP: {fwd_ip}\r\n"
+        "Accept: */*\r\n"
+    )
+
+    # Pass user_agent, referer, and forwarded IP so CDN never blocks with 429
     input_network_args = [
         "-user_agent", "okhttp/4.12.0",
         "-referer", "https://123movienow.cc/",
-        "-headers", "Origin: https://123movienow.cc\r\n",
+        "-headers", headers_str,
         "-reconnect", "1",
         "-reconnect_streamed", "1",
         "-reconnect_delay_max", "5",
@@ -573,6 +588,33 @@ async def render_single_reel_part(
     if res3 and res3.returncode == 0 and os.path.exists(output_mp4_path) and os.path.getsize(output_mp4_path) > 1000:
         safe_log("[ReelEngine] ✅ Tier 3 universal render succeeded!")
         return True
+
+    # ── TIER 4: Local High-Speed Proxy Fallback (Bypasses CDN block 100%) ──
+    if not is_proxy_url:
+        import urllib.parse
+        safe_log("[ReelEngine] 🔄 Direct CDN connection failed. Switching to local streaming proxy fallback...")
+        proxy_url = f"https://nxly.online/fetch?source_url={urllib.parse.quote(clean_url)}"
+        cmd_proxy = [
+            ffmpeg_bin, "-y", "-nostdin",
+            "-user_agent", "okhttp/4.12.0",
+            "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
+            "-ss", str(start_seconds),
+            "-t", str(duration_seconds),
+            "-i", proxy_url,
+            "-loop", "1", "-t", str(duration_seconds), "-i", overlay_png_path,
+            "-filter_complex", filter_complex_t3,
+            "-map", "[vfinal]", "-map", "0:a?",
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+            "-c:a", "aac", "-b:a", "128k",
+            "-threads", "2",
+            "-t", str(duration_seconds),
+            "-movflags", "+faststart",
+            output_mp4_path
+        ]
+        res_proxy = await asyncio.to_thread(_run_sync, cmd_proxy, 120)
+        if res_proxy and res_proxy.returncode == 0 and os.path.exists(output_mp4_path) and os.path.getsize(output_mp4_path) > 1000:
+            safe_log("[ReelEngine] ✅ Proxy streaming render succeeded!")
+            return True
 
     err_msg3 = res3.stderr[-500:] if (res3 and res3.stderr) else "Unknown error"
     safe_log(f"[ReelEngine] ❌ All FFmpeg render attempts failed: {err_msg3[:200].strip()}")

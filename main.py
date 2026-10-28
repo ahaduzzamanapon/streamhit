@@ -2957,7 +2957,7 @@ def get_fetch_client():
         )
     return _fetch_client
 
-@app.get("/fetch")
+@app.api_route("/fetch", methods=["GET", "HEAD"])
 async def handle_fetch(request: Request, source_url: str):
     if not source_url:
         raise HTTPException(status_code=400, detail="Missing source_url")
@@ -2981,8 +2981,12 @@ async def handle_fetch(request: Request, source_url: str):
     else:
         sorted_templates = [CDN_CANDIDATE_HEADERS[2]] + [t for i, t in enumerate(CDN_CANDIDATE_HEADERS) if i != 2]
 
+    fwd_ip = get_random_singapore_ip()
     for template in sorted_templates:
         headers_to_send = dict(template)
+        headers_to_send["X-Forwarded-For"] = fwd_ip
+        headers_to_send["CF-Connecting-IP"] = fwd_ip
+        headers_to_send["X-Real-IP"] = fwd_ip
         if range_header:
             headers_to_send["Range"] = range_header
             
@@ -3016,6 +3020,11 @@ async def handle_fetch(request: Request, source_url: str):
         
     real_status = resp.status_code
     
+    # For HEAD requests (used by FFmpeg probe), return headers immediately
+    if request.method == "HEAD":
+        await resp.aclose()
+        return Response(status_code=real_status, headers=response_headers)
+
     async def stream_generator():
         try:
             async for chunk in resp.aiter_bytes(chunk_size=1024 * 256):
