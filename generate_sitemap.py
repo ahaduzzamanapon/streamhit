@@ -1,79 +1,51 @@
+"""
+Sitemap Generator Utility
+Exports Google-compliant Sitemap Index architecture to public/ folder
+"""
+
+import os
 import asyncio
-import main
+import seo_engine
 
 async def build_sitemap():
-    pool = await main.get_db_pool()
-    async with pool.acquire() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute('''
-                SELECT title, detail_path, subject_type, rating, updated_at 
-                FROM subjects 
-                WHERE detail_path IS NOT NULL AND detail_path != '' 
-                ORDER BY rating DESC, updated_at DESC
-            ''')
-            rows = await cur.fetchall()
-            print(f"Total subjects with detail_path: {len(rows)}")
-            
-            domain = "https://nxly.online"
-            
-            xml = ['<?xml version="1.0" encoding="UTF-8"?>']
-            xml.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
-            
-            # Static pages
-            static_pages = [
-                ("", "1.0", "daily"),
-                ("/movies", "0.9", "daily"),
-                ("/tv", "0.9", "daily"),
-                ("/live-tv", "0.8", "daily"),
-                ("/download", "0.8", "weekly"),
-                ("/app", "0.8", "weekly"),
-            ]
-            
-            for p, prio, freq in static_pages:
-                xml.append("  <url>")
-                xml.append(f"    <loc>{domain}{p}</loc>")
-                xml.append(f"    <changefreq>{freq}</changefreq>")
-                xml.append(f"    <priority>{prio}</priority>")
-                xml.append("  </url>")
-                
-            genres = ["Action", "Comedy", "Horror", "Animation", "Thriller", "Romance", "Sci-Fi", "Drama"]
-            for g in genres:
-                xml.append("  <url>")
-                xml.append(f"    <loc>{domain}/movies?genre={g}</loc>")
-                xml.append("    <changefreq>weekly</changefreq>")
-                xml.append("    <priority>0.7</priority>")
-                xml.append("  </url>")
-            
-            count = 0
-            for r in rows:
-                title, detail_path, s_type, rating, updated_at = r
-                slug = detail_path.strip()
-                if not slug:
-                    continue
-                count += 1
-                type_seg = "movie" if s_type == 1 else "tv"
-                
-                # Detail page
-                xml.append("  <url>")
-                xml.append(f"    <loc>{domain}/movie/{slug}</loc>")
-                xml.append("    <changefreq>weekly</changefreq>")
-                xml.append("    <priority>0.8</priority>")
-                xml.append("  </url>")
-                
-                # Watch page
-                xml.append("  <url>")
-                xml.append(f"    <loc>{domain}/watch/{type_seg}/{slug}</loc>")
-                xml.append("    <changefreq>weekly</changefreq>")
-                xml.append("    <priority>0.7</priority>")
-                xml.append("  </url>")
-                
-            xml.append("</urlset>")
-            
-            with open("public/sitemap.xml", "w", encoding="utf-8") as f:
-                f.write("\n".join(xml))
-                
-            total_urls = len(static_pages) + len(genres) + (count * 2)
-            print(f"Generated public/sitemap.xml with {total_urls} indexed URLs!")
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    public_dir = os.path.join(base_dir, "public")
+    sitemaps_dir = os.path.join(public_dir, "sitemaps")
+    os.makedirs(sitemaps_dir, exist_ok=True)
+
+    domain = "https://nxly.online"
+    print(f"[Sitemap Generator] Generating Multi-Sitemap Index for {domain}...")
+
+    # 1. Master index
+    master_index = await seo_engine.build_master_sitemap_index("nxly.online")
+    with open(os.path.join(public_dir, "sitemap.xml"), "w", encoding="utf-8") as f:
+        f.write(master_index)
+    print(" -> Generated public/sitemap.xml (Master Sitemap Index)")
+
+    # 2. Static sitemap
+    static_sm = await seo_engine.build_static_sitemap("nxly.online")
+    with open(os.path.join(sitemaps_dir, "sitemap-static.xml"), "w", encoding="utf-8") as f:
+        f.write(static_sm)
+    print(" -> Generated public/sitemaps/sitemap-static.xml")
+
+    # 3. Movies sitemaps
+    total_subjects = await seo_engine.get_total_subjects_count()
+    movie_pages = max(1, (total_subjects + 999) // 1000)
+    for p in range(1, movie_pages + 1):
+        mov_sm = await seo_engine.build_movies_sitemap(p, "nxly.online")
+        with open(os.path.join(sitemaps_dir, f"sitemap-movies-{p}.xml"), "w", encoding="utf-8") as f:
+            f.write(mov_sm)
+        print(f" -> Generated public/sitemaps/sitemap-movies-{p}.xml")
+
+    # 4. SEO guides sitemaps
+    seo_pages = max(1, (total_subjects + 249) // 250)
+    for p in range(1, seo_pages + 1):
+        seo_sm = await seo_engine.build_seo_guides_sitemap(p, "nxly.online")
+        with open(os.path.join(sitemaps_dir, f"sitemap-seo-guides-{p}.xml"), "w", encoding="utf-8") as f:
+            f.write(seo_sm)
+        print(f" -> Generated public/sitemaps/sitemap-seo-guides-{p}.xml")
+
+    print(f"[Sitemap Generator] Complete! Indexed {total_subjects} movies across {1 + movie_pages + seo_pages} sub-sitemaps.")
 
 if __name__ == "__main__":
     asyncio.run(build_sitemap())

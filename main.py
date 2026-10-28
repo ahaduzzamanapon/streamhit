@@ -1502,6 +1502,9 @@ async def register_fcm_token(request: Request):
 import admin
 app.include_router(admin.router)
 
+import seo_engine
+app.include_router(seo_engine.router)
+
 import traceback
 from fastapi.responses import JSONResponse
 
@@ -1768,13 +1771,8 @@ async def download_page(request: Request):
     return serve_html("public/download.html", host=host)
 
 @app.get("/sitemap.xml")
-async def sitemap_endpoint():
-    path = os.path.join(base_dir, "public", "sitemap.xml")
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            content = f.read()
-        return Response(content=content, media_type="application/xml", headers={"Cache-Control": "public, max-age=3600"})
-    raise HTTPException(status_code=404, detail="Sitemap not found")
+async def sitemap_endpoint(request: Request):
+    return await seo_engine.master_sitemap_index_endpoint(request)
 
 @app.get("/robots.txt")
 async def robots_endpoint():
