@@ -463,11 +463,12 @@ async def render_single_reel_part(
         clean_url = urllib.parse.quote(clean_url, safe=":/=&?~#+!$,;'()*[]@%")
 
     ffmpeg_bin = get_ffmpeg_path()
-    headers_str = "User-Agent: okhttp/4.12.0\r\nOrigin: https://123movienow.cc\r\nReferer: https://123movienow.cc/\r\n"
 
-    # Common input arguments with stream reconnect
+    # Pass user_agent and referer as direct ffmpeg CLI parameters so default Lavf UA never triggers 429
     input_network_args = [
-        "-headers", headers_str,
+        "-user_agent", "okhttp/4.12.0",
+        "-referer", "https://123movienow.cc/",
+        "-headers", "Origin: https://123movienow.cc\r\n",
         "-reconnect", "1",
         "-reconnect_streamed", "1",
         "-reconnect_delay_max", "5",

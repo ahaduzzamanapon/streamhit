@@ -2975,11 +2975,11 @@ async def handle_fetch(request: Request, source_url: str):
     # Prioritize candidate headers based on target CDN host
     source_lower = source_url.lower()
     if "bcdnxw" in source_lower:
-        sorted_templates = [CDN_CANDIDATE_HEADERS[1], CDN_CANDIDATE_HEADERS[2]] + [t for i, t in enumerate(CDN_CANDIDATE_HEADERS) if i not in (1, 2)]
+        sorted_templates = [CDN_CANDIDATE_HEADERS[2], CDN_CANDIDATE_HEADERS[1]] + [t for i, t in enumerate(CDN_CANDIDATE_HEADERS) if i not in (1, 2)]
     elif "bcdn." in source_lower:
-        sorted_templates = [CDN_CANDIDATE_HEADERS[0]] + [t for i, t in enumerate(CDN_CANDIDATE_HEADERS) if i != 0]
+        sorted_templates = [CDN_CANDIDATE_HEADERS[0], CDN_CANDIDATE_HEADERS[2]] + [t for i, t in enumerate(CDN_CANDIDATE_HEADERS) if i not in (0, 2)]
     else:
-        sorted_templates = CDN_CANDIDATE_HEADERS
+        sorted_templates = [CDN_CANDIDATE_HEADERS[2]] + [t for i, t in enumerate(CDN_CANDIDATE_HEADERS) if i != 2]
 
     for template in sorted_templates:
         headers_to_send = dict(template)
