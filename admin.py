@@ -1244,15 +1244,52 @@ async def admin_facebook_terminal_clear(request: Request):
     return {"code": 0, "success": True, "message": "Live terminal logs cleared successfully."}
 
 
+def dispatch_to_github_actions():
+    import os, json, urllib.request
+    from facebook_bot import load_fb_config, bot_log
+    
+    fb_cfg = load_fb_config()
+    token = os.environ.get("GITHUB_TOKEN") or fb_cfg.get("github_token", "")
+    if not token:
+        bot_log("[Terminal] ⚠️ No GITHUB_TOKEN found. Executing locally on server...")
+        return False, "No GITHUB_TOKEN"
+        
+    url = "https://api.github.com/repos/ahaduzzamanapon/streamhit/actions/workflows/autopilot-publisher.yml/dispatches"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "StreamhitAdmin/2.0",
+        "X-GitHub-Api-Version": "2022-11-28"
+    }
+    data = json.dumps({"ref": "main"}).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as res:
+            if res.status in (200, 204):
+                bot_log("[Terminal] 🚀 Dispatched cycle to GitHub Actions Cloud Runner! Heavy rendering will execute on GitHub Cloud with 0% server CPU load.")
+                return True, "Triggered GitHub Actions"
+            return False, f"GitHub status: {res.status}"
+    except Exception as e:
+        bot_log(f"[Terminal] ⚠️ GitHub dispatch failed ({e}). Falling back to local execution...")
+        return False, str(e)
+
 @router.post("/api/admin/facebook/terminal-run")
 async def admin_facebook_terminal_run(request: Request):
     check_admin_auth(request)
     import facebook_bot
+    gh_ok, gh_msg = dispatch_to_github_actions()
+    if gh_ok:
+        return {
+            "code": 0,
+            "success": True,
+            "message": "Dispatched to GitHub Actions Cloud Runner! Heavy rendering will run on GitHub (0% server load).",
+            "logs": facebook_bot.get_live_logs()
+        }
     asyncio.create_task(facebook_bot.run_live_bot_cycle())
     return {
         "code": 0,
         "success": True,
-        "message": "Auto-Pilot cycle initiated in background! Check terminal output below.",
+        "message": "Auto-Pilot cycle initiated locally in background! Check terminal output below.",
         "logs": facebook_bot.get_live_logs()
     }
 
@@ -1638,6 +1675,15 @@ async def admin_automation_run_now(request: Request):
     from facebook_bot import bot_log
     bot_log(f"[Terminal] ⚡ Manual Auto-Pilot cycle triggered by Admin{' (Target Job: ' + target_job_id + ')' if target_job_id else ''}...")
     
+    # Try GitHub Actions Cloud Runner First (0% Server Load)
+    gh_ok, gh_msg = dispatch_to_github_actions()
+    if gh_ok:
+        return {
+            "code": 0,
+            "success": True,
+            "message": "Dispatched to GitHub Actions Cloud Runner! Heavy rendering will execute on GitHub Cloud."
+        }
+        
     async def _safe_run():
         try:
             await autopilot_queue.process_next_queue_job(target_job_id=target_job_id)
@@ -1650,7 +1696,7 @@ async def admin_automation_run_now(request: Request):
     return {
         "code": 0,
         "success": True,
-        "message": "Auto-Pilot cycle triggered! Watch live terminal and visual workflow."
+        "message": "Auto-Pilot cycle triggered locally! Watch live terminal and visual workflow."
     }
 
 @router.get("/api/admin/automation/cloud-task")
