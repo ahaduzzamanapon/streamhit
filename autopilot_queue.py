@@ -1107,13 +1107,25 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
         # 1. Fetch direct video stream
         stream_candidates = []
         try:
-            from main import api_resource
-            bot_log(f"[AutoPilot] 🔍 Resolving stream for '{title}' (detailPath={active_job.get('detail_path')}, S{se_arg}E{ep_arg})...")
+            from main import api_resource, resolve_subject_id
+            sid = active_job.get("subject_id", "")
+            dpath = active_job.get("detail_path", "")
+            if not sid and dpath:
+                try:
+                    sid = await resolve_subject_id(dpath)
+                    if sid:
+                        active_job["subject_id"] = str(sid)
+                except Exception:
+                    pass
+
+            is_retry = active_job.get("retry_count", 0) > 0
+            bot_log(f"[AutoPilot] 🔍 Resolving stream for '{title}' (detailPath={dpath}, S{se_arg}E{ep_arg}, force_fresh={is_retry})...")
             res = await api_resource(
                 se=se_arg,
                 ep=ep_arg,
-                detailPath=active_job.get("detail_path", ""),
-                subjectId=active_job.get("subject_id", "")
+                detailPath=dpath,
+                subjectId=sid,
+                force_fresh=is_retry
             )
             items = res.get("data", {}).get("list") or []
             for it in items:

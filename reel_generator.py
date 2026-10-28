@@ -464,32 +464,24 @@ async def render_single_reel_part(
 
     ffmpeg_bin = get_ffmpeg_path()
 
-    try:
-        from main import get_random_singapore_ip
-        fwd_ip = get_random_singapore_ip()
-    except Exception:
-        import random
-        fwd_ip = f"103.{random.randint(1, 250)}.{random.randint(1, 250)}.{random.randint(1, 250)}"
-
     headers_str = (
         "Origin: https://123movienow.cc\r\n"
-        f"X-Forwarded-For: {fwd_ip}\r\n"
-        f"CF-Connecting-IP: {fwd_ip}\r\n"
-        f"X-Real-IP: {fwd_ip}\r\n"
         "Accept: */*\r\n"
     )
 
-    # Pass user_agent, referer, and forwarded IP so CDN never blocks with 429
+    # Clean network args to avoid CDN 429 rate limit triggers
     input_network_args = [
         "-user_agent", "okhttp/4.12.0",
         "-referer", "https://123movienow.cc/",
         "-headers", headers_str,
+        "-multiple_requests", "1",
+        "-seekable", "1",
         "-reconnect", "1",
         "-reconnect_streamed", "1",
         "-reconnect_delay_max", "5",
     ]
 
-    def _run_sync(cmd_to_run, timeout_sec=90):
+    def _run_sync(cmd_to_run, timeout_sec=180):
         try:
             return subprocess.run(cmd_to_run, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=timeout_sec)
         except subprocess.TimeoutExpired:
@@ -518,14 +510,14 @@ async def render_single_reel_part(
         "-map", "[vfinal]", "-map", "[afinal]",
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
         "-c:a", "aac", "-b:a", "128k", "-ac", "2", "-ar", "44100",
-        "-threads", "2",
+        "-threads", "1",
         "-t", str(duration_seconds),
         "-movflags", "+faststart",
         output_mp4_path
     ]
 
     safe_log(f"[ReelEngine] 🎬 Slicing & rendering (Tier 1) at {start_seconds}s for {duration_seconds}s...")
-    res = await asyncio.to_thread(_run_sync, cmd_t1, 90)
+    res = await asyncio.to_thread(_run_sync, cmd_t1, 180)
     if res and res.returncode == 0 and os.path.exists(output_mp4_path) and os.path.getsize(output_mp4_path) > 1000:
         return True
 
@@ -550,13 +542,13 @@ async def render_single_reel_part(
         "-map", "[vfinal]", "-map", "0:a?",
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
         "-c:a", "aac", "-b:a", "128k",
-        "-threads", "2",
+        "-threads", "1",
         "-t", str(duration_seconds),
         "-movflags", "+faststart",
         output_mp4_path
     ]
 
-    res2 = await asyncio.to_thread(_run_sync, cmd_t2, 90)
+    res2 = await asyncio.to_thread(_run_sync, cmd_t2, 180)
     if res2 and res2.returncode == 0 and os.path.exists(output_mp4_path) and os.path.getsize(output_mp4_path) > 1000:
         safe_log("[ReelEngine] ✅ Tier 2 render succeeded!")
         return True
@@ -580,13 +572,13 @@ async def render_single_reel_part(
         "-map", "[vfinal]", "-map", "0:a?",
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
         "-c:a", "aac", "-b:a", "128k", "-af", "volume=1.20",
-        "-threads", "2",
+        "-threads", "1",
         "-t", str(duration_seconds),
         "-movflags", "+faststart",
         output_mp4_path
     ]
 
-    res3 = await asyncio.to_thread(_run_sync, cmd_t3, 90)
+    res3 = await asyncio.to_thread(_run_sync, cmd_t3, 180)
     if res3 and res3.returncode == 0 and os.path.exists(output_mp4_path) and os.path.getsize(output_mp4_path) > 1000:
         safe_log("[ReelEngine] ✅ Tier 3 widescreen render succeeded!")
         return True
@@ -595,10 +587,12 @@ async def render_single_reel_part(
     if not is_proxy_url:
         import urllib.parse
         safe_log("[ReelEngine] 🔄 Direct CDN connection failed. Switching to local streaming proxy fallback with widescreen layout...")
-        proxy_url = f"https://nxly.online/fetch?source_url={urllib.parse.quote(clean_url)}"
+        proxy_url = f"https://nxly.online/fetch?source_url={urllib.parse.quote(clean_url, safe='')}"
         cmd_proxy = [
             ffmpeg_bin, "-y", "-nostdin",
             "-user_agent", "okhttp/4.12.0",
+            "-multiple_requests", "1",
+            "-seekable", "1",
             "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
             "-ss", str(start_seconds),
             "-t", str(duration_seconds),

@@ -2542,14 +2542,14 @@ def is_deprecated_or_dummy_url(url: str) -> bool:
     # Filter out ad / redirect landing domains (not playable MP4 streams)
     if any(ad_domain in u_lower for ad_domain in ["vegamovies.pet", "vegamovies.cx", "asiafilm.org", "fzmovies", "southfreak"]):
         return True
-    # Invalidate expired signed URLs (tokens are valid for 2 hours = 7200s from creation timestamp t)
+    # Invalidate stale signed URLs (tokens expire quickly, refresh after 30 mins)
     if ("&t=" in u_lower or "?t=" in u_lower) and "sign=" in u_lower:
         try:
             parsed = urllib.parse.urlparse(url)
             qs = urllib.parse.parse_qs(parsed.query)
             if "t" in qs:
                 t_val = int(qs["t"][0])
-                if (time.time() - t_val) > 7200:
+                if (time.time() - t_val) > 1800:
                     return True
         except Exception:
             pass
@@ -2710,7 +2710,7 @@ async def _do_fetch_resource(subjectId: str, se: int, ep: int, detailPath: str, 
     return res
 
 @app.get("/api/resource")
-async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId: str = ""):
+async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId: str = "", force_fresh: bool = False):
     if not subjectId and detailPath:
         subjectId = await resolve_subject_id(detailPath, subjectId)
             
@@ -2723,15 +2723,19 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
     cache_key = f"{subjectId}_{se}_{ep}_{detailPath}"
     now = time.time()
 
-    # 1. In-memory fast cache (Instant: < 0.001s)
-    if cache_key in _resource_cache and (now - _resource_cache_time.get(cache_key, 0) < 7200):
-        cached_val = _resource_cache[cache_key]
-        cached_list = cached_val.get("data", {}).get("list") or []
-        if not any(is_deprecated_or_dummy_url(it.get("url", "")) or is_deprecated_or_dummy_url(it.get("resourceLink", "")) for it in cached_list):
-            return cached_val
+    if force_fresh:
+        _resource_cache.pop(cache_key, None)
+        _resource_cache_time.pop(cache_key, None)
+    else:
+        # 1. In-memory fast cache (Instant: < 0.001s, 5 min TTL to keep signatures fresh)
+        if cache_key in _resource_cache and (now - _resource_cache_time.get(cache_key, 0) < 300):
+            cached_val = _resource_cache[cache_key]
+            cached_list = cached_val.get("data", {}).get("list") or []
+            if not any(is_deprecated_or_dummy_url(it.get("url", "")) or is_deprecated_or_dummy_url(it.get("resourceLink", "")) for it in cached_list):
+                return cached_val
 
-    # 2. Database persistent cache (Super fast: < 0.005s)
-    db_data = await db_get_stream_resource(subjectId, se, ep)
+        # 2. Database persistent cache (Super fast: < 0.005s)
+        db_data = await db_get_stream_resource(subjectId, se, ep)
     if db_data and db_data.get("resources"):
         items = db_data["resources"]
         if not any(is_deprecated_or_dummy_url(it.get("url", "")) or is_deprecated_or_dummy_url(it.get("resourceLink", "")) for it in items):
@@ -3011,7 +3015,8 @@ async def handle_fetch(request: Request, source_url: str):
     }
     if resp.headers.get("Content-Range"):
         response_headers["Content-Range"] = resp.headers.get("Content-Range")
-    if resp.headers.get("Content-Length"):
+    # Only send Content-Length for 206 Partial Content to prevent LiteSpeed 413 error on large video streams
+    if resp.headers.get("Content-Length") and real_status == 206:
         response_headers["Content-Length"] = resp.headers.get("Content-Length")
     if resp.headers.get("Accept-Ranges"):
         response_headers["Accept-Ranges"] = resp.headers.get("Accept-Ranges")
@@ -3021,6 +3026,7 @@ async def handle_fetch(request: Request, source_url: str):
     # For HEAD requests (used by FFmpeg probe), return headers immediately
     if request.method == "HEAD":
         await resp.aclose()
+        response_headers.pop("Content-Length", None)
         return Response(status_code=real_status, headers=response_headers)
 
     async def stream_generator():

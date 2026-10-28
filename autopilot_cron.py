@@ -57,7 +57,25 @@ async def main():
 
         # Check if due for next post
         if now - last_post >= interval_sec:
+            jobs_list = q_data.get("jobs", [])
+            has_pending = any(it.get("status") in ("queued", "active", "processing") for it in jobs_list)
+            if not has_pending:
+                return
+
             facebook_bot.bot_log(f"[CronDaemon] ⏰ Scheduled interval reached ({interval_sec // 60}m). Auto-triggering next video in queue...")
+            
+            # Prefer 100% cloud rendering on GitHub Actions to maintain 0% cPanel CPU load
+            try:
+                import admin
+                gh_ok, gh_msg = admin.dispatch_to_github_actions()
+                if gh_ok:
+                    facebook_bot.bot_log("[CronDaemon] 🚀 Dispatched cycle to GitHub Actions Cloud Runner (0% server load).")
+                    return
+                else:
+                    facebook_bot.bot_log(f"[CronDaemon] Cloud dispatch note: {gh_msg}. Proceeding locally...")
+            except Exception as ge:
+                facebook_bot.bot_log(f"[CronDaemon] Cloud dispatch fallback: {ge}")
+
             res = await autopilot_queue.process_next_queue_job()
             facebook_bot.bot_log(f"[CronDaemon] Finished auto-cycle: success={res.get('success')}, title={res.get('title')}, error={res.get('error')}")
     except Exception as e:
