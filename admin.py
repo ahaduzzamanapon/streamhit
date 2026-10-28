@@ -1197,6 +1197,9 @@ async def admin_facebook_save_config(data: dict, request: Request):
         elif isinstance(raw_groups, list):
             cfg["target_groups"] = [str(g).strip() for g in raw_groups if str(g).strip()]
 
+    if "github_token" in data and data["github_token"]:
+        cfg["github_token"] = str(data["github_token"]).strip()
+
     facebook_bot.save_fb_config(cfg)
     return {"code": 0, "message": "Facebook configuration saved successfully!"}
 
@@ -1250,6 +1253,14 @@ def dispatch_to_github_actions():
     
     fb_cfg = load_fb_config()
     token = os.environ.get("GITHUB_TOKEN") or fb_cfg.get("github_token", "")
+    if not token:
+        tok_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".github_token")
+        if os.path.exists(tok_file):
+            try:
+                token = open(tok_file, "r", encoding="utf-8").read().strip()
+            except Exception:
+                pass
+
     if not token:
         bot_log("[Terminal] ⚠️ No GITHUB_TOKEN found. Executing locally on server...")
         return False, "No GITHUB_TOKEN"
