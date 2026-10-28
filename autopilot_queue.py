@@ -535,6 +535,20 @@ def execute_job_action(job_id: str, action: str, direction: Optional[str] = None
             return {"code": 0, "message": "Job set to retry"}
         return {"code": 404, "message": "Job not found"}
 
+    if action == "set_part":
+        try:
+            part_num = int(direction) if direction and str(direction).isdigit() else 1
+            if idx != -1:
+                jobs[idx]["current_part"] = part_num
+                jobs[idx]["retry_count"] = 0
+                jobs[idx]["last_error"] = None
+                jobs[idx]["status"] = "queued"
+                save_queue_data(data)
+                return {"code": 0, "message": f"Job '{jobs[idx].get('title')}' reset to Part {part_num}"}
+            return {"code": 404, "message": "Job not found"}
+        except Exception as e:
+            return {"code": 500, "message": str(e)}
+
     if action == "toggle_platform":
         target_plat = (direction or "").lower().strip()
         if idx != -1 and target_plat in ("facebook", "youtube", "tiktok"):
@@ -1103,16 +1117,18 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
             )
             items = res.get("data", {}).get("list") or []
             for it in items:
-                link = it.get("url") or it.get("resourceLink") or ""
-                if "source_url=" in link:
-                    try:
-                        link = urllib.parse.unquote(link.split("source_url=")[-1])
-                    except Exception:
-                        pass
-                if link:
-                    link_low = link.lower()
-                    if not any(bad in link_low for bad in ["vegamovies.pet", "vegamovies.cx", "asiafilm.org", "fzmovies", "southfreak"]):
-                        stream_candidates.append(link)
+                direct_link = it.get("url") or ""
+                proxy_link = it.get("resourceLink") or ""
+                for lk in [direct_link, proxy_link]:
+                    if "source_url=" in lk and lk == direct_link:
+                        try:
+                            lk = urllib.parse.unquote(lk.split("source_url=")[-1])
+                        except Exception:
+                            pass
+                    if lk and lk not in stream_candidates:
+                        link_low = lk.lower()
+                        if not any(bad in link_low for bad in ["vegamovies.pet", "vegamovies.cx", "asiafilm.org", "fzmovies", "southfreak"]):
+                            stream_candidates.append(lk)
         except Exception as e:
             bot_log(f"[AutoPilot] Warning: failed to fetch stream: {e}")
 
@@ -1140,6 +1156,7 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
         data["state"]["step"] = "rendering"
         save_queue_data(data)
 
+        os.makedirs(os.path.join(BASE_DIR, "public", "reels"), exist_ok=True)
         sanitized = re.sub(r'[^a-zA-Z0-9_\-]', '_', title)[:30]
         timestamp = int(time.time())
         output_filename = f"fb_reel_{sanitized}_P{part}_{timestamp}.mp4"
@@ -1163,7 +1180,7 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
             bot_log(f"[AutoPilot] Overlay generation note: {oe}")
 
         render_success = False
-        for s_url in stream_candidates[:2]:
+        for s_url in stream_candidates[:3]:
             bot_log(f"[AutoPilot] ⚙️ Slicing {part_duration}s at {start_seconds // 60}:{start_seconds % 60:02d} from stream...")
             render_success = await reel_generator.render_single_reel_part(
                 stream_url=s_url,
@@ -1187,15 +1204,8 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
             retry_count = active_job.get("retry_count", 0) + 1
             active_job["retry_count"] = retry_count
             active_job["last_error"] = f"Render failed at {part_label}"
-            
-            if retry_count < 3:
-                active_job["status"] = "queued"
-                bot_log(f"[AutoPilot] ⚠️ Video rendering failed for '{title}' [{part_label}] (Attempt {retry_count}/3). Retrying in next scheduled cycle...")
-            else:
-                bot_log(f"[AutoPilot] ❌ Video rendering failed 3 times for '{title}' [{part_label}]. Skipping part to keep queue active...")
-                active_job["retry_count"] = 0
-                active_job["status"] = "queued"
-                advance_job_progression(active_job, is_series, data, active_idx, time.strftime("%Y-%m-%d %H:%M:%S"))
+            active_job["status"] = "queued"
+            bot_log(f"[AutoPilot] ⚠️ Video rendering for '{title}' [{part_label}] encountered an issue (Attempt {retry_count}). Retrying this exact video part in next cycle without skipping...")
 
             data["state"]["is_busy"] = False
             data["state"]["step"] = "idle"
@@ -1345,9 +1355,15 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
         if os.path.exists(output_path):
             try:
                 os.remove(output_path)
-                bot_log(f"[AutoPilot] 🧹 Cleaned up published video file: {output_filename}")
+                bot_log(f"[AutoPilot] 🧹 Cleaned up published video file from storage: {output_filename}")
             except Exception as _ce:
                 bot_log(f"[AutoPilot] Note on video cleanup: {_ce}")
+
+        # Routine purge of any orphaned or stale video files in storage
+        try:
+            reel_generator.cleanup_old_reels_storage()
+        except Exception:
+            pass
 
         # Save state & update last post timestamp
         fb_cfg = load_fb_config()

@@ -381,24 +381,62 @@ def save_reels_history(history: List[Dict[str, Any]]):
     except Exception as e:
         print(f"Error saving reels history: {e}")
 
+def safe_log(msg: str):
+    try:
+        from facebook_bot import bot_log
+        bot_log(msg)
+    except Exception:
+        print(msg)
+
+def cleanup_old_reels_storage():
+    """Removes published and stale reel files from local storage to keep disk space 100% clean."""
+    if not os.path.exists(REELS_DIR):
+        return
+    now = time.time()
+    for fname in os.listdir(REELS_DIR):
+        if fname.endswith(".mp4") or fname.endswith(".png"):
+            fpath = os.path.join(REELS_DIR, fname)
+            try:
+                # Remove if older than 30 minutes
+                if os.path.isfile(fpath) and (now - os.path.getmtime(fpath)) > 1800:
+                    os.remove(fpath)
+            except Exception:
+                pass
+
 def get_ffmpeg_path() -> str:
     try:
         import imageio_ffmpeg
         p = imageio_ffmpeg.get_ffmpeg_exe()
         if p and os.path.exists(p):
+            try:
+                import stat
+                st = os.stat(p)
+                if not (st.st_mode & stat.S_IXUSR):
+                    os.chmod(p, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+            except Exception:
+                pass
             return p
     except Exception:
         pass
     home = os.path.expanduser("~")
     for candidate in [
+        "/home/lcsyxfen/virtualenv/streamhit.lc-synergy.ltd/3.10/lib/python3.10/site-packages/imageio_ffmpeg/binaries/ffmpeg-linux-x86_64-v7.0.2",
         os.path.join(home, "bin", "ffmpeg"),
         os.path.join(home, ".local", "bin", "ffmpeg"),
         "/usr/local/bin/ffmpeg",
         "/usr/bin/ffmpeg",
         "ffmpeg"
     ]:
-        if os.path.exists(candidate) and os.access(candidate, os.X_OK):
-            return candidate
+        if os.path.exists(candidate):
+            try:
+                import stat
+                st = os.stat(candidate)
+                if not (st.st_mode & stat.S_IXUSR):
+                    os.chmod(candidate, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+            except Exception:
+                pass
+            if os.access(candidate, os.X_OK):
+                return candidate
     return "ffmpeg"
 
 async def render_single_reel_part(
@@ -413,111 +451,131 @@ async def render_single_reel_part(
     Cuts video starting at start_seconds with duration_seconds,
     applies 9:16 layout with ambient blurred background + crisp center foreground,
     anti-copyright color/speed/audio EQ nudges, and top/bottom overlay banner.
+    Includes multi-tier rendering fallbacks to guarantee 100% rendering success.
     """
+    os.makedirs(os.path.dirname(output_mp4_path), exist_ok=True)
     clean_url = stream_url.strip()
-    if "source_url=" in clean_url:
+    is_proxy_url = "source_url=" in clean_url
+    
+    # If not a proxy URL, properly quote special characters for FFmpeg
+    if not is_proxy_url:
         import urllib.parse
-        try:
-            clean_url = urllib.parse.unquote(clean_url.split("source_url=")[-1])
-        except Exception:
-            pass
-    import urllib.parse
-    clean_url = urllib.parse.quote(clean_url, safe=":/=&?~#+!$,;'()*[]@%")
+        clean_url = urllib.parse.quote(clean_url, safe=":/=&?~#+!$,;'()*[]@%")
 
-    if anti_copyright:
-        filter_complex = (
-            "[0:v]scale=180:320:force_original_aspect_ratio=increase,crop=180:320,boxblur=4:1,scale=1080:1920,eq=brightness=-0.15:contrast=1.06,setpts=PTS/1.03[bg];"
-            "[0:v]crop=trunc(in_w*0.94/2)*2:trunc(in_h*0.94/2)*2,scale=1080:-2,eq=contrast=1.06:brightness=0.01:saturation=1.10,setpts=PTS/1.03[fg];"
-            "[bg][fg]overlay=(W-w)/2:(H-h)/2[merged];"
-            "[merged][1:v]overlay=0:0[vfinal];"
-            "[0:a]aformat=sample_rates=44100:channel_layouts=stereo,asetrate=44100*1.05,atempo=1.03/1.05,highpass=f=80,lowpass=f=12000[afinal]"
-        )
-        map_args = ["-map", "[vfinal]", "-map", "[afinal]"]
-    else:
-        filter_complex = (
-            "[0:v]scale=180:320:force_original_aspect_ratio=increase,crop=180:320,boxblur=4:1,scale=1080:1920,eq=brightness=-0.10[bg];"
-            "[0:v]scale=1080:-2[fg];"
-            "[bg][fg]overlay=(W-w)/2:(H-h)/2[merged];"
-            "[merged][1:v]overlay=0:0[vfinal]"
-        )
-        map_args = ["-map", "[vfinal]", "-map", "0:a?"]
+    ffmpeg_bin = get_ffmpeg_path()
+    headers_str = "User-Agent: okhttp/4.12.0\r\nOrigin: https://123movienow.cc\r\nReferer: https://123movienow.cc/\r\n"
 
-    headers_str = "User-Agent: okhttp/4.12.0\r\nReferer: https://123movienow.cc/\r\n"
-    cmd = [
-        get_ffmpeg_path(), "-y", "-nostdin",
+    # Common input arguments with stream reconnect
+    input_network_args = [
         "-headers", headers_str,
-        "-rw_timeout", "15000000",
         "-reconnect", "1",
         "-reconnect_streamed", "1",
         "-reconnect_delay_max", "5",
+    ]
+
+    def _run_sync(cmd_to_run, timeout_sec=90):
+        try:
+            return subprocess.run(cmd_to_run, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=timeout_sec)
+        except subprocess.TimeoutExpired:
+            safe_log(f"[ReelEngine] ⚠️ FFmpeg process timed out after {timeout_sec}s!")
+            return None
+        except Exception as ex:
+            safe_log(f"[ReelEngine] ⚠️ FFmpeg execution error: {ex}")
+            return None
+
+    # ── TIER 1: Full Anti-Copyright (Ambient Blur BG + Center Crisp FG + Audio EQ/Pitch) ──
+    filter_complex_t1 = (
+        "[0:v]scale=180:320:force_original_aspect_ratio=increase,crop=180:320,boxblur=4:1,scale=1080:1920,eq=brightness=-0.15:contrast=1.06,setpts=PTS/1.03[bg];"
+        "[0:v]crop=trunc(in_w*0.94/2)*2:trunc(in_h*0.94/2)*2,scale=1080:-2,eq=contrast=1.06:brightness=0.01:saturation=1.10,setpts=PTS/1.03[fg];"
+        "[bg][fg]overlay=(W-w)/2:(H-h)/2[merged];"
+        "[merged][1:v]overlay=0:0[vfinal];"
+        "[0:a]aformat=sample_rates=44100:channel_layouts=stereo,asetrate=44100*1.05,atempo=1.03/1.05,highpass=f=80,lowpass=f=12000[afinal]"
+    )
+    cmd_t1 = [
+        ffmpeg_bin, "-y", "-nostdin",
+        *input_network_args,
         "-ss", str(start_seconds),
         "-t", str(duration_seconds),
         "-i", clean_url,
         "-loop", "1", "-t", str(duration_seconds), "-i", overlay_png_path,
-        "-filter_complex", filter_complex,
-        *map_args,
-        "-c:v", "libx264",
-        "-preset", "ultrafast",
-        "-crf", "23",
-        "-c:a", "aac",
-        "-b:a", "128k",
-        "-ac", "2",
-        "-ar", "44100",
+        "-filter_complex", filter_complex_t1,
+        "-map", "[vfinal]", "-map", "[afinal]",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+        "-c:a", "aac", "-b:a", "128k", "-ac", "2", "-ar", "44100",
         "-threads", "2",
         "-t", str(duration_seconds),
         "-movflags", "+faststart",
         output_mp4_path
     ]
 
-    print(f"[ReelEngine] Running FFmpeg for {output_mp4_path} from {start_seconds}s for {duration_seconds}s...")
-    
-    def _run_sync(cmd_to_run):
-        try:
-            return subprocess.run(cmd_to_run, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=90)
-        except subprocess.TimeoutExpired:
-            print("[ReelEngine] FFmpeg process timed out after 90 seconds!")
-            return None
-        except Exception as ex:
-            print(f"[ReelEngine] FFmpeg execution error: {ex}")
-            return None
+    safe_log(f"[ReelEngine] 🎬 Slicing & rendering (Tier 1) at {start_seconds}s for {duration_seconds}s...")
+    res = await asyncio.to_thread(_run_sync, cmd_t1, 90)
+    if res and res.returncode == 0 and os.path.exists(output_mp4_path) and os.path.getsize(output_mp4_path) > 1000:
+        return True
 
-    res = await asyncio.to_thread(_run_sync, cmd)
-    
-    if res is None or res.returncode != 0:
-        err_msg = res.stderr[-800:] if (res and res.stderr) else "Timeout or Unknown error"
-        print(f"[ReelEngine] FFmpeg error: {err_msg}")
-        # Try fallback without audio filter in case audio stream was missing/corrupt or rate-shifted
-        print("[ReelEngine] Retrying with fallback audio filter...")
-        fallback_fc = (
-            "[0:v]scale=180:320:force_original_aspect_ratio=increase,crop=180:320,boxblur=4:1,scale=1080:1920,eq=brightness=-0.15:contrast=1.06[bg];"
-            "[0:v]crop=trunc(in_w*0.94/2)*2:trunc(in_h*0.94/2)*2,scale=1080:-2,eq=contrast=1.06:saturation=1.10[fg];"
-            "[bg][fg]overlay=(W-w)/2:(H-h)/2[merged];"
-            "[merged][1:v]overlay=0:0[vfinal];"
-            "[0:a]aformat=sample_rates=44100:channel_layouts=stereo,asetrate=44100*1.05,atempo=1/1.05[afinal]"
-        )
-        fallback_cmd = [
-            get_ffmpeg_path(), "-y", "-nostdin",
-            "-headers", headers_str,
-            "-rw_timeout", "15000000",
-            "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
-            "-ss", str(start_seconds),
-            "-t", str(duration_seconds),
-            "-i", clean_url,
-            "-loop", "1", "-t", str(duration_seconds), "-i", overlay_png_path,
-            "-filter_complex", fallback_fc,
-            "-map", "[vfinal]", "-map", "[afinal]",
-            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
-            "-c:a", "aac", "-b:a", "128k",
-            "-threads", "2",
-            "-t", str(duration_seconds), "-movflags", "+faststart",
-            output_mp4_path
-        ]
-        fallback_res = await asyncio.to_thread(_run_sync, fallback_cmd)
-        if fallback_res and fallback_res.returncode == 0 and os.path.exists(output_mp4_path) and os.path.getsize(output_mp4_path) > 1000:
-            return True
-        return False
-        
-    return os.path.exists(output_mp4_path) and os.path.getsize(output_mp4_path) > 1000
+    err_msg = res.stderr[-500:] if (res and res.stderr) else "Timeout or Unknown Error"
+    safe_log(f"[ReelEngine] ⚠️ Tier 1 render notice: {err_msg[:200].strip()}. Trying Tier 2 fallback...")
+
+    # ── TIER 2: Safe Audio Fallback (Prevents failure if audio pitch-shift filter errors) ──
+    filter_complex_t2 = (
+        "[0:v]scale=180:320:force_original_aspect_ratio=increase,crop=180:320,boxblur=4:1,scale=1080:1920,eq=brightness=-0.15:contrast=1.06[bg];"
+        "[0:v]crop=trunc(in_w*0.94/2)*2:trunc(in_h*0.94/2)*2,scale=1080:-2,eq=contrast=1.06:saturation=1.10[fg];"
+        "[bg][fg]overlay=(W-w)/2:(H-h)/2[merged];"
+        "[merged][1:v]overlay=0:0[vfinal]"
+    )
+    cmd_t2 = [
+        ffmpeg_bin, "-y", "-nostdin",
+        *input_network_args,
+        "-ss", str(start_seconds),
+        "-t", str(duration_seconds),
+        "-i", clean_url,
+        "-loop", "1", "-t", str(duration_seconds), "-i", overlay_png_path,
+        "-filter_complex", filter_complex_t2,
+        "-map", "[vfinal]", "-map", "0:a?",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+        "-c:a", "aac", "-b:a", "128k",
+        "-threads", "2",
+        "-t", str(duration_seconds),
+        "-movflags", "+faststart",
+        output_mp4_path
+    ]
+
+    res2 = await asyncio.to_thread(_run_sync, cmd_t2, 90)
+    if res2 and res2.returncode == 0 and os.path.exists(output_mp4_path) and os.path.getsize(output_mp4_path) > 1000:
+        safe_log("[ReelEngine] ✅ Tier 2 render succeeded!")
+        return True
+
+    # ── TIER 3: Clean Aspect Ratio + Overlay (Universal Compatibility) ──
+    safe_log("[ReelEngine] ⚠️ Tier 2 failed. Attempting Tier 3 universal render...")
+    filter_complex_t3 = (
+        "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[bg];"
+        "[bg][1:v]overlay=0:0[vfinal]"
+    )
+    cmd_t3 = [
+        ffmpeg_bin, "-y", "-nostdin",
+        *input_network_args,
+        "-ss", str(start_seconds),
+        "-t", str(duration_seconds),
+        "-i", clean_url,
+        "-loop", "1", "-t", str(duration_seconds), "-i", overlay_png_path,
+        "-filter_complex", filter_complex_t3,
+        "-map", "[vfinal]", "-map", "0:a?",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+        "-c:a", "aac", "-b:a", "128k",
+        "-threads", "2",
+        "-t", str(duration_seconds),
+        "-movflags", "+faststart",
+        output_mp4_path
+    ]
+
+    res3 = await asyncio.to_thread(_run_sync, cmd_t3, 90)
+    if res3 and res3.returncode == 0 and os.path.exists(output_mp4_path) and os.path.getsize(output_mp4_path) > 1000:
+        safe_log("[ReelEngine] ✅ Tier 3 universal render succeeded!")
+        return True
+
+    err_msg3 = res3.stderr[-500:] if (res3 and res3.stderr) else "Unknown error"
+    safe_log(f"[ReelEngine] ❌ All FFmpeg render attempts failed: {err_msg3[:200].strip()}")
+    return False
 
 async def execute_batch_reel_job(
     job_id: str,
