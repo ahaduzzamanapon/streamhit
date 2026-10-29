@@ -47,11 +47,13 @@ jobs:
                 else
                   echo "Copying latest files to $appdir..."
                   cp -f ~/streamhit.lc-synergy.ltd/*.py "$appdir/" 2>/dev/null || true
+                  cp -f ~/streamhit.lc-synergy.ltd/.htaccess "$appdir/" 2>/dev/null || true
                   mkdir -p "$appdir/public"
                   cp -f ~/streamhit.lc-synergy.ltd/public/*.html "$appdir/public/" 2>/dev/null || true
                   cp -f ~/streamhit.lc-synergy.ltd/public/*.css "$appdir/public/" 2>/dev/null || true
                   cp -f ~/streamhit.lc-synergy.ltd/public/*.js "$appdir/public/" 2>/dev/null || true
                 fi
+                cp -f ~/streamhit.lc-synergy.ltd/.htaccess "$appdir/.htaccess" 2>/dev/null || true
                 touch "$appdir/passenger_wsgi.py" 2>/dev/null || true
                 mkdir -p "$appdir/tmp" 2>/dev/null || true
                 touch "$appdir/tmp/restart.txt" 2>/dev/null || true

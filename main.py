@@ -31,6 +31,9 @@ DB_PORT = int(os.getenv("DB_PORT", "3306"))
 DB_USER = os.getenv("DB_USER", "root")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_NAME = os.getenv("DB_NAME", "moviebox")
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin").strip()
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "").strip()
+ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY", "nxly_control_2026").strip()
 
 db_pool = None
 db_init_lock = None
@@ -796,15 +799,28 @@ async def init_db():
                         INDEX idx_expires (subject_id, season_num, episode_num, expires_at)
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
-                # Seed default admin if table is empty
-                await cur.execute("SELECT COUNT(*) FROM admins")
-                row = await cur.fetchone()
-                if row and row[0] == 0:
-                    default_pw = "admin123"
-                    salt = "streamfit_secure_salt_2026"
-                    pw_hash = hashlib.sha256((default_pw + salt).encode('utf-8')).hexdigest()
-                    await cur.execute("INSERT INTO admins (username, password_hash) VALUES (%s, %s)", ("admin", pw_hash))
-                    print("[Database] Created default admin account (admin / admin123).")
+                # Seed or update admin account securely
+                salt = "streamfit_secure_salt_2026"
+                if ADMIN_PASSWORD:
+                    pw_hash = hashlib.sha256((ADMIN_PASSWORD + salt).encode('utf-8')).hexdigest()
+                    await cur.execute("SELECT id FROM admins WHERE username = %s", (ADMIN_USERNAME,))
+                    existing = await cur.fetchone()
+                    if existing:
+                        await cur.execute("UPDATE admins SET password_hash = %s WHERE username = %s", (pw_hash, ADMIN_USERNAME))
+                        print(f"[Database Security] Admin account '{ADMIN_USERNAME}' password synced from environment.")
+                    else:
+                        await cur.execute("INSERT INTO admins (username, password_hash) VALUES (%s, %s)", (ADMIN_USERNAME, pw_hash))
+                        print(f"[Database Security] Admin account '{ADMIN_USERNAME}' created from environment.")
+                    if ADMIN_USERNAME != "admin":
+                        await cur.execute("DELETE FROM admins WHERE username = 'admin'")
+                else:
+                    await cur.execute("SELECT COUNT(*) FROM admins")
+                    row = await cur.fetchone()
+                    if row and row[0] == 0:
+                        default_pw = "admin123"
+                        pw_hash = hashlib.sha256((default_pw + salt).encode('utf-8')).hexdigest()
+                        await cur.execute("INSERT INTO admins (username, password_hash) VALUES (%s, %s)", ("admin", pw_hash))
+                        print("[Database] Created initial admin account (admin / admin123).")
         print("[Database] MySQL pool and tables initialized successfully.")
     except Exception as e:
         print(f"[Database Warning] MySQL connection failed ({e}). Running in standalone mode.")
@@ -1517,10 +1533,43 @@ async def global_exception_handler(request: Request, exc: Exception):
             f.write(f"\n--- ERROR: {request.method} {request.url.path} ---\n{err_trace}\n")
     except:
         pass
+    # NEVER leak server file paths or internal traceback to client in production
     return JSONResponse(
         status_code=500,
-        content={"code": 500, "message": f"Server Error: {exc}", "trace": err_trace}
+        content={"code": 500, "message": "An internal server error occurred. Please try again later."}
     )
+
+@app.middleware("http")
+async def block_sensitive_files_middleware(request: Request, call_next):
+    raw_path = request.url.path.lower()
+    
+    # Stealth Admin Access Protection
+    if raw_path in ("/admin.html", "/admin"):
+        from admin import verify_signed_token
+        auth_cookie = request.cookies.get("admin_token")
+        auth_header = request.headers.get("Authorization")
+        token = auth_header[7:] if (auth_header and auth_header.startswith("Bearer ")) else auth_cookie
+        is_authenticated = bool(token and verify_signed_token(token))
+        
+        key_param = request.query_params.get("key") or request.query_params.get("secret")
+        has_secret_key = bool(ADMIN_SECRET_KEY and key_param == ADMIN_SECRET_KEY)
+        
+        if not is_authenticated and not has_secret_key:
+            return RedirectResponse(url="/", status_code=302)
+
+    blocked_exts = (
+        ".py", ".env", ".json", ".sql", ".db", ".sqlite",
+        ".sqlite3", ".sh", ".log", ".bat", ".yml", ".yaml",
+        ".git", ".gitignore", ".md", ".cfg", ".ini", ".bak"
+    )
+    blocked_keywords = (
+        "passenger_wsgi", "procfile", "requirements.txt",
+        "singapore_ips.txt", "firebase-service-account", "facebook_config", "tiktok_config"
+    )
+    if any(raw_path.endswith(ext) for ext in blocked_exts) or any(kw in raw_path for kw in blocked_keywords):
+        return Response(status_code=403, content="Access Denied: Protected System Resource", media_type="text/plain")
+        
+    return await call_next(request)
 
 @app.middleware("http")
 async def add_no_cache_headers(request: Request, call_next):
@@ -3007,6 +3056,8 @@ async def handle_fetch(request: Request, source_url: str):
     if not resp:
         raise HTTPException(status_code=last_error_status, detail=f"CDN stream unavailable or rate limited ({last_error_status})")
 
+    real_status = resp.status_code
+
     response_headers = {
         "Content-Type": resp.headers.get("Content-Type", "video/mp4"),
         "Access-Control-Allow-Origin": "*",
@@ -3020,8 +3071,6 @@ async def handle_fetch(request: Request, source_url: str):
         response_headers["Content-Length"] = resp.headers.get("Content-Length")
     if resp.headers.get("Accept-Ranges"):
         response_headers["Accept-Ranges"] = resp.headers.get("Accept-Ranges")
-        
-    real_status = resp.status_code
     
     # For HEAD requests (used by FFmpeg probe), return headers immediately
     if request.method == "HEAD":

@@ -62,10 +62,29 @@ def check_admin_auth(request: Request):
         
     return {"username": username}
 
+_login_failures = {} # client_ip -> {"count": int, "locked_until": float, "reset_time": float}
+
 @router.post("/api/admin/login")
-async def admin_login(data: dict, response: Response):
-    username = data.get("username")
-    password = data.get("password")
+async def admin_login(data: dict, request: Request, response: Response):
+    client_ip = (
+        request.headers.get("cf-connecting-ip")
+        or request.headers.get("x-real-ip")
+        or (request.headers.get("x-forwarded-for", "").split(",")[0].strip())
+        or (request.client.host if request.client else "unknown")
+    )
+    now = time.time()
+    
+    # Check brute force lockout
+    lock_data = _login_failures.get(client_ip)
+    if lock_data:
+        if lock_data.get("locked_until", 0) > now:
+            remaining = int(lock_data["locked_until"] - now)
+            raise HTTPException(status_code=429, detail=f"Too many failed login attempts. IP locked out for {remaining} seconds.")
+        elif lock_data.get("reset_time", 0) < now:
+            _login_failures.pop(client_ip, None)
+
+    username = (data.get("username") or "").strip()
+    password = (data.get("password") or "").strip()
     
     if not username or not password:
         raise HTTPException(status_code=400, detail="Username and password are required")
@@ -80,21 +99,63 @@ async def admin_login(data: dict, response: Response):
             await cur.execute("SELECT * FROM admins WHERE username = %s", (username,))
             admin = await cur.fetchone()
             
-    if not admin:
-        raise HTTPException(status_code=401, detail="Invalid username or password")
-        
-    # Verify hash
     salt = "streamfit_secure_salt_2026"
     h = hashlib.sha256((password + salt).encode('utf-8')).hexdigest()
     
-    if admin["password_hash"] != h:
-        raise HTTPException(status_code=401, detail="Invalid username or password")
+    if not admin or admin["password_hash"] != h:
+        entry = _login_failures.setdefault(client_ip, {"count": 0, "locked_until": 0, "reset_time": now + 900})
+        entry["count"] += 1
+        if entry["count"] >= 5:
+            entry["locked_until"] = now + 900 # 15 min lock
+            raise HTTPException(status_code=429, detail="Too many failed login attempts. Your IP has been locked out for 15 minutes.")
         
+        # 1-second delay to defeat dictionary/brute-force scripts
+        await asyncio.sleep(1.0)
+        remaining = 5 - entry["count"]
+        raise HTTPException(status_code=401, detail=f"Invalid username or password. ({remaining} attempts remaining)")
+        
+    # Successful login: reset attempts
+    _login_failures.pop(client_ip, None)
+    
     # Generate token
     token = generate_signed_token(username)
     
     response.set_cookie(key="admin_token", value=token, max_age=86400, httponly=True)
     return {"code": 0, "token": token, "message": "Login successful"}
+
+@router.post("/api/admin/change-password")
+async def admin_change_password(data: dict, request: Request):
+    user_info = check_admin_auth(request)
+    username = user_info["username"]
+    
+    current_pw = (data.get("current_password") or "").strip()
+    new_pw = (data.get("new_password") or "").strip()
+    
+    if not current_pw or not new_pw:
+        raise HTTPException(status_code=400, detail="Current and new passwords are required")
+        
+    if len(new_pw) < 8:
+        raise HTTPException(status_code=400, detail="New password must be at least 8 characters long")
+        
+    from main import get_db_pool
+    pool = await get_db_pool()
+    if not pool:
+        raise HTTPException(status_code=500, detail="Database pool not available")
+        
+    salt = "streamfit_secure_salt_2026"
+    curr_hash = hashlib.sha256((current_pw + salt).encode('utf-8')).hexdigest()
+    new_hash = hashlib.sha256((new_pw + salt).encode('utf-8')).hexdigest()
+    
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute("SELECT * FROM admins WHERE username = %s", (username,))
+            admin = await cur.fetchone()
+            if not admin or admin["password_hash"] != curr_hash:
+                raise HTTPException(status_code=400, detail="Current password is incorrect")
+                
+            await cur.execute("UPDATE admins SET password_hash = %s WHERE username = %s", (new_hash, username))
+            
+    return {"code": 0, "message": "Password changed successfully"}
 
 @router.post("/api/admin/logout")
 async def admin_logout(request: Request, response: Response):

@@ -1,0 +1,36 @@
+# ======================================================================
+# STREAMHIT / NXLY SECURITY CONFIGURATION
+# ======================================================================
+
+# 1. Disable directory browsing
+Options -Indexes
+
+# 2. Block direct access to source code, configs, databases, and logs
+<FilesMatch "(?i)\.(py|env|json|sql|db|sqlite|sqlite3|sh|log|bat|yml|yaml|gitignore|md|cfg|ini|bak)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# 3. Specifically block critical system files by exact name
+<FilesMatch "(?i)^(passenger_wsgi|passenger_wsgi\.py|Procfile|requirements\.txt|singapore_ips\.txt|\.env|\.gitignore|\.scraper_progress\.json|\.last_direct_fail_time|\.db_timezone_migration_done|active_users\.db|facebook_config\.json|tiktok_config\.json|firebase-service-account\.json)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# 4. Block access to hidden files and directories (except .well-known)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule (^|/)\.(?!well-known/) - [F,L]
+    
+    # Block any direct URL query for code / database / config extensions
+    RewriteCond %{REQUEST_URI} \.(py|sh|env|sql|db|sqlite|log|json|yml|yaml)$ [NC]
+    RewriteRule ^ - [F,L]
+</IfModule>
+
+# 5. Security Headers
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
