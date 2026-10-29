@@ -2785,13 +2785,13 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
 
         # 2. Database persistent cache (Super fast: < 0.005s)
         db_data = await db_get_stream_resource(subjectId, se, ep)
-    if db_data and db_data.get("resources"):
-        items = db_data["resources"]
-        if not any(is_deprecated_or_dummy_url(it.get("url", "")) or is_deprecated_or_dummy_url(it.get("resourceLink", "")) for it in items):
-            res = {"code": 0, "data": {"list": items, "isUpcoming": False}}
-            _resource_cache[cache_key] = res
-            _resource_cache_time[cache_key] = now
-            return res
+        if db_data and db_data.get("resources"):
+            items = db_data["resources"]
+            if not any(is_deprecated_or_dummy_url(it.get("url", "")) or is_deprecated_or_dummy_url(it.get("resourceLink", "")) for it in items):
+                res = {"code": 0, "data": {"list": items, "isUpcoming": False}}
+                _resource_cache[cache_key] = res
+                _resource_cache_time[cache_key] = now
+                return res
 
     # 3. Single-flight request coalescing for upstream fetch
     if cache_key in _resource_inflight:

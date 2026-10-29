@@ -453,7 +453,9 @@ async def render_single_reel_part(
     anti-copyright color/speed/audio EQ nudges, and top/bottom overlay banner.
     Includes multi-tier rendering fallbacks to guarantee 100% rendering success.
     """
-    os.makedirs(os.path.dirname(output_mp4_path), exist_ok=True)
+    out_dir = os.path.dirname(output_mp4_path)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
     clean_url = stream_url.strip()
     is_proxy_url = "source_url=" in clean_url
     

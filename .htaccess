@@ -1,3 +1,9 @@
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
+PassengerAppRoot "/home/lcsyxfen/streamhit.lc-synergy.ltd"
+PassengerBaseURI "/"
+PassengerPython "/home/lcsyxfen/virtualenv/streamhit.lc-synergy.ltd/3.10/bin/python"
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
+
 # ======================================================================
 # STREAMHIT / NXLY SECURITY CONFIGURATION
 # ======================================================================
