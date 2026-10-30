@@ -1118,14 +1118,13 @@ async def process_next_queue_job(target_job_id: Optional[str] = None) -> Dict[st
                 except Exception:
                     pass
 
-            is_retry = active_job.get("retry_count", 0) > 0
-            bot_log(f"[AutoPilot] 🔍 Resolving stream for '{title}' (detailPath={dpath}, S{se_arg}E{ep_arg}, force_fresh={is_retry})...")
+            bot_log(f"[AutoPilot] 🔍 Resolving fresh stream for '{title}' (detailPath={dpath}, S{se_arg}E{ep_arg})...")
             res = await api_resource(
                 se=se_arg,
                 ep=ep_arg,
                 detailPath=dpath,
                 subjectId=sid,
-                force_fresh=is_retry
+                force_fresh=True
             )
             items = res.get("data", {}).get("list") or []
             for it in items:

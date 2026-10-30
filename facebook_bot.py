@@ -674,7 +674,7 @@ async def trigger_auto_trending_reel(custom_title: Optional[str] = None, custom_
         detail_path = candidate.get("detail_path", "")
 
         try:
-            res_data = await main.api_resource(se=1, ep=1, detailPath=detail_path, subjectId=subject_id)
+            res_data = await main.api_resource(se=1, ep=1, detailPath=detail_path, subjectId=subject_id, force_fresh=True)
             res_list = res_data.get("data", {}).get("list", [])
         except Exception as re_err:
             print(f"[FacebookBot] Stream fetch error for {target_title}: {re_err}")

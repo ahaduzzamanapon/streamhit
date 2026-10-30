@@ -625,13 +625,13 @@ async def _fetch_download_resources(subject_id: str, se: int = 1, ep: int = 1, d
         "Cookie": cookie
     }
     try:
-        resp = await http_client.get(url, headers=headers, timeout=2.0)
+        resp = await http_client.get(url, headers=headers, timeout=8.0)
         if resp.status_code == 200:
             data = resp.json().get("data")
             if data:
                 return data
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[H5 Download Fetch Error] {e}")
     return {}
 
 async def _get_bearer_token() -> str:
@@ -871,7 +871,7 @@ async def db_get_stream_resource(subject_id: str, season: int = 1, episode: int 
         print(f"[DB Resource Read Error] {e}")
     return None
 
-async def db_save_stream_resource(subject_id: str, season: int = 1, episode: int = 1, detail_path: str = "", resources: list = None, captions: list = None, ttl_hours: float = 24.0):
+async def db_save_stream_resource(subject_id: str, season: int = 1, episode: int = 1, detail_path: str = "", resources: list = None, captions: list = None, ttl_hours: float = 2.0):
     pool = await get_db_pool()
     if not pool or not subject_id:
         return
@@ -879,8 +879,27 @@ async def db_save_stream_resource(subject_id: str, season: int = 1, episode: int
         res_json = json.dumps(resources or [])
         cap_json = json.dumps(captions or []) if captions is not None else None
         
-        hours = ttl_hours if (resources and len(resources) > 0) else 0.05
-        expires_at = datetime.datetime.now() + datetime.timedelta(hours=hours)
+        min_exp_timestamp = None
+        for r in (resources or []):
+            u = (r.get("url") or "") if isinstance(r, dict) else ""
+            if "t=" in u and "sign=" in u:
+                try:
+                    q = urllib.parse.parse_qs(urllib.parse.urlparse(u).query)
+                    if "t" in q:
+                        tv = float(q["t"][0])
+                        if tv > 10**11:
+                            tv = tv / 1000.0
+                        if min_exp_timestamp is None or tv < min_exp_timestamp:
+                            min_exp_timestamp = tv
+                except Exception:
+                    pass
+
+        now_ts = time.time()
+        if min_exp_timestamp and min_exp_timestamp > now_ts:
+            expires_at = datetime.datetime.fromtimestamp(min_exp_timestamp - 30)
+        else:
+            hours = min(ttl_hours, 2.0) if (resources and len(resources) > 0) else 0.05
+            expires_at = datetime.datetime.now() + datetime.timedelta(hours=hours)
 
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
@@ -1595,10 +1614,10 @@ async def resolve_subject_id(detail_path: str = "", subject_id: str = "") -> str
     # 2. Extract numeric subjectId from slug tail (e.g. title-803658983365039832)
     if "-" in detail_path:
         tail = detail_path.split("-")[-1]
-        if tail.isdigit():
+        if tail.isdigit() and len(tail) >= 15:
             _slug_to_id[detail_path] = tail
             return tail
-    elif detail_path.isdigit():
+    elif detail_path.isdigit() and len(detail_path) >= 15:
         _slug_to_id[detail_path] = detail_path
         return detail_path
 
@@ -2589,16 +2608,19 @@ def is_deprecated_or_dummy_url(url: str) -> bool:
     if any(bad in u_lower for bad in DEPRECATED_VIDEO_HASHES):
         return True
     # Filter out ad / redirect landing domains (not playable MP4 streams)
-    if any(ad_domain in u_lower for ad_domain in ["vegamovies.pet", "vegamovies.cx", "asiafilm.org", "fzmovies", "southfreak"]):
+    if any(ad_domain in u_lower for ad_domain in ["vegamovies.pet", "vegamovies.cx", "asiafilm.org", "fzmovies", "southfreak", "ailok.pe", "rebahin.com"]):
         return True
-    # Invalidate stale signed URLs (tokens expire quickly, refresh after 30 mins)
+    # Invalidate stale signed URLs (tokens expire; refresh if older than 2 hours)
     if ("&t=" in u_lower or "?t=" in u_lower) and "sign=" in u_lower:
         try:
             parsed = urllib.parse.urlparse(url)
             qs = urllib.parse.parse_qs(parsed.query)
             if "t" in qs:
-                t_val = int(qs["t"][0])
-                if (time.time() - t_val) > 1800:
+                t_val = float(qs["t"][0])
+                if t_val > 10**11:
+                    t_val = t_val / 1000.0
+                # Stale if older than 2 hours (7200s)
+                if (time.time() - t_val) > 7200:
                     return True
         except Exception:
             pass
@@ -2606,7 +2628,7 @@ def is_deprecated_or_dummy_url(url: str) -> bool:
 
 def _extract_playable_detectors(detectors: list) -> list:
     mob_items = []
-    bad_hosts = ["fzmovies", "southfreak", "vegamovies", "asiafilm"]
+    bad_hosts = ["fzmovies", "southfreak", "vegamovies", "asiafilm", "ailok.pe", "rebahin.com"]
     for det in detectors:
         res_list = det.get("resolutionList", [])
         if res_list:
@@ -2806,7 +2828,7 @@ async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId
         res = await task
         items = res.get("data", {}).get("list") or []
         if items:
-            asyncio.create_task(db_save_stream_resource(subjectId, se, ep, detailPath, items, ttl_hours=24.0))
+            asyncio.create_task(db_save_stream_resource(subjectId, se, ep, detailPath, items, ttl_hours=2.0))
         return res
     finally:
         _resource_inflight.pop(cache_key, None)
