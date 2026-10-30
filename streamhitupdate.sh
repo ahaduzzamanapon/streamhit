@@ -104,9 +104,12 @@ import asyncio, os
 os.environ['ADMIN_USERNAME'] = 'nxly_master_9'
 os.environ['ADMIN_PASSWORD'] = 'NxLy#79Wp$2026!KqX'
 os.environ['ADMIN_SECRET_KEY'] = 'nxly_sec_8492'
-from main import init_mysql_pool
-asyncio.run(init_mysql_pool())
-print('Admin database credentials verified successfully.')
+try:
+    from main import init_db
+    asyncio.run(init_db())
+    print('Admin database credentials verified successfully.')
+except Exception as e:
+    print(f'Database verification note: {e}')
 " 2>/dev/null || true
 
 # 5. Update other virtual hosts (such as nxly.online)

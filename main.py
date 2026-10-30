@@ -31,8 +31,8 @@ DB_PORT = int(os.getenv("DB_PORT", "3306"))
 DB_USER = os.getenv("DB_USER", "root")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_NAME = os.getenv("DB_NAME", "moviebox")
-ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin").strip()
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "").strip()
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "nxly_master_9").strip()
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "NxLy#79Wp$2026!KqX").strip()
 ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY", "nxly_control_2026").strip()
 
 db_pool = None
