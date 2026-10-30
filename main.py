@@ -2605,11 +2605,35 @@ def is_deprecated_or_dummy_url(url: str) -> bool:
     if not url:
         return True
     u_lower = str(url).lower()
+
+    # If wrapped in fetch proxy, unwrap the real underlying source URL
+    if "source_url=" in u_lower:
+        try:
+            parsed = urllib.parse.urlparse(url)
+            qs = urllib.parse.parse_qs(parsed.query)
+            if "source_url" in qs and qs["source_url"]:
+                real_u = qs["source_url"][0]
+                if real_u and real_u != url:
+                    return is_deprecated_or_dummy_url(real_u)
+        except Exception:
+            pass
+
     if any(bad in u_lower for bad in DEPRECATED_VIDEO_HASHES):
         return True
-    # Filter out ad / redirect landing domains (not playable MP4 streams)
-    if any(ad_domain in u_lower for ad_domain in ["vegamovies.pet", "vegamovies.cx", "asiafilm.org", "fzmovies", "southfreak", "ailok.pe", "rebahin.com"]):
+
+    # Filter out ad / redirect / scraper landing domains (not playable video streams)
+    bad_ad_domains = [
+        "vegamovies", "asiafilm", "fzmovies", "southfreak", "ailok.pe",
+        "rebahin.com", "ugc-anime", "mkvcinemas", "kurdsubtitle", "filmyzilla",
+        "bollyshare", "desiremovies", "katmovie", "hindilinks4u", "animekai.to"
+    ]
+    if any(ad_domain in u_lower for ad_domain in bad_ad_domains):
         return True
+
+    # Scraper landing patterns (webpages rather than video files)
+    if ".html" in u_lower or "hianime-" in u_lower:
+        return True
+
     # Invalidate stale signed URLs (tokens expire; refresh if older than 2 hours)
     if ("&t=" in u_lower or "?t=" in u_lower) and "sign=" in u_lower:
         try:
@@ -2624,17 +2648,24 @@ def is_deprecated_or_dummy_url(url: str) -> bool:
                     return True
         except Exception:
             pass
+
+    # Must be hosted on a recognized video CDN OR have a direct video media extension
+    known_cdns = ["hakunaymatata.com", "aoneroom.com", "moviebox.ph", "vidnest"]
+    has_known_cdn = any(cdn in u_lower for cdn in known_cdns)
+    has_media_ext = any(ext in u_lower for ext in [".mp4", ".m3u8", ".webm", ".mkv"])
+    if not (has_known_cdn or has_media_ext):
+        return True
+
     return False
 
 def _extract_playable_detectors(detectors: list) -> list:
     mob_items = []
-    bad_hosts = ["fzmovies", "southfreak", "vegamovies", "asiafilm", "ailok.pe", "rebahin.com"]
     for det in detectors:
         res_list = det.get("resolutionList", [])
         if res_list:
             for r in res_list:
                 r_link = r.get("resourceLink") or r.get("url")
-                if r_link and not any(bad in r_link.lower() for bad in bad_hosts) and not is_deprecated_or_dummy_url(r_link):
+                if r_link and not is_deprecated_or_dummy_url(r_link):
                     fetch_link = f"https://nxly.online/fetch?source_url={urllib.parse.quote(r_link)}" if r_link.startswith("http") else r_link
                     mob_items.append({
                         "resourceId": str(r.get("resourceId") or r.get("id") or "0"),
@@ -2643,7 +2674,7 @@ def _extract_playable_detectors(detectors: list) -> list:
                         "url": fetch_link,
                         "resourceLink": fetch_link
                     })
-        elif det.get("resourceLink") and not any(bad in det.get("resourceLink", "").lower() for bad in bad_hosts):
+        elif det.get("resourceLink"):
             r_link = det["resourceLink"]
             if not is_deprecated_or_dummy_url(r_link):
                 fetch_link = f"https://nxly.online/fetch?source_url={urllib.parse.quote(r_link)}" if r_link.startswith("http") else r_link
@@ -2781,7 +2812,11 @@ async def _do_fetch_resource(subjectId: str, se: int, ep: int, detailPath: str, 
     return res
 
 @app.get("/api/resource")
-async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId: str = "", force_fresh: bool = False):
+async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId: str = "", force_fresh: bool = False, response: Response = None):
+    if response:
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
     if not subjectId and detailPath:
         subjectId = await resolve_subject_id(detailPath, subjectId)
             
@@ -3067,6 +3102,12 @@ async def handle_fetch(request: Request, source_url: str):
             req = client.build_request("GET", source_url, headers=headers_to_send)
             candidate_resp = await client.send(req, stream=True)
             if candidate_resp.status_code in (200, 206):
+                cl = candidate_resp.headers.get("Content-Length")
+                ct = candidate_resp.headers.get("Content-Type", "")
+                if cl == "0" or "text/html" in ct.lower():
+                    last_error_status = 502
+                    await candidate_resp.aclose()
+                    continue
                 resp = candidate_resp
                 break
             else:
