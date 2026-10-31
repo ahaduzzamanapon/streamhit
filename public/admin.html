@@ -1335,10 +1335,21 @@
                         </div>
                     </div>
 
-                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:14px;">
+                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
                         <button type="button" class="btn-secondary active" id="btnFilterAll" onclick="setUserTypeFilter('all')">👥 All Users (<span id="userStatAll">0</span>)</button>
                         <button type="button" class="btn-secondary" id="btnFilterApp" onclick="setUserTypeFilter('app')">📱 App (<span id="userStatApp">0</span>)</button>
                         <button type="button" class="btn-secondary" id="btnFilterWeb" onclick="setUserTypeFilter('web')">🌐 Web (<span id="userStatWeb">0</span>)</button>
+                    </div>
+
+                    <!-- Country Filter Pills & Selector -->
+                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap; padding:8px 12px; background:rgba(255,255,255,0.02); border:1px solid var(--border-subtle); border-radius:var(--radius-sm);">
+                        <span style="font-size:12px; color:var(--text-muted); font-weight:700; display:inline-flex; align-items:center; gap:4px;">🌍 Country:</span>
+                        <div id="countryPillsContainer" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                            <button type="button" class="btn-secondary active" id="btnCountryAll" onclick="setUserCountryFilter('all')">🌍 All Countries</button>
+                        </div>
+                        <select id="userCountrySelect" class="form-control" style="width:auto; min-width:160px; height:30px; font-size:12px; padding:2px 8px; margin-left:auto;" onchange="setUserCountryFilter(this.value)">
+                            <option value="all">More Countries...</option>
+                        </select>
                     </div>
 
                     <div class="table-responsive">
@@ -1348,6 +1359,7 @@
                                     <th>#</th>
                                     <th>Status</th>
                                     <th>Device / Platform & IP</th>
+                                    <th>Country</th>
                                     <th>Current Activity</th>
                                     <th>First Visited</th>
                                     <th>Last Active</th>
@@ -1355,7 +1367,7 @@
                                 </tr>
                             </thead>
                             <tbody id="usersTableBody">
-                                <tr><td colspan="7" style="text-align:center; padding:30px; color:var(--text-muted);">Loading user telemetry...</td></tr>
+                                <tr><td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">Loading user telemetry...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -2541,9 +2553,20 @@
 
         // ── APP & WEB USERS TAB (PAGINATED FOR ZERO FREEZING) ───────────────
         let _allUsers = [];
+        let _countryStats = [];
         let _usersCurrentPage = 1;
         let _userTypeFilter = 'all';
+        let _userCountryFilter = 'all';
         const USERS_PAGE_SIZE = 25;
+
+        function getFlagEmoji(countryCode) {
+            if (!countryCode || countryCode.length !== 2) return '🌍';
+            const codePoints = countryCode
+                .toUpperCase()
+                .split('')
+                .map(char => 127397 + char.charCodeAt(0));
+            return String.fromCodePoint(...codePoints);
+        }
 
         function setUserTypeFilter(type) {
             _userTypeFilter = type;
@@ -2556,16 +2579,63 @@
             renderUsersTablePage(1);
         }
 
+        function setUserCountryFilter(country) {
+            _userCountryFilter = country;
+            const select = document.getElementById('userCountrySelect');
+            if (select && select.value !== country) {
+                select.value = country;
+            }
+            renderCountryFilters(_countryStats);
+            renderUsersTablePage(1);
+        }
+
+        function renderCountryFilters(stats) {
+            const container = document.getElementById('countryPillsContainer');
+            const select = document.getElementById('userCountrySelect');
+            if (!container || !stats) return;
+
+            let pillsHtml = `
+                <button type="button" class="btn-secondary ${_userCountryFilter === 'all' ? 'active' : ''}" onclick="setUserCountryFilter('all')">🌍 All Countries</button>
+            `;
+
+            const validStats = stats.filter(s => s.country && s.country !== 'Unknown');
+            const topCountries = validStats.slice(0, 5);
+
+            topCountries.forEach(s => {
+                const flag = getFlagEmoji(s.country_code);
+                const isActive = (_userCountryFilter.toLowerCase() === s.country.toLowerCase() || _userCountryFilter.toLowerCase() === (s.country_code || '').toLowerCase());
+                pillsHtml += `
+                    <button type="button" class="btn-secondary ${isActive ? 'active' : ''}" onclick="setUserCountryFilter('${s.country.replace(/'/g, "\\'")}')">
+                        ${flag} ${s.country} (${s.count})
+                    </button>
+                `;
+            });
+            container.innerHTML = pillsHtml;
+
+            if (select) {
+                let optionsHtml = `<option value="all">🌐 All Countries</option>`;
+                stats.forEach(s => {
+                    const flag = getFlagEmoji(s.country_code);
+                    const isSel = (_userCountryFilter.toLowerCase() === s.country.toLowerCase() || _userCountryFilter.toLowerCase() === (s.country_code || '').toLowerCase());
+                    optionsHtml += `<option value="${s.country}" ${isSel ? 'selected' : ''}>${flag} ${s.country} (${s.count})</option>`;
+                });
+                select.innerHTML = optionsHtml;
+            }
+        }
+
         async function fetchAppUsersPage(page = 1) {
             try {
-                const res = await fetch('/api/admin/app-users', { headers: { 'Authorization': `Bearer ${token}` } });
+                const res = await fetch('/api/admin/app-users?limit=5000', { headers: { 'Authorization': `Bearer ${token}` } });
                 const d = await res.json();
                 _allUsers = d.users || [];
+                _countryStats = d.country_stats || [];
                 const appCount = d.app_count !== undefined ? d.app_count : _allUsers.filter(u => u.user_type === 'app').length;
                 const webCount = d.web_count !== undefined ? d.web_count : _allUsers.filter(u => u.user_type === 'web').length;
-                if (document.getElementById('userStatAll')) document.getElementById('userStatAll').innerText = _allUsers.length;
+                const totalCount = d.total_installs !== undefined ? d.total_installs : _allUsers.length;
+                if (document.getElementById('userStatAll')) document.getElementById('userStatAll').innerText = totalCount;
                 if (document.getElementById('userStatApp')) document.getElementById('userStatApp').innerText = appCount;
                 if (document.getElementById('userStatWeb')) document.getElementById('userStatWeb').innerText = webCount;
+                renderCountryFilters(_countryStats);
                 renderUsersTablePage(page);
             } catch(e) {}
         }
@@ -2577,11 +2647,19 @@
             if (_userTypeFilter !== 'all') {
                 filtered = filtered.filter(u => u.user_type === _userTypeFilter);
             }
+            if (_userCountryFilter !== 'all') {
+                filtered = filtered.filter(u => 
+                    (u.country || '').toLowerCase() === _userCountryFilter.toLowerCase() || 
+                    (u.country_code || '').toLowerCase() === _userCountryFilter.toLowerCase()
+                );
+            }
             if (filterVal) {
                 filtered = filtered.filter(u => 
                     (u.device_model || '').toLowerCase().includes(filterVal) || 
                     (u.os_version || '').toLowerCase().includes(filterVal) || 
                     (u.ip || '').includes(filterVal) ||
+                    (u.country || '').toLowerCase().includes(filterVal) ||
+                    (u.country_code || '').toLowerCase().includes(filterVal) ||
                     (u.current_watching || '').toLowerCase().includes(filterVal)
                 );
             }
@@ -2592,7 +2670,7 @@
 
             const tbody = document.getElementById('usersTableBody');
             if (pageItems.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--text-muted);">No users found for this filter.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px; color:var(--text-muted);">No users found for this filter.</td></tr>';
                 return;
             }
 
@@ -2611,6 +2689,11 @@
                     ? `<span style="background:rgba(59,130,246,0.15); color:#60a5fa; font-size:10.5px; padding:2px 6px; border-radius:4px; font-weight:700; margin-left:6px;">🌐 Web</span>`
                     : `<span style="background:rgba(16,185,129,0.15); color:#34d399; font-size:10.5px; padding:2px 6px; border-radius:4px; font-weight:700; margin-left:6px;">📱 App</span>`;
 
+                const flag = getFlagEmoji(u.country_code);
+                const countryDisplay = (u.country && u.country !== 'Unknown')
+                    ? `<span style="background:rgba(255,255,255,0.06); border:1px solid var(--border-subtle); padding:3px 8px; border-radius:6px; font-size:12px; font-weight:600; white-space:nowrap; display:inline-flex; align-items:center; gap:5px;"><span>${flag}</span> ${u.country}</span>`
+                    : `<span style="color:var(--text-muted); font-size:12px;">Unknown</span>`;
+
                 return `
                     <tr>
                         <td>${startIdx + i + 1}</td>
@@ -2621,6 +2704,7 @@
                                 ${u.os_version || (isWeb ? 'Web' : 'Android')} • IP: <code style="color:var(--accent-cyan); font-size:11px;">${u.ip || '–'}</code>
                             </div>
                         </td>
+                        <td>${countryDisplay}</td>
                         <td>${watchTitle}</td>
                         <td>${firstSeen}</td>
                         <td>${lastSeen}</td>

@@ -795,10 +795,10 @@ async def get_active_users(request: Request):
     return get_active_users_stats()
 
 @router.get("/api/admin/app-users")
-async def get_app_users_admin(request: Request):
+async def get_app_users_admin(request: Request, limit: int = 5000, country: str = ""):
     check_admin_auth(request)
     from main import get_app_users_list
-    return get_app_users_list()
+    return get_app_users_list(limit=limit, country_filter=country)
 
 @router.post("/api/admin/clear-app-users")
 async def clear_app_users_admin(request: Request):

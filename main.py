@@ -1027,16 +1027,179 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# ── Active User Tracking ───────────────────────────────────────────────────
+# ── Active User Tracking & GeoIP ───────────────────────────────────────────
 import sqlite3
+import datetime
+import threading
+import queue
 
 _ACTIVE_DB_PATH = os.path.join(base_dir, "active_users.db")
-
-import datetime
 
 _active_web_users = {}
 _active_app_users = {}
 _last_db_sync = {}
+_ip_country_cache = {}
+_pending_geoip_queue = queue.Queue(maxsize=10000)
+_queued_ips = set()
+_geoip_thread_started = False
+_geoip_lock = threading.Lock()
+
+COUNTRY_NAMES = {
+    "BD": "Bangladesh",
+    "IN": "India",
+    "US": "United States",
+    "PK": "Pakistan",
+    "SA": "Saudi Arabia",
+    "AE": "United Arab Emirates",
+    "MY": "Malaysia",
+    "GB": "United Kingdom",
+    "CA": "Canada",
+    "SG": "Singapore",
+    "NP": "Nepal",
+    "KW": "Kuwait",
+    "QA": "Qatar",
+    "OM": "Oman",
+    "IT": "Italy",
+    "DE": "Germany",
+    "FR": "France",
+    "AU": "Australia",
+    "ID": "Indonesia",
+    "JP": "Japan",
+    "KR": "South Korea",
+    "CN": "China",
+    "TR": "Turkey",
+    "EG": "Egypt",
+    "BR": "Brazil",
+    "RU": "Russia",
+    "ES": "Spain",
+    "NL": "Netherlands",
+    "SE": "Sweden",
+    "NO": "Norway",
+    "PH": "Philippines",
+    "TH": "Thailand",
+    "VN": "Vietnam",
+    "LK": "Sri Lanka",
+    "ZA": "South Africa"
+}
+
+def _queue_ip_for_resolution(ip: str):
+    if not ip or ip in _ip_country_cache or ip in _queued_ips:
+        return
+    if ip in ("127.0.0.1", "localhost", "::1") or ip.startswith(("10.", "192.168.", "172.16.", "172.17.", "172.18.", "172.19.", "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.", "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.")):
+        _ip_country_cache[ip] = ("Local Network", "LOC")
+        return
+    try:
+        _queued_ips.add(ip)
+        _pending_geoip_queue.put_nowait(ip)
+        _ensure_geoip_worker()
+    except Exception:
+        pass
+
+def _geoip_worker():
+    import urllib.request
+    import json
+    while True:
+        try:
+            ips = []
+            try:
+                first_ip = _pending_geoip_queue.get(timeout=10)
+                ips.append(first_ip)
+                while len(ips) < 50:
+                    try:
+                        ips.append(_pending_geoip_queue.get_nowait())
+                    except queue.Empty:
+                        break
+            except queue.Empty:
+                continue
+
+            if not ips:
+                continue
+
+            try:
+                url = "http://ip-api.com/batch?fields=query,country,countryCode"
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(ips).encode("utf-8"),
+                    headers={"Content-Type": "application/json", "User-Agent": "StreamHit/1.0"}
+                )
+                with urllib.request.urlopen(req, timeout=8) as resp:
+                    results = json.loads(resp.read().decode("utf-8"))
+                    updates = []
+                    for item in results:
+                        q_ip = item.get("query")
+                        c_name = item.get("country") or ""
+                        c_code = (item.get("countryCode") or "").upper()
+                        if q_ip and c_name:
+                            _ip_country_cache[q_ip] = (c_name, c_code)
+                            updates.append((c_name, c_code, q_ip))
+                    if updates:
+                        with sqlite3.connect(_ACTIVE_DB_PATH, timeout=5) as conn:
+                            conn.executemany(
+                                "UPDATE app_installations SET country = ?, country_code = ? WHERE ip = ? AND (country = '' OR country IS NULL)",
+                                updates
+                            )
+            except Exception:
+                time.sleep(2)
+            finally:
+                for ip in ips:
+                    _pending_geoip_queue.task_done()
+                    _queued_ips.discard(ip)
+            time.sleep(1)
+        except Exception:
+            time.sleep(2)
+
+def _ensure_geoip_worker():
+    global _geoip_thread_started
+    if not _geoip_thread_started:
+        with _geoip_lock:
+            if not _geoip_thread_started:
+                t = threading.Thread(target=_geoip_worker, daemon=True, name="GeoIPWorker")
+                t.start()
+                _geoip_thread_started = True
+
+def backfill_missing_countries():
+    try:
+        with sqlite3.connect(_ACTIVE_DB_PATH, timeout=5) as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT DISTINCT ip FROM app_installations 
+                WHERE (country = '' OR country IS NULL) 
+                  AND ip != '' AND ip NOT LIKE '127.%' AND ip NOT LIKE '192.168.%' AND ip NOT LIKE '10.%'
+                LIMIT 500
+            """)
+            rows = cur.fetchall()
+            for r in rows:
+                _queue_ip_for_resolution(r[0])
+    except Exception:
+        pass
+
+def resolve_country_from_request_or_ip(request: Request, client_ip: str) -> tuple[str, str]:
+    # 1. Cloudflare header
+    cf_code = (request.headers.get("CF-IPCountry") or request.headers.get("cf-ipcountry") or "").strip().upper()
+    if cf_code and cf_code not in ("XX", "T1", ""):
+        name = COUNTRY_NAMES.get(cf_code, cf_code)
+        _ip_country_cache[client_ip] = (name, cf_code)
+        return name, cf_code
+
+    # 2. X-Country headers
+    x_code = (request.headers.get("X-Country-Code") or request.headers.get("X-Country") or request.headers.get("X-App-Country") or "").strip().upper()
+    if x_code and len(x_code) == 2:
+        name = COUNTRY_NAMES.get(x_code, x_code)
+        _ip_country_cache[client_ip] = (name, x_code)
+        return name, x_code
+
+    # 3. Cache lookup
+    if client_ip in _ip_country_cache:
+        return _ip_country_cache[client_ip]
+
+    # 4. Local network check
+    if not client_ip or client_ip in ("127.0.0.1", "localhost", "::1") or client_ip.startswith(("10.", "192.168.", "172.16.", "172.17.", "172.18.", "172.19.", "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.", "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.")):
+        _ip_country_cache[client_ip] = ("Local Network", "LOC")
+        return "Local Network", "LOC"
+
+    # 5. Queue for async background resolution
+    _queue_ip_for_resolution(client_ip)
+    return "", ""
 
 def _init_active_db():
     try:
@@ -1065,7 +1228,9 @@ def _init_active_db():
                     today_date TEXT DEFAULT '',
                     current_watching TEXT DEFAULT '',
                     watching_detail_path TEXT DEFAULT '',
-                    is_watching INTEGER DEFAULT 0
+                    is_watching INTEGER DEFAULT 0,
+                    country TEXT DEFAULT '',
+                    country_code TEXT DEFAULT ''
                 )
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_installs_last_seen ON app_installations(last_seen)")
@@ -1076,12 +1241,23 @@ def _init_active_db():
                 ("today_date", "TEXT DEFAULT ''"),
                 ("current_watching", "TEXT DEFAULT ''"),
                 ("watching_detail_path", "TEXT DEFAULT ''"),
-                ("is_watching", "INTEGER DEFAULT 0")
+                ("is_watching", "INTEGER DEFAULT 0"),
+                ("country", "TEXT DEFAULT ''"),
+                ("country_code", "TEXT DEFAULT ''")
             ]:
                 try:
                     conn.execute(f"ALTER TABLE app_installations ADD COLUMN {col} {col_def}")
                 except Exception:
                     pass
+
+            # Pre-load known IP-to-country mapping into memory cache
+            try:
+                cur = conn.cursor()
+                cur.execute("SELECT DISTINCT ip, country, country_code FROM app_installations WHERE country != '' AND country IS NOT NULL")
+                for r in cur.fetchall():
+                    _ip_country_cache[r[0]] = (r[1], r[2])
+            except Exception:
+                pass
     except Exception:
         pass
 
@@ -1108,7 +1284,9 @@ def record_app_device(
     app_version: str = "1.0.7",
     current_watching: str = "",
     watching_detail_path: str = "",
-    is_watching: int = 0
+    is_watching: int = 0,
+    country: str = "",
+    country_code: str = ""
 ):
     if not device_id:
         return
@@ -1124,7 +1302,7 @@ def record_app_device(
             cur = conn.cursor()
             cur.execute("""
                 SELECT first_seen, session_start, last_seen, daily_active_seconds, today_date,
-                       current_watching, watching_detail_path, is_watching
+                       current_watching, watching_detail_path, is_watching, country, country_code
                 FROM app_installations WHERE device_id = ?
             """, (device_id,))
             row = cur.fetchone()
@@ -1137,6 +1315,8 @@ def record_app_device(
                 c_watching = current_watching
                 w_path = watching_detail_path
                 w_flag = is_watching
+                c_name = country
+                c_code = country_code
             else:
                 first_seen = row["first_seen"] or now
                 prev_last_seen = row["last_seen"] or now
@@ -1168,12 +1348,16 @@ def record_app_device(
                     w_path = row["watching_detail_path"] or ""
                     w_flag = row["is_watching"] or 0
 
+                c_name = country if country else (row["country"] if "country" in row.keys() else "")
+                c_code = country_code if country_code else (row["country_code"] if "country_code" in row.keys() else "")
+
             conn.execute("""
                 INSERT INTO app_installations (
                     device_id, ip, device_model, os_version, app_version,
                     first_seen, session_start, last_seen, daily_active_seconds, today_date,
-                    current_watching, watching_detail_path, is_watching
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    current_watching, watching_detail_path, is_watching,
+                    country, country_code
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(device_id) DO UPDATE SET
                     ip = excluded.ip,
                     device_model = CASE WHEN excluded.device_model != '' THEN excluded.device_model ELSE app_installations.device_model END,
@@ -1185,11 +1369,14 @@ def record_app_device(
                     today_date = excluded.today_date,
                     current_watching = excluded.current_watching,
                     watching_detail_path = excluded.watching_detail_path,
-                    is_watching = excluded.is_watching
+                    is_watching = excluded.is_watching,
+                    country = CASE WHEN excluded.country != '' THEN excluded.country ELSE app_installations.country END,
+                    country_code = CASE WHEN excluded.country_code != '' THEN excluded.country_code ELSE app_installations.country_code END
             """, (
                 device_id, ip, device_model, os_version, app_version,
                 first_seen, session_start, now, daily_active_seconds, today_date,
-                c_watching, w_path, w_flag
+                c_watching, w_path, w_flag,
+                c_name, c_code
             ))
             u_type = "web" if device_id.startswith("web_") else "app"
             conn.execute(
@@ -1275,13 +1462,16 @@ def record_active_user(request: Request):
         user_type = "app" if is_app else "web"
         user_id = app_dev_id or (request.headers.get("X-Client-Token") if is_app else None) or client_ip
 
+        # Resolve country from Cloudflare header or GeoIP
+        c_name, c_code = resolve_country_from_request_or_ip(request, client_ip)
+
         if is_app:
             _active_app_users[user_id] = now
             dev_model = request.headers.get("X-App-Model", "Android Device")
             dev_os = request.headers.get("X-App-OS", "Android")
             dev_ver = request.headers.get("X-App-Version", "1.0.7")
             if app_dev_id:
-                record_app_device(app_dev_id, client_ip, dev_model, dev_os, dev_ver)
+                record_app_device(app_dev_id, client_ip, dev_model, dev_os, dev_ver, country=c_name, country_code=c_code)
         else:
             _active_web_users[user_id] = now
             dev_model, dev_os = parse_client_device(raw_ua)
@@ -1321,7 +1511,9 @@ def record_active_user(request: Request):
                     app_version="Web",
                     current_watching=c_watching,
                     watching_detail_path=w_path,
-                    is_watching=is_watching
+                    is_watching=is_watching,
+                    country=c_name,
+                    country_code=c_code
                 )
 
         # Throttle DB writes to once every 20s per user to minimize disk I/O
@@ -1395,7 +1587,7 @@ def get_active_users_stats():
         "total_installs": total_installs
     }
 
-def get_app_users_list():
+def get_app_users_list(limit: int = 5000, country_filter: str = ""):
     now = time.time()
     cutoff = now - 300  # 5 min live
     today_start = now - (now % 86400)
@@ -1404,33 +1596,76 @@ def get_app_users_list():
     live_count = 0
     watching_count = 0
     today_count = 0
+    web_total = 0
+    app_total = 0
+    country_stats = []
+
     try:
-        with sqlite3.connect(_ACTIVE_DB_PATH, timeout=3) as conn:
+        with sqlite3.connect(_ACTIVE_DB_PATH, timeout=5) as conn:
             conn.row_factory = sqlite3.Row
             cur = conn.cursor()
             cur.execute("SELECT COUNT(*) as cnt FROM app_installations")
             total_installs = cur.fetchone()["cnt"]
+
+            cur.execute("SELECT COUNT(*) as cnt FROM app_installations WHERE device_id LIKE 'web_%' OR app_version LIKE '%web%'")
+            web_total = cur.fetchone()["cnt"]
+            app_total = max(0, total_installs - web_total)
+
             cur.execute("SELECT COUNT(*) as cnt FROM app_installations WHERE last_seen >= ?", (cutoff,))
             live_count = cur.fetchone()["cnt"]
+
             cur.execute("SELECT COUNT(*) as cnt FROM app_installations WHERE last_seen >= ? AND is_watching = 1", (cutoff,))
             watching_count = cur.fetchone()["cnt"]
+
             cur.execute("SELECT COUNT(*) as cnt FROM app_installations WHERE last_seen >= ?", (today_start,))
             today_count = cur.fetchone()["cnt"]
 
+            # Aggregate country statistics across ALL users in database
             cur.execute("""
+                SELECT CASE WHEN country != '' AND country IS NOT NULL THEN country ELSE 'Unknown' END as c_name,
+                       CASE WHEN country_code != '' AND country_code IS NOT NULL THEN country_code ELSE '' END as c_code,
+                       COUNT(*) as cnt
+                FROM app_installations
+                GROUP BY c_name, c_code
+                ORDER BY cnt DESC
+            """)
+            for crow in cur.fetchall():
+                country_stats.append({
+                    "country": crow["c_name"],
+                    "country_code": crow["c_code"],
+                    "count": crow["cnt"]
+                })
+
+            query = """
                 SELECT device_id, ip, device_model, os_version, app_version,
                        first_seen, session_start, last_seen, daily_active_seconds,
-                       current_watching, watching_detail_path, is_watching
+                       current_watching, watching_detail_path, is_watching,
+                       country, country_code
                 FROM app_installations
-                ORDER BY last_seen DESC
-                LIMIT 300
-            """)
+            """
+            params = []
+            if country_filter and country_filter.lower() not in ("all", "*"):
+                query += " WHERE LOWER(country) = LOWER(?) OR LOWER(country_code) = LOWER(?)"
+                params.extend([country_filter, country_filter])
+
+            query += " ORDER BY last_seen DESC"
+            if limit and limit > 0:
+                query += " LIMIT ?"
+                params.append(limit)
+
+            cur.execute(query, tuple(params))
             for row in cur.fetchall():
                 last = row["last_seen"] or 0
                 is_online = (last >= cutoff)
                 dev_id = str(row["device_id"] or "")
                 app_ver = str(row["app_version"] or "")
                 u_type = "web" if (dev_id.startswith("web_") or "web" in app_ver.lower()) else "app"
+                
+                c_name = row["country"] if ("country" in row.keys() and row["country"]) else ""
+                c_code = row["country_code"] if ("country_code" in row.keys() and row["country_code"]) else ""
+                if not c_name and row["ip"] in _ip_country_cache:
+                    c_name, c_code = _ip_country_cache[row["ip"]]
+
                 users.append({
                     "device_id": dev_id,
                     "ip": row["ip"] or "",
@@ -1445,26 +1680,33 @@ def get_app_users_list():
                     "current_watching": row["current_watching"] or "",
                     "watching_detail_path": row["watching_detail_path"] or "",
                     "is_watching": (row["is_watching"] == 1 and is_online),
-                    "is_online": is_online
+                    "is_online": is_online,
+                    "country": c_name or "Unknown",
+                    "country_code": c_code or ""
                 })
+    except Exception as e:
+        print(f"[AppUsers] Error fetching users list: {e}")
+
+    # Kick off background backfill if there are missing countries
+    try:
+        threading.Thread(target=backfill_missing_countries, daemon=True).start()
     except Exception:
         pass
 
-    web_count = sum(1 for u in users if u["user_type"] == "web")
-    app_count = sum(1 for u in users if u["user_type"] == "app")
     web_live = sum(1 for u in users if u["user_type"] == "web" and u["is_online"])
     app_live = sum(1 for u in users if u["user_type"] == "app" and u["is_online"])
 
     return {
         "total_installs": total_installs,
         "total_users": len(users),
-        "web_count": web_count,
-        "app_count": app_count,
+        "web_count": web_total,
+        "app_count": app_total,
         "web_live": web_live,
         "app_live": app_live,
         "live_count": live_count,
         "watching_count": watching_count,
         "today_count": today_count,
+        "country_stats": country_stats,
         "users": users
     }
 
@@ -1487,6 +1729,12 @@ async def api_app_heartbeat(request: Request):
     if forwarded:
         client_ip = forwarded.split(",")[0].strip()
 
+    c_name, c_code = resolve_country_from_request_or_ip(request, client_ip)
+    if not c_name and data.get("country"):
+        c_name = str(data.get("country"))
+    if not c_code and data.get("country_code"):
+        c_code = str(data.get("country_code")).upper()
+
     device_id = data.get("device_id") or request.headers.get("X-App-Device-Id") or client_ip
     device_model = data.get("device_model") or request.headers.get("X-App-Model", "Android Device")
     os_version = data.get("os_version") or request.headers.get("X-App-OS", "Android")
@@ -1496,7 +1744,7 @@ async def api_app_heartbeat(request: Request):
     is_watching_raw = str(data.get("is_watching") or "0").strip()
     is_watching = 1 if is_watching_raw in ("1", "true", "True") else 0
 
-    record_app_device(device_id, client_ip, device_model, os_version, app_version, current_watching, detail_path, is_watching)
+    record_app_device(device_id, client_ip, device_model, os_version, app_version, current_watching, detail_path, is_watching, country=c_name, country_code=c_code)
     record_active_user(request)
     return {"code": 0, "status": "ok", "t": int(now)}
 
