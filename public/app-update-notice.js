@@ -217,23 +217,23 @@
             <div class="nxly-update-card">
                 <div class="nxly-update-badge">
                     <span class="pulse-dot"></span>
-                    নতুন ভার্সন রিলিজ (v1.0.20)
+                    নতুন ভার্সন রিলিজ (v1.0.21)
                 </div>
                 <div class="nxly-update-icon-wrap">
                     <i class="fa-solid fa-cloud-arrow-down" style="color: #022c22;"></i>
                 </div>
-                <div class="nxly-update-title">অ্যাপের সমস্যা সমাধান হয়েছে!</div>
+                <div class="nxly-update-title">নতুন ভার্সন আপডেট চলে এসেছে!</div>
                 <div class="nxly-update-subtitle">
-                    অ্যাপে আপডেট চাওয়ার সমস্যা ও টপ বার গ্যাপ ঠিক করা হয়েছে। নিরবচ্ছিন্ন স্ট্রিমিং করতে এখনই নতুন ভার্সনে আপডেট করে নিন।
+                    নতুন স্পিড অপ্টিমাইজেশন, অডিও সিঙ্ক ফিক্স ও পারফরম্যান্স আপডেট সহ নিরবচ্ছিন্ন স্ট্রিমিং করতে এখনই নতুন ভার্সনে আপডেট করে নিন।
                 </div>
                 <div class="nxly-update-features">
                     <div class="nxly-update-features-item">
                         <i class="fa-solid fa-circle-check"></i>
-                        <span><strong>আপডেট লুপ বন্ধ:</strong> বারবার আপডেট চাওয়ার সমস্যা ঠিক করা হয়েছে।</span>
+                        <span><strong>উন্নত স্ট্রিমিং:</strong> দ্রুত বাফারিং ও হাই-স্পিড ভিডিও প্লেব্যাক।</span>
                     </div>
                     <div class="nxly-update-features-item">
                         <i class="fa-solid fa-circle-check"></i>
-                        <span><strong>টপ বার ফিক্স:</strong> স্ট্যাটাস বারের নিচে থাকা ফাঁকা জায়গা রিমুভ করা হয়েছে।</span>
+                        <span><strong>অডিও সিঙ্ক ফিক্স:</strong> কথা ও ভিডিওর টাইমিং পারফেক্ট সিঙ্ক।</span>
                     </div>
                     <div class="nxly-update-features-item">
                         <i class="fa-solid fa-circle-check"></i>
@@ -254,7 +254,7 @@
         pill.id = "nxlyFloatingNoticePill";
         pill.innerHTML = `
             <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#10b981; box-shadow:0 0 8px #10b981;"></span>
-            <span>অ্যাপের সমস্যা ঠিক হয়েছে (v1.0.20)</span>
+            <span>নতুন ভার্সন রিলিজ হয়েছে (v1.0.21)</span>
             <a href="/uploads/apks/NXLY-Stream.apk" download style="background: #10b981; color: #022c22; padding: 4px 12px; border-radius: 999px; text-decoration: none; font-size: 12px; font-weight: 700;">আপডেট নিন</a>
         `;
         document.body.appendChild(pill);
