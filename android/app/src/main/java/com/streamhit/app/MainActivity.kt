@@ -74,7 +74,7 @@ class MainActivity : ComponentActivity() {
         // Register device & start telemetry heartbeat
         AppAnalyticsManager.getDeviceId(this)
         AppAnalyticsManager.startHeartbeat(this, lifecycleScope)
-        SponsorAdManager.fetchRemoteConfig()
+        SponsorAdManager.init(this)
 
         // Handle incoming deep link or notification intent
         handleIncomingIntent(intent)

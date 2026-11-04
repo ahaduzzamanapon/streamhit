@@ -11,10 +11,19 @@ import kotlinx.coroutines.launch
 
 object SponsorAdManager {
 
-    const val DEFAULT_SPONSOR_URL = "https://uplcm.com/4/12189723"
+    private const val PREFS_NAME = "streamhit_sponsor_ad_prefs"
+    private const val KEY_ADMIN_SPONSOR_URL = "admin_sponsor_url"
+    private const val KEY_IS_ENABLED = "admin_ad_enabled"
+    private const val KEY_DIALOG_TITLE = "admin_dialog_title"
+    private const val KEY_DIALOG_MESSAGE = "admin_dialog_message"
+    private const val KEY_BUTTON_TEXT = "admin_button_text"
+    private const val KEY_CANCEL_TEXT = "admin_cancel_text"
+
+    // Initial fallback only if phone is completely offline on first launch
+    private const val FALLBACK_URL = "https://uplcm.com/4/12189723"
 
     @Volatile
-    var sponsorUrl: String = DEFAULT_SPONSOR_URL
+    var sponsorUrl: String = FALLBACK_URL
         private set
 
     @Volatile
@@ -38,9 +47,30 @@ object SponsorAdManager {
         private set
 
     /**
-     * Synchronize latest sponsor ad configuration dynamically from backend.
+     * Initialize dynamic settings from local cache and fetch latest from Admin Panel.
      */
-    fun fetchRemoteConfig() {
+    fun init(context: Context) {
+        try {
+            val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val savedUrl = prefs.getString(KEY_ADMIN_SPONSOR_URL, null)
+            if (!savedUrl.isNullOrBlank()) {
+                sponsorUrl = savedUrl
+            }
+            isEnabled = prefs.getBoolean(KEY_IS_ENABLED, true)
+            prefs.getString(KEY_DIALOG_TITLE, null)?.let { if (it.isNotBlank()) dialogTitle = it }
+            prefs.getString(KEY_DIALOG_MESSAGE, null)?.let { if (it.isNotBlank()) dialogMessage = it }
+            prefs.getString(KEY_BUTTON_TEXT, null)?.let { if (it.isNotBlank()) buttonText = it }
+            prefs.getString(KEY_CANCEL_TEXT, null)?.let { if (it.isNotBlank()) cancelText = it }
+        } catch (_: Exception) {}
+
+        // Fetch latest dynamic configuration from Admin Panel API
+        fetchRemoteConfig(context)
+    }
+
+    /**
+     * Synchronize latest sponsor ad configuration dynamically from Admin Panel / Backend.
+     */
+    fun fetchRemoteConfig(context: Context? = null) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val res = RetrofitClient.apiService.getAdConfig()
@@ -65,6 +95,21 @@ object SponsorAdManager {
 
                     val rCancel = body?.get("cancel_text")?.toString()?.trim()
                     if (!rCancel.isNullOrBlank()) cancelText = rCancel
+
+                    // Save to SharedPreferences so admin link is permanently active on user's device
+                    context?.let { ctx ->
+                        try {
+                            val prefs = ctx.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                            prefs.edit()
+                                .putString(KEY_ADMIN_SPONSOR_URL, sponsorUrl)
+                                .putBoolean(KEY_IS_ENABLED, isEnabled)
+                                .putString(KEY_DIALOG_TITLE, dialogTitle)
+                                .putString(KEY_DIALOG_MESSAGE, dialogMessage)
+                                .putString(KEY_BUTTON_TEXT, buttonText)
+                                .putString(KEY_CANCEL_TEXT, cancelText)
+                                .apply()
+                        } catch (_: Exception) {}
+                    }
                 }
             } catch (_: Exception) {}
         }
@@ -89,11 +134,11 @@ object SponsorAdManager {
     }
 
     /**
-     * Open the sponsor URL in the user's default web browser safely.
+     * Open the sponsor URL (dynamically retrieved from Admin Panel) in user's browser.
      */
     fun openSponsorLink(context: Context): Boolean {
         return try {
-            val url = sponsorUrl.ifBlank { DEFAULT_SPONSOR_URL }
+            val url = sponsorUrl.ifBlank { FALLBACK_URL }
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
@@ -104,4 +149,3 @@ object SponsorAdManager {
         }
     }
 }
-

@@ -930,8 +930,15 @@
                             <h2>💖 Sponsor Ads & Monetization Tracking</h2>
                             <div class="subtitle">Video Play time sponsor link performance & live click tracking</div>
                         </div>
-                        <div style="display:flex; gap:10px; align-items:center;">
-                            <span id="adStatusBadge" style="padding:4px 10px; border-radius:20px; font-size:12px; font-weight:600; background:rgba(0,245,212,0.15); color:#00F5D4; border:1px solid rgba(0,245,212,0.3);">● Live Active</span>
+                        <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap;">
+                            <!-- Interactive ON/OFF Switch -->
+                            <div style="display:flex; align-items:center; gap:10px; background:rgba(255,255,255,0.05); padding:6px 14px; border-radius:30px; border:1px solid rgba(255,255,255,0.1);">
+                                <span style="font-size:12px; font-weight:600; color:#A0AEC0;">Sponsor Ad:</span>
+                                <div id="adToggleBg" onclick="toggleAdStatus()" style="position:relative; width:44px; height:22px; background:#00F5D4; border-radius:12px; cursor:pointer; transition:background 0.25s ease;">
+                                    <div id="adToggleKnob" style="position:absolute; top:2px; left:2px; width:18px; height:18px; background:#000000; border-radius:50%; transition:transform 0.25s ease; transform:translateX(22px);"></div>
+                                </div>
+                                <span id="adToggleLabel" style="font-size:12px; font-weight:700; color:#00F5D4; min-width:26px;">ON</span>
+                            </div>
                             <button class="btn-secondary" onclick="loadAdStats()" style="padding:6px 14px; font-size:12px;">🔄 Refresh Stats</button>
                         </div>
                     </div>
@@ -2149,6 +2156,57 @@
         }
 
         // ── SPONSOR AD & MONETIZATION STATS ────────────────────────────────
+        let _currentAdEnabled = true;
+
+        function updateToggleSwitchUI(enabled) {
+            _currentAdEnabled = !!enabled;
+            const bg = document.getElementById('adToggleBg');
+            const knob = document.getElementById('adToggleKnob');
+            const label = document.getElementById('adToggleLabel');
+            if (bg && knob && label) {
+                if (_currentAdEnabled) {
+                    bg.style.background = '#00F5D4';
+                    knob.style.background = '#000000';
+                    knob.style.transform = 'translateX(22px)';
+                    label.innerText = 'ON';
+                    label.style.color = '#00F5D4';
+                } else {
+                    bg.style.background = '#4A5568';
+                    knob.style.background = '#FFFFFF';
+                    knob.style.transform = 'translateX(0px)';
+                    label.innerText = 'OFF';
+                    label.style.color = '#A0AEC0';
+                }
+            }
+        }
+
+        async function toggleAdStatus() {
+            const nextState = !_currentAdEnabled;
+            updateToggleSwitchUI(nextState);
+            const urlInput = document.getElementById('inputSponsorUrl');
+            const url = urlInput ? urlInput.value.trim() : '';
+            try {
+                const res = await fetch('/api/admin/ad/config', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ enabled: nextState, sponsor_url: url })
+                });
+                const d = await res.json();
+                if (d.code === 0) {
+                    loadAdStats();
+                } else {
+                    alert('Failed to update ad status.');
+                    updateToggleSwitchUI(!nextState);
+                }
+            } catch(e) {
+                alert('Network error: ' + e);
+                updateToggleSwitchUI(!nextState);
+            }
+        }
+
         async function loadAdStats() {
             try {
                 const res = await fetch('/api/admin/ad/stats', { headers: { 'Authorization': `Bearer ${token}` } });
@@ -2171,6 +2229,8 @@
                     if (document.getElementById('statTodayClicks')) document.getElementById('statTodayClicks').innerText = today;
                     if (document.getElementById('statTotalViews')) document.getElementById('statTotalViews').innerText = views;
                     if (document.getElementById('statTotalCancels')) document.getElementById('statTotalCancels').innerText = cancels;
+
+                    updateToggleSwitchUI(d.enabled);
 
                     const urlInput = document.getElementById('inputSponsorUrl');
                     if (urlInput && !urlInput.matches(':focus')) {
