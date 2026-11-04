@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -224,9 +226,67 @@ fun SearchScreen(
                 Text("No results found for \"$query\"", color = TextMuted, fontSize = 14.sp)
             }
         } else {
-            // Empty Search query: Show Recent Searches from clicks
-            if (recentItems.isNotEmpty()) {
-                Column(modifier = Modifier.fillMaxSize()) {
+            // Empty Search query: Show Trending Quick Chips + Recent Searches
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Trending Quick Suggestions Row
+                Column(modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)) {
+                    Text(
+                        text = "🔥 Trending Searches",
+                        color = Color.White,
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp)
+                    )
+
+                    val trendingTags = listOf(
+                        "Spider-Man",
+                        "Bengali",
+                        "Hindi",
+                        "Anime",
+                        "Avatar",
+                        "Avengers",
+                        "Bangla",
+                        "Action"
+                    )
+
+                    androidx.compose.foundation.lazy.LazyRow(
+                        contentPadding = PaddingValues(horizontal = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    ) {
+                        items(trendingTags) { tag ->
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = Color.White.copy(alpha = 0.06f),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
+                                modifier = Modifier.clickable {
+                                    query = tag
+                                }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = null,
+                                        tint = AccentCyan,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Text(
+                                        text = tag,
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (recentItems.isNotEmpty()) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -239,13 +299,13 @@ fun SearchScreen(
                                 imageVector = Icons.Default.History,
                                 contentDescription = "Recent Searches",
                                 tint = AccentEmerald,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Recent Searches",
+                                text = "Recently Viewed",
                                 color = Color.White,
-                                fontSize = 14.sp,
+                                fontSize = 13.5.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -261,18 +321,18 @@ fun SearchScreen(
                                 imageVector = Icons.Default.DeleteOutline,
                                 contentDescription = "Clear All",
                                 tint = TextMuted,
-                                modifier = Modifier.size(15.dp)
+                                modifier = Modifier.size(14.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Clear All", color = TextMuted, fontSize = 12.sp)
+                            Text("Clear", color = TextMuted, fontSize = 11.5.sp)
                         }
                     }
 
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(3),
                         contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 80.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
                         items(recentItems) { item ->
@@ -287,33 +347,33 @@ fun SearchScreen(
                             )
                         }
                     }
-                }
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 100.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = null,
-                            tint = TextMuted.copy(alpha = 0.5f),
-                            modifier = Modifier.size(48.dp)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "Search movies, series & anime",
-                            color = TextMuted,
-                            fontSize = 14.sp
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Items you search and click will appear here",
-                            color = TextMuted.copy(alpha = 0.6f),
-                            fontSize = 12.sp
-                        )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 60.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = null,
+                                tint = TextMuted.copy(alpha = 0.4f),
+                                modifier = Modifier.size(44.dp)
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "Search movies, series & anime",
+                                color = TextMuted,
+                                fontSize = 13.5.sp
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Tap any trending search or type above",
+                                color = TextMuted.copy(alpha = 0.6f),
+                                fontSize = 11.5.sp
+                            )
+                        }
                     }
                 }
             }

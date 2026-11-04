@@ -92,8 +92,9 @@ class AppFirebaseMessagingService : FirebaseMessagingService() {
             ?: ""
 
         val targetUrl = remoteMessage.data["url"] ?: ""
+        val action = remoteMessage.data["action"] ?: ""
 
-        sendPushNotification(title, body, imageUrl, detailPath, subjectId, targetUrl)
+        sendPushNotification(title, body, imageUrl, detailPath, subjectId, targetUrl, action)
     }
 
     private fun sendPushNotification(
@@ -102,13 +103,15 @@ class AppFirebaseMessagingService : FirebaseMessagingService() {
         imageUrl: String?,
         detailPath: String,
         subjectId: String,
-        targetUrl: String
+        targetUrl: String,
+        action: String = ""
     ) {
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra(EXTRA_DETAIL_PATH, detailPath)
             putExtra(EXTRA_SUBJECT_ID, subjectId)
             putExtra(EXTRA_TARGET_URL, targetUrl)
+            if (action.isNotBlank()) putExtra("EXTRA_ACTION", action)
         }
 
         val pendingIntent = PendingIntent.getActivity(
@@ -128,6 +131,26 @@ class AppFirebaseMessagingService : FirebaseMessagingService() {
             .setSound(defaultSoundUri)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
+
+        // Action button for Share/Invite push notification
+        val isShareAction = action.equals("share", ignoreCase = true) ||
+            detailPath.equals("share", ignoreCase = true) ||
+            subjectId.equals("share", ignoreCase = true) ||
+            targetUrl.contains("share", ignoreCase = true)
+
+        if (isShareAction) {
+            val shareActionIntent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("EXTRA_ACTION", "share")
+            }
+            val sharePendingIntent = PendingIntent.getActivity(
+                this,
+                (System.currentTimeMillis() + 1).toInt(),
+                shareActionIntent,
+                PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+            )
+            notificationBuilder.addAction(R.drawable.app_logo, "Share App 🎁", sharePendingIntent)
+        }
 
         // If an image/cover URL was provided, fetch and render BigPictureStyle
         if (!imageUrl.isNullOrBlank()) {

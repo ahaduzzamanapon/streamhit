@@ -20,9 +20,8 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.*
@@ -54,6 +53,7 @@ import androidx.core.content.ContextCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.streamhit.app.service.AppFirebaseMessagingService
+import com.streamhit.app.ui.components.AppShareDialog
 import com.streamhit.app.ui.theme.*
 import com.streamhit.app.update.AppUpdateManager
 import com.streamhit.app.data.analytics.AppAnalyticsManager
@@ -64,6 +64,7 @@ class MainActivity : ComponentActivity() {
 
     private val repository = MovieRepository()
     private val pendingDeepLink = mutableStateOf<Pair<String, String>?>(null)
+    private val pendingShareDialog = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -94,6 +95,8 @@ class MainActivity : ComponentActivity() {
                     repository = repository,
                     pendingDeepLink = pendingDeepLink.value,
                     onClearDeepLink = { pendingDeepLink.value = null },
+                    pendingShareDialog = pendingShareDialog.value,
+                    onClearShareDialog = { pendingShareDialog.value = false },
                     onPlayVideo = { url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPositionMs, dubLanguage, dubSubjectId, dubDetailPath, dubName ->
                         val intent = Intent(this, PlayerActivity::class.java).apply {
                             putExtra("EXTRA_STREAM_URL", url)
@@ -125,18 +128,40 @@ class MainActivity : ComponentActivity() {
     private fun handleIncomingIntent(intent: Intent?) {
         if (intent == null) return
 
-        // 1. From FCM Notification PendingIntent
-        val extraPath = intent.getStringExtra(AppFirebaseMessagingService.EXTRA_DETAIL_PATH)
+        val extraAction = intent.getStringExtra("EXTRA_ACTION") ?: intent.getStringExtra("action") ?: ""
+        val extraPath = intent.getStringExtra(AppFirebaseMessagingService.EXTRA_DETAIL_PATH) ?: ""
         val extraId = intent.getStringExtra(AppFirebaseMessagingService.EXTRA_SUBJECT_ID) ?: ""
+        val extraUrl = intent.getStringExtra(AppFirebaseMessagingService.EXTRA_TARGET_URL) ?: ""
+
+        // 1. Check for Share action / deep link from notification
+        if (extraAction.equals("share", ignoreCase = true) || extraAction.equals("invite", ignoreCase = true) ||
+            extraPath.equals("share", ignoreCase = true) || extraPath.equals("invite", ignoreCase = true) ||
+            extraId.equals("share", ignoreCase = true) || extraUrl.contains("share", ignoreCase = true) ||
+            extraUrl.contains("invite", ignoreCase = true)) {
+            pendingShareDialog.value = true
+            return
+        }
+
+        // 2. From FCM Notification PendingIntent
         if (!extraPath.isNullOrBlank()) {
             pendingDeepLink.value = Pair(extraPath, extraId)
             return
         }
 
-        // 2. From URI Deep Link: supports movies, series, tv, or detail
+        // 3. From URI Deep Link: supports movies, series, tv, share, or detail
         val data: Uri? = intent.data
         if (data != null) {
+            val scheme = data.scheme ?: ""
+            val host = data.host ?: ""
             val path = data.path ?: ""
+
+            // Share URI deep link: nxly://share or https://nxly.online/share or https://streamhit.lc-synergy.ltd/share
+            if ((scheme == "nxly" && (host == "share" || path.contains("share") || path.contains("invite"))) ||
+                ((host == "nxly.online" || host == "streamhit.lc-synergy.ltd") && (path == "/share" || path == "/invite"))) {
+                pendingShareDialog.value = true
+                return
+            }
+
             val regex = Regex("^/(?:movie|series|tv|detail)/(.*)$")
             val match = regex.find(path)
             if (match != null) {
@@ -149,8 +174,8 @@ class MainActivity : ComponentActivity() {
             }
 
             // Custom scheme: nxly://movie/{path} or nxly://series/{path} or nxly://open?detail_path=...
-            if (data.scheme == "nxly") {
-                val subPath = (data.path ?: "").removePrefix("/")
+            if (scheme == "nxly") {
+                val subPath = path.removePrefix("/")
                 val qPath = data.getQueryParameter("detail_path") ?: data.getQueryParameter("path")
                 val target = if (!qPath.isNullOrBlank()) qPath else subPath
                 val targetId = data.getQueryParameter("subject_id") ?: data.getQueryParameter("id") ?: ""
@@ -175,11 +200,21 @@ fun MainAppScreen(
     repository: MovieRepository,
     pendingDeepLink: Pair<String, String>? = null,
     onClearDeepLink: () -> Unit = {},
+    pendingShareDialog: Boolean = false,
+    onClearShareDialog: () -> Unit = {},
     onPlayVideo: (streamUrl: String, title: String, subjectId: String, detailPath: String, coverUrl: String, seasonNum: Int, episodeNum: Int, startPositionMs: Long, dubLanguage: String?, dubSubjectId: String?, dubDetailPath: String?, dubName: String?) -> Unit
 ) {
     val context = LocalContext.current
     val activity = context as? ComponentActivity
     var lastBackPressedTime by remember { mutableLongStateOf(0L) }
+    var showAppShareModal by remember { mutableStateOf(false) }
+
+    LaunchedEffect(pendingShareDialog) {
+        if (pendingShareDialog) {
+            showAppShareModal = true
+            onClearShareDialog()
+        }
+    }
 
     // Request Notification Permission for Android 13+ (TIRAMISU)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -431,56 +466,62 @@ fun MainAppScreen(
                     }
                 )
             } else {
-                when (currentTab) {
-                    Screen.Home -> HomeScreen(
-                        repository = repository,
-                        onMediaClick = { path, id, _ ->
-                            navigateToDetails(path, id)
-                        },
-                        onPlayDirect = { url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPos, dubLanguage, dubSubjectId, dubDetailPath, dubName ->
-                            onPlayVideo(url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPos, dubLanguage, dubSubjectId, dubDetailPath, dubName)
-                        },
-                        onNavigateToSearch = {
-                            switchTab(Screen.Search)
-                        }
-                    )
-                    Screen.LiveTv -> LiveTvScreen(
-                        onPlayStream = { url, title ->
-                            onPlayVideo(url, title, "", "", "", 1, 1, 0L, null, null, null, null)
-                        }
-                    )
-                    Screen.Explore -> ExploreScreen(
-                        repository = repository,
-                        onMediaClick = { path, id, _ ->
-                            navigateToDetails(path, id)
-                        }
-                    )
-                    Screen.Downloads -> DownloadsScreen(
-                        repository = repository,
-                        onPlayOffline = { item ->
-                            val intent = Intent(context, PlayerActivity::class.java).apply {
-                                putExtra("EXTRA_STREAM_URL", item.playUri)
-                                putExtra("EXTRA_VIDEO_TITLE", item.title)
-                                putExtra("EXTRA_SUBJECT_ID", item.subjectId)
-                                putExtra("EXTRA_DETAIL_PATH", item.detailPath)
-                                putExtra("EXTRA_COVER_URL", item.coverUrl)
-                                putExtra("EXTRA_SEASON_NUM", item.seasonNum)
-                                putExtra("EXTRA_EPISODE_NUM", item.episodeNum)
-                                putExtra("EXTRA_START_POSITION_MS", 0L)
-                                putExtra("EXTRA_IS_OFFLINE", true)
+                Crossfade(
+                    targetState = currentTab,
+                    animationSpec = tween(220),
+                    label = "tabCrossfade"
+                ) { tab ->
+                    when (tab) {
+                        Screen.Home -> HomeScreen(
+                            repository = repository,
+                            onMediaClick = { path, id, _ ->
+                                navigateToDetails(path, id)
+                            },
+                            onPlayDirect = { url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPos, dubLanguage, dubSubjectId, dubDetailPath, dubName ->
+                                onPlayVideo(url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPos, dubLanguage, dubSubjectId, dubDetailPath, dubName)
+                            },
+                            onNavigateToSearch = {
+                                switchTab(Screen.Search)
                             }
-                            context.startActivity(intent)
-                        },
-                        onNavigateToDetails = { path, id ->
-                            navigateToDetails(path, id)
-                        }
-                    )
-                    Screen.Search -> SearchScreen(
-                        repository = repository,
-                        onMediaClick = { path, id, _ ->
-                            navigateToDetails(path, id)
-                        }
-                    )
+                        )
+                        Screen.LiveTv -> LiveTvScreen(
+                            onPlayStream = { url, title ->
+                                onPlayVideo(url, title, "", "", "", 1, 1, 0L, null, null, null, null)
+                            }
+                        )
+                        Screen.Explore -> ExploreScreen(
+                            repository = repository,
+                            onMediaClick = { path, id, _ ->
+                                navigateToDetails(path, id)
+                            }
+                        )
+                        Screen.Downloads -> DownloadsScreen(
+                            repository = repository,
+                            onPlayOffline = { item ->
+                                val intent = Intent(context, PlayerActivity::class.java).apply {
+                                    putExtra("EXTRA_STREAM_URL", item.playUri)
+                                    putExtra("EXTRA_VIDEO_TITLE", item.title)
+                                    putExtra("EXTRA_SUBJECT_ID", item.subjectId)
+                                    putExtra("EXTRA_DETAIL_PATH", item.detailPath)
+                                    putExtra("EXTRA_COVER_URL", item.coverUrl)
+                                    putExtra("EXTRA_SEASON_NUM", item.seasonNum)
+                                    putExtra("EXTRA_EPISODE_NUM", item.episodeNum)
+                                    putExtra("EXTRA_START_POSITION_MS", 0L)
+                                    putExtra("EXTRA_IS_OFFLINE", true)
+                                }
+                                context.startActivity(intent)
+                            },
+                            onNavigateToDetails = { path, id ->
+                                navigateToDetails(path, id)
+                            }
+                        )
+                        Screen.Search -> SearchScreen(
+                            repository = repository,
+                            onMediaClick = { path, id, _ ->
+                                navigateToDetails(path, id)
+                            }
+                        )
+                    }
                 }
             }
 
@@ -760,6 +801,10 @@ fun MainAppScreen(
                     containerColor = BgSurface,
                     shape = RoundedCornerShape(16.dp)
                 )
+            }
+
+            if (showAppShareModal) {
+                AppShareDialog(onDismiss = { showAppShareModal = false })
             }
         }
     }

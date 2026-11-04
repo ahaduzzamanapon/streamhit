@@ -19,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.animation.core.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -323,6 +325,17 @@ fun DetailsScreen(
                         else -> "Watch Online Now"
                     }
 
+                    val infinitePulse = rememberInfiniteTransition(label = "watchPulse")
+                    val pulseScale by infinitePulse.animateFloat(
+                        initialValue = 0.985f,
+                        targetValue = 1.015f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1200, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "watchScale"
+                    )
+
                     Button(
                         onClick = {
                             if (hasResume) {
@@ -332,13 +345,22 @@ fun DetailsScreen(
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = AccentEmerald,
+                            containerColor = Color.Transparent,
                             contentColor = Color.Black
                         ),
+                        contentPadding = PaddingValues(),
                         shape = RoundedCornerShape(50.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(44.dp),
+                            .height(46.dp)
+                            .graphicsLayer {
+                                scaleX = pulseScale
+                                scaleY = pulseScale
+                            }
+                            .background(
+                                Brush.horizontalGradient(listOf(Color(0xFF00E676), Color(0xFF00E5FF))),
+                                RoundedCornerShape(50.dp)
+                            ),
                         enabled = !isResolvingStream
                     ) {
                         if (isResolvingStream) {
@@ -346,7 +368,7 @@ fun DetailsScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Connecting Server...", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         } else {
-                            Icon(Icons.Default.PlayArrow, contentDescription = "Play", modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.PlayArrow, contentDescription = "Play", modifier = Modifier.size(22.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(buttonLabel, fontSize = 15.sp, fontWeight = FontWeight.Black)
                         }
@@ -381,7 +403,8 @@ fun DetailsScreen(
                                 .clickable {
                                     val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                                         type = "text/plain"
-                                        putExtra(android.content.Intent.EXTRA_TEXT, "Watch ${item.title} on Streamfit: https://nxly.online/movie/${detailPath}")
+                                        val shareText = "🎬 Watch ${item.title} in HD for FREE on NXLY Stream!\n\n👉 Watch Now: https://nxly.online/movie/${detailPath}\n📲 Download App: https://nxly.online/download"
+                                        putExtra(android.content.Intent.EXTRA_TEXT, shareText)
                                     }
                                     context.startActivity(android.content.Intent.createChooser(shareIntent, "Share with"))
                                 }

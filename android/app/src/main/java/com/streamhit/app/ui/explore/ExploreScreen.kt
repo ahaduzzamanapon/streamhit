@@ -333,6 +333,18 @@ fun ExploreScreen(
             }
 
             // Horizontal Genre Chips
+            val genreIcons = mapOf(
+                "All" to "✨",
+                "Action" to "💥",
+                "Comedy" to "😂",
+                "Drama" to "🎭",
+                "Romance" to "❤️",
+                "Animation" to "⚡",
+                "Sci-Fi" to "🚀",
+                "Horror" to "🧟",
+                "Thriller" to "🔪"
+            )
+
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 14.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -340,19 +352,26 @@ fun ExploreScreen(
             ) {
                 items(genres) { genre ->
                     val isSelected = selectedGenre == genre
+                    val icon = genreIcons[genre] ?: "🎬"
                     Surface(
                         shape = RoundedCornerShape(14.dp),
                         color = if (isSelected) AccentEmerald.copy(alpha = 0.20f) else Color.White.copy(alpha = 0.04f),
                         border = BorderStroke(1.dp, if (isSelected) AccentEmerald else Color.White.copy(alpha = 0.09f)),
                         modifier = Modifier.clickable { selectedGenre = genre }
                     ) {
-                        Text(
-                            text = genre,
-                            color = if (isSelected) AccentEmerald else TextSecondary,
-                            fontSize = 11.5.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp)
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(text = icon, fontSize = 11.sp)
+                            Text(
+                                text = genre,
+                                color = if (isSelected) AccentEmerald else TextSecondary,
+                                fontSize = 11.5.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
                     }
                 }
             }

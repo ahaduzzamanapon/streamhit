@@ -16,8 +16,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
+import com.streamhit.app.data.model.SubjectSummary
 import com.streamhit.app.ui.components.AppShareDialog
 import com.streamhit.app.ui.components.AppBrandHeader
 import androidx.compose.material3.*
@@ -28,6 +30,7 @@ import androidx.compose.ui.draw.clipToBounds
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -185,7 +189,44 @@ fun HomeScreen(
 
     val pullRefreshState = rememberPullToRefreshState()
 
+    val categories = listOf("Trending", "Movies", "TV Shows", "Bengali", "Hindi Dub", "Anime")
+    val categoryIcons = listOf("🔥", "🎬", "📺", "🇧🇩", "🇮🇳", "⚡")
+
+    val categoryData = remember { mutableStateMapOf<Int, List<SubjectSummary>>() }
+    val categoryPageMap = remember { mutableStateMapOf<Int, Int>() }
+    var isCategoryLoading by remember { mutableStateOf(false) }
+    var isLoadingMoreCategory by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    fun fetchCategory(catIndex: Int, page: Int = 1, append: Boolean = false) {
+        if (catIndex == 0) return
+        val cat = categories[catIndex]
+        scope.launch {
+            if (!append) isCategoryLoading = true else isLoadingMoreCategory = true
+            val items = repository.getCategoryContent(cat, page = page)
+            if (append) {
+                val cur = categoryData[catIndex] ?: emptyList()
+                categoryData[catIndex] = (cur + items).distinctBy { it.subjectId.ifEmpty { it.detailPath } }
+            } else {
+                categoryData[catIndex] = items
+            }
+            categoryPageMap[catIndex] = page
+            isCategoryLoading = false
+            isLoadingMoreCategory = false
+        }
+    }
+
+    LaunchedEffect(selectedCategoryIndex) {
+        if (selectedCategoryIndex > 0 && !categoryData.containsKey(selectedCategoryIndex)) {
+            fetchCategory(selectedCategoryIndex, page = 1)
+        }
+    }
+
     suspend fun refreshHomeFeed() {
+        if (selectedCategoryIndex > 0) {
+            fetchCategory(selectedCategoryIndex, page = 1)
+            return
+        }
         try {
             coroutineScope {
                 val histDef = async { RecentHistoryManager.getRecentHistory(context) }
@@ -261,45 +302,6 @@ fun HomeScreen(
         val shimmerBrush = rememberShimmerBrush()
         HomeScreenShimmer(shimmerBrush)
         return
-    }
-
-    val categories = listOf("Trending", "Movies", "TV Shows", "Bengali", "Hindi Dub", "Anime")
-
-    // Dynamic filtering based on category selection
-    val filteredSections = remember(sections, selectedCategoryIndex) {
-        if (selectedCategoryIndex == 0) {
-            sections
-        } else {
-            val cat = categories[selectedCategoryIndex]
-            val result = sections.mapNotNull { sec ->
-                val matching = sec.subjects?.filter { item ->
-                    when (cat) {
-                        "Movies" -> item.subjectType == 1 || sec.title?.contains("Movie", ignoreCase = true) == true
-                        "TV Shows" -> item.subjectType == 2 || sec.title?.contains("TV", ignoreCase = true) == true || sec.title?.contains("Series", ignoreCase = true) == true
-                        "Bengali" -> item.title.contains("Bangla", ignoreCase = true) || item.title.contains("Bengali", ignoreCase = true) || item.genres.contains("Bengali", ignoreCase = true)
-                        "Hindi Dub" -> item.title.contains("Hindi", ignoreCase = true) || item.genres.contains("Hindi", ignoreCase = true)
-                        "Anime" -> item.genres.contains("Anime", ignoreCase = true) || item.genres.contains("Animation", ignoreCase = true) || item.title.contains("Anime", ignoreCase = true)
-                        else -> true
-                    }
-                } ?: emptyList()
-                if (matching.isNotEmpty()) sec.copy(subjects = matching) else null
-            }
-            if (result.isNotEmpty()) result
-            else {
-                val allSubjects = sections.flatMap { it.subjects ?: emptyList() }
-                val fallback = allSubjects.filter { item ->
-                    when (cat) {
-                        "Movies" -> item.subjectType == 1
-                        "TV Shows" -> item.subjectType == 2
-                        "Bengali" -> item.title.contains("Bangla", ignoreCase = true) || item.title.contains("Bengali", ignoreCase = true)
-                        "Hindi Dub" -> item.title.contains("Hindi", ignoreCase = true)
-                        "Anime" -> item.genres.contains("Anime", ignoreCase = true) || item.genres.contains("Animation", ignoreCase = true)
-                        else -> true
-                    }
-                }
-                if (fallback.isNotEmpty()) listOf(HomeSection(title = cat, subjects = fallback)) else emptyList()
-            }
-        }
     }
 
     Column(
@@ -388,20 +390,44 @@ fun HomeScreen(
                         }
                     }
 
+                    val infiniteTransition = rememberInfiniteTransition(label = "homeSharePulse")
+                    val pulseScale by infiniteTransition.animateFloat(
+                        initialValue = 0.94f,
+                        targetValue = 1.05f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1200, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "homePulse"
+                    )
+
                     Surface(
-                        shape = CircleShape,
-                        color = AccentEmerald.copy(alpha = 0.12f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, AccentEmerald.copy(alpha = 0.35f)),
+                        shape = RoundedCornerShape(16.dp),
+                        color = AccentEmerald.copy(alpha = 0.15f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AccentEmerald.copy(alpha = 0.50f)),
                         modifier = Modifier
-                            .size(30.dp)
+                            .graphicsLayer {
+                                scaleX = pulseScale
+                                scaleY = pulseScale
+                            }
                             .clickable { showShareDialog = true }
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.Share,
                                 contentDescription = "Share",
                                 tint = AccentEmerald,
-                                modifier = Modifier.size(14.dp)
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Text(
+                                text = "Share",
+                                color = AccentEmerald,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
@@ -430,7 +456,7 @@ fun HomeScreen(
                 itemsIndexed(categories) { index, cat ->
                     val isSelected = selectedCategoryIndex == index
                     val bgColor by animateColorAsState(
-                        targetValue = if (isSelected) AccentEmerald.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.04f),
+                        targetValue = if (isSelected) AccentEmerald.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.04f),
                         label = "catBg"
                     )
                     val borderColor by animateColorAsState(
@@ -448,13 +474,22 @@ fun HomeScreen(
                         border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
                         modifier = Modifier.clickable { selectedCategoryIndex = index }
                     ) {
-                        Text(
-                            text = cat,
-                            color = textColor,
-                            fontSize = 11.5.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 4.5.dp)
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = categoryIcons[index],
+                                fontSize = 11.5.sp
+                            )
+                            Text(
+                                text = cat,
+                                color = textColor,
+                                fontSize = 11.5.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
                     }
                 }
             }
@@ -593,64 +628,248 @@ fun HomeScreen(
             }
         }
 
-        // Home Sections (Movies, TV Shows, Trending, Filtered Content)
-        itemsIndexed(filteredSections.filter { it.subjects != null && it.subjects.isNotEmpty() }) { sectionIndex, section ->
-            val subjects = section.subjects ?: emptyList()
-            val title = section.title ?: "Trending"
-            val isRankedSection = sectionIndex == 0 || title.contains("Top", ignoreCase = true) || title.contains("Trending", ignoreCase = true)
+        if (selectedCategoryIndex == 0) {
+            // Home Sections (Trending Movies & Series)
+            itemsIndexed(sections.filter { it.subjects != null && it.subjects.isNotEmpty() }) { sectionIndex, section ->
+                val subjects = section.subjects ?: emptyList()
+                val title = section.title ?: "Trending"
+                val isRankedSection = sectionIndex == 0 || title.contains("Top", ignoreCase = true) || title.contains("Trending", ignoreCase = true)
 
-            Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                SectionHeader(title = title)
+                Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                    SectionHeader(title = title)
 
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    itemsIndexed(subjects) { index, subject ->
-                        MediaCard(
-                            item = subject,
-                            rankNumber = if (isRankedSection && index < 10) (index + 1) else null,
-                            onClick = {
-                                val path = subject.detailPath.ifEmpty { subject.subjectId }
-                                onMediaClick(path, subject.subjectId, subject.subjectType)
-                            }
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        itemsIndexed(subjects) { index, subject ->
+                            MediaCard(
+                                item = subject,
+                                rankNumber = if (isRankedSection && index < 10) (index + 1) else null,
+                                onClick = {
+                                    val path = subject.detailPath.ifEmpty { subject.subjectId }
+                                    onMediaClick(path, subject.subjectId, subject.subjectType)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (sections.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 100.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No content found. Check connection.",
+                            color = TextMuted,
+                            fontSize = 14.sp
                         )
                     }
                 }
             }
-        }
+        } else {
+            // Dedicated Rich Category View (Bengali, Hindi Dub, Anime, Movies, TV Shows)
+            val catItems = categoryData[selectedCategoryIndex] ?: emptyList()
 
-        if (filteredSections.isEmpty()) {
             item {
-                Box(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 100.dp),
-                    contentAlignment = Alignment.Center
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = if (selectedCategoryIndex > 0) "No ${categories[selectedCategoryIndex]} titles found." else "No content found. Check connection.",
-                        color = TextMuted,
-                        fontSize = 14.sp
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .width(3.5.dp)
+                                .height(18.dp)
+                                .background(
+                                    Brush.verticalGradient(listOf(AccentCyan, AccentEmerald)),
+                                    RoundedCornerShape(2.dp)
+                                )
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "${categories[selectedCategoryIndex]} Collection",
+                            color = Color.White,
+                            fontSize = 17.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    if (catItems.isNotEmpty()) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = AccentEmerald.copy(alpha = 0.15f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, AccentEmerald.copy(alpha = 0.35f))
+                        ) {
+                            Text(
+                                text = "${catItems.size}+ Titles",
+                                color = AccentEmerald,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
                 }
             }
+
+            if (isCategoryLoading && catItems.isEmpty()) {
+                // Category Shimmer 3-column Grid
+                item {
+                    val brush = rememberShimmerBrush()
+                    Column(modifier = Modifier.padding(horizontal = 14.dp)) {
+                        repeat(4) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                repeat(3) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .aspectRatio(2f / 2.9f)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(brush)
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth(0.8f)
+                                                .height(10.dp)
+                                                .clip(RoundedCornerShape(3.dp))
+                                                .background(brush)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if (catItems.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 70.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "No ${categories[selectedCategoryIndex]} titles found.",
+                                color = TextMuted,
+                                fontSize = 14.sp
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            OutlinedButton(
+                                onClick = { fetchCategory(selectedCategoryIndex, page = 1) },
+                                border = androidx.compose.foundation.BorderStroke(1.dp, AccentEmerald.copy(alpha = 0.5f))
+                            ) {
+                                Text("Retry", color = AccentEmerald)
+                            }
+                        }
+                    }
+                }
+            } else {
+                // 3-Column Responsive Grid
+                val chunked = catItems.chunked(3)
+                items(chunked) { rowItems ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 5.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        rowItems.forEach { subject ->
+                            Box(modifier = Modifier.weight(1f)) {
+                                MediaCard(
+                                    item = subject,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    onClick = {
+                                        val path = subject.detailPath.ifEmpty { subject.subjectId }
+                                        onMediaClick(path, subject.subjectId, subject.subjectType)
+                                    }
+                                )
+                            }
+                        }
+                        repeat(3 - rowItems.size) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+
+                // Load More Button
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 18.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isLoadingMoreCategory) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = AccentEmerald,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = Color.White.copy(alpha = 0.08f),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, AccentEmerald.copy(alpha = 0.45f)),
+                                modifier = Modifier.clickable {
+                                    val curPage = categoryPageMap[selectedCategoryIndex] ?: 1
+                                    fetchCategory(selectedCategoryIndex, page = curPage + 1, append = true)
+                                }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Refresh,
+                                        contentDescription = null,
+                                        tint = AccentEmerald,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Text(
+                                        text = "Load More ${categories[selectedCategoryIndex]}",
+                                        color = Color.White,
+                                        fontSize = 12.5.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
-
-        if (pullRefreshState.isRefreshing || pullRefreshState.verticalOffset > 0.5f) {
-            PullToRefreshContainer(
-                state = pullRefreshState,
-                modifier = Modifier.align(Alignment.TopCenter),
-                containerColor = Color(0xFF0F172A),
-                contentColor = AccentEmerald
-            )
-        }
     }
 
-    if (showShareDialog) {
-        AppShareDialog(onDismiss = { showShareDialog = false })
+    if (pullRefreshState.isRefreshing || pullRefreshState.verticalOffset > 0.5f) {
+        PullToRefreshContainer(
+            state = pullRefreshState,
+            modifier = Modifier.align(Alignment.TopCenter),
+            containerColor = Color(0xFF0F172A),
+            contentColor = AccentEmerald
+        )
     }
+}
+
+if (showShareDialog) {
+    AppShareDialog(onDismiss = { showShareDialog = false })
+}
 }
 }
 

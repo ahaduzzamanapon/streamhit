@@ -92,31 +92,84 @@ fun MediaCard(
                     )
             )
 
-            // Top Badges (Language / Dub)
+            // Top Badges (Language / Dub / Quality)
             val titleLower = item.title.lowercase()
-            val lang = when {
-                titleLower.contains("[hindi]") -> "Hindi"
-                titleLower.contains("[bengali]") -> "Bengali"
-                else -> null
-            }
+            val isBengali = titleLower.contains("[bengali]") || titleLower.contains("(bengali)") || titleLower.contains("bengali") || titleLower.contains("bangla")
+            val isHindi = titleLower.contains("[hindi]") || titleLower.contains("(hindi)") || titleLower.contains("hindi")
+            val isCam = (item.isCam == true) || titleLower.contains("[cam]") || titleLower.contains("(cam)")
 
-            if (lang != null) {
-                Box(
-                    modifier = Modifier
-                        .padding(5.dp)
-                        .align(Alignment.TopStart)
-                        .background(
-                            Brush.horizontalGradient(listOf(AccentEmerald, AccentCyan)),
-                            RoundedCornerShape(5.dp)
+            when {
+                isBengali -> {
+                    Box(
+                        modifier = Modifier
+                            .padding(5.dp)
+                            .align(Alignment.TopStart)
+                            .background(
+                                Brush.horizontalGradient(listOf(Color(0xFF00C853), Color(0xFF00E676))),
+                                RoundedCornerShape(5.dp)
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "🇧🇩 Bangla",
+                            color = Color.Black,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Black
                         )
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = lang,
-                        color = Color.Black,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Black
-                    )
+                    }
+                }
+                isHindi -> {
+                    Box(
+                        modifier = Modifier
+                            .padding(5.dp)
+                            .align(Alignment.TopStart)
+                            .background(
+                                Brush.horizontalGradient(listOf(Color(0xFFFF9100), Color(0xFFFFD600))),
+                                RoundedCornerShape(5.dp)
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "🇮🇳 Hindi",
+                            color = Color.Black,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                }
+                isCam -> {
+                    Box(
+                        modifier = Modifier
+                            .padding(5.dp)
+                            .align(Alignment.TopStart)
+                            .background(Color(0xFFE53935), RoundedCornerShape(5.dp))
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "CAM",
+                            color = Color.White,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                }
+                else -> {
+                    // Subtle HD badge
+                    Box(
+                        modifier = Modifier
+                            .padding(5.dp)
+                            .align(Alignment.TopStart)
+                            .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(4.dp))
+                            .border(0.5.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                    ) {
+                        Text(
+                            text = "HD",
+                            color = AccentCyan,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
 
@@ -162,9 +215,15 @@ fun MediaCard(
 
         Spacer(modifier = Modifier.height(5.dp))
 
-        // Title
+        // Cleaned Title (removes redundant bracket tags for a cleaner look)
+        val cleanTitle = item.title
+            .replace(Regex("\\[(bengali|hindi|cam|bangla).*?\\]", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("\\((bengali|hindi|cam|bangla).*?\\)", RegexOption.IGNORE_CASE), "")
+            .trim()
+            .ifEmpty { item.title }
+
         Text(
-            text = item.title,
+            text = cleanTitle,
             color = TextPrimary,
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,

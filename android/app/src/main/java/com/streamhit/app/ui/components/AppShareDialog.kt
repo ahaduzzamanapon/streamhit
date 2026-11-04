@@ -149,9 +149,44 @@ fun AppShareDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
-                // Primary Share Button (Android Chooser - WhatsApp, Messenger, etc.)
+                // Direct WhatsApp Button (Most popular in BD & India)
+                Button(
+                    onClick = {
+                        try {
+                            val waIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                setPackage("com.whatsapp")
+                                putExtra(Intent.EXTRA_TEXT, APP_SHARE_TEXT)
+                            }
+                            context.startActivity(waIntent)
+                        } catch (_: Exception) {
+                            val fallback = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, APP_SHARE_TEXT)
+                            }
+                            context.startActivity(Intent.createChooser(fallback, "Share NXLY Stream via"))
+                        }
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                ) {
+                    Text(
+                        text = "💬 Share on WhatsApp",
+                        color = Color.White,
+                        fontSize = 14.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Primary Share Button (Android Chooser - Messenger, Telegram, Facebook, etc.)
                 Button(
                     onClick = {
                         val shareIntent = Intent(Intent.ACTION_SEND).apply {
@@ -166,24 +201,24 @@ fun AppShareDialog(
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .height(44.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Share,
                         contentDescription = null,
                         tint = Color.Black,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(17.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Share with Friends",
+                        text = "More Apps (Messenger, Telegram)",
                         color = Color.Black,
-                        fontSize = 15.sp,
+                        fontSize = 13.5.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // Copy Link Button
                 OutlinedButton(
@@ -317,16 +352,52 @@ fun WatchLockShareDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
-                // SINGLE BUTTON - NO CANCEL BUTTON
+                val shareText = "🔥 $movieTitle এবং হাজারো HD মুভি ও সিরিজ সম্পূর্ণ ফ্রিতে দেখুন NXLY Stream অ্যাপে!\n\nএখনই ডাউনলোড করুন: $APP_SHARE_URL"
+
+                // Direct WhatsApp Button
+                Button(
+                    onClick = {
+                        try {
+                            val waIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                setPackage("com.whatsapp")
+                                putExtra(Intent.EXTRA_TEXT, shareText)
+                            }
+                            context.startActivity(waIntent)
+                        } catch (_: Exception) {
+                            val fallback = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, shareText)
+                            }
+                            context.startActivity(Intent.createChooser(fallback, "বন্ধুদের সাথে শেয়ার করুন"))
+                        }
+                        onShareSuccess()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                ) {
+                    Text(
+                        text = "💬 হোয়াটসঅ্যাপে শেয়ার করুন",
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Other Apps Share Button
                 Button(
                     onClick = {
                         val shareIntent = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
                             putExtra(Intent.EXTRA_SUBJECT, "NXLY Stream - Free Movies & TV Shows")
-                            val text = "🔥 $movieTitle এবং হাজারো HD মুভি ও সিরিজ সম্পূর্ণ ফ্রিতে দেখুন NXLY Stream অ্যাপে!\n\nএখনই ডাউনলোড করুন: $APP_SHARE_URL"
-                            putExtra(Intent.EXTRA_TEXT, text)
+                            putExtra(Intent.EXTRA_TEXT, shareText)
                         }
                         context.startActivity(Intent.createChooser(shareIntent, "বন্ধুদের সাথে শেয়ার করুন"))
                         onShareSuccess()
@@ -337,19 +408,19 @@ fun WatchLockShareDialog(
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp)
+                        .height(46.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Share,
                         contentDescription = null,
                         tint = Color.Black,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "বন্ধুদের শেয়ার করে দেখা চালিয়ে যান 🚀",
+                        text = "অন্যান্য অ্যাপে শেয়ার করে দেখা চালান 🚀",
                         color = Color.Black,
-                        fontSize = 14.5.sp,
+                        fontSize = 13.5.sp,
                         fontWeight = FontWeight.Black
                     )
                 }

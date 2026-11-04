@@ -1,6 +1,8 @@
 package com.streamhit.app.ui.livetv
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -292,30 +294,47 @@ fun LiveTvScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 14.dp, vertical = 6.dp)
         ) {
-
-            // Category Filter Pills
+            // Category Filter Pills with Emojis & Glowing active state
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(horizontal = 2.dp)
             ) {
                 items(categories) { cat ->
                     val isSelected = selectedCategory == cat
+                    val icon = when (cat.lowercase()) {
+                        "all" -> "📺"
+                        "sports" -> "⚽"
+                        "news" -> "📰"
+                        "entertainment" -> "🎬"
+                        "bangla", "bengali" -> "🇧🇩"
+                        "hindi", "india" -> "🇮🇳"
+                        "kids" -> "🧸"
+                        "movies", "movie" -> "🍿"
+                        else -> "⚡"
+                    }
+
                     Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = if (isSelected) AccentEmerald.copy(alpha = 0.2f) else Color.Transparent,
+                        shape = RoundedCornerShape(14.dp),
+                        color = if (isSelected) Color(0xFFFF2A54).copy(alpha = 0.22f) else Color.White.copy(alpha = 0.04f),
                         border = BorderStroke(
                             1.dp,
-                            if (isSelected) AccentEmerald else Color.White.copy(alpha = 0.12f)
+                            if (isSelected) Color(0xFFFF2A54) else Color.White.copy(alpha = 0.10f)
                         ),
                         modifier = Modifier.clickable { selectedCategory = cat }
                     ) {
-                        Text(
-                            text = cat,
-                            color = if (isSelected) AccentEmerald else TextSecondary,
-                            fontSize = 12.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(text = icon, fontSize = 11.5.sp)
+                            Text(
+                                text = cat,
+                                color = if (isSelected) Color(0xFFFF4B6E) else TextSecondary,
+                                fontSize = 11.5.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
                     }
                 }
             }
@@ -398,6 +417,14 @@ fun LiveChannelCard(
     channel: LiveTvChannel,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val cardScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.93f else 1.0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "liveCardScale"
+    )
+
     val infiniteTransition = rememberInfiniteTransition(label = "livePulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 0.85f,
@@ -415,7 +442,15 @@ fun LiveChannelCard(
         border = BorderStroke(0.8.dp, Color.White.copy(alpha = 0.08f)),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .graphicsLayer {
+                scaleX = cardScale
+                scaleY = cardScale
+            }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
     ) {
         Column(
             modifier = Modifier

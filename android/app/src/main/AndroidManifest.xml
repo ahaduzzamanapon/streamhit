@@ -48,6 +48,12 @@
                 <data android:scheme="http" android:host="nxly.online" android:pathPrefix="/tv/" />
                 <data android:scheme="https" android:host="nxly.online" android:pathPrefix="/detail/" />
                 <data android:scheme="http" android:host="nxly.online" android:pathPrefix="/detail/" />
+                <data android:scheme="https" android:host="nxly.online" android:pathPrefix="/share" />
+                <data android:scheme="http" android:host="nxly.online" android:pathPrefix="/share" />
+                <data android:scheme="https" android:host="nxly.online" android:pathPrefix="/invite" />
+                <data android:scheme="http" android:host="nxly.online" android:pathPrefix="/invite" />
+                <data android:scheme="https" android:host="streamhit.lc-synergy.ltd" android:pathPrefix="/share" />
+                <data android:scheme="https" android:host="streamhit.lc-synergy.ltd" android:pathPrefix="/invite" />
             </intent-filter>
 
             <!-- Custom scheme: nxly://movie/*, nxly://series/*, nxly://tv/* -->

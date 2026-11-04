@@ -1459,10 +1459,17 @@
                                 <input type="text" id="pushTitle" class="form-control" required placeholder="e.g. New Movie Added: Dune 2!">
                             </div>
                             <div class="form-group">
+                                <label>Notification Action / Destination</label>
+                                <select id="pushActionType" class="form-control" onchange="handlePushActionChange()">
+                                    <option value="movie">🎬 Open Movie / Content</option>
+                                    <option value="share">🎁 Open App Share Dialog (Viral Invite)</option>
+                                </select>
+                            </div>
+                            <div class="form-group" id="pushSubjectGroup">
                                 <label>Target Deep-Link Subject ID (Optional)</label>
                                 <input type="text" id="pushSubjectId" class="form-control" placeholder="e.g. 1511967966181605720">
                             </div>
-                            <div class="form-group" style="grid-column: 1 / -1;">
+                            <div class="form-group">
                                 <label>Poster / Cover Image URL (Optional)</label>
                                 <input type="text" id="pushImage" class="form-control" placeholder="https://.../poster.jpg (shows rich big picture in Android notification)">
                             </div>
@@ -2921,16 +2928,32 @@
             } catch(e) {}
         }
 
+        function handlePushActionChange() {
+            const act = document.getElementById('pushActionType')?.value;
+            const subGrp = document.getElementById('pushSubjectGroup');
+            const titleInput = document.getElementById('pushTitle');
+            const bodyInput = document.getElementById('pushBody');
+            if (act === 'share') {
+                if (subGrp) subGrp.style.display = 'none';
+                if (!titleInput.value) titleInput.value = '🎁 বন্ধুদের সাথে শেয়ার করুন ও আনলিমিটেড মুভি উপভোগ করুন!';
+                if (!bodyInput.value) bodyInput.value = 'NXLY Stream অ্যাপটি এখনই বন্ধুদের সাথে শেয়ার করুন এবং সব প্রিমিয়াম কনটেন্ট ফ্রিতে দেখুন!';
+            } else {
+                if (subGrp) subGrp.style.display = 'block';
+            }
+        }
+
         async function handleSendPushNotification(e) {
             e.preventDefault();
             const btn = document.getElementById('btnSendPush');
             btn.disabled = true;
             btn.innerText = 'Broadcasting via Firebase...';
             try {
+                const actionType = document.getElementById('pushActionType')?.value || 'movie';
                 const payload = {
                     title: document.getElementById('pushTitle').value.trim(),
                     body: document.getElementById('pushBody').value.trim(),
-                    subject_id: document.getElementById('pushSubjectId').value.trim(),
+                    action: actionType,
+                    subject_id: actionType === 'share' ? 'share' : document.getElementById('pushSubjectId').value.trim(),
                     image: (document.getElementById('pushImage')?.value || '').trim()
                 };
                 const res = await fetch('/api/admin/push/send', {

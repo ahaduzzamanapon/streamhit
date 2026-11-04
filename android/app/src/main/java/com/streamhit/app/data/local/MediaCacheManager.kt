@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit
 @OptIn(UnstableApi::class)
 object MediaCacheManager {
 
-    private const val MAX_CACHE_SIZE_BYTES = 250L * 1024L * 1024L // 250 MB LRU budget
+    private const val MAX_CACHE_SIZE_BYTES = 500L * 1024L * 1024L // 500 MB LRU budget for 15m smooth buffering
     private const val CACHE_DIR_NAME = "stream_media_cache"
 
     @Volatile

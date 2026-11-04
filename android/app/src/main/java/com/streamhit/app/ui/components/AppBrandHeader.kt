@@ -1,5 +1,6 @@
 package com.streamhit.app.ui.components
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -21,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -183,20 +185,44 @@ fun AppBrandHeader(
                 }
 
                 if (showShareAction) {
+                    val infiniteTransition = rememberInfiniteTransition(label = "sharePulse")
+                    val pulseScale by infiniteTransition.animateFloat(
+                        initialValue = 0.94f,
+                        targetValue = 1.05f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1200, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "pulse"
+                    )
+
                     Surface(
-                        shape = CircleShape,
-                        color = AccentEmerald.copy(alpha = 0.12f),
-                        border = BorderStroke(1.dp, AccentEmerald.copy(alpha = 0.40f)),
+                        shape = RoundedCornerShape(16.dp),
+                        color = AccentEmerald.copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, AccentEmerald.copy(alpha = 0.50f)),
                         modifier = Modifier
-                            .size(30.dp)
+                            .graphicsLayer {
+                                scaleX = pulseScale
+                                scaleY = pulseScale
+                            }
                             .clickable { showShareModal = true }
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.Share,
                                 contentDescription = "Share",
                                 tint = AccentEmerald,
-                                modifier = Modifier.size(15.dp)
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Text(
+                                text = "Share",
+                                color = AccentEmerald,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }

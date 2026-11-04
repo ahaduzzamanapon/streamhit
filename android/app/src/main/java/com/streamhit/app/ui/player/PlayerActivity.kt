@@ -28,12 +28,16 @@ import androidx.lifecycle.Lifecycle
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -435,6 +439,8 @@ fun AdaptivePlayerScreen(
     var totalDuration by remember { mutableLongStateOf(0L) }
     var bufferedPosition by remember { mutableLongStateOf(0L) }
     var bufferedAheadMs by remember { mutableLongStateOf(0L) }
+    var hasPlaybackError by remember { mutableStateOf(false) }
+    var playbackErrorMessage by remember { mutableStateOf<String?>(null) }
     var playbackSpeed by remember { mutableFloatStateOf(1.0f) }
     var isFastForwarding2x by remember { mutableStateOf(false) }
     var overlayDismissToken by remember { mutableLongStateOf(0L) }
@@ -834,14 +840,14 @@ fun AdaptivePlayerScreen(
         val loadControl = DefaultLoadControl.Builder()
             .setAllocator(allocator)
             .setBufferDurationsMs(
-                30_000,  // minBufferMs (Aggressive 30s continuous buffer: utilizes full network speed!)
-                120_000, // maxBufferMs (120s buffer cap)
-                500,     // bufferForPlaybackMs (Starts playback instantly with 0.5s buffer)
-                1_200    // bufferForPlaybackAfterRebufferMs (Fast rebuffer recovery)
+                60_000,   // minBufferMs (Aggressive continuous buffer)
+                900_000,  // maxBufferMs (15 minutes continuous ahead buffer: 15m buffer!)
+                500,      // bufferForPlaybackMs (Starts playback instantly with 0.5s buffer)
+                1_200     // bufferForPlaybackAfterRebufferMs (Fast rebuffer recovery)
             )
             .setTargetBufferBytes(C.LENGTH_UNSET)
             .setPrioritizeTimeOverSizeThresholds(true)
-            .setBackBuffer(20_000, false)
+            .setBackBuffer(60_000, false)
             .build()
 
         val initialStartMs = when {
@@ -933,6 +939,8 @@ fun AdaptivePlayerScreen(
                     }
                     Player.STATE_READY -> {
                         isBuffering = false
+                        hasPlaybackError = false
+                        playbackErrorMessage = null
                         if (!firstFrameRendered) {
                             firstFrameRendered = true
                             val startupLatency = System.currentTimeMillis() - prepareStartTimeMs
@@ -962,7 +970,8 @@ fun AdaptivePlayerScreen(
                     player.play()
                     return
                 }
-                Toast.makeText(context, "Playback error: Try selecting another server", Toast.LENGTH_LONG).show()
+                hasPlaybackError = true
+                playbackErrorMessage = sanitizedMsg
             }
         }
         player.addListener(listener)
@@ -1380,6 +1389,54 @@ fun AdaptivePlayerScreen(
                 }
             )
         }
+
+        // ── PLAYBACK FAILED / RELOAD OVERLAY ──
+        if (hasPlaybackError) {
+            PlayerErrorReloadOverlay(
+                errorMessage = playbackErrorMessage ?: "Playback failed. Tap Reload to try again.",
+                onReload = {
+                    hasPlaybackError = false
+                    playbackErrorMessage = null
+                    isBuffering = true
+                    exoPlayer?.let { p ->
+                        val curPos = p.currentPosition.coerceAtLeast(0L)
+                        p.stop()
+                        p.clearMediaItems()
+                        val targetUrl = resolveDirectPlayableUrl(currentStreamUrl)
+                        p.setMediaItem(MediaItem.fromUri(Uri.parse(targetUrl)), curPos)
+                        p.prepare()
+                        p.play()
+                    }
+                },
+                onSwitchServer = if (currentChannel != null && currentChannel!!.activeServers.size > 1) {
+                    {
+                        val nextIdx = (currentServerIndex + 1) % currentChannel!!.activeServers.size
+                        switchLiveServer(nextIdx)
+                    }
+                } else if (resources.size > 1) {
+                    {
+                        val curIdx = resources.indexOfFirst { it.url == currentStreamUrl }
+                        val nextIdx = if (curIdx >= 0) (curIdx + 1) % resources.size else 0
+                        val nextRes = resources[nextIdx]
+                        currentStreamUrl = nextRes.url
+                        isBuffering = true
+                        hasPlaybackError = false
+                        playbackErrorMessage = null
+                        exoPlayer?.let { p ->
+                            val pos = p.currentPosition.coerceAtLeast(0L)
+                            p.stop()
+                            p.clearMediaItems()
+                            p.setMediaItem(MediaItem.fromUri(Uri.parse(resolveDirectPlayableUrl(nextRes.url))), pos)
+                            p.prepare()
+                            p.play()
+                        }
+                        Toast.makeText(context, "Switched to ${nextRes.displayResolution} Server", Toast.LENGTH_SHORT).show()
+                    }
+                } else null,
+                onBack = onBack,
+                isFullscreen = isFullscreen
+            )
+        }
     }
 }
 
@@ -1502,6 +1559,151 @@ fun PlayerBufferingIndicator(
                         fontSize = if (isLarge) 12.sp else 11.sp,
                         fontWeight = FontWeight.Medium
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PlayerErrorReloadOverlay(
+    errorMessage: String,
+    onReload: () -> Unit,
+    onSwitchServer: (() -> Unit)? = null,
+    onBack: () -> Unit,
+    isFullscreen: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.90f))
+            .clickable(enabled = false) {},
+        contentAlignment = Alignment.Center
+    ) {
+        // Back Button Top Start
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            contentAlignment = Alignment.TopStart
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = Color.White.copy(alpha = 0.12f),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.20f)),
+                modifier = Modifier
+                    .size(36.dp)
+                    .clickable(onClick = onBack)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+
+        // Center Error Content
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(horizontal = 24.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(54.dp)
+                    .background(Color(0xFFE53935).copy(alpha = 0.18f), CircleShape)
+                    .border(1.5.dp, Color(0xFFE53935), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Reload",
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Text(
+                text = "Playback Failed / প্লে করতে সমস্যা হচ্ছে",
+                color = Color.White,
+                fontSize = if (isFullscreen) 18.sp else 16.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = "ভিডিও সার্ভারের সংযোগ বিচ্ছিন্ন হয়েছে। পুনরায় চেষ্টা করতে নিচের বাটনে চাপুন।",
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 12.5.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Big Reload Button
+                Button(
+                    onClick = onReload,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Transparent,
+                        contentColor = Color.Black
+                    ),
+                    contentPadding = PaddingValues(),
+                    shape = RoundedCornerShape(50.dp),
+                    modifier = Modifier
+                        .height(44.dp)
+                        .background(
+                            Brush.horizontalGradient(listOf(Color(0xFF00E676), Color(0xFF00E5FF))),
+                            RoundedCornerShape(50.dp)
+                        )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 20.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Reload",
+                            tint = Color.Black,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = "Reload / পুনরায় চেষ্টা করুন",
+                            color = Color.Black,
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                }
+
+                if (onSwitchServer != null) {
+                    OutlinedButton(
+                        onClick = onSwitchServer,
+                        shape = RoundedCornerShape(50.dp),
+                        border = BorderStroke(1.dp, Color(0xFF00E676).copy(alpha = 0.6f)),
+                        modifier = Modifier.height(44.dp)
+                    ) {
+                        Text(
+                            text = "Next Server",
+                            color = Color(0xFF00E676),
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }

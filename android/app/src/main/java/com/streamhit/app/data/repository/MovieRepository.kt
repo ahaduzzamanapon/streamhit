@@ -62,6 +62,37 @@ class MovieRepository {
         }
     }
 
+    suspend fun getCategoryContent(category: String, page: Int = 1): List<SubjectSummary> {
+        return try {
+            when (category) {
+                "Movies" -> {
+                    filterContent(page = page, subjectType = 1, sort = "recommend")
+                }
+                "TV Shows" -> {
+                    filterContent(page = page, subjectType = 2, sort = "recommend")
+                }
+                "Bengali" -> {
+                    val q1 = search("Bengali", page = page)
+                    val q2 = if (page == 1) search("Bangla", page = 1) else emptyList()
+                    (q1 + q2).distinctBy { it.subjectId.ifEmpty { it.detailPath } }
+                }
+                "Hindi Dub" -> {
+                    val q1 = search("Hindi", page = page)
+                    val q2 = if (page == 1) search("Dubbed", page = 1) else emptyList()
+                    (q1 + q2).distinctBy { it.subjectId.ifEmpty { it.detailPath } }
+                }
+                "Anime" -> {
+                    val q1 = filterContent(page = page, genre = "Animation", sort = "recommend")
+                    val q2 = if (page == 1) search("Anime", page = 1) else emptyList()
+                    (q1 + q2).distinctBy { it.subjectId.ifEmpty { it.detailPath } }
+                }
+                else -> emptyList()
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
     suspend fun getDetail(detailPath: String, subjectId: String = ""): SubjectDetail? {
         return try {
             val response = api.getDetail(detailPath, subjectId)

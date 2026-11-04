@@ -1089,6 +1089,19 @@ async def admin_push_send(data: dict, request: Request):
     detail_path = str(data.get("detail_path") or data.get("detailPath") or "").strip()
     subject_id = str(data.get("subject_id") or data.get("subjectId") or "").strip()
     subject_type = int(data.get("subject_type") or data.get("subjectType") or 1)
+    action = str(data.get("action") or "").strip().lower()
+
+    if not action and (subject_id.lower() == "share" or detail_path.lower() == "share"):
+        action = "share"
+
+    if action == "share":
+        detail_path = "share"
+        subject_id = "share"
+        deep_link_url = "https://nxly.online/share"
+    elif detail_path:
+        deep_link_url = f"https://nxly.online/movie/{detail_path}"
+    else:
+        deep_link_url = ""
 
     if not title or not body:
         raise HTTPException(status_code=400, detail="Title and message body are required")
@@ -1125,8 +1138,6 @@ async def admin_push_send(data: dict, request: Request):
     project_id = "nxly-3797c"
     fcm_endpoint = f"https://fcm.googleapis.com/v1/projects/{project_id}/messages:send"
 
-    deep_link_url = f"https://nxly.online/movie/{detail_path}" if detail_path else ""
-
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json"
@@ -1153,6 +1164,7 @@ async def admin_push_send(data: dict, request: Request):
                             "title": title,
                             "body": body,
                             "image": image,
+                            "action": action,
                             "detail_path": detail_path,
                             "subject_id": subject_id,
                             "subject_type": str(subject_type),
