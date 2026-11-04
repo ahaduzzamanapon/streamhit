@@ -9,9 +9,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,26 +32,14 @@ import com.streamhit.app.ui.theme.BgCard
 import com.streamhit.app.ui.theme.TextMuted
 import com.streamhit.app.ui.theme.TextSecondary
 import com.streamhit.app.util.SponsorAdManager
-import kotlinx.coroutines.delay
 
 @Composable
 fun SponsorSupportDialog(
     videoTitle: String = "",
+    cancelButtonText: String? = null,
     onSupportClick: () -> Unit,
     onCancel: () -> Unit
 ) {
-    // 5-second auto-skip countdown timer
-    var countdown by remember { mutableIntStateOf(5) }
-
-    LaunchedEffect(Unit) {
-        while (countdown > 0) {
-            delay(1000L)
-            countdown--
-        }
-        // Auto-play when countdown finishes if user did not interact
-        onCancel()
-    }
-
     // Subtle heart pulse animation
     val infiniteTransition = rememberInfiniteTransition(label = "heartPulse")
     val heartScale by infiniteTransition.animateFloat(
@@ -168,11 +156,11 @@ fun SponsorSupportDialog(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Primary Action Button: "💖 সাপোর্ট করতে লিংকে ক্লিক করুন"
+                // Primary Mandatory Action Button: "🚀 স্পন্সর পেজ ভিজিট করুন (১০ সেকেন্ড)"
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .height(50.dp)
                         .clip(RoundedCornerShape(14.dp))
                         .background(
                             Brush.horizontalGradient(
@@ -187,55 +175,17 @@ fun SponsorSupportDialog(
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.OpenInNew,
+                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
                             contentDescription = "Open Link",
                             tint = Color.White,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(20.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = SponsorAdManager.buttonText,
                             color = Color.White,
-                            fontSize = 14.sp,
+                            fontSize = 15.sp,
                             fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Secondary Action Button: "✕ সরাসরি দেখুন / Cancel"
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color.White.copy(alpha = 0.06f))
-                        .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(14.dp))
-                        .clickable { onCancel() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = "Play Directly",
-                            tint = TextMuted,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        val cancelLabel = if (countdown > 0) {
-                            "${SponsorAdManager.cancelText} (${countdown}s)"
-                        } else {
-                            SponsorAdManager.cancelText
-                        }
-                        Text(
-                            text = cancelLabel,
-                            color = Color.White.copy(alpha = 0.85f),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
@@ -243,4 +193,3 @@ fun SponsorSupportDialog(
         }
     }
 }
-

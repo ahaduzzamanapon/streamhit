@@ -23,6 +23,9 @@ object SponsorAdManager {
     private const val FALLBACK_URL = "https://uplcm.com/4/12189723"
 
     @Volatile
+    var isSessionUnlocked: Boolean = false
+
+    @Volatile
     var sponsorUrl: String = FALLBACK_URL
         private set
 
@@ -35,11 +38,11 @@ object SponsorAdManager {
         private set
 
     @Volatile
-    var dialogMessage: String = "অ্যাপটি সম্পূর্ণ ফ্রিতে চালাতে এবং নতুন কনটেন্ট যুক্ত করতে অনুগ্রহ করে স্পন্সর লিংকে একটি ক্লিক করে আমাদের সাপোর্ট করুন!"
+    var dialogMessage: String = "অ্যাপটি সম্পূর্ণ ফ্রিতে চালাতে এবং সকল কনটেন্ট উপভোগ করতে স্পন্সর পেজটি ১০ সেকেন্ড ভিজিট করে আনলক করুন!"
         private set
 
     @Volatile
-    var buttonText: String = "💖 সাপোর্ট করতে লিংকে ক্লিক করুন"
+    var buttonText: String = "🚀 স্পন্সর পেজ ভিজিট করুন (১০ সেকেন্ড)"
         private set
 
     @Volatile
@@ -138,13 +141,17 @@ object SponsorAdManager {
      */
     fun openSponsorLink(context: Context): Boolean {
         return try {
-            val url = sponsorUrl.ifBlank { FALLBACK_URL }
+            var url = sponsorUrl.trim().ifBlank { FALLBACK_URL }
+            if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                url = "https://$url"
+            }
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }
             context.startActivity(intent)
             true
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            e.printStackTrace()
             false
         }
     }

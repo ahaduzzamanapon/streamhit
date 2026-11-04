@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import androidx.compose.material.icons.filled.Tv
+import com.streamhit.app.ui.sponsor.SponsorWebViewActivity
 import com.streamhit.app.data.model.AppVersionInfo
 import com.streamhit.app.data.repository.MovieRepository
 import com.streamhit.app.ui.details.DetailsScreen
@@ -229,8 +230,32 @@ fun MainAppScreen(
 
     var pendingPlayRequest by remember { mutableStateOf<PendingPlayRequest?>(null) }
 
+    val sponsorActivityLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            // Successfully completed 10 seconds on sponsor page!
+            SponsorAdManager.isSessionUnlocked = true
+            pendingPlayRequest?.let { toPlay ->
+                pendingPlayRequest = null
+                onPlayVideo(
+                    toPlay.url, toPlay.title, toPlay.subjectId, toPlay.detailPath,
+                    toPlay.coverUrl, toPlay.seasonNum, toPlay.episodeNum, toPlay.startPositionMs,
+                    toPlay.dubLanguage, toPlay.dubSubjectId, toPlay.dubDetailPath, toPlay.dubName
+                )
+            }
+        } else {
+            // User backed out before 10 seconds: session remains locked!
+            // When user tries to play again, the sponsor dialog will appear again.
+        }
+    }
+
     val triggerPlayWithSponsorCheck: (String, String, String, String, String, Int, Int, Long, String?, String?, String?, String?) -> Unit = { url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPositionMs, dubLanguage, dubSubjectId, dubDetailPath, dubName ->
-        if (SponsorAdManager.isEnabled) {
+        if (!SponsorAdManager.isEnabled || SponsorAdManager.isSessionUnlocked) {
+            // If sponsor ads disabled in admin OR already unlocked in this session: play directly!
+            onPlayVideo(url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPositionMs, dubLanguage, dubSubjectId, dubDetailPath, dubName)
+        } else {
+            // Session locked: prompt user to complete the 10-second sponsor visit to unlock
             pendingPlayRequest = PendingPlayRequest(
                 url = url,
                 title = title,
@@ -245,8 +270,6 @@ fun MainAppScreen(
                 dubDetailPath = dubDetailPath,
                 dubName = dubName
             )
-        } else {
-            onPlayVideo(url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPositionMs, dubLanguage, dubSubjectId, dubDetailPath, dubName)
         }
     }
 
@@ -857,6 +880,7 @@ fun MainAppScreen(
                 AppShareDialog(onDismiss = { showAppShareModal = false })
             }
 
+            // Mandatory Sponsor Unlock Dialog for this session
             if (pendingPlayRequest != null) {
                 val req = pendingPlayRequest!!
                 LaunchedEffect(req.url) {
@@ -865,25 +889,15 @@ fun MainAppScreen(
                 SponsorSupportDialog(
                     videoTitle = req.title,
                     onSupportClick = {
-                        val toPlay = pendingPlayRequest ?: return@SponsorSupportDialog
-                        pendingPlayRequest = null
-                        SponsorAdManager.recordSponsorEvent(context, "click", toPlay.title)
-                        SponsorAdManager.openSponsorLink(context)
-                        onPlayVideo(
-                            toPlay.url, toPlay.title, toPlay.subjectId, toPlay.detailPath,
-                            toPlay.coverUrl, toPlay.seasonNum, toPlay.episodeNum, toPlay.startPositionMs,
-                            toPlay.dubLanguage, toPlay.dubSubjectId, toPlay.dubDetailPath, toPlay.dubName
-                        )
+                        val sponsorIntent = Intent(context, SponsorWebViewActivity::class.java).apply {
+                            putExtra("EXTRA_TARGET_URL", SponsorAdManager.sponsorUrl)
+                        }
+                        sponsorActivityLauncher.launch(sponsorIntent)
                     },
                     onCancel = {
-                        val toPlay = pendingPlayRequest ?: return@SponsorSupportDialog
+                        val title = pendingPlayRequest?.title ?: ""
                         pendingPlayRequest = null
-                        SponsorAdManager.recordSponsorEvent(context, "cancel", toPlay.title)
-                        onPlayVideo(
-                            toPlay.url, toPlay.title, toPlay.subjectId, toPlay.detailPath,
-                            toPlay.coverUrl, toPlay.seasonNum, toPlay.episodeNum, toPlay.startPositionMs,
-                            toPlay.dubLanguage, toPlay.dubSubjectId, toPlay.dubDetailPath, toPlay.dubName
-                        )
+                        SponsorAdManager.recordSponsorEvent(context, "cancel", title)
                     }
                 )
             }
