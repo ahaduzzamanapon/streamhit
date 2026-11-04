@@ -25,5 +25,5 @@ async def update_version(must_update_flag: int = 1):
         print("Version update notice:", e)
 
 if __name__ == "__main__":
-    force = 1 if ("--force" in sys.argv or "--must-update" in sys.argv or "1" in sys.argv) else 0
+    force = 0 if ("--optional" in sys.argv or "0" in sys.argv) else 1
     asyncio.run(update_version(force))
