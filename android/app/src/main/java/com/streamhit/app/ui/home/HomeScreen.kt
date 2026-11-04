@@ -6,12 +6,15 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -116,7 +119,7 @@ fun HomeScreenShimmer(brush: Brush) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(290.dp)
+                .height(215.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(brush)
         )
@@ -192,23 +195,33 @@ fun HomeScreen(
     val categories = listOf("Trending", "Movies", "TV Shows", "Bengali", "Hindi Dub", "Anime")
     val categoryIcons = listOf("🔥", "🎬", "📺", "🇧🇩", "🇮🇳", "⚡")
 
+    val listState = rememberLazyListState()
     val categoryData = remember { mutableStateMapOf<Int, List<SubjectSummary>>() }
     val categoryPageMap = remember { mutableStateMapOf<Int, Int>() }
+    val canLoadMoreMap = remember { mutableStateMapOf<Int, Boolean>() }
     var isCategoryLoading by remember { mutableStateOf(false) }
     var isLoadingMoreCategory by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     fun fetchCategory(catIndex: Int, page: Int = 1, append: Boolean = false) {
-        if (catIndex == 0) return
         val cat = categories[catIndex]
         scope.launch {
             if (!append) isCategoryLoading = true else isLoadingMoreCategory = true
-            val items = repository.getCategoryContent(cat, page = page)
+            val items = if (catIndex == 0) {
+                repository.filterContent(page = page, sort = "recommend")
+            } else {
+                repository.getCategoryContent(cat, page = page)
+            }
             if (append) {
                 val cur = categoryData[catIndex] ?: emptyList()
-                categoryData[catIndex] = (cur + items).distinctBy { it.subjectId.ifEmpty { it.detailPath } }
+                val combined = (cur + items).distinctBy { it.subjectId.ifEmpty { it.detailPath } }
+                if (combined.size == cur.size || items.isEmpty()) {
+                    canLoadMoreMap[catIndex] = false
+                }
+                categoryData[catIndex] = combined
             } else {
                 categoryData[catIndex] = items
+                canLoadMoreMap[catIndex] = items.isNotEmpty()
             }
             categoryPageMap[catIndex] = page
             isCategoryLoading = false
@@ -217,8 +230,26 @@ fun HomeScreen(
     }
 
     LaunchedEffect(selectedCategoryIndex) {
-        if (selectedCategoryIndex > 0 && !categoryData.containsKey(selectedCategoryIndex)) {
+        listState.scrollToItem(0)
+        if (!categoryData.containsKey(selectedCategoryIndex)) {
             fetchCategory(selectedCategoryIndex, page = 1)
+        }
+    }
+
+    val shouldLoadMore = remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val totalItems = layoutInfo.totalItemsCount
+            val lastVisibleItemIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val canLoadMore = canLoadMoreMap[selectedCategoryIndex] ?: true
+            totalItems > 0 && lastVisibleItemIndex >= totalItems - 3 && canLoadMore
+        }
+    }
+
+    LaunchedEffect(shouldLoadMore.value) {
+        if (shouldLoadMore.value && !isCategoryLoading && !isLoadingMoreCategory) {
+            val curPage = categoryPageMap[selectedCategoryIndex] ?: 1
+            fetchCategory(selectedCategoryIndex, page = curPage + 1, append = true)
         }
     }
 
@@ -279,6 +310,10 @@ fun HomeScreen(
         if (cachedBanners.isNotEmpty() || cachedSections.isNotEmpty()) {
             banners = cachedBanners
             sections = cachedSections
+            val seedItems = cachedSections.flatMap { it.subjects ?: emptyList() }
+            if (seedItems.isNotEmpty() && !categoryData.containsKey(0)) {
+                categoryData[0] = seedItems
+            }
             isLoading = false
         }
 
@@ -291,10 +326,18 @@ fun HomeScreen(
                 if (finalBanners.isNotEmpty() || s.isNotEmpty()) {
                     banners = finalBanners
                     sections = s
+                    val seedItems = s.flatMap { it.subjects ?: emptyList() }
+                    if (seedItems.isNotEmpty() && (categoryData[0]?.isEmpty() != false)) {
+                        categoryData[0] = seedItems
+                    }
                     HomeCacheManager.saveHomeCache(context, finalBanners, s)
                 }
             } catch (_: Exception) {}
             isLoading = false
+        }
+
+        if (!categoryData.containsKey(0)) {
+            fetchCategory(0, page = 1)
         }
     }
 
@@ -442,6 +485,7 @@ fun HomeScreen(
                 .nestedScroll(pullRefreshState.nestedScrollConnection)
         ) {
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .background(BgDark),
@@ -455,6 +499,14 @@ fun HomeScreen(
             ) {
                 itemsIndexed(categories) { index, cat ->
                     val isSelected = selectedCategoryIndex == index
+                    val interactionSource = remember { MutableInteractionSource() }
+                    val isPressed by interactionSource.collectIsPressedAsState()
+                    val chipScale by animateFloatAsState(
+                        targetValue = if (isPressed) 0.92f else 1.0f,
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                        label = "catChipScale"
+                    )
+
                     val bgColor by animateColorAsState(
                         targetValue = if (isSelected) AccentEmerald.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.04f),
                         label = "catBg"
@@ -472,7 +524,15 @@ fun HomeScreen(
                         shape = RoundedCornerShape(14.dp),
                         color = bgColor,
                         border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
-                        modifier = Modifier.clickable { selectedCategoryIndex = index }
+                        modifier = Modifier
+                            .graphicsLayer {
+                                scaleX = chipScale
+                                scaleY = chipScale
+                            }
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = null
+                            ) { selectedCategoryIndex = index }
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
@@ -656,7 +716,7 @@ fun HomeScreen(
                 }
             }
 
-            if (sections.isEmpty()) {
+            if (sections.isEmpty() && (categoryData[0]?.isEmpty() != false)) {
                 item {
                     Box(
                         modifier = Modifier
@@ -669,6 +729,68 @@ fun HomeScreen(
                             color = TextMuted,
                             fontSize = 14.sp
                         )
+                    }
+                }
+            } else {
+                // OnStream / Cineb Infinite 3-Column Grid on Home Feed
+                val homeGridItems = categoryData[0] ?: emptyList()
+                if (homeGridItems.isNotEmpty()) {
+                    item {
+                        SectionHeader(title = "🔥 Popular & Latest Releases")
+                    }
+
+                    val chunked = homeGridItems.chunked(3)
+                    items(chunked) { rowItems ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            rowItems.forEach { subject ->
+                                Box(modifier = Modifier.weight(1f)) {
+                                    MediaCard(
+                                        item = subject,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        onClick = {
+                                            val path = subject.detailPath.ifEmpty { subject.subjectId }
+                                            onMediaClick(path, subject.subjectId, subject.subjectType)
+                                        }
+                                    )
+                                }
+                            }
+                            repeat(3 - rowItems.size) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+
+                    if (isLoadingMoreCategory) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 18.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        color = AccentEmerald,
+                                        strokeWidth = 2.dp
+                                    )
+                                    Text(
+                                        text = "Loading more titles...",
+                                        color = TextSecondary,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -780,14 +902,14 @@ fun HomeScreen(
                     }
                 }
             } else {
-                // 3-Column Responsive Grid
+                // 3-Column Ultra-Compact Responsive Cineb/OnStream Grid
                 val chunked = catItems.chunked(3)
                 items(chunked) { rowItems ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 5.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         rowItems.forEach { subject ->
                             Box(modifier = Modifier.weight(1f)) {
@@ -807,49 +929,46 @@ fun HomeScreen(
                     }
                 }
 
-                // Load More Button
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 18.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (isLoadingMoreCategory) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                color = AccentEmerald,
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = Color.White.copy(alpha = 0.08f),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, AccentEmerald.copy(alpha = 0.45f)),
-                                modifier = Modifier.clickable {
-                                    val curPage = categoryPageMap[selectedCategoryIndex] ?: 1
-                                    fetchCategory(selectedCategoryIndex, page = curPage + 1, append = true)
-                                }
+                // Infinite Auto-loading indicator & End of catalog status
+                if (isLoadingMoreCategory) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 18.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Refresh,
-                                        contentDescription = null,
-                                        tint = AccentEmerald,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Text(
-                                        text = "Load More ${categories[selectedCategoryIndex]}",
-                                        color = Color.White,
-                                        fontSize = 12.5.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = AccentEmerald,
+                                    strokeWidth = 2.dp
+                                )
+                                Text(
+                                    text = "Loading more ${categories[selectedCategoryIndex]}...",
+                                    color = TextSecondary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
                             }
+                        }
+                    }
+                } else if (canLoadMoreMap[selectedCategoryIndex] == false && catItems.isNotEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "✓ You've reached the end",
+                                color = TextMuted,
+                                fontSize = 11.5.sp
+                            )
                         }
                     }
                 }

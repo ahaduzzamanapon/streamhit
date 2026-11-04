@@ -34,7 +34,8 @@ object HomeCacheManager {
         val json = getPrefs(context).getString(KEY_BANNERS, null) ?: return emptyList()
         return try {
             val type = object : TypeToken<List<BannerItem>>() {}.type
-            gson.fromJson(json, type) ?: emptyList()
+            val list: List<BannerItem> = gson.fromJson(json, type) ?: emptyList()
+            list.filter { !com.streamhit.app.util.AdultContentFilter.isAdult(it.title, it.subject?.genres, it.detailPath, it.imageUrl) }
         } catch (_: Exception) {
             emptyList()
         }
@@ -44,7 +45,21 @@ object HomeCacheManager {
         val json = getPrefs(context).getString(KEY_SECTIONS, null) ?: return emptyList()
         return try {
             val type = object : TypeToken<List<HomeSection>>() {}.type
-            gson.fromJson(json, type) ?: emptyList()
+            val sections: List<HomeSection> = gson.fromJson(json, type) ?: emptyList()
+            sections.mapNotNull { sec ->
+                val cleanSubjects = sec.subjects?.filter {
+                    !com.streamhit.app.util.AdultContentFilter.isAdult(it.title, it.genres, it.detailPath, it.coverUrl)
+                }
+                val cleanBanner = sec.banner?.items?.filter {
+                    !com.streamhit.app.util.AdultContentFilter.isAdult(it.title, it.subject?.genres, it.detailPath, it.imageUrl)
+                }
+                if ((cleanSubjects != null && cleanSubjects.isNotEmpty()) || (cleanBanner != null && cleanBanner.isNotEmpty())) {
+                    sec.copy(
+                        subjects = cleanSubjects,
+                        banner = if (cleanBanner != null) sec.banner?.copy(items = cleanBanner) else sec.banner
+                    )
+                } else null
+            }
         } catch (_: Exception) {
             emptyList()
         }

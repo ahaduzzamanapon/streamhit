@@ -54,6 +54,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.streamhit.app.service.AppFirebaseMessagingService
 import com.streamhit.app.ui.components.AppShareDialog
+import com.streamhit.app.ui.components.SponsorSupportDialog
+import com.streamhit.app.util.SponsorAdManager
 import com.streamhit.app.ui.theme.*
 import com.streamhit.app.update.AppUpdateManager
 import com.streamhit.app.data.analytics.AppAnalyticsManager
@@ -72,6 +74,7 @@ class MainActivity : ComponentActivity() {
         // Register device & start telemetry heartbeat
         AppAnalyticsManager.getDeviceId(this)
         AppAnalyticsManager.startHeartbeat(this, lifecycleScope)
+        SponsorAdManager.fetchRemoteConfig()
 
         // Handle incoming deep link or notification intent
         handleIncomingIntent(intent)
@@ -195,6 +198,21 @@ sealed class Screen(val title: String, val icon: ImageVector) {
     object Search : Screen("Search", Icons.Default.Search)
 }
 
+data class PendingPlayRequest(
+    val url: String,
+    val title: String,
+    val subjectId: String,
+    val detailPath: String,
+    val coverUrl: String,
+    val seasonNum: Int,
+    val episodeNum: Int,
+    val startPositionMs: Long,
+    val dubLanguage: String?,
+    val dubSubjectId: String?,
+    val dubDetailPath: String?,
+    val dubName: String?
+)
+
 @Composable
 fun MainAppScreen(
     repository: MovieRepository,
@@ -208,6 +226,29 @@ fun MainAppScreen(
     val activity = context as? ComponentActivity
     var lastBackPressedTime by remember { mutableLongStateOf(0L) }
     var showAppShareModal by remember { mutableStateOf(false) }
+
+    var pendingPlayRequest by remember { mutableStateOf<PendingPlayRequest?>(null) }
+
+    val triggerPlayWithSponsorCheck: (String, String, String, String, String, Int, Int, Long, String?, String?, String?, String?) -> Unit = { url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPositionMs, dubLanguage, dubSubjectId, dubDetailPath, dubName ->
+        if (SponsorAdManager.isEnabled) {
+            pendingPlayRequest = PendingPlayRequest(
+                url = url,
+                title = title,
+                subjectId = subjectId,
+                detailPath = detailPath,
+                coverUrl = coverUrl,
+                seasonNum = seasonNum,
+                episodeNum = episodeNum,
+                startPositionMs = startPositionMs,
+                dubLanguage = dubLanguage,
+                dubSubjectId = dubSubjectId,
+                dubDetailPath = dubDetailPath,
+                dubName = dubName
+            )
+        } else {
+            onPlayVideo(url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPositionMs, dubLanguage, dubSubjectId, dubDetailPath, dubName)
+        }
+    }
 
     LaunchedEffect(pendingShareDialog) {
         if (pendingShareDialog) {
@@ -334,104 +375,113 @@ fun MainAppScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             if (activeDetailPath == null && !(showUpdateDialog && updateInfo?.mustUpdate == true)) {
-                // Ultra-luxury Frosted Glass Bottom Navigation Bar
-                Surface(
-                    color = Color(0xFF070B14).copy(alpha = 0.97f),
-                    border = androidx.compose.foundation.BorderStroke(
-                        0.8.dp,
-                        androidx.compose.ui.graphics.Brush.horizontalGradient(
-                            listOf(
-                                Color.White.copy(alpha = 0.04f),
-                                AccentEmerald.copy(alpha = 0.35f),
-                                AccentCyan.copy(alpha = 0.35f),
-                                Color.White.copy(alpha = 0.04f)
-                            )
-                        )
-                    ),
-                    shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
-                    modifier = Modifier.fillMaxWidth().navigationBarsPadding()
+                // Floating Cyber-Glass Bottom Navigation Island
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp)
-                            .padding(horizontal = 6.dp, vertical = 3.dp),
-                        horizontalArrangement = Arrangement.SpaceAround,
-                        verticalAlignment = Alignment.CenterVertically
+                    Surface(
+                        color = Color(0xFF090E1A).copy(alpha = 0.96f),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                listOf(
+                                    Color.White.copy(alpha = 0.06f),
+                                    AccentEmerald.copy(alpha = 0.45f),
+                                    AccentCyan.copy(alpha = 0.45f),
+                                    Color.White.copy(alpha = 0.06f)
+                                )
+                            )
+                        ),
+                        shape = RoundedCornerShape(24.dp),
+                        shadowElevation = 8.dp,
+                        modifier = Modifier.fillMaxWidth().height(52.dp)
                     ) {
-                        val tabs = listOf(Screen.Home, Screen.LiveTv, Screen.Explore, Screen.Downloads, Screen.Search)
-                        tabs.forEach { tab ->
-                            val isSelected = currentTab == tab
-                            val iconScale by animateFloatAsState(
-                                targetValue = if (isSelected) 1.15f else 1.0f,
-                                animationSpec = tween(220),
-                                label = "tabIconScale"
-                            )
-                            val tintColor by animateColorAsState(
-                                targetValue = if (isSelected) AccentEmerald else TextMuted,
-                                animationSpec = tween(220),
-                                label = "tabColor"
-                            )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 6.dp, vertical = 3.dp),
+                            horizontalArrangement = Arrangement.SpaceAround,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val tabs = listOf(Screen.Home, Screen.LiveTv, Screen.Explore, Screen.Downloads, Screen.Search)
+                            tabs.forEach { tab ->
+                                val isSelected = currentTab == tab
+                                val iconScale by animateFloatAsState(
+                                    targetValue = if (isSelected) 1.18f else 1.0f,
+                                    animationSpec = androidx.compose.animation.core.spring(
+                                        dampingRatio = 0.55f,
+                                        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                                    ),
+                                    label = "tabIconScale"
+                                )
+                                val tintColor by animateColorAsState(
+                                    targetValue = if (isSelected) Color(0xFF00E5FF) else TextMuted,
+                                    animationSpec = tween(200),
+                                    label = "tabColor"
+                                )
 
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
-                                    .padding(horizontal = 2.dp, vertical = 2.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(
-                                        if (isSelected) {
-                                            androidx.compose.ui.graphics.Brush.verticalGradient(
-                                                listOf(
-                                                    AccentEmerald.copy(alpha = 0.16f),
-                                                    AccentCyan.copy(alpha = 0.06f)
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .clip(RoundedCornerShape(18.dp))
+                                        .background(
+                                            if (isSelected) {
+                                                androidx.compose.ui.graphics.Brush.verticalGradient(
+                                                    listOf(
+                                                        AccentEmerald.copy(alpha = 0.22f),
+                                                        AccentCyan.copy(alpha = 0.08f)
+                                                    )
                                                 )
-                                            )
-                                        } else {
-                                            androidx.compose.ui.graphics.Brush.verticalGradient(
-                                                listOf(Color.Transparent, Color.Transparent)
+                                            } else {
+                                                androidx.compose.ui.graphics.Brush.verticalGradient(
+                                                    listOf(Color.Transparent, Color.Transparent)
+                                                )
+                                            }
+                                        )
+                                        .clickable { switchTab(tab) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = tab.icon,
+                                            contentDescription = tab.title,
+                                            tint = tintColor,
+                                            modifier = Modifier
+                                                .size(20.dp)
+                                                .graphicsLayer {
+                                                    scaleX = iconScale
+                                                    scaleY = iconScale
+                                                }
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = tab.title,
+                                            color = tintColor,
+                                            fontSize = 9.5.sp,
+                                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
+                                            maxLines = 1
+                                        )
+                                        if (isSelected) {
+                                            Spacer(modifier = Modifier.height(1.5.dp))
+                                            Box(
+                                                modifier = Modifier
+                                                    .width(16.dp)
+                                                    .height(2.dp)
+                                                    .background(
+                                                        androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                                            listOf(AccentEmerald, AccentCyan)
+                                                        ),
+                                                        RoundedCornerShape(1.dp)
+                                                    )
                                             )
                                         }
-                                    )
-                                    .clickable { switchTab(tab) },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    Icon(
-                                        imageVector = tab.icon,
-                                        contentDescription = tab.title,
-                                        tint = tintColor,
-                                        modifier = Modifier
-                                            .size(20.dp)
-                                            .graphicsLayer {
-                                                scaleX = iconScale
-                                                scaleY = iconScale
-                                            }
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = tab.title,
-                                        color = tintColor,
-                                        fontSize = 10.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        maxLines = 1
-                                    )
-                                    if (isSelected) {
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Box(
-                                            modifier = Modifier
-                                                .width(14.dp)
-                                                .height(2.dp)
-                                                .background(
-                                                    androidx.compose.ui.graphics.Brush.horizontalGradient(
-                                                        listOf(AccentEmerald, AccentCyan)
-                                                    ),
-                                                    RoundedCornerShape(1.dp)
-                                                )
-                                        )
                                     }
                                 }
                             }
@@ -456,7 +506,7 @@ fun MainAppScreen(
                         popDetails()
                     },
                     onPlayClick = { url, title, cover, seasonNum, episodeNum, startPos, dubLanguage, dubSubjectId, dubDetailPath, dubName ->
-                        onPlayVideo(url, title, activeSubjectId ?: "", activeDetailPath ?: "", cover, seasonNum, episodeNum, startPos, dubLanguage, dubSubjectId, dubDetailPath, dubName)
+                        triggerPlayWithSponsorCheck(url, title, activeSubjectId ?: "", activeDetailPath ?: "", cover, seasonNum, episodeNum, startPos, dubLanguage, dubSubjectId, dubDetailPath, dubName)
                     },
                     onNavigateToDownloads = {
                         activeDetailPath = null
@@ -478,7 +528,7 @@ fun MainAppScreen(
                                 navigateToDetails(path, id)
                             },
                             onPlayDirect = { url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPos, dubLanguage, dubSubjectId, dubDetailPath, dubName ->
-                                onPlayVideo(url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPos, dubLanguage, dubSubjectId, dubDetailPath, dubName)
+                                triggerPlayWithSponsorCheck(url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPos, dubLanguage, dubSubjectId, dubDetailPath, dubName)
                             },
                             onNavigateToSearch = {
                                 switchTab(Screen.Search)
@@ -486,7 +536,7 @@ fun MainAppScreen(
                         )
                         Screen.LiveTv -> LiveTvScreen(
                             onPlayStream = { url, title ->
-                                onPlayVideo(url, title, "", "", "", 1, 1, 0L, null, null, null, null)
+                                triggerPlayWithSponsorCheck(url, title, "", "", "", 1, 1, 0L, null, null, null, null)
                             }
                         )
                         Screen.Explore -> ExploreScreen(
@@ -805,6 +855,37 @@ fun MainAppScreen(
 
             if (showAppShareModal) {
                 AppShareDialog(onDismiss = { showAppShareModal = false })
+            }
+
+            if (pendingPlayRequest != null) {
+                val req = pendingPlayRequest!!
+                LaunchedEffect(req.url) {
+                    SponsorAdManager.recordSponsorEvent(context, "impression", req.title)
+                }
+                SponsorSupportDialog(
+                    videoTitle = req.title,
+                    onSupportClick = {
+                        val toPlay = pendingPlayRequest ?: return@SponsorSupportDialog
+                        pendingPlayRequest = null
+                        SponsorAdManager.recordSponsorEvent(context, "click", toPlay.title)
+                        SponsorAdManager.openSponsorLink(context)
+                        onPlayVideo(
+                            toPlay.url, toPlay.title, toPlay.subjectId, toPlay.detailPath,
+                            toPlay.coverUrl, toPlay.seasonNum, toPlay.episodeNum, toPlay.startPositionMs,
+                            toPlay.dubLanguage, toPlay.dubSubjectId, toPlay.dubDetailPath, toPlay.dubName
+                        )
+                    },
+                    onCancel = {
+                        val toPlay = pendingPlayRequest ?: return@SponsorSupportDialog
+                        pendingPlayRequest = null
+                        SponsorAdManager.recordSponsorEvent(context, "cancel", toPlay.title)
+                        onPlayVideo(
+                            toPlay.url, toPlay.title, toPlay.subjectId, toPlay.detailPath,
+                            toPlay.coverUrl, toPlay.seasonNum, toPlay.episodeNum, toPlay.startPositionMs,
+                            toPlay.dubLanguage, toPlay.dubSubjectId, toPlay.dubDetailPath, toPlay.dubName
+                        )
+                    }
+                )
             }
         }
     }

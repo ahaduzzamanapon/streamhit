@@ -891,6 +891,20 @@
                             <div class="value" id="dashFbStatus" style="font-size:19px;">Active (10m)</div>
                         </div>
                     </div>
+                    <div class="stat-card">
+                        <div class="stat-icon red">💖</div>
+                        <div class="stat-info">
+                            <div class="label">Sponsor Ad Clicks</div>
+                            <div class="value" id="dashSponsorClicks">–</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon cyan">🎯</div>
+                        <div class="stat-info">
+                            <div class="label">Ad Click Rate (CTR)</div>
+                            <div class="value" id="dashSponsorCtr">–</div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="card">
@@ -906,6 +920,70 @@
                         <button class="btn-secondary" onclick="switchNavTab('notifications')">🔔 Send Push Notification</button>
                         <button class="btn-secondary" onclick="switchNavTab('app-users')">📱 View Live Devices</button>
                         <button class="btn-danger" onclick="cancelStuckReelsJob()">❌ Clear Stuck Reel Queue</button>
+                    </div>
+                </div>
+
+                <!-- 💖 SPONSOR AD & MONETIZATION TRACKING CARD -->
+                <div class="card" style="margin-top:20px;">
+                    <div class="card-header">
+                        <div>
+                            <h2>💖 Sponsor Ads & Monetization Tracking</h2>
+                            <div class="subtitle">Video Play time sponsor link performance & live click tracking</div>
+                        </div>
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <span id="adStatusBadge" style="padding:4px 10px; border-radius:20px; font-size:12px; font-weight:600; background:rgba(0,245,212,0.15); color:#00F5D4; border:1px solid rgba(0,245,212,0.3);">● Live Active</span>
+                            <button class="btn-secondary" onclick="loadAdStats()" style="padding:6px 14px; font-size:12px;">🔄 Refresh Stats</button>
+                        </div>
+                    </div>
+
+                    <!-- 4 Stat Pill Counters -->
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:14px; margin-bottom:20px;">
+                        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
+                            <div style="font-size:12px; color:#A0AEC0; margin-bottom:6px;">💖 Total Clicks (মোট কতজন ক্লিক করেছে)</div>
+                            <div style="font-size:24px; font-weight:700; color:#FF2A54;" id="statTotalClicks">0</div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
+                            <div style="font-size:12px; color:#A0AEC0; margin-bottom:6px;">🔥 Clicks Today (আজকে ক্লিক)</div>
+                            <div style="font-size:24px; font-weight:700; color:#00F5D4;" id="statTodayClicks">0</div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
+                            <div style="font-size:12px; color:#A0AEC0; margin-bottom:6px;">👁️ Total Shown (পপআপ দেখানো হয়েছে)</div>
+                            <div style="font-size:24px; font-weight:700; color:#FFFFFF;" id="statTotalViews">0</div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
+                            <div style="font-size:12px; color:#A0AEC0; margin-bottom:6px;">✕ Direct Watch / Cancel (সরাসরি দেখেছে)</div>
+                            <div style="font-size:24px; font-weight:700; color:#A0AEC0;" id="statTotalCancels">0</div>
+                        </div>
+                    </div>
+
+                    <!-- Sponsor Link Configuration Box -->
+                    <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:14px; padding:16px; margin-bottom:20px;">
+                        <div style="font-size:13px; font-weight:600; color:#E2E8F0; margin-bottom:8px;">🔗 Active Sponsor Link (স্পন্সর লিংক পরিবর্তন করুন)</div>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                            <input type="text" id="inputSponsorUrl" style="flex:1; min-width:280px; padding:10px 14px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.15); border-radius:10px; color:#fff; font-size:13px;" placeholder="https://uplcm.com/4/12189723">
+                            <button class="btn-primary" onclick="saveSponsorUrl()" style="padding:10px 20px; font-size:13px;">💾 Save Link</button>
+                        </div>
+                    </div>
+
+                    <!-- Recent Clicks Table -->
+                    <div style="margin-top:10px;">
+                        <div style="font-size:14px; font-weight:600; color:#E2E8F0; margin-bottom:12px;">📊 Recent Clicks Log (কারা কখন ক্লিক করেছে)</div>
+                        <div style="overflow-x:auto;">
+                            <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left;">
+                                <thead>
+                                    <tr style="border-bottom:1px solid rgba(255,255,255,0.1); color:#A0AEC0;">
+                                        <th style="padding:10px;">Time</th>
+                                        <th style="padding:10px;">Video / Movie</th>
+                                        <th style="padding:10px;">Device</th>
+                                        <th style="padding:10px;">Country</th>
+                                        <th style="padding:10px;">IP</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recentClicksTableBody">
+                                    <tr><td colspan="5" style="padding:16px; text-align:center; color:#A0AEC0;">No clicks recorded yet.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
@@ -2070,8 +2148,86 @@
             }
         }
 
+        // ── SPONSOR AD & MONETIZATION STATS ────────────────────────────────
+        async function loadAdStats() {
+            try {
+                const res = await fetch('/api/admin/ad/stats', { headers: { 'Authorization': `Bearer ${token}` } });
+                if (res.status === 401) return;
+                const d = await res.json();
+                if (d.code === 0) {
+                    const clicks = d.total_clicks || 0;
+                    const today = d.today_clicks || 0;
+                    const views = d.total_impressions || 0;
+                    const cancels = d.total_cancels || 0;
+                    const ctr = (d.ctr || 0) + '%';
+
+                    if (document.getElementById('dashSponsorClicks')) {
+                        document.getElementById('dashSponsorClicks').innerText = `${clicks} (${today} Today)`;
+                    }
+                    if (document.getElementById('dashSponsorCtr')) {
+                        document.getElementById('dashSponsorCtr').innerText = `${ctr} (${views} Views)`;
+                    }
+                    if (document.getElementById('statTotalClicks')) document.getElementById('statTotalClicks').innerText = clicks;
+                    if (document.getElementById('statTodayClicks')) document.getElementById('statTodayClicks').innerText = today;
+                    if (document.getElementById('statTotalViews')) document.getElementById('statTotalViews').innerText = views;
+                    if (document.getElementById('statTotalCancels')) document.getElementById('statTotalCancels').innerText = cancels;
+
+                    const urlInput = document.getElementById('inputSponsorUrl');
+                    if (urlInput && !urlInput.matches(':focus')) {
+                        urlInput.value = d.sponsor_url || '';
+                    }
+
+                    const tbody = document.getElementById('recentClicksTableBody');
+                    if (tbody && d.recent_clicks) {
+                        if (d.recent_clicks.length === 0) {
+                            tbody.innerHTML = '<tr><td colspan="5" style="padding:16px; text-align:center; color:#A0AEC0;">No clicks recorded yet.</td></tr>';
+                        } else {
+                            tbody.innerHTML = d.recent_clicks.map(c => `
+                                <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                                    <td style="padding:10px; color:#A0AEC0;">${c.time || '-'}</td>
+                                    <td style="padding:10px; font-weight:600; color:#00F5D4;">${c.video_title || 'Media'}</td>
+                                    <td style="padding:10px; color:#E2E8F0;">${c.device_model || 'Android'}</td>
+                                    <td style="padding:10px; color:#E2E8F0;">${c.country || 'Unknown'}</td>
+                                    <td style="padding:10px; color:#718096; font-family:monospace;">${c.ip || '-'}</td>
+                                </tr>
+                            `).join('');
+                        }
+                    }
+                }
+            } catch(e) {}
+        }
+
+        async function saveSponsorUrl() {
+            const urlInput = document.getElementById('inputSponsorUrl');
+            const url = urlInput ? urlInput.value.trim() : '';
+            if (!url) {
+                alert('Please enter a valid URL');
+                return;
+            }
+            try {
+                const res = await fetch('/api/admin/ad/config', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ sponsor_url: url, enabled: true })
+                });
+                const d = await res.json();
+                if (d.code === 0) {
+                    alert('Sponsor link updated successfully!');
+                    loadAdStats();
+                } else {
+                    alert('Failed to update sponsor link.');
+                }
+            } catch(e) {
+                alert('Error updating sponsor link: ' + e);
+            }
+        }
+
         // ── DASHBOARD STATS ──────────────────────────────────────────────────
         async function loadDashboardStats() {
+            loadAdStats();
             try {
                 const res = await fetch('/api/admin/active-users', { headers: { 'Authorization': `Bearer ${token}` } });
                 if (res.status === 401) { handleLogout(); return; }

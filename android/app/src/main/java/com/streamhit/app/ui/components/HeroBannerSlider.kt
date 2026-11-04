@@ -58,7 +58,7 @@ fun HeroBannerSlider(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(290.dp)
+            .height(215.dp)
     ) {
         HorizontalPager(
             state = pagerState,
@@ -104,7 +104,7 @@ fun HeroBannerSlider(
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .padding(horizontal = 16.dp, vertical = 22.dp)
+                        .padding(horizontal = 14.dp, vertical = 14.dp)
                 ) {
                     // Genre badge
                     Box(
@@ -121,19 +121,19 @@ fun HeroBannerSlider(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     // Title
                     Text(
                         text = title,
                         color = Color.White,
-                        fontSize = 22.sp,
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Black,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     // Meta: rating + Dual Action Buttons (Watch Now + Details)
                     Row(

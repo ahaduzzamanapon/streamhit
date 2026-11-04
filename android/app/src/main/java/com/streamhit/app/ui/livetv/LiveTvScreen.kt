@@ -437,9 +437,12 @@ fun LiveChannelCard(
     )
 
     Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = BgCard),
-        border = BorderStroke(0.8.dp, Color.White.copy(alpha = 0.08f)),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF101626)),
+        border = BorderStroke(
+            1.dp,
+            if (isPressed) Color(0xFFFF2A54) else Color.White.copy(alpha = 0.09f)
+        ),
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer {
@@ -455,15 +458,21 @@ fun LiveChannelCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(10.dp),
+                .background(
+                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                        listOf(Color(0xFF141D32), Color(0xFF0C1322))
+                    )
+                )
+                .padding(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Channel Logo Box
             Box(
                 modifier = Modifier
-                    .size(54.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.Black.copy(alpha = 0.45f)),
+                    .size(52.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.White.copy(alpha = 0.06f))
+                    .padding(3.dp),
                 contentAlignment = Alignment.Center
             ) {
                 if (channel.logo.isNotBlank()) {
@@ -473,55 +482,64 @@ fun LiveChannelCard(
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(4.dp)
+                            .padding(3.dp)
                     )
                 } else {
                     Icon(
                         imageVector = Icons.Default.Tv,
                         contentDescription = channel.name,
                         tint = TextMuted,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(26.dp)
                     )
                 }
 
-                // Pulsating Red Live Dot
-                Box(
+                // Pulsating Red Live Dot Badge
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = Color.Black.copy(alpha = 0.75f),
+                    border = BorderStroke(0.5.dp, Color(0xFFFF2A54).copy(alpha = 0.8f)),
                     modifier = Modifier
-                        .padding(3.dp)
+                        .padding(2.dp)
                         .align(Alignment.TopEnd)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .graphicsLayer {
-                                scaleX = pulseScale
-                                scaleY = pulseScale
-                            }
-                            .background(Color(0xFFFF2A54).copy(alpha = 0.45f), CircleShape)
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .align(Alignment.Center)
-                            .background(Color(0xFFFF2A54), CircleShape)
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(5.dp)
+                                .graphicsLayer {
+                                    scaleX = pulseScale
+                                    scaleY = pulseScale
+                                }
+                                .background(Color(0xFFFF2A54), CircleShape)
+                        )
+                        Text(
+                            text = "LIVE",
+                            color = Color(0xFFFF4B6E),
+                            fontSize = 7.5.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             // Channel Name
             Text(
                 text = channel.name,
                 color = Color.White,
-                fontSize = 11.5.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(3.dp))
 
             // Multi-server or HD badge
             val serverCount = channel.activeServers.size
@@ -534,16 +552,16 @@ fun LiveChannelCard(
                     Text(
                         text = "$serverCount Servers",
                         color = AccentEmerald,
-                        fontSize = 9.sp,
+                        fontSize = 8.5.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
                     )
                 }
             } else {
                 Text(
                     text = channel.category,
                     color = TextMuted,
-                    fontSize = 9.5.sp,
+                    fontSize = 9.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

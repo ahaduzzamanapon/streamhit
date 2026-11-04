@@ -788,6 +788,23 @@ async def admin_import_tv_channels(data: dict, request: Request):
         "message": f"Import completed successfully. Added: {added}, Updated (link added): {updated}, Skipped (duplicate): {skipped}"
     }
 
+@router.get("/api/admin/ad/stats")
+async def admin_ad_stats(request: Request):
+    check_admin_auth(request)
+    from main import get_sponsor_ad_stats
+    return get_sponsor_ad_stats()
+
+@router.post("/api/admin/ad/config")
+async def admin_save_ad_config(request: Request):
+    check_admin_auth(request)
+    data = await request.json()
+    from main import set_sponsor_setting
+    if "sponsor_url" in data:
+        set_sponsor_setting("sponsor_url", str(data["sponsor_url"]).strip())
+    if "enabled" in data:
+        set_sponsor_setting("enabled", "1" if data["enabled"] else "0")
+    return {"code": 0, "status": "ok"}
+
 @router.get("/api/admin/active-users")
 async def get_active_users(request: Request):
     check_admin_auth(request)

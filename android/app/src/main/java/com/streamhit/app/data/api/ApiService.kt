@@ -67,4 +67,11 @@ interface ApiService {
     // FCM Push Notification Token Registration
     @POST("api/fcm/register")
     suspend fun registerFcmToken(@Body payload: Map<String, String>): Response<Map<String, Any>>
+
+    // Sponsor Ad Telemetry & Dynamic Config
+    @POST("api/ad/event")
+    suspend fun recordAdEvent(@Body payload: Map<String, String>): Response<Map<String, Any>>
+
+    @GET("api/ad/config")
+    suspend fun getAdConfig(): Response<Map<String, Any>>
 }

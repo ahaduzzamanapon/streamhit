@@ -238,7 +238,7 @@ fun DetailsScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(340.dp)
+                        .height(270.dp)
                 ) {
                     AsyncImage(
                         model = item.coverUrl,
@@ -377,29 +377,41 @@ fun DetailsScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     // Action Buttons Row (Add to list, Share, Download - Screenshot 5)
+                    // Cineb/OnStream Modern Action Pill Buttons
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Add to list
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color.White.copy(alpha = 0.06f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
                             modifier = Modifier
+                                .weight(1f)
                                 .clickable {
                                     Toast.makeText(context, "Added to My List", Toast.LENGTH_SHORT).show()
                                 }
-                                .padding(8.dp)
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("Add to list", color = TextSecondary, fontSize = 11.sp)
+                            Row(
+                                modifier = Modifier.padding(vertical = 9.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(5.dp))
+                                Text("My List", color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
+                            }
                         }
 
                         // Share
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color.White.copy(alpha = 0.06f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
                             modifier = Modifier
+                                .weight(1f)
                                 .clickable {
                                     val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                                         type = "text/plain"
@@ -408,25 +420,38 @@ fun DetailsScreen(
                                     }
                                     context.startActivity(android.content.Intent.createChooser(shareIntent, "Share with"))
                                 }
-                                .padding(8.dp)
                         ) {
-                            Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("Share", color = TextSecondary, fontSize = 11.sp)
+                            Row(
+                                modifier = Modifier.padding(vertical = 9.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(5.dp))
+                                Text("Share", color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
+                            }
                         }
 
-                        // Download
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
+                        // Download (Highlighted)
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = AccentEmerald.copy(alpha = 0.14f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, AccentEmerald.copy(alpha = 0.45f)),
                             modifier = Modifier
+                                .weight(1f)
                                 .clickable {
                                     showDownloadSheet = true
                                 }
-                                .padding(8.dp)
                         ) {
-                            Icon(Icons.Default.Download, contentDescription = "Download", tint = AccentEmerald, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("Download", color = AccentEmerald, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Row(
+                                modifier = Modifier.padding(vertical = 9.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Download, contentDescription = "Download", tint = AccentEmerald, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(5.dp))
+                                Text("Download", color = AccentEmerald, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
 
@@ -752,8 +777,8 @@ fun DetailsScreen(
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Episode Grid (screenshot style: 01, 02, 03... chips in rows of 6)
-                        val epChunks = episodes.chunked(6)
+                        // 4-Column Modern Cineb/OnStream Episode Grid
+                        val epChunks = episodes.chunked(4)
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             epChunks.forEach { rowEpisodes ->
                                 Row(
@@ -763,15 +788,25 @@ fun DetailsScreen(
                                     rowEpisodes.forEach { ep ->
                                         val isSelected = selectedEpisodeNumber == ep.episodeNumber
                                         Surface(
-                                            shape = RoundedCornerShape(8.dp),
-                                            color = if (isSelected) AccentEmerald else BgCard,
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = if (isSelected) Color.Transparent else Color(0xFF101728),
                                             border = androidx.compose.foundation.BorderStroke(
                                                 1.dp,
                                                 if (isSelected) AccentEmerald else Color.White.copy(alpha = 0.08f)
                                             ),
                                             modifier = Modifier
                                                 .weight(1f)
-                                                .height(36.dp)
+                                                .height(40.dp)
+                                                .then(
+                                                    if (isSelected) {
+                                                        Modifier.background(
+                                                            Brush.horizontalGradient(
+                                                                listOf(Color(0xFF00E676), Color(0xFF00E5FF))
+                                                            ),
+                                                            RoundedCornerShape(10.dp)
+                                                        )
+                                                    } else Modifier
+                                                )
                                                 .clickable {
                                                     selectedEpisodeNumber = ep.episodeNumber
                                                     val epStartPos = com.streamhit.app.data.local.RecentHistoryManager.getSavedPosition(
@@ -786,20 +821,28 @@ fun DetailsScreen(
                                                     playBestContent(currentSeason.seasonNumber, ep.episodeNumber, epStartPos)
                                                 }
                                         ) {
-                                            Box(
+                                            Row(
                                                 modifier = Modifier.fillMaxSize(),
-                                                contentAlignment = Alignment.Center
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.Center
                                             ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.PlayArrow,
+                                                    contentDescription = null,
+                                                    tint = if (isSelected) Color.Black else AccentEmerald,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(3.dp))
                                                 Text(
-                                                    text = if (ep.episodeNumber < 10) "0${ep.episodeNumber}" else "${ep.episodeNumber}",
-                                                    color = if (isSelected) Color.Black else TextPrimary,
-                                                    fontSize = 13.sp,
-                                                    fontWeight = FontWeight.Bold
+                                                    text = "EP ${ep.episodeNumber}",
+                                                    color = if (isSelected) Color.Black else Color.White,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold
                                                 )
                                             }
                                         }
                                     }
-                                    repeat(6 - rowEpisodes.size) {
+                                    repeat(4 - rowEpisodes.size) {
                                         Spacer(modifier = Modifier.weight(1f))
                                     }
                                 }

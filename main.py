@@ -301,19 +301,37 @@ ADULT_GENRES = {
 
 ADULT_KEYWORDS = [
     '18+', '18 +', 'r18', 'r-18', 'r30', 'r-30', 'nc-17', 'erotic', 'erotica', 'softcore', 'hardcore',
-    'porn', 'pornography', 'adult movie', 'adult series', 'adult film', 'adult animation',
+    'porn', 'pornography', 'adult movie', 'adult series', 'adult film', 'adult animation', 'adult anime',
     'sensual', 'uncensored', 'nudity', 'sexual', 'masturbat', 'seduction', 'striptease',
     'kaam sastra', 'charmsukh', 'palang tod', 'riti riwaj', 'kavita bhabhi', 'chull',
     'hotspot', 'gandii baat', 'kama sutra', 'kamasutra', 'mastram', 'tandoor', 'rasikan',
+    'jalebi bai', 'dunali', 'walkman', 'farebi yaar', 'raja ka baaja', 'samne wali khidki',
+    'imli', 'woh teacher', 'garam masala', 'choodiwala', 'mona home delivery', 'raghav',
+    'tadap', 'jane anjane mein', 'doraha', 'matki', 'tauba tauba', 'siskiyaan', 'suraksha',
+    'bidaai', 'chhupa rustam', 'chaudharahat', 'aadhe adhoore', 'ghar jamai', 'jaal',
+    'khidki', 'seal', 'sultan', 'kamini', 'kangan', 'betaab', 'shaukeen', 'jhol',
+    'lovely massage parlour', 'honey trap', 'call girl', 'escort service',
+    'savita bhabhi', 'sapna bhabhi', 'sarala bhabhi', 'devar bhabhi', 'suhagraat', 'suhag raat',
+    'desi sex', 'desi porn', 'desi bhabhi', 'desi hot',
     'dani daniels', 'mia khalifa', 'eva elfie', 'kendra lust', 'johnny sins',
     'lana rhoades', 'angela white', 'riley reid', 'leah gotti', 'sunny leone adult',
     'ullu', 'kooku', 'primeshots', 'hunters', 'voovi', 'moodx', 'besharams',
     'rabbit movies', 'neonx', 'hotx', 'feneo', 'jalva', 'boomx', 'big bang',
+    'cineprime', 'nuefliks', 'primeplay', 'redprime', 'cliff movies', 'look entertainment',
+    'showx', 'cine7', 'hitprime', 'dreamfilm', 'mojflix', 'digi movieplex', 'chikoo',
+    'chikooflix', 'fliz movies', 'fliz', 'hothit', 'gupchup', 'cinema dosti', 'cinemadosti',
+    'hotshots',
+    'yoasobi gurashi', 'turned into a beast', 'do you like big girls',
+    'toshoshitsu no kanojo', 'seiso na kimi', 'ochiru made',
     'natsuzuma', 'nikuen', 'shitsurakuen', 'anime edition', 'niku mesu', 'boin', 'mankitsu',
     'overflow', 'boku no pico', 'kuroinu', 'futanari', 'ahegao', 'chikan', 'ero ',
-    'eroge', 'oppai', 'tentacle', 'savita bhabhi', 'boobs', 'tits', 'pussy', 'creampie',
+    'eroge', 'oppai', 'tentacle', 'boobs', 'tits', 'pussy', 'creampie',
     'blowjob', 'gangbang', 'horny', 'xxx', 'seiso de bitch', 'mesu-tachi', 'succubus',
-    'sexfriend', 'stepmom', 'bhabhi', 'desi sex', 'desi porn'
+    'sexfriend', 'stepmom', 'bhabhi', 'animefesta', 'comicfesta', 'queen bee', 'mary jane',
+    'bunnywalker', 'poju', 'pink pineapple', 'white bear', 'green bunny', 'milky anime',
+    'suzuki mirano', 'paris 05:59', 'theo & hugo', 'theo and hugo', 'nymphomaniac',
+    'shortbus', 'caligula', 'baise-moi', '9 songs', 'the brown bunny', 'all about anna',
+    'playboy', 'penthouse', 'hustler', 'onlyfans', 'camgirl', 'webcam model', 'sex tape'
 ]
 
 def is_adult_content(item: dict) -> bool:
@@ -1263,6 +1281,130 @@ def _init_active_db():
 
 _init_active_db()
 
+def get_sponsor_setting(key: str, default: str = "") -> str:
+    try:
+        with sqlite3.connect(_ACTIVE_DB_PATH, timeout=3) as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT value FROM sponsor_ad_settings WHERE key = ?", (key,))
+            row = cur.fetchone()
+            if row:
+                return row[0]
+    except Exception:
+        pass
+    return default
+
+def set_sponsor_setting(key: str, value: str):
+    try:
+        with sqlite3.connect(_ACTIVE_DB_PATH, timeout=3) as conn:
+            conn.execute("INSERT OR REPLACE INTO sponsor_ad_settings (key, value) VALUES (?, ?)", (key, value))
+    except Exception as e:
+        print(f"[SponsorSettings] Error setting {key}: {e}")
+
+def record_sponsor_ad_event(event_type: str, device_id: str, device_model: str, video_title: str, client_ip: str, country: str):
+    now = time.time()
+    today_str = datetime.datetime.fromtimestamp(now).strftime("%Y-%m-%d")
+    try:
+        with sqlite3.connect(_ACTIVE_DB_PATH, timeout=5) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS sponsor_ad_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_type TEXT NOT NULL,
+                    device_id TEXT DEFAULT '',
+                    device_model TEXT DEFAULT '',
+                    video_title TEXT DEFAULT '',
+                    ip TEXT DEFAULT '',
+                    country TEXT DEFAULT '',
+                    created_at REAL NOT NULL,
+                    date_str TEXT NOT NULL
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_ad_events_type ON sponsor_ad_events(event_type)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_ad_events_date ON sponsor_ad_events(date_str)")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS sponsor_ad_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+            """)
+            conn.execute("""
+                INSERT INTO sponsor_ad_events (event_type, device_id, device_model, video_title, ip, country, created_at, date_str)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (event_type, device_id, device_model, video_title, client_ip, country, now, today_str))
+    except Exception as e:
+        print(f"[AdTracker] Error saving ad event: {e}")
+
+def get_sponsor_ad_stats():
+    now = time.time()
+    today_str = datetime.datetime.fromtimestamp(now).strftime("%Y-%m-%d")
+    total_clicks = 0
+    today_clicks = 0
+    total_impressions = 0
+    today_impressions = 0
+    total_cancels = 0
+    today_cancels = 0
+    recent_clicks = []
+    
+    try:
+        with sqlite3.connect(_ACTIVE_DB_PATH, timeout=5) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            
+            cur.execute("SELECT COUNT(*) as cnt FROM sponsor_ad_events WHERE event_type = 'click'")
+            total_clicks = cur.fetchone()["cnt"]
+            
+            cur.execute("SELECT COUNT(*) as cnt FROM sponsor_ad_events WHERE event_type = 'click' AND date_str = ?", (today_str,))
+            today_clicks = cur.fetchone()["cnt"]
+            
+            cur.execute("SELECT COUNT(*) as cnt FROM sponsor_ad_events WHERE event_type = 'impression'")
+            total_impressions = cur.fetchone()["cnt"]
+            
+            cur.execute("SELECT COUNT(*) as cnt FROM sponsor_ad_events WHERE event_type = 'impression' AND date_str = ?", (today_str,))
+            today_impressions = cur.fetchone()["cnt"]
+            
+            cur.execute("SELECT COUNT(*) as cnt FROM sponsor_ad_events WHERE event_type = 'cancel'")
+            total_cancels = cur.fetchone()["cnt"]
+            
+            cur.execute("SELECT COUNT(*) as cnt FROM sponsor_ad_events WHERE event_type = 'cancel' AND date_str = ?", (today_str,))
+            today_cancels = cur.fetchone()["cnt"]
+            
+            cur.execute("""
+                SELECT event_type, device_id, device_model, video_title, ip, country, created_at 
+                FROM sponsor_ad_events 
+                WHERE event_type = 'click'
+                ORDER BY created_at DESC 
+                LIMIT 50
+            """)
+            for r in cur.fetchall():
+                t_str = datetime.datetime.fromtimestamp(r["created_at"]).strftime("%d %b, %I:%M %p")
+                recent_clicks.append({
+                    "device_id": r["device_id"] or "Unknown",
+                    "device_model": r["device_model"] or "Android Device",
+                    "video_title": r["video_title"] or "Playing Media",
+                    "ip": r["ip"] or "-",
+                    "country": r["country"] or "Unknown",
+                    "time": t_str
+                })
+    except Exception as e:
+        print(f"[AdStats] Error: {e}")
+        
+    ctr = round((total_clicks / total_impressions * 100), 1) if total_impressions > 0 else 0.0
+    sponsor_url = get_sponsor_setting("sponsor_url", "https://uplcm.com/4/12189723")
+    enabled = get_sponsor_setting("enabled", "1") == "1"
+    
+    return {
+        "code": 0,
+        "total_clicks": total_clicks,
+        "today_clicks": today_clicks,
+        "total_impressions": total_impressions,
+        "today_impressions": today_impressions,
+        "total_cancels": total_cancels,
+        "today_cancels": today_cancels,
+        "ctr": ctr,
+        "sponsor_url": sponsor_url,
+        "enabled": enabled,
+        "recent_clicks": recent_clicks
+    }
+
 def clear_all_app_installations():
     try:
         with sqlite3.connect(_ACTIVE_DB_PATH, timeout=5) as conn:
@@ -1747,6 +1889,40 @@ async def api_app_heartbeat(request: Request):
     record_app_device(device_id, client_ip, device_model, os_version, app_version, current_watching, detail_path, is_watching, country=c_name, country_code=c_code)
     record_active_user(request)
     return {"code": 0, "status": "ok", "t": int(now)}
+
+@app.post("/api/ad/event")
+async def api_ad_event(request: Request):
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    event_type = str(data.get("event") or "click").strip().lower()
+    device_id = str(data.get("device_id") or "").strip()
+    device_model = str(data.get("device_model") or "").strip()
+    video_title = str(data.get("video_title") or "").strip()
+    
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+    c_name, _ = resolve_country_from_request_or_ip(request, client_ip)
+    
+    record_sponsor_ad_event(event_type, device_id, device_model, video_title, client_ip, c_name)
+    return {"code": 0, "status": "ok"}
+
+@app.get("/api/ad/config")
+async def api_ad_config():
+    sponsor_url = get_sponsor_setting("sponsor_url", "https://uplcm.com/4/12189723")
+    enabled = get_sponsor_setting("enabled", "1") == "1"
+    return {
+        "code": 0,
+        "sponsor_url": sponsor_url,
+        "enabled": enabled,
+        "dialog_title": "আমাদের সাপোর্ট করুন",
+        "dialog_message": "অ্যাপটি সম্পূর্ণ ফ্রিতে চালাতে এবং নতুন কনটেন্ট যুক্ত করতে অনুগ্রহ করে স্পন্সর লিংকে একটি ক্লিক করে আমাদের সাপোর্ট করুন!",
+        "button_text": "💖 সাপোর্ট করতে লিংকে ক্লিক করুন",
+        "cancel_text": "✕ সরাসরি দেখুন"
+    }
 
 @app.get("/api/ping")
 async def api_ping(request: Request):

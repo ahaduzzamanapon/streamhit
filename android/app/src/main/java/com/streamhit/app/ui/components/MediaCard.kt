@@ -94,8 +94,10 @@ fun MediaCard(
 
             // Top Badges (Language / Dub / Quality)
             val titleLower = item.title.lowercase()
+            val genresLower = item.genres.lowercase()
             val isBengali = titleLower.contains("[bengali]") || titleLower.contains("(bengali)") || titleLower.contains("bengali") || titleLower.contains("bangla")
             val isHindi = titleLower.contains("[hindi]") || titleLower.contains("(hindi)") || titleLower.contains("hindi")
+            val isAnime = genresLower.contains("anime") || genresLower.contains("animation") || titleLower.contains("anime")
             val isCam = (item.isCam == true) || titleLower.contains("[cam]") || titleLower.contains("(cam)")
 
             when {
@@ -132,6 +134,25 @@ fun MediaCard(
                         Text(
                             text = "🇮🇳 Hindi",
                             color = Color.Black,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                }
+                isAnime -> {
+                    Box(
+                        modifier = Modifier
+                            .padding(5.dp)
+                            .align(Alignment.TopStart)
+                            .background(
+                                Brush.horizontalGradient(listOf(Color(0xFF8E24AA), Color(0xFFD81B60))),
+                                RoundedCornerShape(5.dp)
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "⚡ Anime",
+                            color = Color.White,
                             fontSize = 8.5.sp,
                             fontWeight = FontWeight.Black
                         )
@@ -217,8 +238,8 @@ fun MediaCard(
 
         // Cleaned Title (removes redundant bracket tags for a cleaner look)
         val cleanTitle = item.title
-            .replace(Regex("\\[(bengali|hindi|cam|bangla).*?\\]", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("\\((bengali|hindi|cam|bangla).*?\\)", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("\\[(bengali|hindi|cam|bangla|dual audio|multi|english|dubbed|720p|1080p|480p).*?\\]", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("\\((bengali|hindi|cam|bangla|dual audio|multi|english|dubbed|720p|1080p|480p).*?\\)", RegexOption.IGNORE_CASE), "")
             .trim()
             .ifEmpty { item.title }
 
