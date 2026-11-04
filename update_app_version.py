@@ -2,7 +2,7 @@ import os
 import sys
 import asyncio
 
-async def update_version(must_update_flag: int = 0):
+async def update_version(must_update_flag: int = 1):
     try:
         from main import get_db_pool
         pool = await get_db_pool()
@@ -11,14 +11,14 @@ async def update_version(must_update_flag: int = 0):
                 async with conn.cursor() as cur:
                     await cur.execute("""
                         INSERT INTO app_versions (version_code, version_name, apk_url, must_update, release_notes)
-                        VALUES (22, '1.0.21', 'https://nxly.online/uploads/apks/NXLY-Stream.apk', %s, 'Performance improvements, audio sync enhancement, subtitle stability & live streaming updates.')
+                        VALUES (26, '1.0.25', 'https://nxly.online/uploads/apks/NXLY-Stream.apk', %s, 'UI update and buffer solve')
                         ON DUPLICATE KEY UPDATE
                             version_name = VALUES(version_name),
                             apk_url = VALUES(apk_url),
                             must_update = VALUES(must_update),
                             release_notes = VALUES(release_notes)
                     """, (must_update_flag,))
-                    print(f"Updated database app_versions table to v1.0.21 (must_update={must_update_flag})")
+                    print(f"Updated database app_versions table to v1.0.25 (code=26, must_update={must_update_flag})")
         else:
             print("Database pool not available for version update")
     except Exception as e:

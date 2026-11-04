@@ -155,7 +155,7 @@ fun SponsorWebScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
-                            text = "StreamHit Sponsor",
+                            text = "NXLY Stream",
                             color = Color.White,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold
@@ -229,3 +229,4 @@ fun SponsorWebScreen(
         )
     }
 }
+
