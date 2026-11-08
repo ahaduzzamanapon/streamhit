@@ -989,7 +989,7 @@ function showShimmers(show) {
     if (show) {
         if (trendingSection) trendingSection.style.display = 'none';
         customSections.forEach(s => s.style.display = 'none');
-        if (dynamicGrid) {
+        if (dynamicGrid && dynamicGrid.children.length === 0) {
             dynamicGrid.innerHTML = `
                 <div class="card-shimmer"></div>
                 <div class="card-shimmer"></div>

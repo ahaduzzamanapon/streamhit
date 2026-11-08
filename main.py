@@ -1,4 +1,5 @@
 import os
+import html
 import re
 import json
 import httpx
@@ -2238,22 +2239,96 @@ async def index(request: Request): return serve_html("public/index.html", host=r
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request): return serve_html("public/admin.html", host=request.headers.get("host", ""))
 
+async def render_seo_cards_html(subject_type: int = 1) -> str:
+    """Pre-renders 24 rich movie/TV cards inside HTML to eliminate Google Search Console 'Soft 404'."""
+    items = []
+    try:
+        items = await get_latest_content(subject_type=subject_type, limit=24)
+    except Exception:
+        pass
+
+    if not items:
+        pool = await get_db_pool()
+        if pool:
+            try:
+                async with pool.acquire() as conn:
+                    async with conn.cursor(aiomysql.DictCursor) as cur:
+                        await cur.execute("""
+                            SELECT subject_id, title, detail_path, cover, rating, release_date, subject_type
+                            FROM subjects
+                            WHERE detail_path IS NOT NULL AND detail_path != '' AND subject_type = %s
+                            ORDER BY rating DESC, updated_at DESC
+                            LIMIT 24
+                        """, (subject_type,))
+                        rows = await cur.fetchall()
+                        for r in rows:
+                            items.append({
+                                "subjectId": r.get("subject_id"),
+                                "title": r.get("title"),
+                                "detailPath": r.get("detail_path"),
+                                "cover": r.get("cover"),
+                                "imdbRatingValue": str(r.get("rating") or "7.5"),
+                                "releaseDate": str(r.get("release_date") or "2026"),
+                                "subjectType": r.get("subject_type") or subject_type
+                            })
+            except Exception as e:
+                print(f"[SEO Prerender DB Fallback Error]: {e}")
+
+    if not items:
+        return ""
+
+    cards_html = []
+    type_name = "TV Show" if subject_type == 2 else "Movie"
+    url_prefix = "/tv/" if subject_type == 2 else "/movie/"
+
+    for it in items[:24]:
+        title = html.escape(str(it.get("title") or "Title"))
+        dpath = str(it.get("detailPath") or "")
+        sid = str(it.get("subjectId") or "")
+        cov = it.get("cover")
+        cover_url = (cov.get("url") if isinstance(cov, dict) else cov) or "/default-cover.png"
+        rating = str(it.get("imdbRatingValue") or "7.5")
+        rdate = str(it.get("releaseDate") or "2026")
+        year = rdate.split("-")[0] if "-" in rdate else (rdate[:4] if len(rdate) >= 4 else "2026")
+        href = f"{url_prefix}{urllib.parse.quote(dpath)}?id={urllib.parse.quote(sid)}" if sid else f"{url_prefix}{urllib.parse.quote(dpath)}"
+
+        cards_html.append(f'''
+        <a class="content-card" data-id="{sid}" href="{href}" style="text-decoration:none;">
+            <div class="card-poster">
+                <img src="{cover_url}" alt="{title}" loading="lazy">
+                <div class="card-rating"><i class="fa-solid fa-star"></i> {rating}</div>
+            </div>
+            <div class="card-info">
+                <h3 class="card-title" title="{title}">{title}</h3>
+                <div class="card-meta">
+                    <span>{year}</span>
+                    <span>{type_name}</span>
+                </div>
+            </div>
+        </a>''')
+
+    return "\n".join(cards_html)
+
 @app.get("/movies", response_class=HTMLResponse)
 async def movies(request: Request):
     host = request.headers.get("host", "")
     brand = get_brand_config(host)
+    cards = await render_seo_cards_html(1)
     return serve_html("public/movies.html", {
         "<title>Watch Free HD Movies Online — NXLY</title>": f"<title>Watch Free HD Movies Online — {brand['name']}</title>",
-        "<title>Explore Movies - Streamfit</title>": f"<title>Explore Movies - {brand['name']}</title>"
+        "<title>Explore Movies - Streamfit</title>": f"<title>Explore Movies - {brand['name']}</title>",
+        '<div class="content-grid" id="dynamicGrid"></div>': f'<div class="content-grid" id="dynamicGrid">\n{cards}\n</div>'
     }, host=host)
 
 @app.get("/tv", response_class=HTMLResponse)
 async def tv(request: Request):
     host = request.headers.get("host", "")
     brand = get_brand_config(host)
+    cards = await render_seo_cards_html(2)
     return serve_html("public/tv.html", {
         "<title>Watch Free TV Series & Anime Online — NXLY</title>": f"<title>Watch Free TV Series & Anime Online — {brand['name']}</title>",
-        "<title>Explore TV Series - Streamfit</title>": f"<title>Explore TV Series - {brand['name']}</title>"
+        "<title>Explore TV Series - Streamfit</title>": f"<title>Explore TV Series - {brand['name']}</title>",
+        '<div class="content-grid" id="dynamicGrid"></div>': f'<div class="content-grid" id="dynamicGrid">\n{cards}\n</div>'
     }, host=host)
 
 @app.get("/live-tv")
