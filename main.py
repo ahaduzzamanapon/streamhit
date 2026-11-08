@@ -1391,6 +1391,10 @@ def get_sponsor_ad_stats():
     ctr = round((total_clicks / total_impressions * 100), 1) if total_impressions > 0 else 0.0
     sponsor_url = get_sponsor_setting("sponsor_url", "https://uplcm.com/4/12189723")
     enabled = get_sponsor_setting("enabled", "1") == "1"
+    try:
+        duration = int(get_sponsor_setting("duration", "15"))
+    except Exception:
+        duration = 15
     
     return {
         "code": 0,
@@ -1403,6 +1407,7 @@ def get_sponsor_ad_stats():
         "ctr": ctr,
         "sponsor_url": sponsor_url,
         "enabled": enabled,
+        "duration": duration,
         "recent_clicks": recent_clicks
     }
 
@@ -1915,13 +1920,18 @@ async def api_ad_event(request: Request):
 async def api_ad_config():
     sponsor_url = get_sponsor_setting("sponsor_url", "https://uplcm.com/4/12189723")
     enabled = get_sponsor_setting("enabled", "1") == "1"
+    try:
+        duration = int(get_sponsor_setting("duration", "15"))
+    except Exception:
+        duration = 15
     return {
         "code": 0,
         "sponsor_url": sponsor_url,
         "enabled": enabled,
-        "dialog_title": "আমাদের সাপোর্ট করুন",
-        "dialog_message": "অ্যাপটি সম্পূর্ণ ফ্রিতে চালাতে এবং নতুন কনটেন্ট যুক্ত করতে অনুগ্রহ করে স্পন্সর লিংকে একটি ক্লিক করে আমাদের সাপোর্ট করুন!",
-        "button_text": "💖 সাপোর্ট করতে লিংকে ক্লিক করুন",
+        "duration": duration,
+        "dialog_title": "অটোমেটেড অ্যাড সেন্টার",
+        "dialog_message": "এটি একটি অটোমেটেড অ্যাড সেন্টার। দয়া করে কিছু ক্লিক বা কাটবেন না। অ্যাড শেষ হলে অটোমেটিক আপনার ভিডিও প্লে হবে।",
+        "button_text": f"🚀 অ্যাড দেখুন ({duration} সেকেন্ড)",
         "cancel_text": "✕ সরাসরি দেখুন"
     }
 

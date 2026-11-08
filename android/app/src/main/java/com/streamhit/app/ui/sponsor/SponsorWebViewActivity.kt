@@ -44,11 +44,13 @@ class SponsorWebViewActivity : ComponentActivity() {
 
         val targetUrl = intent.getStringExtra("EXTRA_TARGET_URL") ?: SponsorAdManager.sponsorUrl
         val isDownloadAd = intent.getBooleanExtra("EXTRA_IS_DOWNLOAD_AD", false)
+        val duration = intent.getIntExtra("EXTRA_AD_DURATION", SponsorAdManager.adDurationSeconds).coerceAtLeast(3)
 
         setContent {
             StreamfitTheme {
                 SponsorWebScreen(
                     targetUrl = targetUrl,
+                    duration = duration,
                     onTimerFinished = {
                         if (!isDownloadAd) {
                             SponsorAdManager.recordAdUnlock()
@@ -56,7 +58,7 @@ class SponsorWebViewActivity : ComponentActivity() {
                         SponsorAdManager.recordSponsorEvent(
                             this@SponsorWebViewActivity,
                             "click",
-                            if (isDownloadAd) "15s_download_ad_complete" else "15s_unlock_complete"
+                            if (isDownloadAd) "${duration}s_download_ad_complete" else "${duration}s_unlock_complete"
                         )
                         setResult(Activity.RESULT_OK)
                         finish()
@@ -104,12 +106,13 @@ class SponsorWebViewActivity : ComponentActivity() {
 @Composable
 fun SponsorWebScreen(
     targetUrl: String,
+    duration: Int = SponsorAdManager.adDurationSeconds,
     onTimerFinished: () -> Unit,
     onBackRequested: () -> Unit,
     onBindWebView: (WebView) -> Unit
 ) {
-    // 15-second countdown timer for automated ad center
-    var secondsRemaining by remember { mutableIntStateOf(15) }
+    // Dynamic countdown timer for automated ad center
+    var secondsRemaining by remember { mutableIntStateOf(duration) }
     var isComplete by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -167,7 +170,7 @@ fun SponsorWebScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = if (isComplete) "সফলভাবে সম্পন্ন হয়েছে! চালিয়ে যাচ্ছি..." else "পেজটিতে ১৫ সেকেন্ড অপেক্ষা করুন",
+                            text = if (isComplete) "সফলভাবে সম্পন্ন হয়েছে! চালিয়ে যাচ্ছি..." else "পেজটিতে ${duration} সেকেন্ড অপেক্ষা করুন",
                             color = if (isComplete) Color(0xFF00F5D4) else Color(0xFFA0AEC0),
                             fontSize = 11.sp
                         )

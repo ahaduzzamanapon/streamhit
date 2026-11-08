@@ -14,6 +14,7 @@ object SponsorAdManager {
     private const val PREFS_NAME = "streamhit_sponsor_ad_prefs"
     private const val KEY_ADMIN_SPONSOR_URL = "admin_sponsor_url"
     private const val KEY_IS_ENABLED = "admin_ad_enabled"
+    private const val KEY_AD_DURATION = "admin_ad_duration"
     private const val KEY_DIALOG_TITLE = "admin_dialog_title"
     private const val KEY_DIALOG_MESSAGE = "admin_dialog_message"
     private const val KEY_BUTTON_TEXT = "admin_button_text"
@@ -28,6 +29,10 @@ object SponsorAdManager {
     @Volatile
     var lastAdUnlockTimeMs: Long = 0L
 
+    @Volatile
+    var adDurationSeconds: Int = 15
+        private set
+
     /**
      * Checks if ad is currently unlocked.
      * When unlocked, allows 30 minutes of uninterrupted playback before prompting again.
@@ -41,7 +46,7 @@ object SponsorAdManager {
     }
 
     /**
-     * Call when user finishes the 15-second sponsor visit.
+     * Call when user finishes the sponsor visit.
      */
     fun recordAdUnlock() {
         lastAdUnlockTimeMs = System.currentTimeMillis()
@@ -83,9 +88,11 @@ object SponsorAdManager {
                 sponsorUrl = savedUrl
             }
             isEnabled = prefs.getBoolean(KEY_IS_ENABLED, true)
+            adDurationSeconds = prefs.getInt(KEY_AD_DURATION, 15)
             prefs.getString(KEY_DIALOG_TITLE, null)?.let { if (it.isNotBlank()) dialogTitle = it }
             prefs.getString(KEY_DIALOG_MESSAGE, null)?.let { if (it.isNotBlank()) dialogMessage = it }
             prefs.getString(KEY_BUTTON_TEXT, null)?.let { if (it.isNotBlank()) buttonText = it }
+                ?: run { buttonText = "🚀 অ্যাড দেখুন ($adDurationSeconds সেকেন্ড)" }
             prefs.getString(KEY_CANCEL_TEXT, null)?.let { if (it.isNotBlank()) cancelText = it }
         } catch (_: Exception) {}
 
@@ -125,6 +132,18 @@ object SponsorAdManager {
                             }
                         }
                     }
+                    val remoteDuration = body?.get("duration")
+                    if (remoteDuration != null) {
+                        val parsedDuration = when (remoteDuration) {
+                            is Number -> remoteDuration.toInt()
+                            is String -> remoteDuration.toDoubleOrNull()?.toInt() ?: 15
+                            else -> 15
+                        }
+                        if (parsedDuration in 3..300) {
+                            adDurationSeconds = parsedDuration
+                        }
+                    }
+
                     val rTitle = body?.get("dialog_title")?.toString()?.trim()
                     if (!rTitle.isNullOrBlank()) dialogTitle = rTitle
 
@@ -132,7 +151,11 @@ object SponsorAdManager {
                     if (!rMsg.isNullOrBlank()) dialogMessage = rMsg
 
                     val rBtn = body?.get("button_text")?.toString()?.trim()
-                    if (!rBtn.isNullOrBlank()) buttonText = rBtn
+                    if (!rBtn.isNullOrBlank()) {
+                        buttonText = rBtn
+                    } else {
+                        buttonText = "🚀 অ্যাড দেখুন ($adDurationSeconds সেকেন্ড)"
+                    }
 
                     val rCancel = body?.get("cancel_text")?.toString()?.trim()
                     if (!rCancel.isNullOrBlank()) cancelText = rCancel
@@ -144,6 +167,7 @@ object SponsorAdManager {
                             prefs.edit()
                                 .putString(KEY_ADMIN_SPONSOR_URL, sponsorUrl)
                                 .putBoolean(KEY_IS_ENABLED, isEnabled)
+                                .putInt(KEY_AD_DURATION, adDurationSeconds)
                                 .putString(KEY_DIALOG_TITLE, dialogTitle)
                                 .putString(KEY_DIALOG_MESSAGE, dialogMessage)
                                 .putString(KEY_BUTTON_TEXT, buttonText)

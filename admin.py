@@ -388,11 +388,11 @@ async def admin_upload_apk(request: Request, file: UploadFile = File(...)):
 async def public_get_app_version():
     from main import get_db_pool
     default_version = {
-        "versionCode": 27,
-        "versionName": "1.0.26",
+        "versionCode": 28,
+        "versionName": "1.0.27",
         "apkUrl": "https://nxly.online/uploads/apks/NXLY-Stream.apk",
         "mustUpdate": True,
-        "releaseNotes": "TV Remote optimization, background download, multi-server auto check & speed fix"
+        "releaseNotes": "Customizable sponsor timer & performance upgrade"
     }
     pool = await get_db_pool()
     if not pool: return {"version": default_version}
@@ -803,6 +803,12 @@ async def admin_save_ad_config(request: Request):
         set_sponsor_setting("sponsor_url", str(data["sponsor_url"]).strip())
     if "enabled" in data:
         set_sponsor_setting("enabled", "1" if data["enabled"] else "0")
+    if "duration" in data:
+        try:
+            dur = max(3, min(300, int(data["duration"])))
+            set_sponsor_setting("duration", str(dur))
+        except Exception:
+            pass
     return {"code": 0, "status": "ok"}
 
 @router.get("/api/admin/active-users")

@@ -963,12 +963,20 @@
                         </div>
                     </div>
 
-                    <!-- Sponsor Link Configuration Box -->
-                    <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:14px; padding:16px; margin-bottom:20px;">
-                        <div style="font-size:13px; font-weight:600; color:#E2E8F0; margin-bottom:8px;">🔗 Active Sponsor Link (স্পন্সর লিংক পরিবর্তন করুন)</div>
-                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                            <input type="text" id="inputSponsorUrl" style="flex:1; min-width:280px; padding:10px 14px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.15); border-radius:10px; color:#fff; font-size:13px;" placeholder="https://uplcm.com/4/12189723">
-                            <button class="btn-primary" onclick="saveSponsorUrl()" style="padding:10px 20px; font-size:13px;">💾 Save Link</button>
+                    <!-- Sponsor Link & Duration Configuration Box -->
+                    <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:14px; padding:18px; margin-bottom:20px;">
+                        <div style="display:grid; grid-template-columns:1fr auto; gap:16px; align-items:flex-end;">
+                            <div>
+                                <div style="font-size:13px; font-weight:600; color:#E2E8F0; margin-bottom:8px;">🔗 Active Sponsor Link (স্পন্সর লিংক পরিবর্তন করুন)</div>
+                                <input type="text" id="inputSponsorUrl" style="width:100%; box-sizing:border-box; padding:10px 14px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.15); border-radius:10px; color:#fff; font-size:13px;" placeholder="https://uplcm.com/4/12189723">
+                            </div>
+                            <div>
+                                <div style="font-size:13px; font-weight:600; color:#E2E8F0; margin-bottom:8px;">⏱️ Ad Duration (সেকেন্ড)</div>
+                                <div style="display:flex; gap:10px;">
+                                    <input type="number" id="inputSponsorDuration" min="3" max="180" style="width:100px; padding:10px 12px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.15); border-radius:10px; color:#00F5D4; font-weight:700; font-size:14px; text-align:center;" placeholder="15">
+                                    <button class="btn-primary" onclick="saveSponsorUrl()" style="padding:10px 20px; font-size:13px; white-space:nowrap;">💾 Save Settings</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -2185,6 +2193,8 @@
             updateToggleSwitchUI(nextState);
             const urlInput = document.getElementById('inputSponsorUrl');
             const url = urlInput ? urlInput.value.trim() : '';
+            const durInput = document.getElementById('inputSponsorDuration');
+            const duration = parseInt(durInput ? durInput.value : '15') || 15;
             try {
                 const res = await fetch('/api/admin/ad/config', {
                     method: 'POST',
@@ -2192,7 +2202,7 @@
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ enabled: nextState, sponsor_url: url })
+                    body: JSON.stringify({ enabled: nextState, sponsor_url: url, duration: duration })
                 });
                 const d = await res.json();
                 if (d.code === 0) {
@@ -2237,6 +2247,11 @@
                         urlInput.value = d.sponsor_url || '';
                     }
 
+                    const durInput = document.getElementById('inputSponsorDuration');
+                    if (durInput && !durInput.matches(':focus')) {
+                        durInput.value = d.duration || 15;
+                    }
+
                     const tbody = document.getElementById('recentClicksTableBody');
                     if (tbody && d.recent_clicks) {
                         if (d.recent_clicks.length === 0) {
@@ -2264,6 +2279,8 @@
                 alert('Please enter a valid URL');
                 return;
             }
+            const durInput = document.getElementById('inputSponsorDuration');
+            const duration = Math.max(3, Math.min(180, parseInt(durInput ? durInput.value : '15') || 15));
             try {
                 const res = await fetch('/api/admin/ad/config', {
                     method: 'POST',
@@ -2271,17 +2288,17 @@
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ sponsor_url: url, enabled: true })
+                    body: JSON.stringify({ sponsor_url: url, duration: duration, enabled: true })
                 });
                 const d = await res.json();
                 if (d.code === 0) {
-                    alert('Sponsor link updated successfully!');
+                    alert('Sponsor settings (Link & ' + duration + 's Timer) updated successfully!');
                     loadAdStats();
                 } else {
-                    alert('Failed to update sponsor link.');
+                    alert('Failed to update sponsor settings.');
                 }
             } catch(e) {
-                alert('Error updating sponsor link: ' + e);
+                alert('Error updating sponsor settings: ' + e);
             }
         }
 
