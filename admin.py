@@ -388,11 +388,11 @@ async def admin_upload_apk(request: Request, file: UploadFile = File(...)):
 async def public_get_app_version():
     from main import get_db_pool
     default_version = {
-        "versionCode": 28,
-        "versionName": "1.0.27",
+        "versionCode": 29,
+        "versionName": "1.0.28",
         "apkUrl": "https://nxly.online/uploads/apks/NXLY-Stream.apk",
         "mustUpdate": True,
-        "releaseNotes": "Customizable sponsor timer & performance upgrade"
+        "releaseNotes": "🙏 বারবার আপডেটের জন্য আমরা আন্তরিকভাবে দুঃখিত! লাইভ টিভি স্মুথ করা, বাফারিং দূর করা, টিভি রিমোট কন্ট্রোল এবং ব্যাকগ্রাউন্ড ডাউনলোডের বড় ফিচারের জন্য এই জরুরি আপডেটটি দিতে হয়েছে। দয়া করে একবার আপডেট করে নিন।"
     }
     pool = await get_db_pool()
     if not pool: return {"version": default_version}

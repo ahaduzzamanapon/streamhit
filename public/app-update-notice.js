@@ -228,7 +228,7 @@
         pill.id = "nxlyFloatingNoticePill";
         pill.innerHTML = `
             <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#10b981; box-shadow:0 0 8px #10b981;"></span>
-            <span>নতুন ভার্সন রিলিজ হয়েছে (v1.0.27)</span>
+            <span>নতুন ভার্সন রিলিজ হয়েছে (v1.0.28)</span>
             <a href="/uploads/apks/NXLY-Stream.apk" download style="background: #10b981; color: #022c22; padding: 4px 12px; border-radius: 999px; text-decoration: none; font-size: 12px; font-weight: 700;">আপডেট নিন</a>
         `;
         document.body.appendChild(pill);
@@ -248,7 +248,7 @@
             <div class="nxly-update-card">
                 <div class="nxly-update-badge">
                     <span class="pulse-dot"></span>
-                    নতুন ভার্সন রিলিজ (v1.0.27)
+                    নতুন ভার্সন রিলিজ (v1.0.28)
                 </div>
                 <div class="nxly-update-icon-wrap">
                     <i class="fa-solid fa-cloud-arrow-down" style="color: #022c22;"></i>

@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
+import android.net.Uri
 import android.os.Bundle
 import android.view.ViewGroup
 import android.webkit.WebChromeClient
@@ -220,11 +221,54 @@ fun SponsorWebScreen(
                         userAgentString = "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
                     }
                     webViewClient = object : WebViewClient() {
-                        override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
-                            if (!url.isNullOrBlank()) {
-                                view?.loadUrl(url)
+                        private fun handleUrl(view: WebView?, url: String): Boolean {
+                            if (url.startsWith("http://") || url.startsWith("https://")) {
+                                return false // Let WebView load HTTP/HTTPS normally
+                            }
+                            try {
+                                val intent = if (url.startsWith("intent://")) {
+                                    Intent.parseUri(url, Intent.URI_INTENT_SCHEME)
+                                } else {
+                                    Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                }
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                view?.context?.startActivity(intent)
+                                return true
+                            } catch (_: Exception) {
+                                try {
+                                    if (url.startsWith("intent://")) {
+                                        val parsedIntent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME)
+                                        val fallbackUrl = parsedIntent.getStringExtra("browser_fallback_url")
+                                        if (!fallbackUrl.isNullOrBlank()) {
+                                            view?.loadUrl(fallbackUrl)
+                                            return true
+                                        }
+                                    } else if (url.startsWith("market://details?id=")) {
+                                        val pkgName = url.substringAfter("market://details?id=").substringBefore("&")
+                                        view?.loadUrl("https://play.google.com/store/apps/details?id=$pkgName")
+                                        return true
+                                    }
+                                } catch (_: Exception) {}
                             }
                             return true
+                        }
+
+                        override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
+                            val target = request?.url?.toString() ?: return false
+                            return handleUrl(view, target)
+                        }
+
+                        @Deprecated("Deprecated in Java")
+                        override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                            if (url.isNullOrBlank()) return false
+                            return handleUrl(view, url)
+                        }
+
+                        override fun onReceivedError(view: WebView?, errorCode: Int, description: String?, failingUrl: String?) {
+                            if (failingUrl?.startsWith("market://") == true || failingUrl?.startsWith("intent://") == true) {
+                                return // Ignore unsupported scheme error pages
+                            }
+                            super.onReceivedError(view, errorCode, description, failingUrl)
                         }
                     }
                     webChromeClient = WebChromeClient()
