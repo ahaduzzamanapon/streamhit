@@ -1,6 +1,9 @@
 package com.streamhit.app.ui.details
 
+import android.content.Intent
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,6 +33,11 @@ import com.streamhit.app.data.model.DubInfo
 import com.streamhit.app.data.model.SeasonInfo
 import com.streamhit.app.data.model.SubjectDetail
 import com.streamhit.app.data.repository.MovieRepository
+import com.streamhit.app.ui.components.BackgroundDownloadPermissionDialog
+import com.streamhit.app.ui.components.SponsorSupportDialog
+import com.streamhit.app.ui.sponsor.SponsorWebViewActivity
+import com.streamhit.app.util.BackgroundDownloadHelper
+import com.streamhit.app.util.SponsorAdManager
 import com.streamhit.app.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -39,6 +47,7 @@ fun SeriesDownloadBottomSheet(
     detail: SubjectDetail,
     repository: MovieRepository,
     initialSeason: Int = 1,
+    initialDub: DubInfo? = null,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -46,17 +55,26 @@ fun SeriesDownloadBottomSheet(
     val scope = rememberCoroutineScope()
 
     val seasons = detail.seasons ?: emptyList()
-    var selectedSeasonNum by remember { mutableIntStateOf(if (seasons.any { it.se == initialSeason }) initialSeason else (seasons.firstOrNull()?.se ?: 1)) }
+    var selectedSeasonNum by remember {
+        mutableIntStateOf(
+            if (seasons.any { it.seasonNumber == initialSeason }) initialSeason
+            else (seasons.firstOrNull()?.seasonNumber ?: 1)
+        )
+    }
     var seasonDropdownExpanded by remember { mutableStateOf(false) }
 
     val dubs = detail.dubs ?: emptyList()
-    var selectedDub by remember { mutableStateOf<DubInfo?>(dubs.firstOrNull { it.original == true } ?: dubs.firstOrNull()) }
+    var selectedDub by remember {
+        mutableStateOf<DubInfo?>(
+            initialDub ?: dubs.firstOrNull { it.original == true } ?: dubs.firstOrNull()
+        )
+    }
     var dubDropdownExpanded by remember { mutableStateOf(false) }
 
     val availableResolutions = listOf(480, 720, 1080)
     var selectedResolution by remember { mutableIntStateOf(720) }
 
-    val currentSeason = seasons.firstOrNull { it.se == selectedSeasonNum } ?: seasons.firstOrNull()
+    val currentSeason = seasons.firstOrNull { it.seasonNumber == selectedSeasonNum } ?: seasons.firstOrNull()
     val episodeList = remember(currentSeason) {
         val maxEp = currentSeason?.maxEp ?: 1
         val allEpStr = currentSeason?.allEp ?: ""
@@ -68,16 +86,116 @@ fun SeriesDownloadBottomSheet(
     }
 
     val selectedEpisodes = remember { mutableStateListOf<Int>() }
+    var pendingEpisodesToDownload by remember { mutableStateOf<List<Int>>(emptyList()) }
 
-    // Start with episode 1 selected by default if available
+    // Start with episode 1 selected by default if available only once
+    var initialEpisodeInitialized by remember { mutableStateOf(false) }
     LaunchedEffect(episodeList) {
-        selectedEpisodes.clear()
-        if (episodeList.isNotEmpty()) {
+        if (!initialEpisodeInitialized && episodeList.isNotEmpty()) {
+            selectedEpisodes.clear()
             selectedEpisodes.add(episodeList.first())
+            initialEpisodeInitialized = true
         }
     }
 
     var isBatchDownloading by remember { mutableStateOf(false) }
+    var showDownloadSponsorDialog by remember { mutableStateOf(false) }
+    var showBgPermissionDialog by remember { mutableStateOf(false) }
+
+    fun executeBatchDownload(episodesToDownload: List<Int>) {
+        if (episodesToDownload.isEmpty()) {
+            Toast.makeText(context, "No episodes selected for download.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        isBatchDownloading = true
+        val activeSubjectId = selectedDub?.subjectId?.ifBlank { detail.subjectId } ?: detail.subjectId
+        val activeDetailPath = selectedDub?.detailPath?.ifBlank { detail.detailPath } ?: detail.detailPath
+        val seriesName = detail.title
+        val sNum = selectedSeasonNum
+
+        scope.launch {
+            var queuedCount = 0
+            for (ep in episodesToDownload) {
+                val epTitle = "$seriesName S${String.format("%02d", sNum)}E${String.format("%02d", ep)}"
+                try {
+                    // Try with active dub / subject first
+                    var resList = repository.getStreamingResources(activeSubjectId, activeDetailPath, sNum, ep)
+
+                    // Fallback 1: Try with main detail subjectId & detailPath
+                    if (resList.isEmpty()) {
+                        resList = repository.getStreamingResources(detail.subjectId, detail.detailPath, sNum, ep)
+                    }
+
+                    // Fallback 2: Try with any other dubs
+                    if (resList.isEmpty()) {
+                        val otherDubs = detail.dubs?.filter { it.subjectId.isNotBlank() && it.subjectId != activeSubjectId } ?: emptyList()
+                        for (d in otherDubs) {
+                            val fList = repository.getStreamingResources(d.subjectId, d.detailPath.ifBlank { activeDetailPath }, sNum, ep)
+                            if (fList.isNotEmpty()) {
+                                resList = fList
+                                break
+                            }
+                        }
+                    }
+
+                    val matchingRes = resList.firstOrNull { it.resolution == selectedResolution }
+                        ?: resList.maxByOrNull { it.resolution ?: 720 }
+                        ?: resList.firstOrNull()
+
+                    if (matchingRes != null && matchingRes.url.isNotBlank()) {
+                        val finalDownloadUrl = when {
+                            matchingRes.url.startsWith("http://") || matchingRes.url.startsWith("https://") -> matchingRes.url
+                            matchingRes.url.startsWith("/") -> "https://nxly.online${matchingRes.url}"
+                            else -> "https://nxly.online/${matchingRes.url}"
+                        }
+                        MediaDownloadManager.startDownload(
+                            context = context,
+                            subjectId = activeSubjectId,
+                            detailPath = activeDetailPath,
+                            title = epTitle,
+                            coverUrl = detail.coverUrl,
+                            quality = "${matchingRes.resolution ?: selectedResolution}p",
+                            downloadUrl = finalDownloadUrl,
+                            isSeries = true,
+                            seriesTitle = seriesName,
+                            seasonNum = sNum,
+                            episodeNum = ep
+                        )
+                        queuedCount++
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            isBatchDownloading = false
+            onDismiss()
+            if (queuedCount > 0) {
+                Toast.makeText(
+                    context,
+                    "Started downloading $queuedCount episodes in background!",
+                    Toast.LENGTH_LONG
+                ).show()
+                if (!BackgroundDownloadHelper.isBatteryOptimizationIgnored(context) && !BackgroundDownloadHelper.hasPromptedInitialPermission(context)) {
+                    showBgPermissionDialog = true
+                }
+            } else {
+                Toast.makeText(
+                    context,
+                    "Streaming resources unavailable for selected episodes. Please try another quality or dub.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    val downloadSponsorLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            showDownloadSponsorDialog = false
+            executeBatchDownload(pendingEpisodesToDownload)
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -364,60 +482,17 @@ fun SeriesDownloadBottomSheet(
             // Bottom Green Action Button: "Download (N Episodes)"
             Button(
                 onClick = {
-                    if (selectedEpisodes.isEmpty()) {
+                    val toDownload = selectedEpisodes.toList().sorted()
+                    if (toDownload.isEmpty()) {
                         Toast.makeText(context, "Please select at least 1 episode.", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
+                    pendingEpisodesToDownload = toDownload
 
-                    isBatchDownloading = true
-                    val activeSubjectId = selectedDub?.subjectId?.ifBlank { detail.subjectId } ?: detail.subjectId
-                    val activeDetailPath = selectedDub?.detailPath?.ifBlank { detail.detailPath } ?: detail.detailPath
-                    val seriesName = detail.title
-                    val sNum = selectedSeasonNum
-                    val episodesToDownload = selectedEpisodes.toList().sorted()
-
-                    scope.launch {
-                        var queuedCount = 0
-                        for (ep in episodesToDownload) {
-                            val epTitle = "$seriesName S${String.format("%02d", sNum)}E${String.format("%02d", ep)}"
-                            try {
-                                val resList = repository.getStreamingResources(activeSubjectId, activeDetailPath, sNum, ep)
-                                val matchingRes = resList.firstOrNull { it.resolution == selectedResolution }
-                                    ?: resList.maxByOrNull { it.resolution ?: 720 }
-                                    ?: resList.firstOrNull()
-
-                                if (matchingRes != null && matchingRes.url.isNotBlank()) {
-                                    val finalDownloadUrl = when {
-                                        matchingRes.url.startsWith("http://") || matchingRes.url.startsWith("https://") -> matchingRes.url
-                                        matchingRes.url.startsWith("/") -> "https://nxly.online${matchingRes.url}"
-                                        else -> "https://nxly.online/${matchingRes.url}"
-                                    }
-                                    MediaDownloadManager.startDownload(
-                                        context = context,
-                                        subjectId = activeSubjectId,
-                                        detailPath = activeDetailPath,
-                                        title = epTitle,
-                                        coverUrl = detail.coverUrl,
-                                        quality = "${selectedResolution}p",
-                                        downloadUrl = finalDownloadUrl,
-                                        isSeries = true,
-                                        seriesTitle = seriesName,
-                                        seasonNum = sNum,
-                                        episodeNum = ep
-                                    )
-                                    queuedCount++
-                                }
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
-                        }
-                        isBatchDownloading = false
-                        onDismiss()
-                        Toast.makeText(
-                            context,
-                            "Started downloading $queuedCount episodes in background!",
-                            Toast.LENGTH_LONG
-                        ).show()
+                    if (SponsorAdManager.isEnabled) {
+                        showDownloadSponsorDialog = true
+                    } else {
+                        executeBatchDownload(toDownload)
                     }
                 },
                 enabled = selectedEpisodes.isNotEmpty() && !isBatchDownloading,
@@ -456,6 +531,39 @@ fun SeriesDownloadBottomSheet(
                     )
                 }
             }
+        }
+
+        // Sponsor gate for series batch download
+        if (showDownloadSponsorDialog) {
+            SponsorSupportDialog(
+                videoTitle = "${detail.title} (S${selectedSeasonNum})",
+                onSupportClick = {
+                    val intent = Intent(context, SponsorWebViewActivity::class.java).apply {
+                        putExtra("EXTRA_TARGET_URL", SponsorAdManager.sponsorUrl)
+                        putExtra("EXTRA_IS_DOWNLOAD_AD", true)
+                    }
+                    downloadSponsorLauncher.launch(intent)
+                },
+                onCancel = {
+                    showDownloadSponsorDialog = false
+                }
+            )
+        }
+
+        // Initial background download permission explanation
+        if (showBgPermissionDialog) {
+            BackgroundDownloadPermissionDialog(
+                onGrantClick = {
+                    showBgPermissionDialog = false
+                    BackgroundDownloadHelper.setPromptedInitialPermission(context, true)
+                    BackgroundDownloadHelper.requestIgnoreBatteryOptimization(context)
+                    Toast.makeText(context, "ব্যাকগ্রাউন্ড পারমিশন উইন্ডো খোলা হয়েছে। 'Allow' দিন।", Toast.LENGTH_LONG).show()
+                },
+                onDismiss = {
+                    showBgPermissionDialog = false
+                    BackgroundDownloadHelper.setPromptedInitialPermission(context, true)
+                }
+            )
         }
     }
 }

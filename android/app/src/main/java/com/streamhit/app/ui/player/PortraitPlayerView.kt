@@ -71,6 +71,9 @@ fun PortraitVideoPlayerBox(
     onSeekTo: (Long) -> Unit,
     gestureDetector: GestureDetector,
     isLiveStream: Boolean,
+    channelNumber: Int = 0,
+    onNextChannel: (() -> Unit)? = null,
+    onPrevChannel: (() -> Unit)? = null,
     audioSyncOffsetMs: Long = 0L,
     onOpenAudioSync: () -> Unit = {}
 ) {
@@ -328,14 +331,27 @@ fun PortraitVideoPlayerBox(
                 } else {
                     Row(
                         modifier = Modifier.align(Alignment.Center),
-                        horizontalArrangement = Arrangement.spacedBy(24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(22.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(
-                            onClick = onRewind10,
-                            modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape).size(36.dp)
-                        ) {
-                            Icon(Icons.Default.Replay10, contentDescription = "Rewind", tint = Color.White)
+                        if (isLiveStream && onPrevChannel != null) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                IconButton(
+                                    onClick = onPrevChannel,
+                                    modifier = Modifier.background(Color.Black.copy(alpha = 0.6f), CircleShape).size(42.dp)
+                                ) {
+                                    Icon(Icons.Default.SkipPrevious, contentDescription = "Previous Channel", tint = Color.White, modifier = Modifier.size(24.dp))
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text("Prev", color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            }
+                        } else {
+                            IconButton(
+                                onClick = onRewind10,
+                                modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape).size(36.dp)
+                            ) {
+                                Icon(Icons.Default.Replay10, contentDescription = "Rewind", tint = Color.White)
+                            }
                         }
 
                         IconButton(
@@ -350,19 +366,32 @@ fun PortraitVideoPlayerBox(
                             )
                         }
 
-                        IconButton(
-                            onClick = onForward10,
-                            modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape).size(36.dp)
-                        ) {
-                            Icon(Icons.Default.Forward10, contentDescription = "Forward", tint = Color.White)
-                        }
-
-                        if (hasNextEpisode) {
+                        if (isLiveStream && onNextChannel != null) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                IconButton(
+                                    onClick = onNextChannel,
+                                    modifier = Modifier.background(Color.Black.copy(alpha = 0.6f), CircleShape).size(42.dp)
+                                ) {
+                                    Icon(Icons.Default.SkipNext, contentDescription = "Next Channel", tint = Color.White, modifier = Modifier.size(24.dp))
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text("Next", color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            }
+                        } else {
                             IconButton(
-                                onClick = onPlayNextEpisode,
+                                onClick = onForward10,
                                 modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape).size(36.dp)
                             ) {
-                                Icon(Icons.Default.SkipNext, contentDescription = "Next Episode", tint = AccentEmerald)
+                                Icon(Icons.Default.Forward10, contentDescription = "Forward", tint = Color.White)
+                            }
+
+                            if (hasNextEpisode) {
+                                IconButton(
+                                    onClick = onPlayNextEpisode,
+                                    modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape).size(36.dp)
+                                ) {
+                                    Icon(Icons.Default.SkipNext, contentDescription = "Next Episode", tint = AccentEmerald)
+                                }
                             }
                         }
                     }

@@ -2,8 +2,21 @@
     // Avoid running on admin page
     if (window.location.pathname.startsWith("/admin")) return;
 
+    // CRITICAL SEO FIX: Never run for search engine bots, crawlers, or inspection tools!
+    // Googlebot, Google Inspection Tool, Bingbot must see clean content without any interstitial overlay.
+    const ua = (navigator.userAgent || "").toLowerCase();
+    const isBot = /googlebot|google-inspectiontool|google-safety|inspection|mediapartners-google|bingbot|slurp|duckduckbot|baiduspider|yandexbot|sogou|exabot|facebot|facebookexternalhit|ia_archiver|crawler|spider|headless|lighthouse|chrome-lighthouse/i.test(ua);
+    if (isBot) return;
+
+    const isDismissed = localStorage.getItem("nxly_update_pop_dismissed") === "1" || sessionStorage.getItem("nxly_update_pop_dismissed") === "1";
+    const path = window.location.pathname.toLowerCase();
+    const isCatalogOrContentPage = path.startsWith("/movie") ||
+                                   path.startsWith("/tv") ||
+                                   path.startsWith("/watch") ||
+                                   path.startsWith("/details");
+
     function renderUpdateNotice() {
-        if (document.getElementById("nxlyAppUpdateModalOverlay")) return;
+        if (document.getElementById("nxlyFloatingNoticePill")) return;
 
         // Inject CSS
         const style = document.createElement("style");
@@ -210,14 +223,32 @@
         `;
         document.head.appendChild(style);
 
-        // Modal Overlay DOM
+        // Floating pill for persistent, non-intrusive access (never blocks page content or crawlers)
+        const pill = document.createElement("div");
+        pill.id = "nxlyFloatingNoticePill";
+        pill.innerHTML = `
+            <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#10b981; box-shadow:0 0 8px #10b981;"></span>
+            <span>নতুন ভার্সন রিলিজ হয়েছে (v1.0.26)</span>
+            <a href="/uploads/apks/NXLY-Stream.apk" download style="background: #10b981; color: #022c22; padding: 4px 12px; border-radius: 999px; text-decoration: none; font-size: 12px; font-weight: 700;">আপডেট নিন</a>
+        `;
+        document.body.appendChild(pill);
+
+        // If on catalog/content page (movies, tv, details) or user already dismissed: ONLY show pill, NEVER block with modal overlay!
+        if (isCatalogOrContentPage || isDismissed) {
+            setTimeout(() => {
+                pill.classList.add("visible");
+            }, 600);
+            return;
+        }
+
+        // Modal Overlay DOM (only shown on homepage/download to first-time human visitors)
         const overlay = document.createElement("div");
         overlay.id = "nxlyAppUpdateModalOverlay";
         overlay.innerHTML = `
             <div class="nxly-update-card">
                 <div class="nxly-update-badge">
                     <span class="pulse-dot"></span>
-                    নতুন ভার্সন রিলিজ (v1.0.21)
+                    নতুন ভার্সন রিলিজ (v1.0.26)
                 </div>
                 <div class="nxly-update-icon-wrap">
                     <i class="fa-solid fa-cloud-arrow-down" style="color: #022c22;"></i>
@@ -249,16 +280,6 @@
         `;
         document.body.appendChild(overlay);
 
-        // Floating pill for persistent access
-        const pill = document.createElement("div");
-        pill.id = "nxlyFloatingNoticePill";
-        pill.innerHTML = `
-            <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#10b981; box-shadow:0 0 8px #10b981;"></span>
-            <span>নতুন ভার্সন রিলিজ হয়েছে (v1.0.21)</span>
-            <a href="/uploads/apks/NXLY-Stream.apk" download style="background: #10b981; color: #022c22; padding: 4px 12px; border-radius: 999px; text-decoration: none; font-size: 12px; font-weight: 700;">আপডেট নিন</a>
-        `;
-        document.body.appendChild(pill);
-
         // Events
         const dismissBtn = document.getElementById("nxlyDismissUpdateModal");
         const downloadBtn = document.getElementById("nxlyUpdateNowBtn");
@@ -268,7 +289,10 @@
             setTimeout(() => {
                 pill.classList.add("visible");
             }, 300);
-            try { sessionStorage.setItem("nxly_update_pop_dismissed", "1"); } catch (_) {}
+            try {
+                localStorage.setItem("nxly_update_pop_dismissed", "1");
+                sessionStorage.setItem("nxly_update_pop_dismissed", "1");
+            } catch (_) {}
         }
 
         if (dismissBtn) dismissBtn.addEventListener("click", closeModal);
@@ -276,11 +300,10 @@
             setTimeout(closeModal, 1000);
         });
 
-        // Trigger popup immediately so every visitor sees it
         setTimeout(() => {
             overlay.classList.add("active");
             pill.classList.add("visible");
-        }, 300);
+        }, 500);
     }
 
     if (document.readyState === "loading") {

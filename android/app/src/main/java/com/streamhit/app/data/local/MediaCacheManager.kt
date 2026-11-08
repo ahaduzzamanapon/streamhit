@@ -90,6 +90,16 @@ object MediaCacheManager {
         return cacheDataSourceFactory!!
     }
 
+    /**
+     * Direct HTTP DataSource bypassing disk SimpleCache.
+     * Prevents disk I/O bottlenecks and cache churn for live HLS streams, especially on Android TV devices.
+     */
+    @Synchronized
+    fun getDirectDataSourceFactory(context: Context): DataSource.Factory {
+        val httpDataSourceFactory = OkHttpDataSource.Factory(getOkHttpClient())
+        return DefaultDataSource.Factory(context.applicationContext, httpDataSourceFactory)
+    }
+
     fun release() {
         try {
             simpleCache?.release()

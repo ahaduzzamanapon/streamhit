@@ -43,15 +43,21 @@ class SponsorWebViewActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val targetUrl = intent.getStringExtra("EXTRA_TARGET_URL") ?: SponsorAdManager.sponsorUrl
+        val isDownloadAd = intent.getBooleanExtra("EXTRA_IS_DOWNLOAD_AD", false)
 
         setContent {
             StreamfitTheme {
                 SponsorWebScreen(
                     targetUrl = targetUrl,
                     onTimerFinished = {
-                        // Mark session as permanently unlocked for this session
-                        SponsorAdManager.isSessionUnlocked = true
-                        SponsorAdManager.recordSponsorEvent(this@SponsorWebViewActivity, "click", "10s_unlock_complete")
+                        if (!isDownloadAd) {
+                            SponsorAdManager.recordAdUnlock()
+                        }
+                        SponsorAdManager.recordSponsorEvent(
+                            this@SponsorWebViewActivity,
+                            "click",
+                            if (isDownloadAd) "15s_download_ad_complete" else "15s_unlock_complete"
+                        )
                         setResult(Activity.RESULT_OK)
                         finish()
                     },
@@ -102,8 +108,8 @@ fun SponsorWebScreen(
     onBackRequested: () -> Unit,
     onBindWebView: (WebView) -> Unit
 ) {
-    // 10-second countdown timer
-    var secondsRemaining by remember { mutableIntStateOf(10) }
+    // 15-second countdown timer for automated ad center
+    var secondsRemaining by remember { mutableIntStateOf(15) }
     var isComplete by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -155,13 +161,13 @@ fun SponsorWebScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
-                            text = "NXLY Stream",
+                            text = "NXLY Stream • অটোমেটেড অ্যাড সেন্টার",
                             color = Color.White,
-                            fontSize = 14.sp,
+                            fontSize = 13.5.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = if (isComplete) "সফলভাবে আনলক হয়েছে!" else "পেজটিতে ১০ সেকেন্ড থাকুন",
+                            text = if (isComplete) "সফলভাবে সম্পন্ন হয়েছে! চালিয়ে যাচ্ছি..." else "পেজটিতে ১৫ সেকেন্ড অপেক্ষা করুন",
                             color = if (isComplete) Color(0xFF00F5D4) else Color(0xFFA0AEC0),
                             fontSize = 11.sp
                         )

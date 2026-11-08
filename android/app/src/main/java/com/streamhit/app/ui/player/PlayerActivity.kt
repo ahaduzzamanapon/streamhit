@@ -3,11 +3,13 @@ package com.streamhit.app.ui.player
 import android.app.PendingIntent
 import android.app.PictureInPictureParams
 import android.app.RemoteAction
+import android.app.UiModeManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.drawable.Icon
 import android.media.AudioManager
@@ -17,6 +19,7 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Rational
 import android.view.GestureDetector
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.WindowManager
 import android.widget.Toast
@@ -26,6 +29,9 @@ import androidx.activity.compose.setContent
 import androidx.annotation.OptIn
 import androidx.lifecycle.Lifecycle
 import androidx.compose.animation.*
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
+import java.util.concurrent.TimeUnit
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -76,6 +82,13 @@ import com.streamhit.app.data.model.SubjectDetail
 import com.streamhit.app.data.model.SubjectSummary
 import com.streamhit.app.data.repository.LiveTvRepository
 import com.streamhit.app.data.repository.MovieRepository
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.streamhit.app.ui.components.BackgroundDownloadPermissionDialog
+import com.streamhit.app.ui.components.SponsorSupportDialog
+import com.streamhit.app.ui.sponsor.SponsorWebViewActivity
+import com.streamhit.app.util.BackgroundDownloadHelper
+import com.streamhit.app.util.SponsorAdManager
 import com.streamhit.app.ui.details.DownloadQualityBottomSheet
 import com.streamhit.app.ui.details.SeriesDownloadBottomSheet
 import com.streamhit.app.ui.components.WatchLockShareDialog
@@ -143,14 +156,35 @@ class PlayerActivity : ComponentActivity() {
         }
     }
 
+    var onRemoteKeyEventListener: ((KeyEvent) -> Boolean)? = null
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (onRemoteKeyEventListener?.invoke(event) == true) {
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         // Keep screen on
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        // Start in portrait orientation as requested by user
-        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        // On Smart TV / Android TV devices: start in landscape; on mobile phones: start in portrait
+        val isTvDevice = try {
+            val uiModeManager = getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
+            uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
+            packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+        } catch (_: Exception) {
+            false
+        }
+
+        if (isTvDevice) {
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        } else {
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
 
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
@@ -352,8 +386,18 @@ fun AdaptivePlayerScreen(
     var targetStartPositionMs by remember { mutableStateOf<Long?>(if (initialStartPositionMs > 1000L) initialStartPositionMs else null) }
     var pendingSeekMs by remember { mutableStateOf<Long?>(null) }
 
-    // Orientation, Fullscreen, and Lock state
-    var isFullscreen by remember { mutableStateOf(false) }
+    val isTvDevice = remember {
+        try {
+            val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
+            uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
+            context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    // Orientation, Fullscreen, and Lock state (defaults to fullscreen landscape on TV devices)
+    var isFullscreen by remember { mutableStateOf(isTvDevice) }
     var isLocked by remember { mutableStateOf(false) }
 
     // Handle system back button: return to portrait if in fullscreen (unless locked)
@@ -441,6 +485,7 @@ fun AdaptivePlayerScreen(
     var bufferedAheadMs by remember { mutableLongStateOf(0L) }
     var hasPlaybackError by remember { mutableStateOf(false) }
     var playbackErrorMessage by remember { mutableStateOf<String?>(null) }
+    val failedStreamUrls = remember { mutableStateListOf<String>() }
     var playbackSpeed by remember { mutableFloatStateOf(1.0f) }
     var isFastForwarding2x by remember { mutableStateOf(false) }
     var overlayDismissToken by remember { mutableLongStateOf(0L) }
@@ -455,6 +500,47 @@ fun AdaptivePlayerScreen(
     var showDoubleTapFeedback by remember { mutableStateOf(false) }
 
     val maxSystemVolume = remember { audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).toFloat() }
+
+    var showPeriodicSponsorDialog by remember { mutableStateOf(false) }
+    var pendingPlayerDownloadRes by remember { mutableStateOf<StreamResource?>(null) }
+    var showPlayerDownloadSponsorDialog by remember { mutableStateOf(false) }
+    var showPlayerBgPermissionDialog by remember { mutableStateOf(false) }
+
+    val periodicSponsorLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            SponsorAdManager.recordAdUnlock()
+            showPeriodicSponsorDialog = false
+            exoPlayer?.play()
+        }
+    }
+
+    val playerDownloadSponsorLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val res = pendingPlayerDownloadRes
+            pendingPlayerDownloadRes = null
+            showPlayerDownloadSponsorDialog = false
+            if (res != null) {
+                MediaDownloadManager.startDownload(
+                    context = context,
+                    subjectId = detail?.subjectId ?: subjectId,
+                    detailPath = detail?.detailPath ?: detailPath,
+                    title = "${detail?.title ?: currentVideoTitle} (${res.displayResolution})",
+                    coverUrl = detail?.coverUrl ?: initialCoverUrl,
+                    quality = res.displayResolution,
+                    downloadUrl = res.url,
+                    isSeries = false
+                )
+                Toast.makeText(context, "Download started: ${res.displayResolution}", Toast.LENGTH_SHORT).show()
+                if (!BackgroundDownloadHelper.isBatteryOptimizationIgnored(context) && !BackgroundDownloadHelper.hasPromptedInitialPermission(context)) {
+                    showPlayerBgPermissionDialog = true
+                }
+            }
+        }
+    }
 
     val isLiveTv = subjectId.isBlank() && detailPath.isBlank()
     val liveTvRepository = remember { LiveTvRepository() }
@@ -475,6 +561,9 @@ fun AdaptivePlayerScreen(
         )
     }
     var loadingStatusIndex by remember { mutableIntStateOf(0) }
+
+    var enteredChannelDigits by remember { mutableStateOf("") }
+    var channelOverlayBanner by remember { mutableStateOf<Pair<Int, LiveTvChannel>?>(null) }
 
     LaunchedEffect(isBuffering) {
         if (isBuffering) {
@@ -499,6 +588,8 @@ fun AdaptivePlayerScreen(
             if (matched != null) {
                 val idx = matched.activeServers.indexOfFirst { it.url == currentStreamUrl }
                 currentServerIndex = if (idx >= 0) idx else 0
+                val chIdx = all.indexOfFirst { it.name.equals(matched.name, ignoreCase = true) }
+                channelOverlayBanner = Pair(if (chIdx >= 0) chIdx + 1 else 1, matched)
             }
         }
     }
@@ -510,8 +601,18 @@ fun AdaptivePlayerScreen(
         currentStreamUrl = s.url
         isBuffering = true
         val directUrl = resolveDirectPlayableUrl(s.url)
+        val mediaItem = MediaItem.Builder()
+            .setUri(Uri.parse(directUrl))
+            .setLiveConfiguration(
+                MediaItem.LiveConfiguration.Builder()
+                    .setTargetOffsetMs(3500L)
+                    .setMinPlaybackSpeed(0.97f)
+                    .setMaxPlaybackSpeed(1.03f)
+                    .build()
+            )
+            .build()
         exoPlayer?.apply {
-            setMediaItem(MediaItem.fromUri(Uri.parse(directUrl)))
+            setMediaItem(mediaItem)
             prepare()
             play()
         }
@@ -534,6 +635,16 @@ fun AdaptivePlayerScreen(
         }
     }
 
+    val currentChannelIndex = remember(liveChannels, currentChannel, currentVideoTitle) {
+        val targetName = currentChannel?.name ?: currentVideoTitle
+        val idx = liveChannels.indexOfFirst {
+            it.name.equals(targetName, ignoreCase = true) ||
+            targetName.startsWith(it.name, ignoreCase = true) ||
+            it.name.startsWith(targetName, ignoreCase = true)
+        }
+        if (idx >= 0) idx else 0
+    }
+
     fun switchLiveChannel(channel: LiveTvChannel) {
         currentChannel = channel
         currentVideoTitle = channel.name
@@ -542,21 +653,151 @@ fun AdaptivePlayerScreen(
         currentStreamUrl = s.url
         isBuffering = true
         val directUrl = resolveDirectPlayableUrl(s.url)
+        val mediaItem = MediaItem.Builder()
+            .setUri(Uri.parse(directUrl))
+            .setLiveConfiguration(
+                MediaItem.LiveConfiguration.Builder()
+                    .setTargetOffsetMs(3500L)
+                    .setMinPlaybackSpeed(0.97f)
+                    .setMaxPlaybackSpeed(1.03f)
+                    .build()
+            )
+            .build()
         exoPlayer?.apply {
-            setMediaItem(MediaItem.fromUri(Uri.parse(directUrl)))
+            setMediaItem(mediaItem)
             prepare()
             play()
         }
+        val idx = liveChannels.indexOfFirst { it.name.equals(channel.name, ignoreCase = true) }
+        channelOverlayBanner = Pair(if (idx >= 0) idx + 1 else 1, channel)
         Toast.makeText(context, "Playing ${channel.name}", Toast.LENGTH_SHORT).show()
+    }
+
+    fun playNextChannel() {
+        if (liveChannels.isEmpty()) return
+        val nextIdx = (currentChannelIndex + 1) % liveChannels.size
+        switchLiveChannel(liveChannels[nextIdx])
+    }
+
+    fun playPrevChannel() {
+        if (liveChannels.isEmpty()) return
+        val prevIdx = if (currentChannelIndex > 0) currentChannelIndex - 1 else liveChannels.size - 1
+        switchLiveChannel(liveChannels[prevIdx])
+    }
+
+    fun switchToChannelNumber(number: Int) {
+        if (liveChannels.isEmpty()) return
+        val targetIdx = (number - 1).coerceIn(0, liveChannels.size - 1)
+        switchLiveChannel(liveChannels[targetIdx])
+    }
+
+    // Auto-commit remote entered channel numbers after 1.2s debounce
+    LaunchedEffect(enteredChannelDigits) {
+        if (enteredChannelDigits.isNotEmpty()) {
+            delay(1200L)
+            val num = enteredChannelDigits.toIntOrNull()
+            if (num != null && liveChannels.isNotEmpty()) {
+                switchToChannelNumber(num)
+            }
+            enteredChannelDigits = ""
+        }
+    }
+
+    // Auto-hide TV Channel switch banner after 3.5s
+    LaunchedEffect(channelOverlayBanner) {
+        if (channelOverlayBanner != null) {
+            delay(3500L)
+            channelOverlayBanner = null
+        }
+    }
+
+    // ── TV Remote Control Key Event Interceptor ──
+    val playerActivity = context as? PlayerActivity
+    DisposableEffect(playerActivity, isLiveTv, liveChannels, currentChannelIndex, enteredChannelDigits, showControls) {
+        if (playerActivity != null && isLiveTv) {
+            playerActivity.onRemoteKeyEventListener = { event ->
+                if (event.action == KeyEvent.ACTION_DOWN) {
+                    val code = event.keyCode
+                    when {
+                        // 1. Number keys 0-9 & Numpad 0-9
+                        (code in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) || (code in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9) -> {
+                            val digit = if (code in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) {
+                                code - KeyEvent.KEYCODE_0
+                            } else {
+                                code - KeyEvent.KEYCODE_NUMPAD_0
+                            }
+                            enteredChannelDigits = (enteredChannelDigits + digit.toString()).take(3)
+                            true
+                        }
+                        // 2. ENTER / DPAD_CENTER (Confirm immediately if number was entered)
+                        code == KeyEvent.KEYCODE_ENTER || code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                            if (enteredChannelDigits.isNotEmpty()) {
+                                val num = enteredChannelDigits.toIntOrNull()
+                                if (num != null && liveChannels.isNotEmpty()) {
+                                    switchToChannelNumber(num)
+                                }
+                                enteredChannelDigits = ""
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                        // 3. Channel UP / PAGE UP / MEDIA NEXT
+                        code == KeyEvent.KEYCODE_CHANNEL_UP || code == KeyEvent.KEYCODE_PAGE_UP || code == KeyEvent.KEYCODE_MEDIA_NEXT -> {
+                            playNextChannel()
+                            true
+                        }
+                        // 4. Channel DOWN / PAGE DOWN / MEDIA PREVIOUS
+                        code == KeyEvent.KEYCODE_CHANNEL_DOWN || code == KeyEvent.KEYCODE_PAGE_DOWN || code == KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
+                            playPrevChannel()
+                            true
+                        }
+                        // 5. D-Pad UP / DOWN for Channel surfing when controls are hidden
+                        code == KeyEvent.KEYCODE_DPAD_UP && !showControls -> {
+                            playPrevChannel()
+                            true
+                        }
+                        code == KeyEvent.KEYCODE_DPAD_DOWN && !showControls -> {
+                            playNextChannel()
+                            true
+                        }
+                        // 6. D-Pad LEFT / RIGHT for Channel surfing when controls are hidden on Live TV
+                        code == KeyEvent.KEYCODE_DPAD_LEFT && !showControls -> {
+                            playPrevChannel()
+                            true
+                        }
+                        code == KeyEvent.KEYCODE_DPAD_RIGHT && !showControls -> {
+                            playNextChannel()
+                            true
+                        }
+                        else -> false
+                    }
+                } else false
+            }
+        }
+        onDispose {
+            playerActivity?.onRemoteKeyEventListener = null
+        }
     }
 
     fun selectFastestResolution(resList: List<StreamResource>): StreamResource? {
         if (resList.isEmpty()) return null
-        return resList.firstOrNull { it.resolution == 720 }
-            ?: resList.firstOrNull { it.resolution == 480 }
-            ?: resList.firstOrNull { it.resolution == 1080 }
-            ?: resList.firstOrNull { it.resolution == 360 }
-            ?: resList.firstOrNull()
+        val available = resList.filter { it.url.isNotBlank() && it.url !in failedStreamUrls }
+        val targetList = if (available.isNotEmpty()) available else resList
+        return targetList.firstOrNull { it.resolution == 720 }
+            ?: targetList.firstOrNull { it.resolution == 480 }
+            ?: targetList.firstOrNull { it.resolution == 1080 }
+            ?: targetList.firstOrNull { it.resolution == 360 }
+            ?: targetList.firstOrNull()
+    }
+
+    fun selectNextBestUntried(candidates: List<StreamResource>): StreamResource? {
+        if (candidates.isEmpty()) return null
+        return candidates.firstOrNull { it.resolution == 720 }
+            ?: candidates.firstOrNull { it.resolution == 480 }
+            ?: candidates.firstOrNull { it.resolution == 1080 }
+            ?: candidates.firstOrNull { it.resolution == 360 }
+            ?: candidates.firstOrNull()
     }
 
     // Report real-time watching telemetry to server
@@ -601,7 +842,7 @@ fun AdaptivePlayerScreen(
                 val resList = resDeferred.await()
                 if (resList.isNotEmpty()) {
                     resources = resList
-                    if (currentStreamUrl.isBlank()) {
+                    if (currentStreamUrl.isBlank() || currentStreamUrl in failedStreamUrls) {
                         val best = selectFastestResolution(resList)
                         if (best != null && best.url.isNotBlank()) {
                             currentStreamUrl = best.url
@@ -657,9 +898,11 @@ fun AdaptivePlayerScreen(
                     val dubRes = repository.getStreamingResources(sId, dPath, currentSeasonNum, currentEpisodeNum)
                     if (dubRes.isNotEmpty()) {
                         resources = dubRes
-                        val best = selectFastestResolution(dubRes)
-                        if (best != null && best.url.isNotBlank()) {
-                            currentStreamUrl = best.url
+                        if (currentStreamUrl.isBlank() || currentStreamUrl in failedStreamUrls) {
+                            val best = selectFastestResolution(dubRes)
+                            if (best != null && best.url.isNotBlank()) {
+                                currentStreamUrl = best.url
+                            }
                         }
                     }
                 }
@@ -719,11 +962,33 @@ fun AdaptivePlayerScreen(
 
         currentSeasonNum = season
         currentEpisodeNum = episode
+        failedStreamUrls.clear()
+        hasPlaybackError = false
+        playbackErrorMessage = null
         isBuffering = true
         scope.launch {
             val sId = selectedDub?.subjectId?.ifBlank { detail?.subjectId?.ifEmpty { subjectId } } ?: subjectId
             val dPath = selectedDub?.detailPath?.ifBlank { detail?.detailPath?.ifEmpty { detailPath } } ?: detailPath
-            val resList = repository.getStreamingResources(sId, dPath, season, episode)
+            var resList = repository.getStreamingResources(sId, dPath, season, episode)
+
+            // Fallback 1: detail subject
+            if (resList.isEmpty() && detail != null && detail!!.subjectId.isNotBlank() && detail!!.subjectId != sId) {
+                resList = repository.getStreamingResources(detail!!.subjectId, detail!!.detailPath.ifBlank { dPath }, season, episode)
+            }
+
+            // Fallback 2: candidate dubs
+            if (resList.isEmpty()) {
+                val candidateDubs = detail?.dubs?.filter { it.subjectId.isNotBlank() && it.subjectId != sId } ?: emptyList()
+                for (dub in candidateDubs) {
+                    val dStreams = repository.getStreamingResources(dub.subjectId, dub.detailPath.ifBlank { dPath }, season, episode)
+                    if (dStreams.isNotEmpty()) {
+                        resList = dStreams
+                        selectedDub = dub
+                        break
+                    }
+                }
+            }
+
             resources = resList
             val best = selectFastestResolution(resList)
             if (best != null && best.url.isNotBlank()) {
@@ -741,6 +1006,9 @@ fun AdaptivePlayerScreen(
         val currentPos = exoPlayer?.currentPosition ?: 0L
         pendingSeekMs = currentPos
         selectedDub = dub
+        failedStreamUrls.clear()
+        hasPlaybackError = false
+        playbackErrorMessage = null
         isBuffering = true
         scope.launch {
             val sId = dub.subjectId.ifBlank { detail?.subjectId?.ifEmpty { subjectId } } ?: subjectId
@@ -832,23 +1100,42 @@ fun AdaptivePlayerScreen(
         val resolvedUrl = resolveDirectPlayableUrl(currentStreamUrl)
         var triedProxyFallback = false
 
-        val dataSourceFactory = MediaCacheManager.getDataSourceFactory(context)
+        val dataSourceFactory = if (isLiveTv) {
+            MediaCacheManager.getDirectDataSourceFactory(context)
+        } else {
+            MediaCacheManager.getDataSourceFactory(context)
+        }
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
             .setDataSourceFactory(dataSourceFactory)
 
         val allocator = DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE)
-        val loadControl = DefaultLoadControl.Builder()
-            .setAllocator(allocator)
-            .setBufferDurationsMs(
-                60_000,   // minBufferMs (Aggressive continuous buffer)
-                900_000,  // maxBufferMs (15 minutes continuous ahead buffer: 15m buffer!)
-                500,      // bufferForPlaybackMs (Starts playback instantly with 0.5s buffer)
-                1_200     // bufferForPlaybackAfterRebufferMs (Fast rebuffer recovery)
-            )
-            .setTargetBufferBytes(C.LENGTH_UNSET)
-            .setPrioritizeTimeOverSizeThresholds(true)
-            .setBackBuffer(60_000, false)
-            .build()
+        val loadControl = if (isLiveTv) {
+            DefaultLoadControl.Builder()
+                .setAllocator(allocator)
+                .setBufferDurationsMs(
+                    6_000,    // minBufferMs (6s buffer for Live TV eliminates continuous stalls)
+                    20_000,   // maxBufferMs (20s buffer max)
+                    800,      // bufferForPlaybackMs (Instant 0.8s start for Live TV)
+                    1_500     // bufferForPlaybackAfterRebufferMs (1.5s recovery)
+                )
+                .setTargetBufferBytes(C.LENGTH_UNSET)
+                .setPrioritizeTimeOverSizeThresholds(true)
+                .setBackBuffer(0, false)
+                .build()
+        } else {
+            DefaultLoadControl.Builder()
+                .setAllocator(allocator)
+                .setBufferDurationsMs(
+                    60_000,   // minBufferMs (Aggressive continuous buffer for VOD)
+                    900_000,  // maxBufferMs (15 minutes continuous ahead buffer: 15m buffer!)
+                    500,      // bufferForPlaybackMs (Starts playback instantly with 0.5s buffer)
+                    1_200     // bufferForPlaybackAfterRebufferMs (Fast rebuffer recovery)
+                )
+                .setTargetBufferBytes(C.LENGTH_UNSET)
+                .setPrioritizeTimeOverSizeThresholds(true)
+                .setBackBuffer(60_000, false)
+                .build()
+        }
 
         val initialStartMs = when {
             pendingSeekMs != null -> {
@@ -887,8 +1174,21 @@ fun AdaptivePlayerScreen(
             .setLoadControl(loadControl)
             .setSeekParameters(SeekParameters.CLOSEST_SYNC)
             .build().apply {
-                val mediaItem = MediaItem.fromUri(Uri.parse(resolvedUrl))
-                setMediaItem(mediaItem, initialStartMs)
+                val mediaItem = if (isLiveTv) {
+                    MediaItem.Builder()
+                        .setUri(Uri.parse(resolvedUrl))
+                        .setLiveConfiguration(
+                            MediaItem.LiveConfiguration.Builder()
+                                .setTargetOffsetMs(3500L)
+                                .setMinPlaybackSpeed(0.97f)
+                                .setMaxPlaybackSpeed(1.03f)
+                                .build()
+                        )
+                        .build()
+                } else {
+                    MediaItem.fromUri(Uri.parse(resolvedUrl))
+                }
+                setMediaItem(mediaItem, if (isLiveTv) 0L else initialStartMs)
                 prepare()
                 playWhenReady = true
             }
@@ -960,18 +1260,86 @@ fun AdaptivePlayerScreen(
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 isBuffering = false
                 val sanitizedMsg = error.localizedMessage ?: "Playback error"
-                android.util.Log.e("StreamHitPlayer", "Player error code=${error.errorCode}: $sanitizedMsg")
-                // Automatic fallback: if direct CDN failed and we haven't tried proxy yet:
+                android.util.Log.e("StreamHitPlayer", "Player error code=${error.errorCode}: $sanitizedMsg on $currentStreamUrl")
+
+                // Step 1: Automatic proxy fallback if direct CDN failed and we haven't tried proxy yet
                 if (resolvedUrl != currentStreamUrl && !triedProxyFallback) {
                     triedProxyFallback = true
                     android.util.Log.w("StreamHitPlayer", "Direct CDN stream failed. Falling back to proxy: $currentStreamUrl")
-                    player.setMediaItem(MediaItem.fromUri(Uri.parse(currentStreamUrl)), player.currentPosition)
+                    val curPos = player.currentPosition.coerceAtLeast(0L)
+                    player.setMediaItem(MediaItem.fromUri(Uri.parse(currentStreamUrl)), curPos)
                     player.prepare()
                     player.play()
                     return
                 }
-                hasPlaybackError = true
-                playbackErrorMessage = sanitizedMsg
+
+                // Step 2: Mark currentStreamUrl as failed so we don't loop on it
+                if (!failedStreamUrls.contains(currentStreamUrl)) {
+                    failedStreamUrls.add(currentStreamUrl)
+                }
+
+                // Step 3: Check all other available untried servers/resolutions (1080p, 720p, 480p, 360p, etc.)
+                val untriedStreams = resources.filter { it.url.isNotBlank() && !failedStreamUrls.contains(it.url) }
+                if (untriedStreams.isNotEmpty()) {
+                    val nextRes = selectNextBestUntried(untriedStreams) ?: untriedStreams.first()
+                    android.util.Log.w("StreamHitPlayer", "Auto-failover: Trying next server ${nextRes.displayResolution} (${nextRes.url})")
+                    val curPos = player.currentPosition.coerceAtLeast(0L)
+                    targetStartPositionMs = curPos
+                    Toast.makeText(context, "সার্ভার চেক করা হচ্ছে: ${nextRes.displayResolution}...", Toast.LENGTH_SHORT).show()
+                    currentStreamUrl = nextRes.url
+                    return
+                }
+
+                // Step 4: If resources has no untried streams left, check alternative dubs or subject
+                scope.launch {
+                    isBuffering = true
+                    val sid = selectedDub?.subjectId?.ifBlank { detail?.subjectId?.ifEmpty { subjectId } } ?: subjectId
+                    val path = detail?.detailPath?.ifBlank { selectedDub?.detailPath?.ifBlank { detailPath } } ?: detailPath
+
+                    var freshList: List<StreamResource> = emptyList()
+
+                    if (resources.isEmpty() || resources.all { it.url in failedStreamUrls }) {
+                        // Check main detail if different
+                        if (detail != null && detail!!.subjectId.isNotBlank() && detail!!.subjectId != sid) {
+                            try {
+                                val mainStreams = repository.getStreamingResources(detail!!.subjectId, detail!!.detailPath.ifBlank { path }, currentSeasonNum, currentEpisodeNum)
+                                if (mainStreams.any { it.url !in failedStreamUrls }) {
+                                    freshList = mainStreams
+                                }
+                            } catch (_: Exception) {}
+                        }
+
+                        // Check candidate dubs
+                        if (freshList.none { it.url !in failedStreamUrls }) {
+                            val candidateDubs = detail?.dubs?.filter { it.subjectId.isNotBlank() && it.subjectId != sid } ?: emptyList()
+                            for (dub in candidateDubs) {
+                                try {
+                                    val dStreams = repository.getStreamingResources(dub.subjectId, dub.detailPath.ifBlank { path }, currentSeasonNum, currentEpisodeNum)
+                                    if (dStreams.any { it.url !in failedStreamUrls }) {
+                                        freshList = dStreams
+                                        selectedDub = dub
+                                        break
+                                    }
+                                } catch (_: Exception) {}
+                            }
+                        }
+                    }
+
+                    val candidates = freshList.filter { it.url.isNotBlank() && it.url !in failedStreamUrls }
+                    if (candidates.isNotEmpty()) {
+                        resources = freshList
+                        val nextBest = selectNextBestUntried(candidates) ?: candidates.first()
+                        val curPos = player.currentPosition.coerceAtLeast(0L)
+                        targetStartPositionMs = curPos
+                        Toast.makeText(context, "বিকল্প সার্ভার পাওয়া গেছে: ${nextBest.displayResolution}...", Toast.LENGTH_SHORT).show()
+                        currentStreamUrl = nextBest.url
+                    } else {
+                        // All servers across all available resolutions (1080p, 720p, 480p, 360p) have been tested and failed!
+                        isBuffering = false
+                        hasPlaybackError = true
+                        playbackErrorMessage = "সকল সার্ভার (1080p, 720p, 480p, 360p) যাচাই করা হয়েছে, কিন্তু কোনোটিতেই ভিডিওটি চালু করা যায়নি।"
+                    }
+                }
             }
         }
         player.addListener(listener)
@@ -1059,6 +1427,12 @@ fun AdaptivePlayerScreen(
                     showWatchLockDialog = true
                 }
 
+                // 30-minute automated sponsor ad gate
+                if (!isOffline && SponsorAdManager.isEnabled && !SponsorAdManager.isAdUnlocked() && !showPeriodicSponsorDialog) {
+                    p.pause()
+                    showPeriodicSponsorDialog = true
+                }
+
                 // Real-time AI Audio Translation synchronization
                 com.streamhit.app.util.SubtitleTtsManager.syncWithPlayback(pos, p)
             }
@@ -1111,6 +1485,7 @@ fun AdaptivePlayerScreen(
                 detail = detail!!,
                 repository = repository,
                 initialSeason = currentSeasonNum,
+                initialDub = selectedDub,
                 onDismiss = { showDownloadSheet = false }
             )
         } else if (resources.isNotEmpty()) {
@@ -1120,17 +1495,25 @@ fun AdaptivePlayerScreen(
                 onDismiss = { showDownloadSheet = false },
                 onDownloadSelected = { res ->
                     showDownloadSheet = false
-                    MediaDownloadManager.startDownload(
-                        context = context,
-                        subjectId = detail?.subjectId ?: subjectId,
-                        detailPath = detail?.detailPath ?: detailPath,
-                        title = "${detail?.title ?: currentVideoTitle} (${res.displayResolution})",
-                        coverUrl = detail?.coverUrl ?: initialCoverUrl,
-                        quality = res.displayResolution,
-                        downloadUrl = res.url,
-                        isSeries = false
-                    )
-                    Toast.makeText(context, "Download started: ${res.displayResolution}", Toast.LENGTH_SHORT).show()
+                    if (SponsorAdManager.isEnabled) {
+                        pendingPlayerDownloadRes = res
+                        showPlayerDownloadSponsorDialog = true
+                    } else {
+                        MediaDownloadManager.startDownload(
+                            context = context,
+                            subjectId = detail?.subjectId ?: subjectId,
+                            detailPath = detail?.detailPath ?: detailPath,
+                            title = "${detail?.title ?: currentVideoTitle} (${res.displayResolution})",
+                            coverUrl = detail?.coverUrl ?: initialCoverUrl,
+                            quality = res.displayResolution,
+                            downloadUrl = res.url,
+                            isSeries = false
+                        )
+                        Toast.makeText(context, "Download started: ${res.displayResolution}", Toast.LENGTH_SHORT).show()
+                        if (!BackgroundDownloadHelper.isBatteryOptimizationIgnored(context) && !BackgroundDownloadHelper.hasPromptedInitialPermission(context)) {
+                            showPlayerBgPermissionDialog = true
+                        }
+                    }
                 }
             )
         }
@@ -1261,7 +1644,11 @@ fun AdaptivePlayerScreen(
                 onResetOverlayToken = { overlayDismissToken = System.currentTimeMillis() },
                 audioSyncOffsetMs = audioSyncOffsetMs,
                 onOpenAudioSync = { showAudioSyncDialog = true },
-                onOpenTranslator = { showTranslatorDialog = true }
+                onOpenTranslator = { showTranslatorDialog = true },
+                isLiveStream = isLiveTv,
+                channelNumber = currentChannelIndex + 1,
+                onNextChannel = { playNextChannel() },
+                onPrevChannel = { playPrevChannel() }
             )
         } else {
             val isOffline = initialIsOffline || initialStreamUrl.startsWith("content://") || initialStreamUrl.startsWith("file://") || initialStreamUrl.startsWith("/")
@@ -1311,6 +1698,9 @@ fun AdaptivePlayerScreen(
                     },
                     gestureDetector = gestureDetector,
                     isLiveStream = isLiveStream,
+                    channelNumber = currentChannelIndex + 1,
+                    onNextChannel = { playNextChannel() },
+                    onPrevChannel = { playPrevChannel() },
                     audioSyncOffsetMs = audioSyncOffsetMs,
                     onOpenAudioSync = { showAudioSyncDialog = true }
                 )
@@ -1395,6 +1785,7 @@ fun AdaptivePlayerScreen(
             PlayerErrorReloadOverlay(
                 errorMessage = playbackErrorMessage ?: "Playback failed. Tap Reload to try again.",
                 onReload = {
+                    failedStreamUrls.clear()
                     hasPlaybackError = false
                     playbackErrorMessage = null
                     isBuffering = true
@@ -1435,6 +1826,155 @@ fun AdaptivePlayerScreen(
                 } else null,
                 onBack = onBack,
                 isFullscreen = isFullscreen
+            )
+        }
+
+        // ── TV REMOTE DIGIT ENTRY OVERLAY ──
+        if (enteredChannelDigits.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                contentAlignment = Alignment.TopEnd
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.Black.copy(alpha = 0.85f),
+                    border = BorderStroke(2.dp, AccentCyan),
+                    shadowElevation = 8.dp
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tv,
+                            contentDescription = null,
+                            tint = AccentCyan,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "CH $enteredChannelDigits _",
+                            color = Color.White,
+                            fontSize = 26.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+
+        // ── LIVE TV CHANNEL SWITCH BANNER (Auto-hides) ──
+        AnimatedVisibility(
+            visible = channelOverlayBanner != null,
+            enter = fadeIn() + slideInVertically(initialOffsetY = { -it / 2 }),
+            exit = fadeOut() + slideOutVertically(targetOffsetY = { -it / 2 }),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = if (isFullscreen) 24.dp else 48.dp)
+        ) {
+            channelOverlayBanner?.let { (num, ch) ->
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color.Black.copy(alpha = 0.90f),
+                    border = BorderStroke(1.5.dp, AccentBlue.copy(alpha = 0.8f)),
+                    shadowElevation = 12.dp
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = AccentBlue,
+                            modifier = Modifier.padding(end = 12.dp)
+                        ) {
+                            Text(
+                                text = "CH ${String.format("%02d", num)}",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                        if (ch.logo.isNotBlank()) {
+                            AsyncImage(
+                                model = ch.logo,
+                                contentDescription = ch.name,
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(6.dp)),
+                                contentScale = ContentScale.Fit
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                        }
+                        Column {
+                            Text(
+                                text = ch.name,
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "LIVE • ${ch.category.ifBlank { "Channel" }}",
+                                color = Color.Red,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // 30-minute automated sponsor ad dialog during playback
+        if (showPeriodicSponsorDialog) {
+            SponsorSupportDialog(
+                videoTitle = currentVideoTitle,
+                onSupportClick = {
+                    val intent = Intent(context, SponsorWebViewActivity::class.java).apply {
+                        putExtra("EXTRA_TARGET_URL", SponsorAdManager.sponsorUrl)
+                    }
+                    periodicSponsorLauncher.launch(intent)
+                },
+                onCancel = {
+                    // Stays paused until ad viewed
+                }
+            )
+        }
+
+        // Sponsor gate for movie download
+        if (showPlayerDownloadSponsorDialog && pendingPlayerDownloadRes != null) {
+            SponsorSupportDialog(
+                videoTitle = "${currentVideoTitle} (${pendingPlayerDownloadRes?.displayResolution})",
+                onSupportClick = {
+                    val intent = Intent(context, SponsorWebViewActivity::class.java).apply {
+                        putExtra("EXTRA_TARGET_URL", SponsorAdManager.sponsorUrl)
+                        putExtra("EXTRA_IS_DOWNLOAD_AD", true)
+                    }
+                    playerDownloadSponsorLauncher.launch(intent)
+                },
+                onCancel = {
+                    showPlayerDownloadSponsorDialog = false
+                    pendingPlayerDownloadRes = null
+                }
+            )
+        }
+
+        // Initial background download permission explanation
+        if (showPlayerBgPermissionDialog) {
+            BackgroundDownloadPermissionDialog(
+                onGrantClick = {
+                    showPlayerBgPermissionDialog = false
+                    BackgroundDownloadHelper.setPromptedInitialPermission(context, true)
+                    BackgroundDownloadHelper.requestIgnoreBatteryOptimization(context)
+                    Toast.makeText(context, "ব্যাকগ্রাউন্ড পারমিশন উইন্ডো খোলা হয়েছে। 'Allow' দিন।", Toast.LENGTH_LONG).show()
+                },
+                onDismiss = {
+                    showPlayerBgPermissionDialog = false
+                    BackgroundDownloadHelper.setPromptedInitialPermission(context, true)
+                }
             )
         }
     }

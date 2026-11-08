@@ -1,6 +1,9 @@
 package com.streamhit.app.ui.details
 
+import android.content.Intent
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,7 +35,12 @@ import com.streamhit.app.data.model.SubjectDetail
 import com.streamhit.app.data.repository.MovieRepository
 import com.streamhit.app.ui.components.AppBrandHeader
 import com.streamhit.app.ui.components.AppShareDialog
+import com.streamhit.app.ui.components.BackgroundDownloadPermissionDialog
 import com.streamhit.app.ui.components.ShareAppBannerCard
+import com.streamhit.app.ui.components.SponsorSupportDialog
+import com.streamhit.app.ui.sponsor.SponsorWebViewActivity
+import com.streamhit.app.util.BackgroundDownloadHelper
+import com.streamhit.app.util.SponsorAdManager
 import com.streamhit.app.ui.theme.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -75,6 +83,44 @@ fun DetailsScreen(
     var savedHistory by remember { mutableStateOf<com.streamhit.app.data.local.WatchHistoryItem?>(null) }
     var showAppShareDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    var pendingDownloadRes by remember { mutableStateOf<StreamResource?>(null) }
+    var showDownloadSponsorDialog by remember { mutableStateOf(false) }
+    var showBgPermissionDialog by remember { mutableStateOf(false) }
+
+    val downloadSponsorLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val res = pendingDownloadRes
+            pendingDownloadRes = null
+            showDownloadSponsorDialog = false
+            if (res != null && detail != null) {
+                val item = detail!!
+                val sId = item.subjectId.ifEmpty { subjectId }
+                val dPath = item.detailPath.ifEmpty { detailPath }
+                val downloadId = com.streamhit.app.data.local.MediaDownloadManager.startDownload(
+                    context = context,
+                    subjectId = sId,
+                    detailPath = dPath,
+                    title = item.title,
+                    coverUrl = item.coverUrl,
+                    quality = res.displayResolution,
+                    downloadUrl = res.url,
+                    isSeries = false
+                )
+                if (downloadId != -1L) {
+                    isDownloadingActive = true
+                    Toast.makeText(context, "Downloading ${res.displayResolution} ${item.title}", Toast.LENGTH_SHORT).show()
+                    if (!BackgroundDownloadHelper.isBatteryOptimizationIgnored(context) && !BackgroundDownloadHelper.hasPromptedInitialPermission(context)) {
+                        showBgPermissionDialog = true
+                    }
+                } else {
+                    Toast.makeText(context, "Failed to start download.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
 
     fun selectFastestPlayable(resList: List<StreamResource>): StreamResource? {
         if (resList.isEmpty()) return null
@@ -156,9 +202,6 @@ fun DetailsScreen(
     }
 
     fun playBestContent(season: Int = 1, episode: Int = 1, startPos: Long = 0L) {
-        val sId = selectedDub?.subjectId?.ifBlank { detail?.subjectId?.ifEmpty { subjectId } } ?: subjectId
-        val dPath = selectedDub?.detailPath?.ifBlank { detail?.detailPath?.ifEmpty { detailPath } } ?: detailPath
-
         // If we already have resources for season & episode
         if (resources.isNotEmpty() && season == (savedHistory?.seasonNum ?: 1) && episode == (savedHistory?.episodeNum ?: 1)) {
             val best = selectFastestPlayable(resources) ?: resources.first()
@@ -168,25 +211,38 @@ fun DetailsScreen(
 
         isResolvingStream = true
         scope.launch {
-            val resList = repository.getStreamingResources(sId, dPath, season, episode)
-            resources = resList
-            isResolvingStream = false
-            var best = selectFastestPlayable(resList)
+            val d = detail ?: repository.getDetail(detailPath, subjectId).also { detail = it }
+            val currentDub = selectedDub ?: d?.dubs?.firstOrNull { it.original == true } ?: d?.dubs?.firstOrNull()
+            if (selectedDub == null && currentDub != null) {
+                selectedDub = currentDub
+            }
 
-            // Fallback: If no streams found, try candidate dubs (original or other language)
-            if (best == null || best.url.isBlank()) {
-                val candidateDubs = detail?.dubs?.filter { it.subjectId.isNotBlank() && it.subjectId != sId } ?: emptyList()
+            val sId = currentDub?.subjectId?.ifBlank { d?.subjectId?.ifEmpty { subjectId } } ?: subjectId
+            val dPath = currentDub?.detailPath?.ifBlank { d?.detailPath?.ifEmpty { detailPath } } ?: detailPath
+
+            var resList = repository.getStreamingResources(sId, dPath, season, episode)
+
+            // Fallback 1: Try with main detail subjectId & detailPath if different from sId
+            if (resList.isEmpty() && d != null && d.subjectId.isNotBlank() && d.subjectId != sId) {
+                resList = repository.getStreamingResources(d.subjectId, d.detailPath.ifBlank { dPath }, season, episode)
+            }
+
+            // Fallback 2: Try with candidate dubs
+            if (resList.isEmpty()) {
+                val candidateDubs = d?.dubs?.filter { it.subjectId.isNotBlank() && it.subjectId != sId } ?: emptyList()
                 for (dub in candidateDubs) {
                     val fallbackList = repository.getStreamingResources(dub.subjectId, dub.detailPath.ifBlank { dPath }, season, episode)
-                    val fallbackBest = selectFastestPlayable(fallbackList)
-                    if (fallbackBest != null && fallbackBest.url.isNotBlank()) {
-                        resources = fallbackList
+                    if (fallbackList.isNotEmpty()) {
+                        resList = fallbackList
                         selectedDub = dub
-                        playStream(fallbackBest, season, episode, startPos)
-                        return@launch
+                        break
                     }
                 }
             }
+
+            resources = resList
+            isResolvingStream = false
+            val best = selectFastestPlayable(resList)
 
             if (best != null && best.url.isNotBlank()) {
                 playStream(best, season, episode, startPos)
@@ -341,7 +397,9 @@ fun DetailsScreen(
                             if (hasResume) {
                                 playBestContent(resumeTargetSeason, resumeTargetEpisode, resumeTargetPos)
                             } else {
-                                playBestContent(1, 1, 0L)
+                                val sNum = detail?.seasons?.firstOrNull()?.seasonNumber ?: 1
+                                val epNum = detail?.seasons?.firstOrNull()?.episodes?.firstOrNull()?.episodeNumber ?: 1
+                                playBestContent(sNum, epNum, 0L)
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
@@ -941,10 +999,13 @@ fun DetailsScreen(
         // Download Bottom Sheet Modal (Series multi-episode download or Movie quality)
         if (showDownloadSheet) {
             if (item.subjectType == 2) {
+                val activeSeason = detail?.seasons?.filter { it.episodes.isNotEmpty() }?.getOrNull(selectedSeasonIndex)
+                val curSeasonNum = activeSeason?.seasonNumber ?: (selectedSeasonIndex + 1)
                 SeriesDownloadBottomSheet(
                     detail = item,
                     repository = repository,
-                    initialSeason = selectedSeasonIndex + 1,
+                    initialSeason = curSeasonNum,
+                    initialDub = selectedDub,
                     onDismiss = { showDownloadSheet = false }
                 )
             } else {
@@ -954,23 +1015,31 @@ fun DetailsScreen(
                     onDismiss = { showDownloadSheet = false },
                     onDownloadSelected = { res ->
                         showDownloadSheet = false
-                        val sId = item.subjectId.ifEmpty { subjectId }
-                        val dPath = item.detailPath.ifEmpty { detailPath }
-                        val downloadId = com.streamhit.app.data.local.MediaDownloadManager.startDownload(
-                            context = context,
-                            subjectId = sId,
-                            detailPath = dPath,
-                            title = item.title,
-                            coverUrl = item.coverUrl,
-                            quality = res.displayResolution,
-                            downloadUrl = res.url,
-                            isSeries = false
-                        )
-                        if (downloadId != -1L) {
-                            isDownloadingActive = true
-                            Toast.makeText(context, "Downloading ${res.displayResolution} ${item.title}", Toast.LENGTH_SHORT).show()
+                        if (SponsorAdManager.isEnabled) {
+                            pendingDownloadRes = res
+                            showDownloadSponsorDialog = true
                         } else {
-                            Toast.makeText(context, "Failed to start download.", Toast.LENGTH_SHORT).show()
+                            val sId = item.subjectId.ifEmpty { subjectId }
+                            val dPath = item.detailPath.ifEmpty { detailPath }
+                            val downloadId = com.streamhit.app.data.local.MediaDownloadManager.startDownload(
+                                context = context,
+                                subjectId = sId,
+                                detailPath = dPath,
+                                title = item.title,
+                                coverUrl = item.coverUrl,
+                                quality = res.displayResolution,
+                                downloadUrl = res.url,
+                                isSeries = false
+                            )
+                            if (downloadId != -1L) {
+                                isDownloadingActive = true
+                                Toast.makeText(context, "Downloading ${res.displayResolution} ${item.title}", Toast.LENGTH_SHORT).show()
+                                if (!BackgroundDownloadHelper.isBatteryOptimizationIgnored(context) && !BackgroundDownloadHelper.hasPromptedInitialPermission(context)) {
+                                    showBgPermissionDialog = true
+                                }
+                            } else {
+                                Toast.makeText(context, "Failed to start download.", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     }
                 )
@@ -1040,6 +1109,40 @@ fun DetailsScreen(
 
         if (showAppShareDialog) {
             AppShareDialog(onDismiss = { showAppShareDialog = false })
+        }
+
+        // Sponsor gate for movie download
+        if (showDownloadSponsorDialog && pendingDownloadRes != null) {
+            SponsorSupportDialog(
+                videoTitle = "${detail?.title ?: ""} (${pendingDownloadRes?.displayResolution})",
+                onSupportClick = {
+                    val intent = Intent(context, SponsorWebViewActivity::class.java).apply {
+                        putExtra("EXTRA_TARGET_URL", SponsorAdManager.sponsorUrl)
+                        putExtra("EXTRA_IS_DOWNLOAD_AD", true)
+                    }
+                    downloadSponsorLauncher.launch(intent)
+                },
+                onCancel = {
+                    showDownloadSponsorDialog = false
+                    pendingDownloadRes = null
+                }
+            )
+        }
+
+        // Initial background download permission explanation
+        if (showBgPermissionDialog) {
+            BackgroundDownloadPermissionDialog(
+                onGrantClick = {
+                    showBgPermissionDialog = false
+                    BackgroundDownloadHelper.setPromptedInitialPermission(context, true)
+                    BackgroundDownloadHelper.requestIgnoreBatteryOptimization(context)
+                    Toast.makeText(context, "ব্যাকগ্রাউন্ড পারমিশন উইন্ডো খোলা হয়েছে। 'Allow' দিন।", Toast.LENGTH_LONG).show()
+                },
+                onDismiss = {
+                    showBgPermissionDialog = false
+                    BackgroundDownloadHelper.setPromptedInitialPermission(context, true)
+                }
+            )
         }
     }
 }

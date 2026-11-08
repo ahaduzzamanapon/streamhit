@@ -1,5 +1,6 @@
 package com.streamhit.app.ui.downloads
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -35,7 +36,9 @@ import com.streamhit.app.data.local.MediaDownloadManager
 import com.streamhit.app.data.model.SubjectSummary
 import com.streamhit.app.data.repository.MovieRepository
 import com.streamhit.app.ui.components.AppShareDialog
+import com.streamhit.app.ui.components.BackgroundDownloadPermissionDialog
 import com.streamhit.app.ui.components.MediaCard
+import com.streamhit.app.util.BackgroundDownloadHelper
 import com.streamhit.app.ui.theme.*
 import kotlinx.coroutines.delay
 
@@ -53,6 +56,8 @@ fun DownloadsScreen(
     var selectedFilterIndex by remember { mutableStateOf(0) }
     var selectedSeriesForDetail by remember { mutableStateOf<String?>(null) }
     var showShareDialog by remember { mutableStateOf(false) }
+    var isBgDownloadActive by remember { mutableStateOf(BackgroundDownloadHelper.isBatteryOptimizationIgnored(context)) }
+    var showBgDownloadPermissionDialog by remember { mutableStateOf(false) }
 
     // Intercept back button when inside a Series Download Detail view
     BackHandler(enabled = selectedSeriesForDetail != null) {
@@ -69,9 +74,10 @@ fun DownloadsScreen(
             recommendations = allSubs.take(12)
         } catch (_: Exception) {}
 
-        // Periodic storage check
+        // Periodic storage and background permission check
         while (true) {
-            delay(5000)
+            delay(2500)
+            isBgDownloadActive = BackgroundDownloadHelper.isBatteryOptimizationIgnored(context)
             availableStorage = MediaDownloadManager.getAvailableStorageFormatted()
         }
     }
@@ -369,6 +375,20 @@ fun DownloadsScreen(
             contentPadding = PaddingValues(bottom = 90.dp)
         ) {
 
+            // Background Download Optimization Status Banner
+            item {
+                BackgroundDownloadStatusBanner(
+                    isGranted = isBgDownloadActive,
+                    onClick = {
+                        if (isBgDownloadActive) {
+                            Toast.makeText(context, "✅ ব্যাকগ্রাউন্ড ডাউনলোড সক্রিয় আছে! স্ক্রিন বন্ধ বা অ্যাপ মিনিমাইজ থাকলেও ডাউনলোড চলবে।", Toast.LENGTH_LONG).show()
+                        } else {
+                            showBgDownloadPermissionDialog = true
+                        }
+                    }
+                )
+            }
+
             // Section: Downloading (Active tasks)
             if (downloadingList.isNotEmpty()) {
                 item {
@@ -630,7 +650,102 @@ fun DownloadsScreen(
     if (showShareDialog) {
         AppShareDialog(onDismiss = { showShareDialog = false })
     }
+
+    if (showBgDownloadPermissionDialog) {
+        BackgroundDownloadPermissionDialog(
+            onGrantClick = {
+                showBgDownloadPermissionDialog = false
+                BackgroundDownloadHelper.setPromptedInitialPermission(context, true)
+                BackgroundDownloadHelper.requestIgnoreBatteryOptimization(context)
+                Toast.makeText(context, "ব্যাকগ্রাউন্ড পারমিশন উইন্ডো খোলা হয়েছে। 'Allow' বা 'No restrictions' দিন।", Toast.LENGTH_LONG).show()
+            },
+            onDismiss = {
+                showBgDownloadPermissionDialog = false
+                BackgroundDownloadHelper.setPromptedInitialPermission(context, true)
+            }
+        )
+    }
 }
+}
+
+@Composable
+fun BackgroundDownloadStatusBanner(
+    isGranted: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = if (isGranted) Color(0xFF0F2624) else Color(0xFF131F33),
+        border = BorderStroke(
+            1.2.dp,
+            if (isGranted) Color(0xFF00F5D4).copy(alpha = 0.5f) else AccentCyan.copy(alpha = 0.4f)
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .clickable { onClick() }
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(if (isGranted) Color(0x2200F5D4) else Color(0x2200C6FF)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (isGranted) Icons.Default.CheckCircle else Icons.Default.Bolt,
+                        contentDescription = null,
+                        tint = if (isGranted) Color(0xFF00F5D4) else AccentCyan,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = if (isGranted) "ব্যাকগ্রাউন্ড ডাউনলোড সক্রিয়" else "ব্যাকগ্রাউন্ড ডাউনলোড চালু করুন",
+                        color = Color.White,
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = if (isGranted) "অ্যাপ মিনিমাইজ বা স্ক্রিন অফ থাকলেও সচল থাকবে" else "অ্যাপ থেকে বের হলেও যেন ডাউনলোড না থামে",
+                        color = if (isGranted) Color(0xFF00F5D4).copy(alpha = 0.85f) else TextSecondary,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = if (isGranted) Color(0xFF00F5D4).copy(alpha = 0.15f) else AccentEmerald.copy(alpha = 0.2f),
+                border = BorderStroke(
+                    1.dp,
+                    if (isGranted) Color(0xFF00F5D4) else AccentEmerald
+                ),
+                modifier = Modifier.padding(start = 8.dp)
+            ) {
+                Text(
+                    text = if (isGranted) "Active ✓" else "Turn ON >",
+                    color = if (isGranted) Color(0xFF00F5D4) else AccentCyan,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+        }
+    }
 }
 
 @Composable

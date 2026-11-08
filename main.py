@@ -2242,13 +2242,19 @@ async def admin_page(request: Request): return serve_html("public/admin.html", h
 async def movies(request: Request):
     host = request.headers.get("host", "")
     brand = get_brand_config(host)
-    return serve_html("public/movies.html", {"<title>Explore Movies - Streamfit</title>": f"<title>Explore Movies - {brand['name']}</title>"}, host=host)
+    return serve_html("public/movies.html", {
+        "<title>Watch Free HD Movies Online — NXLY</title>": f"<title>Watch Free HD Movies Online — {brand['name']}</title>",
+        "<title>Explore Movies - Streamfit</title>": f"<title>Explore Movies - {brand['name']}</title>"
+    }, host=host)
 
 @app.get("/tv", response_class=HTMLResponse)
 async def tv(request: Request):
     host = request.headers.get("host", "")
     brand = get_brand_config(host)
-    return serve_html("public/tv.html", {"<title>Explore TV Series - Streamfit</title>": f"<title>Explore TV Series - {brand['name']}</title>"}, host=host)
+    return serve_html("public/tv.html", {
+        "<title>Watch Free TV Series & Anime Online — NXLY</title>": f"<title>Watch Free TV Series & Anime Online — {brand['name']}</title>",
+        "<title>Explore TV Series - Streamfit</title>": f"<title>Explore TV Series - {brand['name']}</title>"
+    }, host=host)
 
 @app.get("/live-tv")
 @app.get("/live-tv.html")
@@ -2290,16 +2296,20 @@ async def details(slug: str, request: Request):
     brand = get_brand_config(host)
     meta = await get_subject_meta(slug, host=host)
     reps = {
-        '<title>Details — Streamfit</title>': f'<title>{meta["title"]}</title>',
+        '<title>Details — Streamfit</title>': f'<title>{meta["title"]} — {brand["name"]}</title>',
         'id="detailsTitle">Title': f'id="detailsTitle">{meta["title"]}',
         'id="watchDescription">Description loading...': f'id="watchDescription">{meta["description"]}',
         'src="/default-cover.png"': f'src="{meta["cover"]}"',
         'content="Watch free movies, TV shows, anime and live sports online."': f'content="{meta["description"]}"',
-        'content="Streamfit - Free Movies, TV Shows & Anime Streaming"': f'content="{meta["title"]}"',
+        'content="NXLY - Free Movies, TV Shows & Anime Streaming"': f'content="{meta["title"]} — {brand["name"]}"',
+        'content="Streamfit - Free Movies, TV Shows & Anime Streaming"': f'content="{meta["title"]} — {brand["name"]}"',
+        'content="https://nxly.online/"': f'content="{meta["url"]}"',
         'content="https://streamfit.ehealthfinder.com/"': f'content="{meta["url"]}"',
+        'content="https://nxly.online/default-cover.png"': f'content="{meta["cover"]}"',
         'content="https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=1200&q=80"': f'content="{meta["cover"]}"',
         'content="website"': 'content="video.movie"',
-        '<!-- SCHEMA_PLACEHOLDER -->': meta.get("schema", "")
+        '<!-- SCHEMA_PLACEHOLDER -->': meta.get("schema", ""),
+        '<!-- CANONICAL_PLACEHOLDER -->': f'<link rel="canonical" href="{meta["url"]}">'
     }
     return serve_html("public/details.html", reps, host=host)
 

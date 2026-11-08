@@ -19,6 +19,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.Person
+import com.streamhit.app.ui.account.AccountScreen
 import androidx.compose.material3.*
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -123,6 +125,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Synchronize latest dynamic sponsor settings from admin panel
+        SponsorAdManager.fetchRemoteConfig(this)
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -197,6 +205,7 @@ sealed class Screen(val title: String, val icon: ImageVector) {
     object Explore : Screen("Explore", Icons.Default.Movie)
     object Downloads : Screen("Downloads", Icons.Default.FileDownload)
     object Search : Screen("Search", Icons.Default.Search)
+    object Account : Screen("Account", Icons.Default.Person)
 }
 
 data class PendingPlayRequest(
@@ -234,8 +243,8 @@ fun MainAppScreen(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == android.app.Activity.RESULT_OK) {
-            // Successfully completed 10 seconds on sponsor page!
-            SponsorAdManager.isSessionUnlocked = true
+            // Successfully completed 15 seconds on sponsor page!
+            SponsorAdManager.recordAdUnlock()
             pendingPlayRequest?.let { toPlay ->
                 pendingPlayRequest = null
                 onPlayVideo(
@@ -245,17 +254,16 @@ fun MainAppScreen(
                 )
             }
         } else {
-            // User backed out before 10 seconds: session remains locked!
-            // When user tries to play again, the sponsor dialog will appear again.
+            // User backed out before 15 seconds: session remains locked!
         }
     }
 
     val triggerPlayWithSponsorCheck: (String, String, String, String, String, Int, Int, Long, String?, String?, String?, String?) -> Unit = { url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPositionMs, dubLanguage, dubSubjectId, dubDetailPath, dubName ->
-        if (!SponsorAdManager.isEnabled || SponsorAdManager.isSessionUnlocked) {
-            // If sponsor ads disabled in admin OR already unlocked in this session: play directly!
+        if (!SponsorAdManager.isEnabled || SponsorAdManager.isAdUnlocked()) {
+            // If sponsor ads disabled in admin OR ad currently unlocked for 30 minutes: play directly!
             onPlayVideo(url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPositionMs, dubLanguage, dubSubjectId, dubDetailPath, dubName)
         } else {
-            // Session locked: prompt user to complete the 10-second sponsor visit to unlock
+            // Ad locked: prompt user to complete 15-second sponsor visit to unlock
             pendingPlayRequest = PendingPlayRequest(
                 url = url,
                 title = title,
@@ -429,7 +437,7 @@ fun MainAppScreen(
                             horizontalArrangement = Arrangement.SpaceAround,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            val tabs = listOf(Screen.Home, Screen.LiveTv, Screen.Explore, Screen.Downloads, Screen.Search)
+                            val tabs = listOf(Screen.Home, Screen.LiveTv, Screen.Explore, Screen.Downloads, Screen.Search, Screen.Account)
                             tabs.forEach { tab ->
                                 val isSelected = currentTab == tab
                                 val iconScale by animateFloatAsState(
@@ -592,6 +600,11 @@ fun MainAppScreen(
                             repository = repository,
                             onMediaClick = { path, id, _ ->
                                 navigateToDetails(path, id)
+                            }
+                        )
+                        Screen.Account -> AccountScreen(
+                            onShareApp = {
+                                showAppShareModal = true
                             }
                         )
                     }

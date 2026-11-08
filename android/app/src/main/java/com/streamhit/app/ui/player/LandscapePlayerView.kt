@@ -7,6 +7,7 @@ import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -77,7 +78,11 @@ fun LandscapePlayerView(
     onResetOverlayToken: () -> Unit,
     audioSyncOffsetMs: Long = 0L,
     onOpenAudioSync: () -> Unit = {},
-    onOpenTranslator: () -> Unit = {}
+    onOpenTranslator: () -> Unit = {},
+    isLiveStream: Boolean = false,
+    channelNumber: Int = 0,
+    onNextChannel: (() -> Unit)? = null,
+    onPrevChannel: (() -> Unit)? = null
 ) {
     var initialTouchX by remember { mutableFloatStateOf(0f) }
     var initialTouchY by remember { mutableFloatStateOf(0f) }
@@ -458,14 +463,27 @@ fun LandscapePlayerView(
                 } else {
                     Row(
                         modifier = Modifier.align(Alignment.Center),
-                        horizontalArrangement = Arrangement.spacedBy(32.dp),
+                        horizontalArrangement = Arrangement.spacedBy(28.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(
-                            onClick = onRewind10,
-                            modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape).size(48.dp)
-                        ) {
-                            Icon(Icons.Default.Replay10, contentDescription = "Rewind", tint = Color.White)
+                        if (isLiveStream && onPrevChannel != null) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                IconButton(
+                                    onClick = onPrevChannel,
+                                    modifier = Modifier.background(Color.Black.copy(alpha = 0.6f), CircleShape).size(52.dp)
+                                ) {
+                                    Icon(Icons.Default.SkipPrevious, contentDescription = "Previous Channel", tint = Color.White, modifier = Modifier.size(30.dp))
+                                }
+                                Spacer(modifier = Modifier.height(3.dp))
+                                Text("Prev CH", color = TextSecondary, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
+                            }
+                        } else {
+                            IconButton(
+                                onClick = onRewind10,
+                                modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape).size(48.dp)
+                            ) {
+                                Icon(Icons.Default.Replay10, contentDescription = "Rewind", tint = Color.White)
+                            }
                         }
 
                         IconButton(
@@ -480,19 +498,32 @@ fun LandscapePlayerView(
                             )
                         }
 
-                        IconButton(
-                            onClick = onForward10,
-                            modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape).size(48.dp)
-                        ) {
-                            Icon(Icons.Default.Forward10, contentDescription = "Forward", tint = Color.White)
-                        }
-
-                        if (hasNextEpisode) {
+                        if (isLiveStream && onNextChannel != null) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                IconButton(
+                                    onClick = onNextChannel,
+                                    modifier = Modifier.background(Color.Black.copy(alpha = 0.6f), CircleShape).size(52.dp)
+                                ) {
+                                    Icon(Icons.Default.SkipNext, contentDescription = "Next Channel", tint = Color.White, modifier = Modifier.size(30.dp))
+                                }
+                                Spacer(modifier = Modifier.height(3.dp))
+                                Text("Next CH", color = TextSecondary, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
+                            }
+                        } else {
                             IconButton(
-                                onClick = onPlayNextEpisode,
+                                onClick = onForward10,
                                 modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape).size(48.dp)
                             ) {
-                                Icon(Icons.Default.SkipNext, contentDescription = "Next Episode", tint = AccentEmerald)
+                                Icon(Icons.Default.Forward10, contentDescription = "Forward", tint = Color.White)
+                            }
+
+                            if (hasNextEpisode) {
+                                IconButton(
+                                    onClick = onPlayNextEpisode,
+                                    modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape).size(48.dp)
+                                ) {
+                                    Icon(Icons.Default.SkipNext, contentDescription = "Next Episode", tint = AccentEmerald)
+                                }
                             }
                         }
                     }
@@ -506,84 +537,57 @@ fun LandscapePlayerView(
                         .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))))
                         .padding(horizontal = 20.dp, vertical = 12.dp)
                 ) {
-                    Column {
-                        val bufferedRatio = if (totalDuration > 0L) {
-                            (bufferedPosition.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f)
-                        } else 0f
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(24.dp),
-                            contentAlignment = Alignment.CenterStart
-                        ) {
-                            // Background base track & buffered progress track
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 8.dp)
-                                    .height(4.dp)
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(Color.White.copy(alpha = 0.2f)),
-                                contentAlignment = Alignment.CenterStart
-                            ) {
-                                if (bufferedRatio > 0f) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxHeight()
-                                            .fillMaxWidth(fraction = bufferedRatio)
-                                            .background(Color.White.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
-                                    )
-                                }
-                            }
-
-                            // Playback active track & thumb
-                            Slider(
-                                value = currentPosition.toFloat(),
-                                onValueChange = { newPos -> onSeekTo(newPos.toLong()) },
-                                valueRange = 0f..totalDuration.coerceAtLeast(1L).toFloat(),
-                                colors = SliderDefaults.colors(
-                                    thumbColor = AccentEmerald,
-                                    activeTrackColor = AccentEmerald,
-                                    inactiveTrackColor = Color.Transparent
-                                ),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-
+                    if (isLiveStream) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "${formatDuration(currentPosition)} / ${formatDuration(totalDuration)}",
-                                    color = Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                if (bufferedAheadMs > 0L && totalDuration > 0L) {
-                                    Spacer(modifier = Modifier.width(10.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = Color(0xFFFF2A54)
+                                ) {
                                     Text(
-                                        text = "•  Buffer: ${formatBufferedAhead(bufferedAheadMs)}",
-                                        color = AccentEmerald.copy(alpha = 0.85f),
+                                        text = "LIVE",
+                                        color = Color.White,
                                         fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                                     )
                                 }
+                                if (channelNumber > 0) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = AccentEmerald.copy(alpha = 0.2f),
+                                        border = BorderStroke(1.dp, AccentEmerald)
+                                    ) {
+                                        Text(
+                                            text = "CH %02d".format(channelNumber),
+                                            color = AccentCyan,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = currentVideoTitle,
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1
+                                )
                             }
 
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                                 Text(
-                                    text = "${playbackSpeed}x",
-                                    color = AccentCyan,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier
-                                        .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(4.dp))
-                                        .clickable { onCyclePlaybackSpeed() }
-                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                    text = "TV Remote: CH +/- or 0-9",
+                                    color = TextMuted,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium
                                 )
 
                                 IconButton(
@@ -591,6 +595,96 @@ fun LandscapePlayerView(
                                     modifier = Modifier.size(32.dp)
                                 ) {
                                     Icon(Icons.Default.FullscreenExit, contentDescription = "Exit Fullscreen", tint = Color.White)
+                                }
+                            }
+                        }
+                    } else {
+                        Column {
+                            val bufferedRatio = if (totalDuration > 0L) {
+                                (bufferedPosition.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f)
+                            } else 0f
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(24.dp),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                // Background base track & buffered progress track
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 8.dp)
+                                        .height(4.dp)
+                                        .clip(RoundedCornerShape(2.dp))
+                                        .background(Color.White.copy(alpha = 0.2f)),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    if (bufferedRatio > 0f) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxHeight()
+                                                .fillMaxWidth(fraction = bufferedRatio)
+                                                .background(Color.White.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
+                                        )
+                                    }
+                                }
+
+                                // Playback active track & thumb
+                                Slider(
+                                    value = currentPosition.toFloat(),
+                                    onValueChange = { newPos -> onSeekTo(newPos.toLong()) },
+                                    valueRange = 0f..totalDuration.coerceAtLeast(1L).toFloat(),
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = AccentEmerald,
+                                        activeTrackColor = AccentEmerald,
+                                        inactiveTrackColor = Color.Transparent
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "${formatDuration(currentPosition)} / ${formatDuration(totalDuration)}",
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    if (bufferedAheadMs > 0L && totalDuration > 0L) {
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Text(
+                                            text = "•  Buffer: ${formatBufferedAhead(bufferedAheadMs)}",
+                                            color = AccentEmerald.copy(alpha = 0.85f),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                    Text(
+                                        text = "${playbackSpeed}x",
+                                        color = AccentCyan,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier
+                                            .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(4.dp))
+                                            .clickable { onCyclePlaybackSpeed() }
+                                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+
+                                    IconButton(
+                                        onClick = onExitFullscreen,
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(Icons.Default.FullscreenExit, contentDescription = "Exit Fullscreen", tint = Color.White)
+                                    }
                                 }
                             }
                         }

@@ -227,6 +227,9 @@ object MediaDownloadManager {
             saveDownloads(context, list)
 
             executeDownload(context.applicationContext, item, targetFile)
+            try {
+                com.streamhit.app.service.DownloadForegroundService.startService(context.applicationContext)
+            } catch (_: Exception) {}
 
             downloadId
         } catch (e: Exception) {
@@ -385,6 +388,9 @@ object MediaDownloadManager {
 
         val targetFile = File(target.localFilePath)
         executeDownload(context.applicationContext, target, targetFile)
+        try {
+            com.streamhit.app.service.DownloadForegroundService.startService(context.applicationContext)
+        } catch (_: Exception) {}
     }
 
     @Synchronized

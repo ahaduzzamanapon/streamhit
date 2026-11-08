@@ -26,6 +26,29 @@ object SponsorAdManager {
     var isSessionUnlocked: Boolean = false
 
     @Volatile
+    var lastAdUnlockTimeMs: Long = 0L
+
+    /**
+     * Checks if ad is currently unlocked.
+     * When unlocked, allows 30 minutes of uninterrupted playback before prompting again.
+     */
+    fun isAdUnlocked(): Boolean {
+        if (!isEnabled) return true
+        if (!isSessionUnlocked) return false
+        val elapsed = System.currentTimeMillis() - lastAdUnlockTimeMs
+        val intervalMs = 30 * 60 * 1000L // 30 minutes
+        return elapsed < intervalMs
+    }
+
+    /**
+     * Call when user finishes the 15-second sponsor visit.
+     */
+    fun recordAdUnlock() {
+        lastAdUnlockTimeMs = System.currentTimeMillis()
+        isSessionUnlocked = true
+    }
+
+    @Volatile
     var sponsorUrl: String = FALLBACK_URL
         private set
 
@@ -34,15 +57,15 @@ object SponsorAdManager {
         private set
 
     @Volatile
-    var dialogTitle: String = "আমাদের সাপোর্ট করুন"
+    var dialogTitle: String = "অটোমেটেড অ্যাড সেন্টার"
         private set
 
     @Volatile
-    var dialogMessage: String = "অ্যাপটি সম্পূর্ণ ফ্রিতে চালাতে এবং সকল কনটেন্ট উপভোগ করতে স্পন্সর পেজটি ১০ সেকেন্ড ভিজিট করে আনলক করুন!"
+    var dialogMessage: String = "এটি একটি অটোমেটেড অ্যাড সেন্টার। দয়া করে কিছু ক্লিক বা কাটবেন না। অ্যাড শেষ হলে অটোমেটিক আপনার ভিডিও প্লে হবে।"
         private set
 
     @Volatile
-    var buttonText: String = "🚀 স্পন্সর পেজ ভিজিট করুন (১০ সেকেন্ড)"
+    var buttonText: String = "🚀 অ্যাড দেখুন (১৫ সেকেন্ড)"
         private set
 
     @Volatile
@@ -81,11 +104,26 @@ object SponsorAdManager {
                     val body = res.body()
                     val remoteUrl = body?.get("sponsor_url")?.toString()?.trim()
                     if (!remoteUrl.isNullOrBlank() && remoteUrl.startsWith("http")) {
-                        sponsorUrl = remoteUrl
+                        if (remoteUrl != sponsorUrl) {
+                            sponsorUrl = remoteUrl
+                            // When admin updates sponsor link, instantly reset session unlock so user gets the new ad!
+                            isSessionUnlocked = false
+                        }
                     }
                     val remoteEnabled = body?.get("enabled")
-                    if (remoteEnabled is Boolean) {
-                        isEnabled = remoteEnabled
+                    if (remoteEnabled != null) {
+                        val parsedEnabled = when (remoteEnabled) {
+                            is Boolean -> remoteEnabled
+                            is Number -> remoteEnabled.toInt() == 1
+                            is String -> remoteEnabled.equals("true", ignoreCase = true) || remoteEnabled == "1"
+                            else -> true
+                        }
+                        if (parsedEnabled != isEnabled) {
+                            isEnabled = parsedEnabled
+                            if (parsedEnabled) {
+                                isSessionUnlocked = false
+                            }
+                        }
                     }
                     val rTitle = body?.get("dialog_title")?.toString()?.trim()
                     if (!rTitle.isNullOrBlank()) dialogTitle = rTitle
