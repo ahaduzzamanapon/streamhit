@@ -314,6 +314,67 @@ data class StreamResource(
         }
 }
 
+data class WorldSportsResponse(
+    @SerializedName("total_matches") val totalMatches: Int = 0,
+    @SerializedName("live_count") val liveCount: Int = 0,
+    @SerializedName("upcoming_count") val upcomingCount: Int = 0,
+    @SerializedName("matches") val matches: List<WorldSportMatch> = emptyList()
+)
+
+data class WorldSportMatch(
+    @SerializedName("match_id") val matchId: String = "",
+    @SerializedName("title") val title: String = "",
+    @SerializedName("teams") val teams: String? = null,
+    @SerializedName("league") val league: String = "",
+    @SerializedName("sport") val sport: String = "",
+    @SerializedName("status") val status: String = "live",
+    @SerializedName("status_display") val statusDisplay: String = "LIVE",
+    @SerializedName("thumbnail") val thumbnail: String = "",
+    @SerializedName("viewers") val viewers: String? = null,
+    @SerializedName("viewers_type") val viewersType: String? = null,
+    @SerializedName("server_urls") val serverUrls: List<String> = emptyList()
+) {
+    val isLive: Boolean
+        get() = status.equals("live", ignoreCase = true) || statusDisplay.equals("LIVE", ignoreCase = true)
+
+    val displayTitle: String
+        get() = teams?.ifBlank { null } ?: title.ifBlank { "Live Match" }
+
+    val team1: String
+        get() {
+            val text = displayTitle
+            val parts = text.split(Regex("(?i)\\s+vs\\.?\\s+"))
+            return if (parts.size >= 2) parts[0].trim() else text
+        }
+
+    val team2: String
+        get() {
+            val text = displayTitle
+            val parts = text.split(Regex("(?i)\\s+vs\\.?\\s+"))
+            if (parts.size >= 2) {
+                val t2 = parts[1].trim()
+                return t2.replace(Regex("(?i)(\\d+(st|nd|rd|th)\\s+[a-z]+.*|\\(.*\\)|-.*)"), "").trim()
+            }
+            return ""
+        }
+
+    val extraInfo: String
+        get() {
+            val text = displayTitle
+            val match = Regex("(?i)(\\d+(?:st|nd|rd|th)\\s+[A-Za-z]+.*|\\(.*\\))").find(text)
+            val info = match?.value?.trim()?.removePrefix("(")?.removeSuffix(")")
+            return if (!info.isNullOrBlank()) info else league
+        }
+
+    val activeServers: List<StreamLinkItem>
+        get() = serverUrls.filter { it.isNotBlank() }.mapIndexed { index, url ->
+            StreamLinkItem(
+                label = "Server ${index + 1}",
+                url = url
+            )
+        }
+}
+
 data class LiveSportsResponse(
     @SerializedName("code") val code: Int = 0,
     @SerializedName("list") val list: List<LiveSportItem> = emptyList()

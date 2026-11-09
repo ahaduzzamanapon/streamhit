@@ -1,9 +1,12 @@
 package com.streamhit.app.data.repository
 
 import android.content.Context
+import com.google.gson.Gson
 import com.streamhit.app.data.local.LiveTvCacheManager
 import com.streamhit.app.data.model.LiveTvChannel
 import com.streamhit.app.data.model.StreamLinkItem
+import com.streamhit.app.data.model.WorldSportMatch
+import com.streamhit.app.data.model.WorldSportsResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -13,11 +16,44 @@ import java.util.concurrent.TimeUnit
 class LiveTvRepository {
 
     private val m3uUrl = "https://raw.githubusercontent.com/saeidrahmanbd/BDIX-IPTV/main/IPTV-Playlist.m3u"
+    private val worldSportsUrls = listOf(
+        "https://raw.githubusercontent.com/sportlive18/Sportlink-Live/main/api/world-sports.json",
+        "https://streamhit.online/api/sports/live"
+    )
+    private val gson = Gson()
 
     private val okHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .build()
+
+    /**
+     * Auto-fetches real-time Live World Sports.
+     * In fallback / offline mode or if API fails, returns emptyList() so the section is not shown.
+     */
+    suspend fun getWorldSports(): List<WorldSportMatch> = withContext(Dispatchers.IO) {
+        for (url in worldSportsUrls) {
+            try {
+                val request = Request.Builder()
+                    .url(url)
+                    .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile)")
+                    .build()
+
+                val response = okHttpClient.newCall(request).execute()
+                if (response.isSuccessful) {
+                    val content = response.body?.string() ?: ""
+                    val parsed = gson.fromJson(content, WorldSportsResponse::class.java)
+                    if (parsed != null && parsed.matches.isNotEmpty()) {
+                        return@withContext parsed.matches
+                    }
+                }
+            } catch (_: Exception) {
+                // Try next source
+            }
+        }
+        // In fallback / offline mode: return empty list (section will not be visible)
+        return@withContext emptyList()
+    }
 
     suspend fun getChannels(context: Context, forceRefresh: Boolean = false): List<LiveTvChannel> = withContext(Dispatchers.IO) {
         val cached = LiveTvCacheManager.getCachedChannels(context)
