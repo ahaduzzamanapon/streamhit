@@ -11,6 +11,8 @@ import android.content.IntentFilter
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import com.streamhit.app.util.DeviceUtils
+import com.streamhit.app.ui.tv.TvLivePlaylistSidePanel
 import android.graphics.drawable.Icon
 import android.media.AudioManager
 import android.media.audiofx.LoudnessEnhancer
@@ -400,9 +402,22 @@ fun AdaptivePlayerScreen(
     var isFullscreen by remember { mutableStateOf(isTvDevice) }
     var isLocked by remember { mutableStateOf(false) }
 
-    // Handle system back button: return to portrait if in fullscreen (unless locked)
-    BackHandler(enabled = isFullscreen) {
-        if (!isLocked) {
+    // TV Live Playlist side panel & auto-dismiss interaction timer (6s)
+    var showTvSidePanel by remember { mutableStateOf(false) }
+    var tvSidePanelInteractionTime by remember { mutableLongStateOf(0L) }
+
+    LaunchedEffect(showTvSidePanel, tvSidePanelInteractionTime) {
+        if (showTvSidePanel) {
+            delay(6000L)
+            showTvSidePanel = false
+        }
+    }
+
+    // Handle system back button: close TV side panel first, or return to portrait if in fullscreen (unless locked)
+    BackHandler(enabled = showTvSidePanel || isFullscreen) {
+        if (showTvSidePanel) {
+            showTvSidePanel = false
+        } else if (!isLocked) {
             isFullscreen = false
         } else {
             Toast.makeText(context, "Screen is locked", Toast.LENGTH_SHORT).show()
@@ -579,15 +594,29 @@ fun AdaptivePlayerScreen(
         if (isLiveTv) {
             val all = liveTvRepository.getChannels(context)
             liveChannels = all
+            val (lastChannel, lastServerIdx) = DeviceUtils.getLastPlayedLiveChannel(context)
             val matched = all.firstOrNull { 
                 it.name.equals(initialVideoTitle, ignoreCase = true) ||
                 initialVideoTitle.startsWith(it.name, ignoreCase = true) ||
                 it.name.startsWith(initialVideoTitle, ignoreCase = true)
-            }
+            } ?: (if (lastChannel != null) all.firstOrNull { it.name.equals(lastChannel.name, ignoreCase = true) } else null)
+              ?: all.firstOrNull()
+
             currentChannel = matched
             if (matched != null) {
-                val idx = matched.activeServers.indexOfFirst { it.url == currentStreamUrl }
-                currentServerIndex = if (idx >= 0) idx else 0
+                val idx = if (currentStreamUrl.isNotBlank()) {
+                    matched.activeServers.indexOfFirst { it.url == currentStreamUrl }
+                } else if (lastChannel != null && lastChannel.name.equals(matched.name, ignoreCase = true)) {
+                    lastServerIdx.coerceIn(0, (matched.activeServers.size - 1).coerceAtLeast(0))
+                } else 0
+                val activeIdx = if (idx >= 0) idx else 0
+                currentServerIndex = activeIdx
+                val server = matched.activeServers.getOrNull(activeIdx) ?: matched.activeServers.firstOrNull()
+                if (server != null && currentStreamUrl.isBlank()) {
+                    currentStreamUrl = server.url
+                    currentVideoTitle = matched.name
+                }
+                DeviceUtils.saveLastPlayedLiveChannel(context, matched, activeIdx)
                 val chIdx = all.indexOfFirst { it.name.equals(matched.name, ignoreCase = true) }
                 channelOverlayBanner = Pair(if (chIdx >= 0) chIdx + 1 else 1, matched)
             }
@@ -599,6 +628,9 @@ fun AdaptivePlayerScreen(
         val s = servers.getOrNull(index) ?: return
         currentServerIndex = index
         currentStreamUrl = s.url
+        currentChannel?.let {
+            DeviceUtils.saveLastPlayedLiveChannel(context, it, index)
+        }
         hasPlaybackError = false
         playbackErrorMessage = null
         isBuffering = true
@@ -652,6 +684,7 @@ fun AdaptivePlayerScreen(
         val s = channel.activeServers.firstOrNull() ?: return
         currentServerIndex = 0
         currentStreamUrl = s.url
+        DeviceUtils.saveLastPlayedLiveChannel(context, channel, 0)
         failedStreamUrls.clear()
         hasPlaybackError = false
         playbackErrorMessage = null
@@ -725,12 +758,22 @@ fun AdaptivePlayerScreen(
 
     // ── TV Remote Control Key Event Interceptor ──
     val playerActivity = context as? PlayerActivity
-    DisposableEffect(playerActivity, isLiveTv, liveChannels, currentChannelIndex, enteredChannelDigits, showControls) {
+    DisposableEffect(playerActivity, isLiveTv, liveChannels, currentChannelIndex, enteredChannelDigits, showControls, showTvSidePanel) {
         if (playerActivity != null && isLiveTv) {
             playerActivity.onRemoteKeyEventListener = { event ->
                 if (event.action == KeyEvent.ACTION_DOWN) {
                     val code = event.keyCode
                     when {
+                        // 0a. Close side panel on Back button
+                        code == KeyEvent.KEYCODE_BACK && showTvSidePanel -> {
+                            showTvSidePanel = false
+                            true
+                        }
+                        // 0b. Reset 6s auto-dismiss timer on any D-Pad navigation while panel is open
+                        showTvSidePanel && (code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN || code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT) -> {
+                            tvSidePanelInteractionTime = System.currentTimeMillis()
+                            false // Let Compose focus system navigate the list
+                        }
                         // 1. Number keys 0-9 & Numpad 0-9
                         (code in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) || (code in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9) -> {
                             val digit = if (code in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) {
@@ -741,7 +784,7 @@ fun AdaptivePlayerScreen(
                             enteredChannelDigits = (enteredChannelDigits + digit.toString()).take(3)
                             true
                         }
-                        // 2. ENTER / DPAD_CENTER (Confirm immediately if number was entered)
+                        // 2. ENTER / DPAD_CENTER (Confirm entered number OR Toggle Live TV Playlist Side Panel)
                         code == KeyEvent.KEYCODE_ENTER || code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_NUMPAD_ENTER -> {
                             if (enteredChannelDigits.isNotEmpty()) {
                                 val num = enteredChannelDigits.toIntOrNull()
@@ -751,7 +794,10 @@ fun AdaptivePlayerScreen(
                                 enteredChannelDigits = ""
                                 true
                             } else {
-                                false
+                                // Bring up side playlist panel while TV keeps playing smoothly!
+                                showTvSidePanel = !showTvSidePanel
+                                tvSidePanelInteractionTime = System.currentTimeMillis()
+                                true
                             }
                         }
                         // 3. Channel UP / PAGE UP / MEDIA NEXT
@@ -764,21 +810,21 @@ fun AdaptivePlayerScreen(
                             playPrevChannel()
                             true
                         }
-                        // 5. D-Pad UP / DOWN for Channel surfing when controls are hidden
-                        code == KeyEvent.KEYCODE_DPAD_UP && !showControls -> {
+                        // 5. D-Pad UP / DOWN for Channel surfing when controls and side panel are hidden
+                        code == KeyEvent.KEYCODE_DPAD_UP && !showControls && !showTvSidePanel -> {
                             playPrevChannel()
                             true
                         }
-                        code == KeyEvent.KEYCODE_DPAD_DOWN && !showControls -> {
+                        code == KeyEvent.KEYCODE_DPAD_DOWN && !showControls && !showTvSidePanel -> {
                             playNextChannel()
                             true
                         }
-                        // 6. D-Pad LEFT / RIGHT for Channel surfing when controls are hidden on Live TV
-                        code == KeyEvent.KEYCODE_DPAD_LEFT && !showControls -> {
+                        // 6. D-Pad LEFT / RIGHT for Channel surfing when controls and side panel are hidden on Live TV
+                        code == KeyEvent.KEYCODE_DPAD_LEFT && !showControls && !showTvSidePanel -> {
                             playPrevChannel()
                             true
                         }
-                        code == KeyEvent.KEYCODE_DPAD_RIGHT && !showControls -> {
+                        code == KeyEvent.KEYCODE_DPAD_RIGHT && !showControls && !showTvSidePanel -> {
                             playNextChannel()
                             true
                         }
@@ -2025,6 +2071,24 @@ fun AdaptivePlayerScreen(
                     showPlayerBgPermissionDialog = false
                     BackgroundDownloadHelper.setPromptedInitialPermission(context, true)
                 }
+            )
+        }
+
+        // ── TV LIVE PLAYLIST SIDE PANEL (6s Auto-Dismiss Overlay) ──
+        if (isLiveTv) {
+            TvLivePlaylistSidePanel(
+                isVisible = showTvSidePanel,
+                allChannels = liveChannels,
+                currentChannel = currentChannel,
+                onChannelSelected = { ch: LiveTvChannel ->
+                    switchLiveChannel(ch)
+                    tvSidePanelInteractionTime = System.currentTimeMillis()
+                },
+                onClosePanel = { showTvSidePanel = false },
+                onUserInteracted = {
+                    tvSidePanelInteractionTime = System.currentTimeMillis()
+                },
+                modifier = Modifier.align(Alignment.CenterStart)
             )
         }
     }

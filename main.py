@@ -2334,7 +2334,7 @@ def serve_html(filename: str, meta_replacements=None, host: str = ""):
         for k, v in meta_replacements.items(): html = html.replace(k, v)
     return HTMLResponse(content=html)
 
-@app.get("/", response_class=HTMLResponse)
+@app.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def index(request: Request): return serve_html("public/index.html", host=request.headers.get("host", ""))
 
 @app.get("/admin", response_class=HTMLResponse)
@@ -2379,10 +2379,11 @@ async def render_seo_cards_html(subject_type: int = 1) -> str:
         return ""
 
     cards_html = []
+    items_schema = []
     type_name = "TV Show" if subject_type == 2 else "Movie"
     url_prefix = "/tv/" if subject_type == 2 else "/movie/"
 
-    for it in items[:24]:
+    for idx, it in enumerate(items[:24], 1):
         title = html.escape(str(it.get("title") or "Title"))
         dpath = str(it.get("detailPath") or "")
         sid = str(it.get("subjectId") or "")
@@ -2408,9 +2409,26 @@ async def render_seo_cards_html(subject_type: int = 1) -> str:
             </div>
         </a>''')
 
-    return "\n".join(cards_html)
+        items_schema.append({
+            "@type": "ListItem",
+            "position": idx,
+            "url": f"https://nxly.online{href}",
+            "name": it.get("title") or "Title",
+            "image": cover_url
+        })
 
-@app.get("/movies", response_class=HTMLResponse)
+    json_ld = json.dumps({
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        "name": f"Popular {type_name}s on NXLY",
+        "numberOfItems": len(items_schema),
+        "itemListElement": items_schema
+    }, ensure_ascii=False)
+
+    schema_tag = f'<script type="application/ld+json">\n{json_ld}\n</script>'
+    return "\n".join(cards_html) + "\n" + schema_tag
+
+@app.api_route("/movies", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def movies(request: Request):
     host = request.headers.get("host", "")
     brand = get_brand_config(host)
@@ -2421,7 +2439,7 @@ async def movies(request: Request):
         '<div class="content-grid" id="dynamicGrid"></div>': f'<div class="content-grid" id="dynamicGrid">\n{cards}\n</div>'
     }, host=host)
 
-@app.get("/tv", response_class=HTMLResponse)
+@app.api_route("/tv", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def tv(request: Request):
     host = request.headers.get("host", "")
     brand = get_brand_config(host)
@@ -2432,20 +2450,20 @@ async def tv(request: Request):
         '<div class="content-grid" id="dynamicGrid"></div>': f'<div class="content-grid" id="dynamicGrid">\n{cards}\n</div>'
     }, host=host)
 
-@app.get("/live-tv")
-@app.get("/live-tv.html")
+@app.api_route("/live-tv", methods=["GET", "HEAD"])
+@app.api_route("/live-tv.html", methods=["GET", "HEAD"])
 async def livetv(request: Request):
     return RedirectResponse(url="/download", status_code=302)
 
-@app.get("/download", response_class=HTMLResponse)
-@app.get("/download.html", response_class=HTMLResponse)
-@app.get("/app", response_class=HTMLResponse)
+@app.api_route("/download", methods=["GET", "HEAD"], response_class=HTMLResponse)
+@app.api_route("/download.html", methods=["GET", "HEAD"], response_class=HTMLResponse)
+@app.api_route("/app", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def download_page(request: Request):
     host = request.headers.get("host", "")
     return serve_html("public/download.html", host=host)
 
-@app.get("/app.apk")
-@app.get("/download/apk")
+@app.api_route("/app.apk", methods=["GET", "HEAD"])
+@app.api_route("/download/apk", methods=["GET", "HEAD"])
 async def download_apk_endpoint():
     apk_path = os.path.join(base_dir, "public", "uploads", "apks", "NXLY-Stream.apk")
     if os.path.exists(apk_path):
@@ -2456,11 +2474,39 @@ async def download_apk_endpoint():
         )
     return JSONResponse(status_code=404, content={"message": "APK not found"})
 
-@app.get("/sitemap.xml")
+@app.api_route("/download/tv", methods=["GET", "HEAD"])
+@app.api_route("/download/tv-apk", methods=["GET", "HEAD"])
+async def download_tv_apk_endpoint():
+    apk_path = os.path.join(base_dir, "public", "uploads", "apks", "NXLY-Stream-TV.apk")
+    if not os.path.exists(apk_path):
+        apk_path = os.path.join(base_dir, "public", "uploads", "apks", "NXLY-Stream.apk")
+    if os.path.exists(apk_path):
+        return FileResponse(
+            path=apk_path,
+            filename="NXLY-Stream-TV.apk",
+            media_type="application/vnd.android.package-archive"
+        )
+    return JSONResponse(status_code=404, content={"message": "APK not found"})
+
+@app.api_route("/download/beta", methods=["GET", "HEAD"])
+@app.api_route("/download/beta-apk", methods=["GET", "HEAD"])
+async def download_beta_apk_endpoint():
+    apk_path = os.path.join(base_dir, "public", "uploads", "apks", "NXLY-Stream-Beta.apk")
+    if not os.path.exists(apk_path):
+        apk_path = os.path.join(base_dir, "public", "uploads", "apks", "NXLY-Stream.apk")
+    if os.path.exists(apk_path):
+        return FileResponse(
+            path=apk_path,
+            filename="NXLY-Stream-Beta.apk",
+            media_type="application/vnd.android.package-archive"
+        )
+    return JSONResponse(status_code=404, content={"message": "APK not found"})
+
+@app.api_route("/sitemap.xml", methods=["GET", "HEAD"])
 async def sitemap_endpoint(request: Request):
     return await seo_engine.master_sitemap_index_endpoint(request)
 
-@app.get("/robots.txt")
+@app.api_route("/robots.txt", methods=["GET", "HEAD"])
 async def robots_endpoint():
     path = os.path.join(base_dir, "public", "robots.txt")
     if os.path.exists(path):

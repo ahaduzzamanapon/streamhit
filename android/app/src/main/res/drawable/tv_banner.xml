@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 16:9 Dark Gradient TV Banner Background -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="135"
+                android:startColor="#060913"
+                android:centerColor="#0B1528"
+                android:endColor="#02251B"
+                android:type="linear" />
+            <corners android:radius="12dp" />
+        </shape>
+    </item>
+
+    <!-- Subtle border glow -->
+    <item>
+        <shape android:shape="rectangle">
+            <stroke
+                android:width="2dp"
+                android:color="#2610B981" />
+            <corners android:radius="12dp" />
+        </shape>
+    </item>
+
+    <!-- Center App Logo Icon -->
+    <item
+        android:width="120dp"
+        android:height="120dp"
+        android:gravity="center"
+        android:drawable="@drawable/app_logo" />
+</layer-list>
+

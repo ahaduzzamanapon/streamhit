@@ -59,6 +59,8 @@ import com.streamhit.app.service.AppFirebaseMessagingService
 import com.streamhit.app.ui.components.AppShareDialog
 import com.streamhit.app.ui.components.SponsorSupportDialog
 import com.streamhit.app.util.SponsorAdManager
+import com.streamhit.app.util.DeviceUtils
+import com.streamhit.app.ui.tv.TvPortalScreen
 import com.streamhit.app.ui.theme.*
 import com.streamhit.app.update.AppUpdateManager
 import com.streamhit.app.data.analytics.AppAnalyticsManager
@@ -357,6 +359,9 @@ fun MainAppScreen(
     var showUpdateDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
+    val isTvDevice = remember { DeviceUtils.isTvDevice(context) }
+    var showTvPortal by remember { mutableStateOf(isTvDevice) }
+
     // Android System Back Button Handler
     BackHandler(enabled = true) {
         if (showUpdateDialog && updateInfo?.mustUpdate == true) {
@@ -376,11 +381,14 @@ fun MainAppScreen(
             // 2. If navigated from other tabs, back returns to previous tab
             val prevTab = tabBackStack.removeAt(tabBackStack.size - 1)
             currentTab = prevTab
+        } else if (isTvDevice && !showTvPortal) {
+            // 3. On TV, going back from movie catalog returns to TV Hub
+            showTvPortal = true
         } else if (currentTab != Screen.Home) {
-            // 3. Fallback: If not on Home, back goes to Home page
+            // 4. Fallback: If not on Home, back goes to Home page
             currentTab = Screen.Home
         } else {
-            // 4. On Home screen: Double-back to exit within 2 seconds
+            // 5. On Home / TV Hub: Double-back to exit within 2 seconds
             val now = System.currentTimeMillis()
             if (now - lastBackPressedTime < 2000L) {
                 activity?.finish()
@@ -389,6 +397,24 @@ fun MainAppScreen(
                 Toast.makeText(context, "Press back again to exit", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    // TV Hub First Page for Android TV & Google TV devices
+    if (isTvDevice && showTvPortal) {
+        TvPortalScreen(
+            onSelectMovies = {
+                showTvPortal = false
+                currentTab = Screen.Home
+            },
+            onSelectLiveTv = { channel, streamUrl ->
+                val intent = Intent(context, PlayerActivity::class.java).apply {
+                    putExtra("EXTRA_STREAM_URL", streamUrl)
+                    putExtra("EXTRA_VIDEO_TITLE", channel?.name ?: "Live TV")
+                }
+                context.startActivity(intent)
+            }
+        )
+        return
     }
 
     // Check version update against backend admin panel
@@ -405,7 +431,7 @@ fun MainAppScreen(
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            if (activeDetailPath == null && !(showUpdateDialog && updateInfo?.mustUpdate == true)) {
+            if (!isTvDevice && activeDetailPath == null && !(showUpdateDialog && updateInfo?.mustUpdate == true)) {
                 // Floating Cyber-Glass Bottom Navigation Island
                 Box(
                     modifier = Modifier

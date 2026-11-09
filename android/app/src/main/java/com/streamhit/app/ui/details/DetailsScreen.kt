@@ -37,6 +37,9 @@ import com.streamhit.app.ui.components.AppBrandHeader
 import com.streamhit.app.ui.components.AppShareDialog
 import com.streamhit.app.ui.components.BackgroundDownloadPermissionDialog
 import com.streamhit.app.ui.components.ShareAppBannerCard
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import com.streamhit.app.util.DeviceUtils
 import com.streamhit.app.ui.components.SponsorSupportDialog
 import com.streamhit.app.ui.sponsor.SponsorWebViewActivity
 import com.streamhit.app.util.BackgroundDownloadHelper
@@ -83,6 +86,8 @@ fun DetailsScreen(
     var savedHistory by remember { mutableStateOf<com.streamhit.app.data.local.WatchHistoryItem?>(null) }
     var showAppShareDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val isTvDevice = remember { DeviceUtils.isTvDevice(context) }
+    val playButtonFocusRequester = remember { FocusRequester() }
 
     var pendingDownloadRes by remember { mutableStateOf<StreamResource?>(null) }
     var showDownloadSponsorDialog by remember { mutableStateOf(false) }
@@ -294,7 +299,7 @@ fun DetailsScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(270.dp)
+                        .height(if (isTvDevice) 360.dp else 270.dp)
                 ) {
                     AsyncImage(
                         model = item.coverUrl,
@@ -392,6 +397,15 @@ fun DetailsScreen(
                         label = "watchScale"
                     )
 
+                    LaunchedEffect(item) {
+                        if (isTvDevice && item != null) {
+                            kotlinx.coroutines.delay(300)
+                            try {
+                                playButtonFocusRequester.requestFocus()
+                            } catch (_: Exception) {}
+                        }
+                    }
+
                     Button(
                         onClick = {
                             if (hasResume) {
@@ -410,7 +424,8 @@ fun DetailsScreen(
                         shape = RoundedCornerShape(50.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(46.dp)
+                            .height(if (isTvDevice) 52.dp else 46.dp)
+                            .focusRequester(playButtonFocusRequester)
                             .graphicsLayer {
                                 scaleX = pulseScale
                                 scaleY = pulseScale
