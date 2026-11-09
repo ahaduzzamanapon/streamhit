@@ -800,7 +800,10 @@ async function loadSearchResults(isAppend = false) {
         state.hasMore = false;
         if (!isAppend) {
             const grid = document.getElementById("dynamicGrid");
-            if (grid) grid.innerHTML = `<div class="no-results"><i class="fa-solid fa-face-frown"></i> No results found. Try adjusting filters.</div>`;
+            // Do NOT overwrite server-rendered cards with "No results" if server cards already exist
+            if (grid && !grid.querySelector(".content-card")) {
+                grid.innerHTML = `<div class="no-results"><i class="fa-solid fa-face-frown"></i> No results found. Try adjusting filters.</div>`;
+            }
         }
         const prevBtn = document.getElementById("prevPageBtn");
         const nextBtn = document.getElementById("nextPageBtn");

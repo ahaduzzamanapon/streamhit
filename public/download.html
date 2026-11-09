@@ -726,11 +726,11 @@
             <div class="card-top-shine"></div>
 
             <!-- Big Glowing Download Button -->
-            <a href="/uploads/apks/NXLY-Stream.apk" class="btn-download-big" id="primary-dl-btn" download="NXLY-Stream.apk">
+            <a href="/uploads/apks/NXLY-Stream.apk" class="btn-download-big" id="primary-dl-btn">
                 <i class="fa-brands fa-android btn-icon-pulse"></i>
                 <div class="btn-content">
                     <span class="btn-primary-text" id="dl-title-text">ডাউনলোড করুন (Download APK)</span>
-                    <span class="btn-secondary-text">👉 এখানে চাপ দিলেই সরাসরি ডাউনলোড শুরু হবে</span>
+                    <span class="btn-secondary-text">👉 ফোন ও অ্যান্ড্রয়েড টিভির জন্য সরাসরি ডাউনলোড</span>
                 </div>
                 <i class="fa-solid fa-circle-arrow-down btn-arrow"></i>
             </a>
@@ -738,22 +738,24 @@
             <!-- Download Triggered Success Banner -->
             <div id="download-alert">
                 <strong><i class="fa-solid fa-circle-check"></i> ডাউনলোড শুরু হয়েছে!</strong><br>
-                ফাইলটি সেভ হওয়ার পর নোটিফিকেশন থেকে ওপেন করে ইন্সটল করুন। কোনো সমস্যা হলে নিচের ৩টি সহজ ধাপ দেখুন 👇
+                ফাইলটি সেভ হওয়ার পর ওপেন করে ইন্সটল করুন। কোনো সমস্যা হলে নিচের ৩টি সহজ ধাপ দেখুন 👇
             </div>
 
             <!-- Specs Grid -->
             <div class="specs-grid">
                 <div class="spec-item"><i class="fa-solid fa-microchip"></i> <span id="ver-badge">ভার্সন 1.0.31</span></div>
-                <div class="spec-item"><i class="fa-solid fa-file-zipper"></i> সাইজ: মাত্র ১৪ MB</div>
-                <div class="spec-item"><i class="fa-solid fa-mobile-screen"></i> Android 8.0 - 15+</div>
-                <div class="spec-item"><i class="fa-solid fa-shield-halved"></i> ১০০% নিরাপদ ও ভাইরাস মুক্ত</div>
+                <div class="spec-item"><i class="fa-solid fa-file-zipper"></i> সাইজ: মাত্র ১৫ MB</div>
+                <div class="spec-item"><i class="fa-solid fa-mobile-screen"></i> Android Phone & Google TV</div>
+                <div class="spec-item"><i class="fa-solid fa-shield-halved"></i> ১০০% নিরাপদ ও অফিসিয়াল</div>
             </div>
 
-            <!-- Alternate Mirror -->
-            <div class="mirror-wrap">
-                <span style="color: #94a3b8;"><i class="fa-solid fa-server" style="color: #00ff87; margin-right: 6px;"></i>ডাউনলোডে সমস্যা হলে বিকল্প সার্ভার:</span>
-                <a href="/uploads/apks/app-release.apk" class="mirror-btn" download="NXLY-Stream.apk">
-                    <i class="fa-solid fa-cloud-arrow-down"></i> Mirror 2 (বিকল্প ডাউনলোড)
+            <!-- Alternate Mirror / TV Direct Link -->
+            <div class="mirror-wrap" style="display:flex; flex-direction:column; gap:8px; align-items:center;">
+                <a href="/uploads/apks/NXLY-Stream.apk" class="mirror-btn" style="background:rgba(0,255,135,0.15); border-color:#00ff87; color:#00ff87;">
+                    <i class="fa-solid fa-tv"></i> Google TV / Smart TV সরাসরি ডাউনলোড
+                </a>
+                <a href="/uploads/apks/app-release.apk" class="mirror-btn">
+                    <i class="fa-solid fa-cloud-arrow-down"></i> Mirror 2 (বিকল্প সার্ভার)
                 </a>
             </div>
         </div>
@@ -860,9 +862,9 @@
 
     <!-- Sticky Mobile Bottom Bar -->
     <div class="mobile-sticky-bar">
-        <a href="/uploads/apks/NXLY-Stream.apk" class="sticky-btn" id="sticky-dl-btn" download="NXLY-Stream.apk">
+        <a href="/uploads/apks/NXLY-Stream.apk" class="sticky-btn" id="sticky-dl-btn">
             <i class="fa-brands fa-android"></i>
-            <span>ডাউনলোড করুন (APK • 14 MB)</span>
+            <span>ডাউনলোড করুন (APK • 15 MB)</span>
             <i class="fa-solid fa-arrow-down"></i>
         </a>
     </div>
@@ -883,13 +885,6 @@
             function handleDownloadClick() {
                 if (alertBox) {
                     alertBox.style.display = "block";
-                    // Scroll smoothly to installation guide so user understands next steps
-                    setTimeout(function() {
-                        const guide = document.getElementById("steps-guide");
-                        if (guide) {
-                            guide.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        }
-                    }, 1200);
                 }
             }
 
@@ -914,6 +909,6 @@
                 });
         });
     </script>
-    <script src="/app-update-notice.js?v=1.0"></script>
+
 </body>
 </html>
