@@ -310,23 +310,32 @@ fun SponsorWebScreen(
                                     }
                                 } catch(e){}
                             }
-                            window.addEventListener('click', report, true);
-                            window.addEventListener('touchstart', report, {passive: true});
-                            window.addEventListener('mousedown', report, true);
-                            window.addEventListener('blur', function() {
-                                report();
-                            });
+                            document.addEventListener('click', function(e) {
+                                if (e.isTrusted) {
+                                    report();
+                                }
+                            }, true);
                         })();
                     """.trimIndent()
 
+                    var pageLoadTime = System.currentTimeMillis()
+
                     webViewClient = object : WebViewClient() {
-                        private fun handleUrl(view: WebView?, url: String): Boolean {
-                            // Any navigation attempt indicates user clicked on link/action
-                            registerClick()
+                        private fun handleUrl(view: WebView?, url: String, hasGesture: Boolean): Boolean {
+                            if (hasGesture) {
+                                registerClick()
+                            }
 
                             if (url.startsWith("http://") || url.startsWith("https://")) {
                                 return false // Let WebView load HTTP/HTTPS normally
                             }
+
+                            // Non-http schemes (market://, intent://) indicate store or external offer action
+                            // Only count as click if hasGesture OR page has been loaded for > 2.5s (not immediate redirect on load)
+                            if (hasGesture || (System.currentTimeMillis() - pageLoadTime > 2500L)) {
+                                registerClick()
+                            }
+
                             try {
                                 val intent = if (url.startsWith("intent://")) {
                                     Intent.parseUri(url, Intent.URI_INTENT_SCHEME)
@@ -367,13 +376,14 @@ fun SponsorWebScreen(
 
                         override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                             val target = request?.url?.toString() ?: return false
-                            return handleUrl(view, target)
+                            val hasGesture = request?.hasGesture() == true
+                            return handleUrl(view, target, hasGesture)
                         }
 
                         @Deprecated("Deprecated in Java")
                         override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
                             if (url.isNullOrBlank()) return false
-                            return handleUrl(view, url)
+                            return handleUrl(view, url, false)
                         }
 
                         override fun onReceivedError(view: WebView?, errorCode: Int, description: String?, failingUrl: String?) {
@@ -392,17 +402,11 @@ fun SponsorWebScreen(
                             isUserGesture: Boolean,
                             resultMsg: android.os.Message?
                         ): Boolean {
-                            registerClick()
+                            if (isUserGesture) {
+                                registerClick()
+                            }
                             return super.onCreateWindow(view, isDialog, isUserGesture, resultMsg)
                         }
-                    }
-
-                    // 3. Native touch detector for raw touch/tap interactions
-                    setOnTouchListener { _, event ->
-                        if (event.action == MotionEvent.ACTION_UP) {
-                            registerClick()
-                        }
-                        false
                     }
 
                     onBindWebView(this)

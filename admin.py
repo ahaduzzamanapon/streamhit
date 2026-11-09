@@ -398,11 +398,11 @@ async def admin_upload_apk(request: Request, file: UploadFile = File(...)):
 async def public_get_app_version():
     from main import get_db_pool
     default_version = {
-        "versionCode": 30,
-        "versionName": "1.0.29",
+        "versionCode": 31,
+        "versionName": "1.0.30",
         "apkUrl": "https://nxly.online/uploads/apks/NXLY-Stream.apk",
         "mustUpdate": True,
-        "releaseNotes": "📺 লাইভ টিভি বড় আপডেট! টিভি লোগো বড় ও ক্লিয়ার করা হয়েছে, রিলেটেড চ্যানেল ৩-কলাম গ্রিড ভিউ, নেক্সট চ্যানেল সুইচিং ফিক্স এবং সার্ভার অটো-ফেইলওভার যুক্ত করা হয়েছে। দয়া করে এখনই আপডেট করে নিন।"
+        "releaseNotes": "📺 লাইভ টিভি ও স্পন্সর অ্যাড নিখুঁত আপডেট! টিভি লোগো বড় করা হয়েছে, রিলেটেড চ্যানেল ৩-কলাম গ্রিড ভিউ, এবং অ্যাড ক্লিক ডিটেকশন ফিক্স করা হয়েছে। দয়া করে এখনই আপডেট করে নিন।"
     }
     fallback_data = {
         "version": default_version,
