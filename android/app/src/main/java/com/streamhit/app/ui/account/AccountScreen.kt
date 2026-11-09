@@ -19,6 +19,10 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,8 +34,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.streamhit.app.MainActivity
 import com.streamhit.app.data.analytics.AppAnalyticsManager
 import com.streamhit.app.ui.theme.*
+import com.streamhit.app.util.DeviceUtils
 
 private const val TELEGRAM_GROUP_URL = "https://t.me/+c_X9PS6rX2ViNzk9"
 private const val FACEBOOK_GROUP_URL = "https://www.facebook.com/share/g/1EDZZTxryj/"
@@ -305,6 +311,71 @@ fun AccountScreen(
                     contentDescription = "Go",
                     tint = TextMuted,
                     modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // ─── TV Mode Preview Card (Developer / Testing Switch) ───
+        var isTvPreviewActive by remember { mutableStateOf(DeviceUtils.isForcedTvMode(context)) }
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = BgSurface,
+            border = BorderStroke(1.dp, Color(0xFF00F0FF).copy(alpha = 0.25f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF00F0FF).copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Tv,
+                        contentDescription = "TV Mode",
+                        tint = Color(0xFF00F0FF),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Android TV / Google TV প্রিভিউ",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "মোবাইলে TV ইন্টারফেস ও লাইভ টিভি হাব টেস্ট করুন",
+                        color = TextMuted,
+                        fontSize = 11.sp
+                    )
+                }
+
+                Switch(
+                    checked = isTvPreviewActive,
+                    onCheckedChange = { checked ->
+                        isTvPreviewActive = checked
+                        DeviceUtils.setForceTvMode(context, checked)
+                        val intent = Intent(context, MainActivity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        }
+                        context.startActivity(intent)
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color(0xFF00F0FF),
+                        checkedTrackColor = Color(0xFF00F0FF).copy(alpha = 0.35f)
+                    )
                 )
             }
         }

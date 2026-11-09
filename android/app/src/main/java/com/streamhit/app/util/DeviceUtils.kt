@@ -21,6 +21,12 @@ object DeviceUtils {
      */
     fun isTvDevice(context: Context): Boolean {
         try {
+            // Check developer preview toggle first
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            if (prefs.getBoolean("force_tv_mode", false)) {
+                return true
+            }
+
             // 1. Check UI Mode (Recommended Android way)
             val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
             if (uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION) {
@@ -38,6 +44,16 @@ object DeviceUtils {
         } catch (_: Exception) {}
 
         return false
+    }
+
+    fun setForceTvMode(context: Context, enabled: Boolean) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("force_tv_mode", enabled).apply()
+    }
+
+    fun isForcedTvMode(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean("force_tv_mode", false)
     }
 
     /**

@@ -743,6 +743,10 @@ async function initFilterPage() {
 
 // Load List data
 async function loadSearchResults(isAppend = false) {
+    if (typeof navigator !== "undefined" && /bot|googlebot|crawler|spider|robot|crawling/i.test(navigator.userAgent)) {
+        return;
+    }
+
     if (isAppend) {
         state.loadingMore = true;
         const loader = document.getElementById("infiniteLoader");
@@ -826,7 +830,9 @@ function renderExploreGrid(items, isAppend = false) {
 
     let existingIds = new Set();
     if (!isAppend) {
-        grid.innerHTML = "";
+        if (items && items.length > 0) {
+            grid.innerHTML = "";
+        }
     } else {
         grid.querySelectorAll(".content-card").forEach(c => {
             if (c.dataset.id) existingIds.add(c.dataset.id);

@@ -1,6 +1,7 @@
 package com.streamhit.app.ui.tv
 
 import android.content.Context
+import android.content.Intent
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -265,13 +266,33 @@ fun TvHubMainContent(
                     }
                 }
 
-                if (currentTime.isNotBlank()) {
-                    Text(
-                        text = currentTime,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF94A3B8)
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (DeviceUtils.isForcedTvMode(context)) {
+                        Button(
+                            onClick = {
+                                DeviceUtils.setForceTvMode(context, false)
+                                val intent = Intent(context, com.streamhit.app.MainActivity::class.java).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                }
+                                context.startActivity(intent)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444).copy(alpha = 0.2f)),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEF4444)),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            modifier = Modifier.padding(end = 12.dp)
+                        ) {
+                            Text("📱 Exit TV Preview", color = Color(0xFFEF4444), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    if (currentTime.isNotBlank()) {
+                        Text(
+                            text = currentTime,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF94A3B8)
+                        )
+                    }
                 }
             }
 

@@ -2370,11 +2370,12 @@ async def render_seo_cards_html(subject_type: int = 1) -> str:
     """Pre-renders 24 rich movie/TV cards inside HTML to eliminate Google Search Console 'Soft 404'."""
     items = []
     try:
-        items = await get_latest_content(subject_type=subject_type, limit=24)
+        raw_items = await get_latest_content(subject_type=subject_type, limit=60)
+        items = [it for it in raw_items if not is_blocked_content(it)]
     except Exception:
         pass
 
-    if not items:
+    if len(items) < 24:
         pool = await get_db_pool()
         if pool:
             try:
@@ -2385,11 +2386,11 @@ async def render_seo_cards_html(subject_type: int = 1) -> str:
                             FROM subjects
                             WHERE detail_path IS NOT NULL AND detail_path != '' AND subject_type = %s
                             ORDER BY rating DESC, updated_at DESC
-                            LIMIT 24
+                            LIMIT 60
                         """, (subject_type,))
                         rows = await cur.fetchall()
                         for r in rows:
-                            items.append({
+                            it = {
                                 "subjectId": r.get("subject_id"),
                                 "title": r.get("title"),
                                 "detailPath": r.get("detail_path"),
@@ -2397,7 +2398,9 @@ async def render_seo_cards_html(subject_type: int = 1) -> str:
                                 "imdbRatingValue": str(r.get("rating") or "7.5"),
                                 "releaseDate": str(r.get("release_date") or "2026"),
                                 "subjectType": r.get("subject_type") or subject_type
-                            })
+                            }
+                            if not is_blocked_content(it) and not any(x.get("subjectId") == it["subjectId"] for x in items):
+                                items.append(it)
             except Exception as e:
                 print(f"[SEO Prerender DB Fallback Error]: {e}")
 
