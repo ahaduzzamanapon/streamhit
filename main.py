@@ -335,9 +335,84 @@ ADULT_KEYWORDS = [
     'playboy', 'penthouse', 'hustler', 'onlyfans', 'camgirl', 'webcam model', 'sex tape'
 ]
 
+# Admin-defined Blocklist for Movies and Series (In-Memory Cache for 0ms Fast Filtering)
+_blocked_subject_ids = set()
+_blocked_titles = set()
+_blocked_slugs = set()
+
+def is_blocked_content(item: dict) -> bool:
+    if not isinstance(item, dict):
+        return False
+    # 1. Check by Subject ID
+    sid = str(item.get("subjectId") or item.get("subject_id") or item.get("id") or "").strip()
+    if sid and sid in _blocked_subject_ids:
+        return True
+        
+    # 2. Check by Title
+    title = str(item.get("title") or item.get("name") or "").strip().lower()
+    if title:
+        if title in _blocked_titles:
+            return True
+        for bt in _blocked_titles:
+            if len(bt) >= 3 and bt in title:
+                return True
+                
+    # 3. Check by detailPath / slug / URL
+    dpath = str(item.get("detailPath") or item.get("detail_path") or item.get("detailUrl") or item.get("slug") or "").strip().lower()
+    if dpath:
+        for bs in _blocked_slugs:
+            if bs and bs in dpath:
+                return True
+        for bt in _blocked_titles:
+            if len(bt) >= 4 and bt in dpath:
+                return True
+                
+    return False
+
+def clear_all_content_caches():
+    global _banners_cache, _banners_cache_time
+    _banners_cache = None
+    _banners_cache_time = 0
+    _home_cache.clear()
+    _home_cache_time.clear()
+
+async def reload_blocked_contents():
+    global _blocked_subject_ids, _blocked_titles, _blocked_slugs
+    try:
+        pool = await get_db_pool()
+        if not pool:
+            return
+        async with pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+                await cur.execute("""
+                    CREATE TABLE IF NOT EXISTS blocked_contents (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        subject_id VARCHAR(50) DEFAULT '',
+                        title VARCHAR(255) NOT NULL,
+                        subject_type INT DEFAULT 1,
+                        cover TEXT,
+                        detail_path VARCHAR(255) DEFAULT '',
+                        reason VARCHAR(255) DEFAULT 'Blocked by Admin',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE KEY uniq_subj (subject_id)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                await cur.execute("SELECT * FROM blocked_contents")
+                rows = await cur.fetchall()
+                _blocked_subject_ids = {str(r["subject_id"]).strip() for r in rows if r.get("subject_id")}
+                _blocked_titles = {str(r["title"]).strip().lower() for r in rows if r.get("title")}
+                _blocked_slugs = {str(r["detail_path"]).strip().lower() for r in rows if r.get("detail_path")}
+                print(f"[Blocklist] Loaded {len(rows)} blocked items ({len(_blocked_subject_ids)} IDs, {len(_blocked_titles)} titles).")
+    except Exception as e:
+        print(f"[Blocklist Error] Failed to reload blocked contents: {e}")
+
 def is_adult_content(item: dict) -> bool:
     if not isinstance(item, dict):
         return False
+
+    # Blocked by Admin
+    if is_blocked_content(item):
+        return True
 
     # 1. Check genres
     genres = item.get("genre") or []
@@ -841,6 +916,10 @@ async def init_db():
                         await cur.execute("INSERT INTO admins (username, password_hash) VALUES (%s, %s)", ("admin", pw_hash))
                         print("[Database] Created initial admin account (admin / admin123).")
         print("[Database] MySQL pool and tables initialized successfully.")
+        try:
+            await reload_blocked_contents()
+        except Exception:
+            pass
     except Exception as e:
         print(f"[Database Warning] MySQL connection failed ({e}). Running in standalone mode.")
         db_pool = None
@@ -2957,6 +3036,14 @@ async def search_suggest(q: str = ""):
 
 @app.get("/api/detail")
 async def api_detail(detailPath: str = "", subjectId: str = ""):
+    sid_str = str(subjectId).strip()
+    if sid_str and sid_str in _blocked_subject_ids:
+        return JSONResponse(status_code=404, content={"code": 404, "message": "Content unavailable"})
+    if detailPath:
+        d_lower = detailPath.strip().lower()
+        if any(bs in d_lower for bs in _blocked_slugs if bs) or any(bt in d_lower for bt in _blocked_titles if len(bt) >= 4):
+            return JSONResponse(status_code=404, content={"code": 404, "message": "Content unavailable"})
+
     # 1. Try H5 detail first if detailPath given
     if detailPath:
         try:
@@ -2964,6 +3051,8 @@ async def api_detail(detailPath: str = "", subjectId: str = ""):
             data = await _make_request(url)
             if "data" in data and "subject" in data["data"] and data["data"]["subject"]:
                 subj = data["data"]["subject"]
+                if is_blocked_content(subj):
+                    return JSONResponse(status_code=404, content={"code": 404, "message": "Content unavailable"})
                 # If subjectId was explicitly requested and differs from H5 result, it's a dub switch; resolve by subjectId below
                 if subjectId and str(subj.get("subjectId")) != str(subjectId):
                     pass
@@ -3060,6 +3149,9 @@ async def api_detail(detailPath: str = "", subjectId: str = ""):
 
 @app.get("/api/season-info")
 async def api_season(detailPath: str = "", subjectId: str = ""):
+    sid_str = str(subjectId).strip()
+    if sid_str and sid_str in _blocked_subject_ids:
+        return JSONResponse(status_code=404, content={"code": 404, "message": "Content unavailable"})
     if detailPath:
         try:
             url = f"{API_BASE}/wefeed-h5api-bff/detail?detailPath={detailPath}"
@@ -3344,6 +3436,9 @@ async def _do_fetch_resource(subjectId: str, se: int, ep: int, detailPath: str, 
 
 @app.get("/api/resource")
 async def api_resource(se: int = 1, ep: int = 1, detailPath: str = "", subjectId: str = "", force_fresh: bool = False, response: Response = None):
+    sid_str = str(subjectId).strip()
+    if sid_str and sid_str in _blocked_subject_ids:
+        return JSONResponse(status_code=404, content={"code": 404, "message": "Content unavailable"})
     if response:
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         response.headers["Pragma"] = "no-cache"

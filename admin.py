@@ -230,7 +230,119 @@ async def admin_search_subjects(q: str, request: Request):
         except Exception as se:
             print(f"Online search error: {se}")
 
+    try:
+        from main import _blocked_subject_ids, _blocked_titles
+        for it in items:
+            s_id = str(it.get("subjectId") or "")
+            t_low = str(it.get("title") or "").strip().lower()
+            it["isBlocked"] = (s_id in _blocked_subject_ids) or (t_low in _blocked_titles)
+    except Exception:
+        pass
+
     return {"list": items, "items": items}
+
+# ── BLOCKED CONTENT MANAGEMENT (MOVIE & SERIES FILTER) ──────────────────
+@router.get("/api/admin/blocked-contents")
+async def admin_get_blocked_contents(request: Request):
+    check_admin_auth(request)
+    from main import get_db_pool
+    pool = await get_db_pool()
+    if not pool:
+        return {"code": 0, "items": []}
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute("""
+                CREATE TABLE IF NOT EXISTS blocked_contents (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    subject_id VARCHAR(50) DEFAULT '',
+                    title VARCHAR(255) NOT NULL,
+                    subject_type INT DEFAULT 1,
+                    cover TEXT,
+                    detail_path VARCHAR(255) DEFAULT '',
+                    reason VARCHAR(255) DEFAULT 'Blocked by Admin',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY uniq_subj (subject_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """)
+            await cur.execute("SELECT * FROM blocked_contents ORDER BY id DESC")
+            rows = await cur.fetchall()
+            for r in rows:
+                if "created_at" in r and r["created_at"]:
+                    r["created_at"] = str(r["created_at"])
+            return {"code": 0, "items": rows}
+
+@router.post("/api/admin/blocked-contents")
+async def admin_add_blocked_content(data: dict, request: Request):
+    check_admin_auth(request)
+    subject_id = str(data.get("subjectId") or data.get("subject_id") or "").strip()
+    title = str(data.get("title") or "").strip()
+    if not title and not subject_id:
+        raise HTTPException(status_code=400, detail="Title or Subject ID is required")
+    
+    subject_type = int(data.get("subjectType") or data.get("subject_type") or 1)
+    cover = str(data.get("cover") or data.get("coverUrl") or "").strip()
+    detail_path = str(data.get("detailPath") or data.get("detail_path") or "").strip()
+    reason = str(data.get("reason") or "Blocked by Admin").strip()
+    
+    from main import get_db_pool, reload_blocked_contents, clear_all_content_caches
+    pool = await get_db_pool()
+    if not pool:
+        raise HTTPException(status_code=500, detail="Database pool not available")
+        
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute("""
+                CREATE TABLE IF NOT EXISTS blocked_contents (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    subject_id VARCHAR(50) DEFAULT '',
+                    title VARCHAR(255) NOT NULL,
+                    subject_type INT DEFAULT 1,
+                    cover TEXT,
+                    detail_path VARCHAR(255) DEFAULT '',
+                    reason VARCHAR(255) DEFAULT 'Blocked by Admin',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY uniq_subj (subject_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """)
+            await cur.execute("""
+                INSERT INTO blocked_contents (subject_id, title, subject_type, cover, detail_path, reason)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    title = VALUES(title),
+                    subject_type = VALUES(subject_type),
+                    cover = VALUES(cover),
+                    detail_path = VALUES(detail_path),
+                    reason = VALUES(reason)
+            """, (subject_id, title, subject_type, cover, detail_path, reason))
+            
+    await reload_blocked_contents()
+    clear_all_content_caches()
+    return {"code": 0, "message": f"'{title or subject_id}' ব্লক করা হয়েছে। এটি অ্যাপ বা ওয়েবসাইট থেকে সম্পূর্ণ মুছে ফেলা হয়েছে।"}
+
+@router.post("/api/admin/blocked-contents/delete")
+async def admin_delete_blocked_content(data: dict, request: Request):
+    check_admin_auth(request)
+    item_id = data.get("id")
+    subject_id = str(data.get("subjectId") or data.get("subject_id") or "").strip()
+    title = str(data.get("title") or "").strip()
+    
+    from main import get_db_pool, reload_blocked_contents, clear_all_content_caches
+    pool = await get_db_pool()
+    if not pool:
+        raise HTTPException(status_code=500, detail="Database pool not available")
+        
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            if item_id:
+                await cur.execute("DELETE FROM blocked_contents WHERE id = %s", (item_id,))
+            elif subject_id:
+                await cur.execute("DELETE FROM blocked_contents WHERE subject_id = %s", (subject_id,))
+            elif title:
+                await cur.execute("DELETE FROM blocked_contents WHERE title = %s", (title,))
+                
+    await reload_blocked_contents()
+    clear_all_content_caches()
+    return {"code": 0, "message": "মুভি/সিরিজ সফলভাবে আনব্লক করা হয়েছে।"}
 
 @router.get("/api/admin/banners")
 async def admin_get_banners(request: Request):

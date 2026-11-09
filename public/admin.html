@@ -805,6 +805,9 @@
             <a class="nav-item" onclick="switchNavTab('banners')">
                 <span class="icon">🖼️</span> Banners & Featured
             </a>
+            <a class="nav-item" onclick="switchNavTab('blocklist')">
+                <span class="icon">🚫</span> Block Movies & Series
+            </a>
             <a class="nav-item" onclick="switchNavTab('sports')">
                 <span class="icon">⚽</span> Live Sports Matches
             </a>
@@ -1502,6 +1505,70 @@
                 </div>
             </section>
 
+            <!-- 5.5. MOVIE & SERIES CONTENT BLOCKLIST ────────────────────────── -->
+            <section class="tab-panel" id="panel-blocklist">
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <h2>🚫 Movie & TV Series Content Blocklist</h2>
+                            <div class="subtitle">Search and block any movie or series. Blocked titles immediately disappear from App home, banners, search, and detail without any app update!</div>
+                        </div>
+                    </div>
+
+                    <!-- Search Box -->
+                    <div style="display:flex; gap:10px; margin-bottom:16px;">
+                        <input type="text" id="blocklistSearchInput" class="form-control" placeholder="Search movie or TV series name to block (e.g. Fifty Shades, Barbie, etc.)..." onkeydown="if(event.key==='Enter') executeBlocklistSearch()">
+                        <button class="btn-primary" onclick="executeBlocklistSearch()" style="white-space:nowrap; padding:10px 20px;">🔍 Search</button>
+                    </div>
+
+                    <!-- Search Results Grid -->
+                    <div id="blocklistSearchResults" style="display:none; margin-bottom:24px; padding:16px; background:rgba(255,255,255,0.02); border:1px solid var(--border-subtle); border-radius:12px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                            <strong style="color:var(--text-main); font-size:14px;">Search Results (Click 'Block' to immediately remove from app):</strong>
+                            <button class="btn-secondary" style="padding:4px 10px; font-size:11px;" onclick="closeBlocklistSearchResults()">Close Results ✕</button>
+                        </div>
+                        <div id="blocklistSearchGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:14px;"></div>
+                    </div>
+
+                    <!-- Quick Manual Keyword / Title Block Form -->
+                    <div style="background:rgba(239, 68, 68, 0.05); border:1px dashed rgba(239, 68, 68, 0.3); border-radius:12px; padding:16px 20px; margin-bottom:26px;">
+                        <div style="font-size:13.5px; font-weight:700; color:var(--accent-red); margin-bottom:6px;">⚠️ Direct Title / Keyword Filter (সরাসরি টাইটেল বা কি-ওয়ার্ড ব্লক)</div>
+                        <div style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">কোনো মুভি বা সিরিজের নাম সার্চ না করেই সরাসরি লিখে ব্লক করতে পারেন। এই নাম থাকা সব কন্টেন্ট ও ব্যানার ফিল্টার হয়ে যাবে।</div>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                            <input type="text" id="manualBlockTitle" class="form-control" style="flex:2; min-width:220px;" placeholder="টাইটেল বা কি-ওয়ার্ড লিখুন (যেমন: Fifty Shades, 365 Days)">
+                            <input type="text" id="manualBlockReason" class="form-control" style="flex:1; min-width:180px;" placeholder="কারণ (ঐচ্ছিক)">
+                            <button class="btn-danger" onclick="executeManualBlock()" style="background:#ef4444; color:white; border:none; padding:10px 22px; border-radius:8px; font-weight:bold; cursor:pointer;">🚫 Block Content</button>
+                        </div>
+                    </div>
+
+                    <!-- Currently Blocked Table -->
+                    <div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                            <h3 style="font-size:15px; font-weight:700; color:var(--text-main);">🔒 Currently Blocked Items (<span id="blockedCount">0</span>)</h3>
+                            <button class="btn-secondary" style="font-size:12px; padding:6px 14px;" onclick="loadBlockedContents()">🔄 Refresh List</button>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width:65px;">Cover</th>
+                                        <th>Title / Keyword</th>
+                                        <th style="width:100px;">Type</th>
+                                        <th style="width:140px;">Subject ID</th>
+                                        <th>Reason</th>
+                                        <th style="width:140px;">Blocked Date</th>
+                                        <th style="width:100px; text-align:center;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="blockedContentsTableBody">
+                                    <tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:20px;">Loading blocked items...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- 6. LIVE SPORTS MATCHES ────────────────────────────────────── -->
             <section class="tab-panel" id="panel-sports">
                 <div class="card">
@@ -2118,6 +2185,7 @@
                 tiktok: ['TikTok Auto-Pilot Bot', 'Direct vertical video posting via Content Posting API v2'],
                 'app-users': ['App Users & Devices', 'Track active installations, models, and real-time playback'],
                 banners: ['Banners & Highlights', 'Homepage hero slider featured titles'],
+                blocklist: ['Content Blocklist / Filters', 'Search and block movies or series from app and website'],
                 sports: ['Live Sports Streaming', 'Manage live matches and streaming feeds'],
                 tv: ['Live TV Channels', 'IPTV live channels and M3U playlist importer'],
                 notifications: ['Push Notifications', 'Firebase FCM notifications to all Android users'],
@@ -2160,6 +2228,7 @@
                 case 'tiktok': loadTikTokTab(); break;
                 case 'app-users': fetchAppUsersPage(1); break;
                 case 'banners': fetchBanners(); break;
+                case 'blocklist': loadBlockedContents(); break;
                 case 'sports': fetchSports(); break;
                 case 'tv': fetchTvChannels(); break;
                 case 'version': fetchAppVersion(); break;
@@ -3063,6 +3132,196 @@
                 showToast('Banner removed');
                 fetchBanners();
             } catch(e) {}
+        }
+
+        // ── CONTENT BLOCKLIST (MOVIE & SERIES FILTER) ────────────────────────
+        let _allBlockedItems = [];
+
+        async function loadBlockedContents() {
+            const tbody = document.getElementById('blockedContentsTableBody');
+            const countEl = document.getElementById('blockedCount');
+            if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:20px;">Loading blocked items...</td></tr>';
+            try {
+                const res = await fetch('/api/admin/blocked-contents', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const d = await res.json();
+                _allBlockedItems = d.items || [];
+                if (countEl) countEl.innerText = _allBlockedItems.length;
+
+                if (!tbody) return;
+                if (_allBlockedItems.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:24px;">No items blocked yet. Use search above to block movies or series.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = _allBlockedItems.map(b => {
+                    const typeLabel = b.subject_type == 2 ? '📺 TV Series' : '🎬 Movie';
+                    const coverImg = b.cover ? `<img src="${b.cover}" style="width:40px; height:56px; object-fit:cover; border-radius:4px; background:#000;">` : `<div style="width:40px; height:56px; background:rgba(255,255,255,0.05); border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:16px;">🎬</div>`;
+                    const dateFormatted = b.created_at ? new Date(b.created_at).toLocaleDateString('bn-BD', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '–';
+
+                    return `
+                        <tr>
+                            <td>${coverImg}</td>
+                            <td>
+                                <strong style="color:#ffffff; font-size:13.5px;">${escapeHtml(b.title)}</strong>
+                                ${b.detail_path ? `<div style="font-size:11px; color:var(--text-muted); margin-top:2px;">/${escapeHtml(b.detail_path)}</div>` : ''}
+                            </td>
+                            <td><span style="font-size:11.5px; background:rgba(255,255,255,0.06); padding:3px 8px; border-radius:4px; font-weight:600;">${typeLabel}</span></td>
+                            <td><code style="color:var(--accent-cyan); font-size:12px;">${b.subject_id || '–'}</code></td>
+                            <td><span style="color:#f87171; font-size:12px;">${escapeHtml(b.reason || 'Blocked by Admin')}</span></td>
+                            <td style="font-size:12px; color:var(--text-muted);">${dateFormatted}</td>
+                            <td style="text-align:center;">
+                                <button class="btn-secondary" style="font-size:11.5px; padding:4px 10px; color:#34d399; border-color:rgba(52,211,153,0.3);" onclick="unblockContentItem(${b.id}, '${escapeHtml(b.title)}')">✅ Unblock</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch(e) {
+                if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#ef4444; padding:20px;">Error loading blocked items: ${e.message}</td></tr>`;
+            }
+        }
+
+        async function executeBlocklistSearch() {
+            const input = document.getElementById('blocklistSearchInput');
+            const q = (input ? input.value : '').trim();
+            if (!q) {
+                showToast('Please enter a movie or series title to search');
+                return;
+            }
+
+            const resultsContainer = document.getElementById('blocklistSearchResults');
+            const grid = document.getElementById('blocklistSearchGrid');
+            if (resultsContainer) resultsContainer.style.display = 'block';
+            if (grid) grid.innerHTML = '<p style="color:var(--text-muted); grid-column:1/-1;">Searching MovieBox database...</p>';
+
+            try {
+                const res = await fetch(`/api/admin/subjects/search?q=${encodeURIComponent(q)}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const d = await res.json();
+                const items = d.items || d.list || [];
+
+                if (items.length === 0) {
+                    grid.innerHTML = '<p style="color:var(--text-muted); grid-column:1/-1;">No results found. You can use the Quick Manual Title Filter below to block this name directly!</p>';
+                    return;
+                }
+
+                // Check against currently loaded blocked items
+                const blockedSids = new Set(_allBlockedItems.map(b => String(b.subject_id).trim()));
+                const blockedTitles = new Set(_allBlockedItems.map(b => String(b.title).trim().toLowerCase()));
+
+                grid.innerHTML = items.map(it => {
+                    const sid = String(it.subjectId || it.subject_id || '');
+                    const title = it.title || '';
+                    const titleLow = title.toLowerCase().trim();
+                    const isBlocked = it.isBlocked || blockedSids.has(sid) || blockedTitles.has(titleLow);
+                    const cover = it.coverUrl || it.cover || '';
+                    const typeLabel = (it.subjectType == 2 || it.subject_type == 2) ? '📺 Series' : '🎬 Movie';
+                    const detailPath = it.detailPath || it.detail_path || '';
+
+                    return `
+                        <div style="background:var(--bg-card); border:1px solid ${isBlocked ? 'rgba(239,68,68,0.5)' : 'var(--border-subtle)'}; border-radius:10px; overflow:hidden; display:flex; flex-direction:column; position:relative;">
+                            ${isBlocked ? '<div style="position:absolute; top:6px; right:6px; background:#ef4444; color:#fff; font-size:10px; font-weight:700; padding:2px 7px; border-radius:4px; z-index:2;">BLOCKED</div>' : ''}
+                            <div style="width:100%; height:160px; background:#000; overflow:hidden; position:relative;">
+                                ${cover ? `<img src="${cover}" style="width:100%; height:100%; object-fit:cover;">` : '<div style="display:flex; align-items:center; justify-content:center; height:100%; font-size:24px;">🎬</div>'}
+                                <span style="position:absolute; bottom:6px; left:6px; background:rgba(0,0,0,0.7); font-size:10px; padding:2px 6px; border-radius:4px;">${typeLabel}</span>
+                            </div>
+                            <div style="padding:10px; flex:1; display:flex; flex-direction:column; justify-content:space-between;">
+                                <div>
+                                    <strong style="font-size:12.5px; color:#fff; display:block; line-height:1.3; margin-bottom:4px;" title="${escapeHtml(title)}">${escapeHtml(title)}</strong>
+                                    <div style="font-size:10.5px; color:var(--text-muted); margin-bottom:8px;">ID: ${sid || '–'}</div>
+                                </div>
+                                ${isBlocked ? `
+                                    <button class="btn-secondary" style="font-size:11px; padding:6px; width:100%; color:#34d399; border-color:rgba(52,211,153,0.3);" onclick="unblockContentBySubjectId('${sid}', '${escapeHtml(title)}')">✅ Unblock</button>
+                                ` : `
+                                    <button class="btn-danger" style="background:#ef4444; color:#fff; border:none; border-radius:6px; font-size:11px; padding:6px; width:100%; cursor:pointer; font-weight:700;" onclick="blockContentItem('${sid}', '${escapeHtml(title)}', ${it.subjectType||1}, '${escapeHtml(cover)}', '${escapeHtml(detailPath)}')">🚫 Block</button>
+                                `}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch(e) {
+                if (grid) grid.innerHTML = `<p style="color:#ef4444; grid-column:1/-1;">Search error: ${e.message}</p>`;
+            }
+        }
+
+        function closeBlocklistSearchResults() {
+            const resultsContainer = document.getElementById('blocklistSearchResults');
+            if (resultsContainer) resultsContainer.style.display = 'none';
+        }
+
+        async function blockContentItem(subjectId, title, subjectType = 1, cover = '', detailPath = '', reason = 'Blocked by Admin') {
+            try {
+                const res = await fetch('/api/admin/blocked-contents', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({
+                        subjectId: subjectId,
+                        title: title,
+                        subjectType: subjectType,
+                        cover: cover,
+                        detailPath: detailPath,
+                        reason: reason
+                    })
+                });
+                const d = await res.json();
+                showToast(d.message || `'${title}' has been blocked!`);
+                await loadBlockedContents();
+                executeBlocklistSearch();
+            } catch(e) {
+                alert('Error blocking item: ' + e);
+            }
+        }
+
+        async function unblockContentItem(id, title) {
+            if (!confirm(`Are you sure you want to unblock '${title}'? It will become visible in the app again.`)) return;
+            try {
+                const res = await fetch('/api/admin/blocked-contents/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ id: id })
+                });
+                const d = await res.json();
+                showToast(d.message || `'${title}' has been unblocked!`);
+                await loadBlockedContents();
+                executeBlocklistSearch();
+            } catch(e) {
+                alert('Error unblocking: ' + e);
+            }
+        }
+
+        async function unblockContentBySubjectId(subjectId, title) {
+            if (!confirm(`Are you sure you want to unblock '${title}'?`)) return;
+            try {
+                const res = await fetch('/api/admin/blocked-contents/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ subjectId: subjectId })
+                });
+                const d = await res.json();
+                showToast(d.message || `'${title}' has been unblocked!`);
+                await loadBlockedContents();
+                executeBlocklistSearch();
+            } catch(e) {
+                alert('Error unblocking: ' + e);
+            }
+        }
+
+        async function executeManualBlock() {
+            const titleInput = document.getElementById('manualBlockTitle');
+            const reasonInput = document.getElementById('manualBlockReason');
+            const title = (titleInput ? titleInput.value : '').trim();
+            const reason = (reasonInput ? reasonInput.value : '').trim() || 'Blocked by Admin';
+
+            if (!title) {
+                showToast('দয়া করে ব্লক করার জন্য টাইটেল বা নাম লিখুন');
+                return;
+            }
+
+            await blockContentItem('', title, 1, '', '', reason);
+            if (titleInput) titleInput.value = '';
+            if (reasonInput) reasonInput.value = '';
         }
 
         // ── SPORTS TAB ───────────────────────────────────────────────────────
