@@ -2095,6 +2095,16 @@
 
     <!-- ── APPLICATION JAVASCRIPT (BLAZING FAST LAZY LOAD) ────────────────── -->
     <script>
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         let token = localStorage.getItem('admin_token') || '';
         let currentTab = 'dashboard';
         const loadedTabs = new Set();

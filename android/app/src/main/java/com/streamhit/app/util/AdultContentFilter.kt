@@ -56,7 +56,7 @@ object AdultContentFilter {
         "paris 05:59", "theo & hugo", "theo and hugo", "nymphomaniac", "shortbus",
         "caligula", "baise-moi", "9 songs", "the brown bunny", "all about anna",
         "playboy", "penthouse", "hustler", "onlyfans", "camgirl", "webcam model",
-        "sex tape", "sex video",
+        "sex tape", "sex video", "city girl", "city girls",
 
         // Famous adult actors
         "mia khalifa", "dani daniels", "eva elfie", "kendra lust", "johnny sins",

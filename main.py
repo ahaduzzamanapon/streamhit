@@ -332,7 +332,7 @@ ADULT_KEYWORDS = [
     'bunnywalker', 'poju', 'pink pineapple', 'white bear', 'green bunny', 'milky anime',
     'suzuki mirano', 'paris 05:59', 'theo & hugo', 'theo and hugo', 'nymphomaniac',
     'shortbus', 'caligula', 'baise-moi', '9 songs', 'the brown bunny', 'all about anna',
-    'playboy', 'penthouse', 'hustler', 'onlyfans', 'camgirl', 'webcam model', 'sex tape'
+    'playboy', 'penthouse', 'hustler', 'onlyfans', 'camgirl', 'webcam model', 'sex tape', 'city girl', 'city girls'
 ]
 
 # Admin-defined Blocklist for Movies and Series (In-Memory Cache for 0ms Fast Filtering)
@@ -348,33 +348,54 @@ def is_blocked_content(item: dict) -> bool:
     if sid and sid in _blocked_subject_ids:
         return True
         
-    # 2. Check by Title
+    # 2. Check by Title & detailPath with space, punctuation, and hyphen-agnostic matching
     title = str(item.get("title") or item.get("name") or "").strip().lower()
-    if title:
-        if title in _blocked_titles:
+    dpath = str(item.get("detailPath") or item.get("detail_path") or item.get("detailUrl") or item.get("slug") or "").strip().lower()
+    
+    clean_title = re.sub(r'[^a-z0-9]+', '', title)
+    clean_dpath = re.sub(r'[^a-z0-9]+', '', dpath)
+
+    for bt in _blocked_titles:
+        if not bt:
+            continue
+        # Exact match
+        if bt == title or bt == dpath:
             return True
-        for bt in _blocked_titles:
-            if len(bt) >= 3 and bt in title:
+        # Substring title match
+        if len(bt) >= 3 and bt in title:
+            return True
+        # Alphanumeric normalized match (e.g. "city girl" -> "citygirl" matching "city-girl", "the city girl", etc.)
+        clean_bt = re.sub(r'[^a-z0-9]+', '', bt)
+        if len(clean_bt) >= 3:
+            if clean_bt in clean_title or clean_bt in clean_dpath:
                 return True
                 
-    # 3. Check by detailPath / slug / URL
-    dpath = str(item.get("detailPath") or item.get("detail_path") or item.get("detailUrl") or item.get("slug") or "").strip().lower()
-    if dpath:
-        for bs in _blocked_slugs:
-            if bs and bs in dpath:
-                return True
-        for bt in _blocked_titles:
-            if len(bt) >= 4 and bt in dpath:
-                return True
+    for bs in _blocked_slugs:
+        if not bs:
+            continue
+        if bs in dpath or bs in clean_dpath:
+            return True
+        clean_bs = re.sub(r'[^a-z0-9]+', '', bs)
+        if len(clean_bs) >= 3 and clean_bs in clean_dpath:
+            return True
                 
     return False
 
 def clear_all_content_caches():
     global _banners_cache, _banners_cache_time
+    global _movies_pool_cache, _movies_pool_cache_time
+    global _tv_pool_cache, _tv_pool_cache_time
+    global _filter_cache, _filter_cache_time
     _banners_cache = None
     _banners_cache_time = 0
     _home_cache.clear()
     _home_cache_time.clear()
+    _movies_pool_cache = []
+    _movies_pool_cache_time = 0
+    _tv_pool_cache = []
+    _tv_pool_cache_time = 0
+    _filter_cache.clear()
+    _filter_cache_time.clear()
 
 async def reload_blocked_contents():
     global _blocked_subject_ids, _blocked_titles, _blocked_slugs
@@ -387,16 +408,21 @@ async def reload_blocked_contents():
                 await cur.execute("""
                     CREATE TABLE IF NOT EXISTS blocked_contents (
                         id INT AUTO_INCREMENT PRIMARY KEY,
-                        subject_id VARCHAR(50) DEFAULT '',
+                        subject_id VARCHAR(50) DEFAULT NULL,
                         title VARCHAR(255) NOT NULL,
                         subject_type INT DEFAULT 1,
                         cover TEXT,
                         detail_path VARCHAR(255) DEFAULT '',
                         reason VARCHAR(255) DEFAULT 'Blocked by Admin',
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        UNIQUE KEY uniq_subj (subject_id)
+                        INDEX idx_subj (subject_id),
+                        INDEX idx_title (title(100))
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
+                try:
+                    await cur.execute("ALTER TABLE blocked_contents DROP INDEX uniq_subj")
+                except Exception:
+                    pass
                 await cur.execute("SELECT * FROM blocked_contents")
                 rows = await cur.fetchall()
                 _blocked_subject_ids = {str(r["subject_id"]).strip() for r in rows if r.get("subject_id")}
@@ -2810,7 +2836,7 @@ async def api_filter(request: Request):
         return _filter_cache[cache_key]
 
     pool = await (get_movies_pool() if subject_type == 1 else get_tv_pool())
-    filtered = list(pool)
+    filtered = [m for m in pool if not is_blocked_content(m)]
 
     # 1. Filter by genre
     if genre != "ALL":
@@ -2868,8 +2894,8 @@ async def api_filter(request: Request):
         except Exception as e:
             print(f"Error querying mobile search for filter: {e}")
 
-    # Remove any adult content from filtered results
-    filtered = [m for m in filtered if not is_adult_content(m)]
+    # Remove any adult content or blocked content from filtered results
+    filtered = [m for m in filtered if not is_adult_content(m) and not is_blocked_content(m)]
 
     # 5. Sort
     sort_upper = str(sort).upper()
@@ -2962,7 +2988,7 @@ async def api_search(request: Request):
                 if isinstance(genres, str):
                     genres = [g.strip() for g in genres.split(",") if g.strip()]
                     
-                if is_adult_content(it):
+                if is_adult_content(it) or is_blocked_content(it):
                     continue
 
                 cleaned_items.append({
@@ -3079,7 +3105,7 @@ async def search_suggest(q: str = ""):
         if raw_items:
             items = []
             for it in raw_items:
-                if is_adult_content(it):
+                if is_adult_content(it) or is_blocked_content(it):
                     continue
                 sid = str(it.get("subjectId") or "")
                 title = it.get("title") or ""

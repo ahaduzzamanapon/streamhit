@@ -254,16 +254,21 @@ async def admin_get_blocked_contents(request: Request):
             await cur.execute("""
                 CREATE TABLE IF NOT EXISTS blocked_contents (
                     id INT AUTO_INCREMENT PRIMARY KEY,
-                    subject_id VARCHAR(50) DEFAULT '',
+                    subject_id VARCHAR(50) DEFAULT NULL,
                     title VARCHAR(255) NOT NULL,
                     subject_type INT DEFAULT 1,
                     cover TEXT,
                     detail_path VARCHAR(255) DEFAULT '',
                     reason VARCHAR(255) DEFAULT 'Blocked by Admin',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE KEY uniq_subj (subject_id)
+                    INDEX idx_subj (subject_id),
+                    INDEX idx_title (title(100))
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """)
+            try:
+                await cur.execute("ALTER TABLE blocked_contents DROP INDEX uniq_subj")
+            except Exception:
+                pass
             await cur.execute("SELECT * FROM blocked_contents ORDER BY id DESC")
             rows = await cur.fetchall()
             for r in rows:
@@ -294,26 +299,49 @@ async def admin_add_blocked_content(data: dict, request: Request):
             await cur.execute("""
                 CREATE TABLE IF NOT EXISTS blocked_contents (
                     id INT AUTO_INCREMENT PRIMARY KEY,
-                    subject_id VARCHAR(50) DEFAULT '',
+                    subject_id VARCHAR(50) DEFAULT NULL,
                     title VARCHAR(255) NOT NULL,
                     subject_type INT DEFAULT 1,
                     cover TEXT,
                     detail_path VARCHAR(255) DEFAULT '',
                     reason VARCHAR(255) DEFAULT 'Blocked by Admin',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE KEY uniq_subj (subject_id)
+                    INDEX idx_subj (subject_id),
+                    INDEX idx_title (title(100))
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """)
-            await cur.execute("""
-                INSERT INTO blocked_contents (subject_id, title, subject_type, cover, detail_path, reason)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE
-                    title = VALUES(title),
-                    subject_type = VALUES(subject_type),
-                    cover = VALUES(cover),
-                    detail_path = VALUES(detail_path),
-                    reason = VALUES(reason)
-            """, (subject_id, title, subject_type, cover, detail_path, reason))
+            try:
+                await cur.execute("ALTER TABLE blocked_contents DROP INDEX uniq_subj")
+            except Exception:
+                pass
+
+            if subject_id:
+                await cur.execute("SELECT id FROM blocked_contents WHERE subject_id = %s", (subject_id,))
+                existing = await cur.fetchone()
+                if existing:
+                    eid = existing[0] if isinstance(existing, tuple) else existing["id"]
+                    await cur.execute("""
+                        UPDATE blocked_contents
+                        SET title = %s, subject_type = %s, cover = %s, detail_path = %s, reason = %s
+                        WHERE id = %s
+                    """, (title, subject_type, cover, detail_path, reason, eid))
+                else:
+                    await cur.execute("""
+                        INSERT INTO blocked_contents (subject_id, title, subject_type, cover, detail_path, reason)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (subject_id, title, subject_type, cover, detail_path, reason))
+            else:
+                clean_title = title.strip()
+                await cur.execute("SELECT id FROM blocked_contents WHERE LOWER(title) = %s", (clean_title.lower(),))
+                existing = await cur.fetchone()
+                if existing:
+                    eid = existing[0] if isinstance(existing, tuple) else existing["id"]
+                    await cur.execute("UPDATE blocked_contents SET reason = %s WHERE id = %s", (reason, eid))
+                else:
+                    await cur.execute("""
+                        INSERT INTO blocked_contents (subject_id, title, subject_type, cover, detail_path, reason)
+                        VALUES (NULL, %s, %s, %s, %s, %s)
+                    """, (clean_title, subject_type, cover, detail_path, reason))
             
     await reload_blocked_contents()
     clear_all_content_caches()
