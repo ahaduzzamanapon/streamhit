@@ -338,11 +338,11 @@ async def public_get_latest_notification():
 @router.post("/api/admin/version")
 async def admin_update_version(data: dict, request: Request):
     check_admin_auth(request)
-    version_code = int(data.get("versionCode"))
-    version_name = data.get("versionName")
-    apk_url = data.get("apkUrl")
-    must_update = bool(data.get("mustUpdate", False))
-    release_notes = data.get("releaseNotes", "")
+    version_code = int(data.get("versionCode") or data.get("version_code") or 0)
+    version_name = data.get("versionName") or data.get("version_name")
+    apk_url = data.get("apkUrl") or data.get("apk_url")
+    must_update = bool(data.get("mustUpdate", data.get("must_update", False)))
+    release_notes = data.get("releaseNotes") or data.get("release_notes", "")
     
     if not version_code or not version_name or not apk_url:
         raise HTTPException(status_code=400, detail="Version code, name and APK URL are required")
@@ -353,6 +353,16 @@ async def admin_update_version(data: dict, request: Request):
     
     async with pool.acquire() as conn:
         async with conn.cursor() as cur:
+            await cur.execute("""
+                CREATE TABLE IF NOT EXISTS app_versions (
+                    version_code INT PRIMARY KEY,
+                    version_name VARCHAR(50) NOT NULL,
+                    apk_url TEXT NOT NULL,
+                    must_update BOOLEAN DEFAULT FALSE,
+                    release_notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
             await cur.execute("""
                 INSERT INTO app_versions (version_code, version_name, apk_url, must_update, release_notes)
                 VALUES (%s, %s, %s, %s, %s)
@@ -388,21 +398,39 @@ async def admin_upload_apk(request: Request, file: UploadFile = File(...)):
 async def public_get_app_version():
     from main import get_db_pool
     default_version = {
-        "versionCode": 29,
-        "versionName": "1.0.28",
+        "versionCode": 30,
+        "versionName": "1.0.29",
         "apkUrl": "https://nxly.online/uploads/apks/NXLY-Stream.apk",
         "mustUpdate": True,
-        "releaseNotes": "🙏 বারবার আপডেটের জন্য আমরা আন্তরিকভাবে দুঃখিত! লাইভ টিভি স্মুথ করা, বাফারিং দূর করা, টিভি রিমোট কন্ট্রোল এবং ব্যাকগ্রাউন্ড ডাউনলোডের বড় ফিচারের জন্য এই জরুরি আপডেটটি দিতে হয়েছে। দয়া করে একবার আপডেট করে নিন।"
+        "releaseNotes": "📺 লাইভ টিভি বড় আপডেট! টিভি লোগো বড় ও ক্লিয়ার করা হয়েছে, রিলেটেড চ্যানেল ৩-কলাম গ্রিড ভিউ, নেক্সট চ্যানেল সুইচিং ফিক্স এবং সার্ভার অটো-ফেইলওভার যুক্ত করা হয়েছে। দয়া করে এখনই আপডেট করে নিন।"
+    }
+    fallback_data = {
+        "version": default_version,
+        "version_code": default_version["versionCode"],
+        "version_name": default_version["versionName"],
+        "apk_url": default_version["apkUrl"],
+        "must_update": default_version["mustUpdate"],
+        "release_notes": default_version["releaseNotes"]
     }
     pool = await get_db_pool()
-    if not pool: return {"version": default_version}
+    if not pool: return fallback_data
     try:
         async with pool.acquire() as conn:
             async with conn.cursor(aiomysql.DictCursor) as cur:
+                await cur.execute("""
+                    CREATE TABLE IF NOT EXISTS app_versions (
+                        version_code INT PRIMARY KEY,
+                        version_name VARCHAR(50) NOT NULL,
+                        apk_url TEXT NOT NULL,
+                        must_update BOOLEAN DEFAULT FALSE,
+                        release_notes TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
                 await cur.execute("SELECT * FROM app_versions ORDER BY version_code DESC LIMIT 1")
                 row = await cur.fetchone()
                 if not row:
-                    return {"version": default_version}
+                    return fallback_data
                 apk_url = row["apk_url"]
                 if "app-release.apk" in apk_url:
                     apk_url = apk_url.replace("app-release.apk", "NXLY-Stream.apk")
@@ -413,10 +441,15 @@ async def public_get_app_version():
                         "apkUrl": apk_url,
                         "mustUpdate": bool(row["must_update"]),
                         "releaseNotes": row["release_notes"]
-                    }
+                    },
+                    "version_code": row["version_code"],
+                    "version_name": row["version_name"],
+                    "apk_url": apk_url,
+                    "must_update": bool(row["must_update"]),
+                    "release_notes": row["release_notes"]
                 }
     except Exception:
-        return {"version": default_version}
+        return fallback_data
 
 @router.get("/api/app/download")
 async def public_download_latest():
@@ -807,6 +840,20 @@ async def admin_save_ad_config(request: Request):
         try:
             dur = max(3, min(300, int(data["duration"])))
             set_sponsor_setting("duration", str(dur))
+            set_sponsor_setting("duration_clicked", str(dur))
+        except Exception:
+            pass
+    if "duration_clicked" in data:
+        try:
+            dur_c = max(3, min(300, int(data["duration_clicked"])))
+            set_sponsor_setting("duration_clicked", str(dur_c))
+            set_sponsor_setting("duration", str(dur_c))
+        except Exception:
+            pass
+    if "duration_no_click" in data:
+        try:
+            dur_nc = max(5, min(300, int(data["duration_no_click"])))
+            set_sponsor_setting("duration_no_click", str(dur_nc))
         except Exception:
             pass
     return {"code": 0, "status": "ok"}

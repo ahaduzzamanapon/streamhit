@@ -599,6 +599,8 @@ fun AdaptivePlayerScreen(
         val s = servers.getOrNull(index) ?: return
         currentServerIndex = index
         currentStreamUrl = s.url
+        hasPlaybackError = false
+        playbackErrorMessage = null
         isBuffering = true
         val directUrl = resolveDirectPlayableUrl(s.url)
         val mediaItem = MediaItem.Builder()
@@ -612,11 +614,13 @@ fun AdaptivePlayerScreen(
             )
             .build()
         exoPlayer?.apply {
+            stop()
+            clearMediaItems()
             setMediaItem(mediaItem)
             prepare()
             play()
         }
-        Toast.makeText(context, "Switched to ${s.label}", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "📡 ${s.label} চালু করা হয়েছে", Toast.LENGTH_SHORT).show()
     }
 
     val relatedChannels = remember(liveChannels, currentChannel) {
@@ -627,11 +631,8 @@ fun AdaptivePlayerScreen(
             val sameCat = liveChannels.filter { 
                 it.category.equals(cat, ignoreCase = true) && !it.name.equals(curName, ignoreCase = true) 
             }
-            if (sameCat.size >= 7) sameCat.take(7)
-            else {
-                val others = liveChannels.filter { !it.name.equals(curName, ignoreCase = true) && !sameCat.contains(it) }
-                (sameCat + others).take(7)
-            }
+            val others = liveChannels.filter { !it.name.equals(curName, ignoreCase = true) && !sameCat.contains(it) }
+            sameCat + others
         }
     }
 
@@ -651,6 +652,9 @@ fun AdaptivePlayerScreen(
         val s = channel.activeServers.firstOrNull() ?: return
         currentServerIndex = 0
         currentStreamUrl = s.url
+        failedStreamUrls.clear()
+        hasPlaybackError = false
+        playbackErrorMessage = null
         isBuffering = true
         val directUrl = resolveDirectPlayableUrl(s.url)
         val mediaItem = MediaItem.Builder()
@@ -664,24 +668,32 @@ fun AdaptivePlayerScreen(
             )
             .build()
         exoPlayer?.apply {
+            stop()
+            clearMediaItems()
             setMediaItem(mediaItem)
             prepare()
             play()
         }
         val idx = liveChannels.indexOfFirst { it.name.equals(channel.name, ignoreCase = true) }
         channelOverlayBanner = Pair(if (idx >= 0) idx + 1 else 1, channel)
-        Toast.makeText(context, "Playing ${channel.name}", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "📺 চ্যানেল: ${channel.name}", Toast.LENGTH_SHORT).show()
     }
 
     fun playNextChannel() {
         if (liveChannels.isEmpty()) return
-        val nextIdx = (currentChannelIndex + 1) % liveChannels.size
+        val curIdx = liveChannels.indexOfFirst { it.name.equals(currentChannel?.name, ignoreCase = true) }
+        val baseIdx = if (curIdx >= 0) curIdx else currentChannelIndex
+        val nextIdx = (baseIdx + 1) % liveChannels.size
+        failedStreamUrls.clear()
         switchLiveChannel(liveChannels[nextIdx])
     }
 
     fun playPrevChannel() {
         if (liveChannels.isEmpty()) return
-        val prevIdx = if (currentChannelIndex > 0) currentChannelIndex - 1 else liveChannels.size - 1
+        val curIdx = liveChannels.indexOfFirst { it.name.equals(currentChannel?.name, ignoreCase = true) }
+        val baseIdx = if (curIdx >= 0) curIdx else currentChannelIndex
+        val prevIdx = if (baseIdx > 0) baseIdx - 1 else liveChannels.size - 1
+        failedStreamUrls.clear()
         switchLiveChannel(liveChannels[prevIdx])
     }
 
@@ -1278,6 +1290,38 @@ fun AdaptivePlayerScreen(
                     failedStreamUrls.add(currentStreamUrl)
                 }
 
+                // Step 2.5: Live TV Server Auto-Failover ("chanle er ekta server kaj na korle onno server e jabe")
+                if (isLiveTv && currentChannel != null) {
+                    val servers = currentChannel!!.activeServers
+                    val untriedServerIdx = servers.indexOfFirst { it.url.isNotBlank() && !failedStreamUrls.contains(it.url) }
+                    if (untriedServerIdx >= 0) {
+                        val nextServer = servers[untriedServerIdx]
+                        currentServerIndex = untriedServerIdx
+                        currentStreamUrl = nextServer.url
+                        isBuffering = true
+                        triedProxyFallback = false
+                        android.util.Log.w("StreamHitPlayer", "Live TV Auto-failover: Switching to ${nextServer.label} (${nextServer.url})")
+                        Toast.makeText(context, "⚠️ সার্ভার বিচ্ছিন্ন। ${nextServer.label}-এ অটো সুইচ করা হচ্ছে...", Toast.LENGTH_SHORT).show()
+                        val directUrl = resolveDirectPlayableUrl(nextServer.url)
+                        val mediaItem = MediaItem.Builder()
+                            .setUri(Uri.parse(directUrl))
+                            .setLiveConfiguration(
+                                MediaItem.LiveConfiguration.Builder()
+                                    .setTargetOffsetMs(3500L)
+                                    .setMinPlaybackSpeed(0.97f)
+                                    .setMaxPlaybackSpeed(1.03f)
+                                    .build()
+                            )
+                            .build()
+                        player.stop()
+                        player.clearMediaItems()
+                        player.setMediaItem(mediaItem)
+                        player.prepare()
+                        player.play()
+                        return
+                    }
+                }
+
                 // Step 3: Check all other available untried servers/resolutions (1080p, 720p, 480p, 360p, etc.)
                 val untriedStreams = resources.filter { it.url.isNotBlank() && !failedStreamUrls.contains(it.url) }
                 if (untriedStreams.isNotEmpty()) {
@@ -1648,7 +1692,10 @@ fun AdaptivePlayerScreen(
                 isLiveStream = isLiveTv,
                 channelNumber = currentChannelIndex + 1,
                 onNextChannel = { playNextChannel() },
-                onPrevChannel = { playPrevChannel() }
+                onPrevChannel = { playPrevChannel() },
+                onSwitchLiveServer = { switchLiveServer(it) },
+                currentServerIndex = currentServerIndex,
+                serverCount = currentChannel?.activeServers?.size ?: 0
             )
         } else {
             val isOffline = initialIsOffline || initialStreamUrl.startsWith("content://") || initialStreamUrl.startsWith("file://") || initialStreamUrl.startsWith("/")
@@ -1701,6 +1748,9 @@ fun AdaptivePlayerScreen(
                     channelNumber = currentChannelIndex + 1,
                     onNextChannel = { playNextChannel() },
                     onPrevChannel = { playPrevChannel() },
+                    onSwitchLiveServer = { switchLiveServer(it) },
+                    currentServerIndex = currentServerIndex,
+                    serverCount = currentChannel?.activeServers?.size ?: 0,
                     audioSyncOffsetMs = audioSyncOffsetMs,
                     onOpenAudioSync = { showAudioSyncDialog = true }
                 )
@@ -2002,25 +2052,31 @@ fun formatBufferedAhead(aheadMs: Long): String {
 @Composable
 fun LiveTvMiniCard(
     channel: LiveTvChannel,
+    isSelected: Boolean = false,
     onClick: () -> Unit
 ) {
     Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = BgCard,
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+        shape = RoundedCornerShape(12.dp),
+        color = if (isSelected) Color(0xFF16253B) else Color(0xFF0F172A),
+        border = BorderStroke(
+            if (isSelected) 1.2.dp else 0.8.dp,
+            if (isSelected) Color(0xFF00F5D4) else Color.White.copy(alpha = 0.08f)
+        ),
         modifier = Modifier
-            .width(88.dp)
+            .fillMaxWidth()
             .clickable(onClick = onClick)
     ) {
         Column(
-            modifier = Modifier.padding(6.dp),
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(
                 modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color.Black.copy(alpha = 0.4f)),
+                    .size(52.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.White.copy(alpha = 0.06f))
+                    .border(0.5.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                    .padding(4.dp),
                 contentAlignment = Alignment.Center
             ) {
                 if (channel.logo.isNotBlank()) {
@@ -2028,24 +2084,28 @@ fun LiveTvMiniCard(
                         model = channel.logo,
                         contentDescription = channel.name,
                         contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxSize().padding(3.dp)
+                        modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    Icon(Icons.Default.Tv, contentDescription = null, tint = TextMuted, modifier = Modifier.size(22.dp))
+                    Icon(Icons.Default.Tv, contentDescription = null, tint = TextMuted, modifier = Modifier.size(26.dp))
                 }
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .background(AccentEmerald, CircleShape)
-                        .align(Alignment.TopEnd)
-                )
             }
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = channel.name,
-                color = Color.White,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
+                color = if (isSelected) Color(0xFF00F5D4) else Color.White,
+                fontSize = 10.5.sp,
+                fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = if (isSelected) "▶ Playing" else (if (channel.activeServers.size > 1) "${channel.activeServers.size} Servers" else channel.category),
+                color = if (isSelected) Color(0xFF00F5D4) else TextMuted,
+                fontSize = 8.5.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center

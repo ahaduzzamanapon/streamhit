@@ -3,18 +3,22 @@ package com.streamhit.app.ui.sponsor
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
-import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.view.MotionEvent
 import android.view.ViewGroup
+import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,7 +28,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -38,34 +41,70 @@ import kotlinx.coroutines.delay
 class SponsorWebViewActivity : ComponentActivity() {
 
     private var webView: WebView? = null
-    private var lastBackPressTime = 0L
+    private var hasClickedState = false
+    private var isCompletedState = false
+    private var remainingSecondsState = 30
+    private var durationClickedState = 10
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         val targetUrl = intent.getStringExtra("EXTRA_TARGET_URL") ?: SponsorAdManager.sponsorUrl
         val isDownloadAd = intent.getBooleanExtra("EXTRA_IS_DOWNLOAD_AD", false)
-        val duration = intent.getIntExtra("EXTRA_AD_DURATION", SponsorAdManager.adDurationSeconds).coerceAtLeast(3)
+        val durationClicked = intent.getIntExtra("EXTRA_DURATION_CLICKED", SponsorAdManager.durationClickedSeconds).coerceAtLeast(3)
+        val durationNoClick = intent.getIntExtra("EXTRA_DURATION_NO_CLICK", SponsorAdManager.durationNoClickSeconds).coerceAtLeast(5)
+
+        durationClickedState = durationClicked
+        remainingSecondsState = durationNoClick
+
+        // Strict back press handler: back is blocked until click+10s or 30s timeout finishes
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (isCompletedState) {
+                    finish()
+                } else if (!hasClickedState) {
+                    Toast.makeText(
+                        this@SponsorWebViewActivity,
+                        "⚠️ যেকোনো কিছুতে ক্লিক করুন (${durationClickedState}s) অথবা অপেক্ষা করুন (${remainingSecondsState}s)!",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    Toast.makeText(
+                        this@SponsorWebViewActivity,
+                        "⚠️ ক্লিক সনাক্ত হয়েছে! আর মাত্র ${remainingSecondsState} সেকেন্ড অপেক্ষা করুন।",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        })
 
         setContent {
             StreamfitTheme {
                 SponsorWebScreen(
                     targetUrl = targetUrl,
-                    duration = duration,
-                    onTimerFinished = {
+                    durationClicked = durationClicked,
+                    durationNoClick = durationNoClick,
+                    onStatusUpdate = { clicked, remaining, complete ->
+                        hasClickedState = clicked
+                        remainingSecondsState = remaining
+                        isCompletedState = complete
+                    },
+                    onTimerFinished = { wasClicked ->
                         if (!isDownloadAd) {
                             SponsorAdManager.recordAdUnlock()
+                        }
+                        val eventName = if (wasClicked) {
+                            if (isDownloadAd) "download_ad_clicked_${durationClicked}s" else "ad_clicked_${durationClicked}s"
+                        } else {
+                            if (isDownloadAd) "download_ad_timeout_${durationNoClick}s" else "ad_timeout_${durationNoClick}s"
                         }
                         SponsorAdManager.recordSponsorEvent(
                             this@SponsorWebViewActivity,
                             "click",
-                            if (isDownloadAd) "${duration}s_download_ad_complete" else "${duration}s_unlock_complete"
+                            eventName
                         )
                         setResult(Activity.RESULT_OK)
                         finish()
-                    },
-                    onBackRequested = {
-                        handleEarlyBack()
                     },
                     onBindWebView = { wv ->
                         webView = wv
@@ -73,22 +112,6 @@ class SponsorWebViewActivity : ComponentActivity() {
                 )
             }
         }
-    }
-
-    private fun handleEarlyBack() {
-        val now = System.currentTimeMillis()
-        if (now - lastBackPressTime < 2000L) {
-            // User insists on exiting early: don't unlock session
-            setResult(Activity.RESULT_CANCELED)
-            finish()
-        } else {
-            lastBackPressTime = now
-            Toast.makeText(this, "⚠️ আনলক হতে আর কিছুক্ষণ অপেক্ষা করুন। বের হতে চাইলে আবার ব্যাক চাপুন।", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    override fun onBackPressed() {
-        handleEarlyBack()
     }
 
     override fun onDestroy() {
@@ -103,34 +126,69 @@ class SponsorWebViewActivity : ComponentActivity() {
     }
 }
 
-@SuppressLint("SetJavaScriptEnabled")
+// Javascript bridge for multi-layer web click detection
+class WebClickBridge(private val onUserClick: () -> Unit) {
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    @JavascriptInterface
+    fun onAdClicked() {
+        mainHandler.post {
+            onUserClick()
+        }
+    }
+}
+
+@SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
 @Composable
 fun SponsorWebScreen(
     targetUrl: String,
-    duration: Int = SponsorAdManager.adDurationSeconds,
-    onTimerFinished: () -> Unit,
-    onBackRequested: () -> Unit,
+    durationClicked: Int = 10,
+    durationNoClick: Int = 30,
+    onStatusUpdate: (Boolean, Int, Boolean) -> Unit,
+    onTimerFinished: (Boolean) -> Unit,
     onBindWebView: (WebView) -> Unit
 ) {
-    // Dynamic countdown timer for automated ad center
-    var secondsRemaining by remember { mutableIntStateOf(duration) }
+    var hasClicked by remember { mutableStateOf(false) }
+    var secondsRemaining by remember { mutableIntStateOf(durationNoClick) }
     var isComplete by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        while (secondsRemaining > 0) {
-            delay(1000L)
-            secondsRemaining--
-        }
-        isComplete = true
-        delay(600L) // brief celebration before auto-return
-        onTimerFinished()
+    // Report status to Activity for back press handling
+    LaunchedEffect(hasClicked, secondsRemaining, isComplete) {
+        onStatusUpdate(hasClicked, secondsRemaining, isComplete)
     }
 
-    // Glow pulse animation for timer
+    // Function called whenever user clicks on ad
+    val registerClick: () -> Unit = {
+        if (!hasClicked && !isComplete) {
+            hasClicked = true
+            // If user clicked, switch timer to durationClicked (e.g. 10s)
+            if (secondsRemaining > durationClicked) {
+                secondsRemaining = durationClicked
+            }
+        }
+    }
+
+    // Countdown timer loop
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000L)
+            if (secondsRemaining > 1) {
+                secondsRemaining--
+            } else {
+                secondsRemaining = 0
+                isComplete = true
+                delay(500L)
+                onTimerFinished(hasClicked)
+                break
+            }
+        }
+    }
+
+    // Glow pulse animation for timer badge
     val infiniteTransition = rememberInfiniteTransition(label = "timerPulse")
     val glowAlpha by infiniteTransition.animateFloat(
         initialValue = 0.4f,
-        targetValue = 0.9f,
+        targetValue = 0.95f,
         animationSpec = infiniteRepeatable(
             animation = tween(600, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -143,7 +201,7 @@ fun SponsorWebScreen(
             .fillMaxSize()
             .background(BgDark)
     ) {
-        // Sleek floating cyber top bar
+        // Floating cyber top status bar
         Surface(
             color = Color(0xFF0F1728),
             shadowElevation = 8.dp,
@@ -159,43 +217,60 @@ fun SponsorWebScreen(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "💖",
+                        text = if (hasClicked) "⚡" else "💖",
                         fontSize = 18.sp
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
-                            text = "NXLY Stream • অটোমেটেড অ্যাড সেন্টার",
+                            text = "NXLY Stream • স্পন্সর সেন্টার",
                             color = Color.White,
                             fontSize = 13.5.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = if (isComplete) "সফলভাবে সম্পন্ন হয়েছে! চালিয়ে যাচ্ছি..." else "পেজটিতে ${duration} সেকেন্ড অপেক্ষা করুন",
-                            color = if (isComplete) Color(0xFF00F5D4) else Color(0xFFA0AEC0),
+                            text = when {
+                                isComplete -> "সফলভাবে সম্পন্ন হয়েছে! চালিয়ে যাচ্ছি..."
+                                hasClicked -> "✅ ক্লিক সনাক্ত হয়েছে! ${secondsRemaining}s অপেক্ষা করুন..."
+                                else -> "💡 যেকোনো কিছুতে ক্লিক করুন (${durationClicked}s এ শেষ হবে)"
+                            },
+                            color = when {
+                                isComplete || hasClicked -> Color(0xFF00F5D4)
+                                else -> Color(0xFFA0AEC0)
+                            },
                             fontSize = 11.sp
                         )
                     }
                 }
 
                 // Glowing countdown timer badge
+                val badgeColor = when {
+                    isComplete -> Color(0xFF00F5D4)
+                    hasClicked -> Color(0xFF00F5D4)
+                    else -> Color(0xFFFF2A54)
+                }
+
                 Box(
                     modifier = Modifier
                         .border(
                             1.dp,
-                            if (isComplete) Color(0xFF00F5D4) else Color(0xFFFF2A54).copy(alpha = glowAlpha),
+                            badgeColor.copy(alpha = glowAlpha),
                             RoundedCornerShape(20.dp)
                         )
                         .background(
-                            if (isComplete) Color(0x2200F5D4) else Color(0x22FF2A54),
+                            badgeColor.copy(alpha = 0.15f),
                             RoundedCornerShape(20.dp)
                         )
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = if (isComplete) "✅ সম্পন্ন!" else "⏳ ${secondsRemaining}s",
-                        color = if (isComplete) Color(0xFF00F5D4) else Color(0xFFFF2A54),
+                        text = when {
+                            isComplete -> "✅ সম্পন্ন!"
+                            hasClicked -> "⚡ ${secondsRemaining}s"
+                            else -> "⏳ ${secondsRemaining}s"
+                        },
+                        color = badgeColor,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -203,7 +278,7 @@ fun SponsorWebScreen(
             }
         }
 
-        // Web view displaying the sponsor page
+        // WebView with multi-layered Click Detector
         AndroidView(
             factory = { context ->
                 WebView(context).apply {
@@ -220,8 +295,35 @@ fun SponsorWebScreen(
                         mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                         userAgentString = "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
                     }
+
+                    // 1. JavaScript click listener bridge
+                    addJavascriptInterface(WebClickBridge { registerClick() }, "AndroidBridge")
+
+                    val injectScript = """
+                        (function() {
+                            if (window.__clickDetectorAttached) return;
+                            window.__clickDetectorAttached = true;
+                            function report() {
+                                try {
+                                    if (window.AndroidBridge && window.AndroidBridge.onAdClicked) {
+                                        window.AndroidBridge.onAdClicked();
+                                    }
+                                } catch(e){}
+                            }
+                            window.addEventListener('click', report, true);
+                            window.addEventListener('touchstart', report, {passive: true});
+                            window.addEventListener('mousedown', report, true);
+                            window.addEventListener('blur', function() {
+                                report();
+                            });
+                        })();
+                    """.trimIndent()
+
                     webViewClient = object : WebViewClient() {
                         private fun handleUrl(view: WebView?, url: String): Boolean {
+                            // Any navigation attempt indicates user clicked on link/action
+                            registerClick()
+
                             if (url.startsWith("http://") || url.startsWith("https://")) {
                                 return false // Let WebView load HTTP/HTTPS normally
                             }
@@ -253,7 +355,17 @@ fun SponsorWebScreen(
                             return true
                         }
 
-                        override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
+                        override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                            super.onPageStarted(view, url, favicon)
+                            view?.evaluateJavascript(injectScript, null)
+                        }
+
+                        override fun onPageFinished(view: WebView?, url: String?) {
+                            super.onPageFinished(view, url)
+                            view?.evaluateJavascript(injectScript, null)
+                        }
+
+                        override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                             val target = request?.url?.toString() ?: return false
                             return handleUrl(view, target)
                         }
@@ -266,12 +378,33 @@ fun SponsorWebScreen(
 
                         override fun onReceivedError(view: WebView?, errorCode: Int, description: String?, failingUrl: String?) {
                             if (failingUrl?.startsWith("market://") == true || failingUrl?.startsWith("intent://") == true) {
-                                return // Ignore unsupported scheme error pages
+                                return
                             }
                             super.onReceivedError(view, errorCode, description, failingUrl)
                         }
                     }
-                    webChromeClient = WebChromeClient()
+
+                    // 2. WebChromeClient for popup window clicks (window.open)
+                    webChromeClient = object : WebChromeClient() {
+                        override fun onCreateWindow(
+                            view: WebView?,
+                            isDialog: Boolean,
+                            isUserGesture: Boolean,
+                            resultMsg: android.os.Message?
+                        ): Boolean {
+                            registerClick()
+                            return super.onCreateWindow(view, isDialog, isUserGesture, resultMsg)
+                        }
+                    }
+
+                    // 3. Native touch detector for raw touch/tap interactions
+                    setOnTouchListener { _, event ->
+                        if (event.action == MotionEvent.ACTION_UP) {
+                            registerClick()
+                        }
+                        false
+                    }
+
                     onBindWebView(this)
                     loadUrl(targetUrl)
                 }
@@ -282,4 +415,5 @@ fun SponsorWebScreen(
         )
     }
 }
+
 

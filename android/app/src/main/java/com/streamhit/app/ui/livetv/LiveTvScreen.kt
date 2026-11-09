@@ -4,6 +4,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -137,7 +138,7 @@ fun LiveTvScreen(
                                 .fillMaxWidth()
                                 .clickable {
                                     selectedChannelForServers = null
-                                    onPlayStream(server.url, "${ch.name} (${server.label})")
+                                    onPlayStream(server.url, ch.name)
                                 }
                         ) {
                             Row(
@@ -455,116 +456,118 @@ fun LiveChannelCard(
                 onClick = onClick
             )
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
                     androidx.compose.ui.graphics.Brush.verticalGradient(
-                        listOf(Color(0xFF141D32), Color(0xFF0C1322))
+                        listOf(Color(0xFF162038), Color(0xFF0C1322))
                     )
                 )
-                .padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Channel Logo Box
-            Box(
+            Column(
                 modifier = Modifier
-                    .size(52.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color.White.copy(alpha = 0.06f))
-                    .padding(3.dp),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                if (channel.logo.isNotBlank()) {
-                    AsyncImage(
-                        model = channel.logo,
-                        contentDescription = channel.name,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(3.dp)
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Tv,
-                        contentDescription = channel.name,
-                        tint = TextMuted,
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
-
-                // Pulsating Red Live Dot Badge
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = Color.Black.copy(alpha = 0.75f),
-                    border = BorderStroke(0.5.dp, Color(0xFFFF2A54).copy(alpha = 0.8f)),
+                // Large & Clear Channel Logo Box (Separated from LIVE badge so it is never covered)
+                Box(
                     modifier = Modifier
-                        .padding(2.dp)
-                        .align(Alignment.TopEnd)
+                        .size(68.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color.White.copy(alpha = 0.07f))
+                        .border(0.8.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
+                        .padding(6.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(5.dp)
-                                .graphicsLayer {
-                                    scaleX = pulseScale
-                                    scaleY = pulseScale
-                                }
-                                .background(Color(0xFFFF2A54), CircleShape)
+                    if (channel.logo.isNotBlank()) {
+                        AsyncImage(
+                            model = channel.logo,
+                            contentDescription = channel.name,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize()
                         )
-                        Text(
-                            text = "LIVE",
-                            color = Color(0xFFFF4B6E),
-                            fontSize = 7.5.sp,
-                            fontWeight = FontWeight.Black
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Tv,
+                            contentDescription = channel.name,
+                            tint = TextMuted,
+                            modifier = Modifier.size(34.dp)
                         )
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-            // Channel Name
-            Text(
-                text = channel.name,
-                color = Color.White,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center
-            )
+                // Channel Name
+                Text(
+                    text = channel.name,
+                    color = Color.White,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center
+                )
 
-            Spacer(modifier = Modifier.height(3.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
-            // Multi-server or HD badge
-            val serverCount = channel.activeServers.size
-            if (serverCount > 1) {
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = AccentEmerald.copy(alpha = 0.15f),
-                    border = BorderStroke(0.5.dp, AccentEmerald.copy(alpha = 0.40f))
-                ) {
+                // Multi-server or Category badge
+                val serverCount = channel.activeServers.size
+                if (serverCount > 1) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = AccentEmerald.copy(alpha = 0.15f),
+                        border = BorderStroke(0.5.dp, AccentEmerald.copy(alpha = 0.40f))
+                    ) {
+                        Text(
+                            text = "⚡ $serverCount Servers",
+                            color = AccentEmerald,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                } else {
                     Text(
-                        text = "$serverCount Servers",
-                        color = AccentEmerald,
-                        fontSize = 8.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
+                        text = channel.category,
+                        color = TextMuted,
+                        fontSize = 9.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
-            } else {
-                Text(
-                    text = channel.category,
-                    color = TextMuted,
-                    fontSize = 9.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+            }
+
+            // Pulsating Red Live Badge cleanly pinned to Card top corner (Does NOT cover logo!)
+            Surface(
+                shape = RoundedCornerShape(bottomStart = 8.dp, topEnd = 14.dp),
+                color = Color(0xDD12050A),
+                border = BorderStroke(0.6.dp, Color(0xFFFF2A54).copy(alpha = 0.6f)),
+                modifier = Modifier.align(Alignment.TopEnd)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(5.dp)
+                            .graphicsLayer {
+                                scaleX = pulseScale
+                                scaleY = pulseScale
+                            }
+                            .background(Color(0xFFFF2A54), CircleShape)
+                    )
+                    Text(
+                        text = "LIVE",
+                        color = Color(0xFFFF4B6E),
+                        fontSize = 7.5.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
             }
         }
     }

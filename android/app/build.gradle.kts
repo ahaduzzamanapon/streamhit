@@ -12,8 +12,8 @@ android {
         applicationId = "com.streamhit.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 29
-        versionName = "1.0.28"
+        versionCode = 30
+        versionName = "1.0.29"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -29,6 +29,8 @@ android {
             keyPassword = "streamhit_secure_key"
             enableV1Signing = true
             enableV2Signing = true
+            enableV3Signing = true
+            enableV4Signing = true
         }
     }
 

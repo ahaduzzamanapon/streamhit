@@ -1392,9 +1392,13 @@ def get_sponsor_ad_stats():
     sponsor_url = get_sponsor_setting("sponsor_url", "https://uplcm.com/4/12189723")
     enabled = get_sponsor_setting("enabled", "1") == "1"
     try:
-        duration = int(get_sponsor_setting("duration", "15"))
+        duration_clicked = int(get_sponsor_setting("duration_clicked", get_sponsor_setting("duration", "10")))
     except Exception:
-        duration = 15
+        duration_clicked = 10
+    try:
+        duration_no_click = int(get_sponsor_setting("duration_no_click", "30"))
+    except Exception:
+        duration_no_click = 30
     
     return {
         "code": 0,
@@ -1407,7 +1411,9 @@ def get_sponsor_ad_stats():
         "ctr": ctr,
         "sponsor_url": sponsor_url,
         "enabled": enabled,
-        "duration": duration,
+        "duration": duration_clicked,
+        "duration_clicked": duration_clicked,
+        "duration_no_click": duration_no_click,
         "recent_clicks": recent_clicks
     }
 
@@ -1921,17 +1927,23 @@ async def api_ad_config():
     sponsor_url = get_sponsor_setting("sponsor_url", "https://uplcm.com/4/12189723")
     enabled = get_sponsor_setting("enabled", "1") == "1"
     try:
-        duration = int(get_sponsor_setting("duration", "15"))
+        duration_clicked = int(get_sponsor_setting("duration_clicked", get_sponsor_setting("duration", "10")))
     except Exception:
-        duration = 15
+        duration_clicked = 10
+    try:
+        duration_no_click = int(get_sponsor_setting("duration_no_click", "30"))
+    except Exception:
+        duration_no_click = 30
     return {
         "code": 0,
         "sponsor_url": sponsor_url,
         "enabled": enabled,
-        "duration": duration,
+        "duration": duration_clicked,
+        "duration_clicked": duration_clicked,
+        "duration_no_click": duration_no_click,
         "dialog_title": "অটোমেটেড অ্যাড সেন্টার",
-        "dialog_message": "এটি একটি অটোমেটেড অ্যাড সেন্টার। দয়া করে কিছু ক্লিক বা কাটবেন না। অ্যাড শেষ হলে অটোমেটিক আপনার ভিডিও প্লে হবে।",
-        "button_text": f"🚀 অ্যাড দেখুন ({duration} সেকেন্ড)",
+        "dialog_message": f"যেকোনো কিছুতে ক্লিক করলে {duration_clicked} সেকেন্ডে অটো প্লে হবে, না করলে {duration_no_click} সেকেন্ড অপেক্ষা করতে হবে।",
+        "button_text": f"🚀 অ্যাড দেখুন ({duration_clicked}s)",
         "cancel_text": "✕ সরাসরি দেখুন"
     }
 

@@ -803,9 +803,14 @@ fun MainAppScreen(
 
                 AlertDialog(
                     onDismissRequest = {
-                        showUpdateDialog = false
+                        if (!info.mustUpdate) {
+                            showUpdateDialog = false
+                        }
                     },
-                    properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true),
+                    properties = DialogProperties(
+                        dismissOnBackPress = !info.mustUpdate,
+                        dismissOnClickOutside = !info.mustUpdate
+                    ),
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
@@ -816,7 +821,7 @@ fun MainAppScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Update Available (v${info.versionName})",
+                                text = if (info.mustUpdate) "Mandatory Update (v${info.versionName})" else "Update Available (v${info.versionName})",
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 17.sp
@@ -831,6 +836,15 @@ fun MainAppScreen(
                                 fontSize = 13.sp,
                                 lineHeight = 18.sp
                             )
+                            if (info.mustUpdate) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "⚠️ This update is required to continue using the app.",
+                                    color = Color(0xFFFF5252),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                             if (isDownloading) {
                                 Spacer(modifier = Modifier.height(14.dp))
                                 LinearProgressIndicator(
@@ -852,7 +866,9 @@ fun MainAppScreen(
                             OutlinedButton(
                                 onClick = {
                                     AppUpdateManager.openBrowserDownload(context, info)
-                                    showUpdateDialog = false
+                                    if (!info.mustUpdate) {
+                                        showUpdateDialog = false
+                                    }
                                 },
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                                 border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)),
@@ -865,7 +881,9 @@ fun MainAppScreen(
                                 onClick = {
                                     isDownloading = true
                                     AppUpdateManager.startDownloadAndInstall(context, info)
-                                    showUpdateDialog = false
+                                    if (!info.mustUpdate) {
+                                        showUpdateDialog = false
+                                    }
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = AccentEmerald),
                                 shape = RoundedCornerShape(8.dp)
@@ -879,11 +897,13 @@ fun MainAppScreen(
                             }
                         }
                     },
-                    dismissButton = {
-                        TextButton(onClick = { showUpdateDialog = false }) {
-                            Text("Later", color = TextMuted)
+                    dismissButton = if (!info.mustUpdate) {
+                        {
+                            TextButton(onClick = { showUpdateDialog = false }) {
+                                Text("Later", color = TextMuted)
+                            }
                         }
-                    },
+                    } else null,
                     containerColor = BgSurface,
                     shape = RoundedCornerShape(16.dp)
                 )

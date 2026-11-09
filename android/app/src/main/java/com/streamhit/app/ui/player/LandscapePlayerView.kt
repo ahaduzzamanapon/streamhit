@@ -82,7 +82,10 @@ fun LandscapePlayerView(
     isLiveStream: Boolean = false,
     channelNumber: Int = 0,
     onNextChannel: (() -> Unit)? = null,
-    onPrevChannel: (() -> Unit)? = null
+    onPrevChannel: (() -> Unit)? = null,
+    onSwitchLiveServer: ((Int) -> Unit)? = null,
+    currentServerIndex: Int = 0,
+    serverCount: Int = 0
 ) {
     var initialTouchX by remember { mutableFloatStateOf(0f) }
     var initialTouchY by remember { mutableFloatStateOf(0f) }
@@ -383,6 +386,26 @@ fun LandscapePlayerView(
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1
                             )
+                            if (isLiveStream && serverCount > 1) {
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = AccentEmerald.copy(alpha = 0.2f),
+                                    border = BorderStroke(1.dp, AccentEmerald),
+                                    modifier = Modifier.clickable {
+                                        val nextSrv = (currentServerIndex + 1) % serverCount
+                                        onSwitchLiveServer?.invoke(nextSrv)
+                                    }
+                                ) {
+                                    Text(
+                                        text = "⚡ Server ${currentServerIndex + 1}/$serverCount",
+                                        color = AccentEmerald,
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically) {

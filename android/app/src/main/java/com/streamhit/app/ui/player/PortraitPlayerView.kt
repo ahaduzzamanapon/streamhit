@@ -74,6 +74,9 @@ fun PortraitVideoPlayerBox(
     channelNumber: Int = 0,
     onNextChannel: (() -> Unit)? = null,
     onPrevChannel: (() -> Unit)? = null,
+    onSwitchLiveServer: ((Int) -> Unit)? = null,
+    currentServerIndex: Int = 0,
+    serverCount: Int = 0,
     audioSyncOffsetMs: Long = 0L,
     onOpenAudioSync: () -> Unit = {}
 ) {
@@ -300,6 +303,26 @@ fun PortraitVideoPlayerBox(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        if (isLiveStream && serverCount > 1) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = AccentEmerald.copy(alpha = 0.2f),
+                                border = BorderStroke(0.8.dp, AccentEmerald),
+                                modifier = Modifier.clickable {
+                                    val nextSrv = (currentServerIndex + 1) % serverCount
+                                    onSwitchLiveServer?.invoke(nextSrv)
+                                }
+                            ) {
+                                Text(
+                                    text = "⚡ S${currentServerIndex + 1}/$serverCount",
+                                    color = AccentEmerald,
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -663,25 +686,46 @@ fun PortraitMediaDetails(
                 }
             }
 
-            // Related Channels
+            // Related / All Live Channels Grid (Vertical Y-Scroll)
             if (relatedChannels.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Related Channels", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text(currentChannel?.category ?: "Live TV", color = AccentEmerald, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(relatedChannels) { ch ->
-                        LiveTvMiniCard(
-                            channel = ch,
-                            onClick = { onSwitchLiveChannel(ch) }
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("📺 Live Channels", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("(${relatedChannels.size})", color = TextMuted, fontSize = 12.sp)
                     }
+                    Text(
+                        text = currentChannel?.category ?: "Live TV", 
+                        color = Color(0xFFFF4B6E), 
+                        fontSize = 11.5.sp, 
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+
+                relatedChannels.chunked(3).forEach { rowChannels ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        rowChannels.forEach { ch ->
+                            Box(modifier = Modifier.weight(1f)) {
+                                LiveTvMiniCard(
+                                    channel = ch,
+                                    isSelected = currentChannel?.name.equals(ch.name, ignoreCase = true),
+                                    onClick = { onSwitchLiveChannel(ch) }
+                                )
+                            }
+                        }
+                        repeat(3 - rowChannels.size) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
         } else {
