@@ -2444,6 +2444,18 @@ async def download_page(request: Request):
     host = request.headers.get("host", "")
     return serve_html("public/download.html", host=host)
 
+@app.get("/app.apk")
+@app.get("/download/apk")
+async def download_apk_endpoint():
+    apk_path = os.path.join(base_dir, "public", "uploads", "apks", "NXLY-Stream.apk")
+    if os.path.exists(apk_path):
+        return FileResponse(
+            path=apk_path,
+            filename="NXLY-Stream.apk",
+            media_type="application/vnd.android.package-archive"
+        )
+    return JSONResponse(status_code=404, content={"message": "APK not found"})
+
 @app.get("/sitemap.xml")
 async def sitemap_endpoint(request: Request):
     return await seo_engine.master_sitemap_index_endpoint(request)
