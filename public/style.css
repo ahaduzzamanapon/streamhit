@@ -1675,7 +1675,7 @@ input, select { font-family: inherit; }
 
 .watch-cinema-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) 340px;
   gap: 0;
   align-items: start;
 }
@@ -1702,7 +1702,7 @@ input, select { font-family: inherit; }
 
 .resources-container {
   grid-column: 2;
-  grid-row: 1 / 5;
+  grid-row: 1 / 4;
   background: #111319;
   border-left: 1px solid rgba(255,255,255,0.07);
   padding: 14px 14px 18px;
@@ -1716,6 +1716,39 @@ input, select { font-family: inherit; }
 }
 .resources-container::-webkit-scrollbar { width: 4px; }
 .resources-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+
+/* Movie Stream Info Badge in Resources Sidebar */
+.movie-stream-info {
+  margin-top: 4px;
+}
+.stream-info-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+}
+.stream-info-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.stream-info-row i {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
+.stream-info-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+}
+.stream-info-sub {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
 
 /* Resources Header */
 .resources-header {
@@ -3366,9 +3399,22 @@ input, select { font-family: inherit; }
 }
 
 /* ==========================================================================
-   RESPONSIVE — TABLET
+   RESPONSIVE — LAPTOPS & TABLETS (993px - 1200px)
    ========================================================================== */
-@media (max-width: 1200px) {
+@media (min-width: 993px) and (max-width: 1200px) {
+  .watch-cinema-grid {
+    grid-template-columns: minmax(0, 1fr) 300px !important;
+  }
+  .resources-container .episode-grid {
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 5px !important;
+  }
+}
+
+/* ==========================================================================
+   RESPONSIVE — TABLET & MOBILE (<= 992px)
+   ========================================================================== */
+@media (max-width: 992px) {
   .watch-cinema-grid {
     display: flex !important;
     flex-direction: column !important;

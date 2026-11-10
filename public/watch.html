@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <!-- Plyr CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css">
-  <link rel="stylesheet" href="/style.css?v=6.8">
+  <link rel="stylesheet" href="/style.css?v=7.0">
   <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-EGFDL2X6GY"></script>
 <script>
@@ -203,7 +203,54 @@
               <span>Next Ep</span> <i class="fa-solid fa-forward-step"></i>
             </button>
           </div>
+        </div>
 
+        <!-- ── RESOURCES SIDEBAR (Placed on the right side of player) ──────── -->
+        <div class="resources-container" id="resourcesContainer">
+          <div class="resources-header">
+            <span>Resources <span class="upload-by">By Streamfit</span></span>
+            <i class="fa-solid fa-circle-question info-icon"></i>
+          </div>
+
+          <!-- Dual Selectors: Dub + Season side-by-side -->
+          <div class="resources-controls-row">
+            <div class="dub-selector-wrapper" id="watchDubSelectorGroup" style="display:none;">
+              <select id="dubLanguageSelect" class="custom-select"></select>
+            </div>
+            <div class="season-selector-wrapper" id="watchSeasonSelectorGroup" style="display:none;">
+              <select id="seasonSelect" class="custom-select"></select>
+            </div>
+          </div>
+
+          <!-- TV Season + Episode Selector -->
+          <div class="tv-episode-selector" id="watchTvSelector" style="display:none;">
+            <div class="season-tabs" id="watchSeasonTabs" style="display:none;"></div>
+            <div class="episode-grid scroll-y" id="watchEpisodeGrid"></div>
+          </div>
+
+          <!-- Movie Stream Quality & Status (Shown when not TV) -->
+          <div class="movie-stream-info" id="watchMovieStreamInfo" style="display:none;">
+            <div class="stream-info-card">
+              <div class="stream-info-row">
+                <i class="fa-solid fa-bolt" style="color:#00F0FF;"></i>
+                <div>
+                  <div class="stream-info-title">High Speed CDN</div>
+                  <div class="stream-info-sub">Adaptive Bitrate (Auto 1080p / 720p)</div>
+                </div>
+              </div>
+              <div class="stream-info-row">
+                <i class="fa-solid fa-shield-halved" style="color:#00E676;"></i>
+                <div>
+                  <div class="stream-info-title">Buffer Protection</div>
+                  <div class="stream-info-sub">BD region-lock bypass active</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Stream Links (sports/tv) -->
+          <div class="live-stream-selector" id="watchLiveStreamSelector" style="display:none;">
+            <div class="live-stream-grid" id="watchStreamLinksGrid"></div>
           </div>
         </div>
 
@@ -234,43 +281,35 @@
           <p id="watchDescription" class="watch-synopsis"><!-- SSR_DESCRIPTION --></p>
         </div>
 
-        <!-- ── MORE LIKE THIS / RECOMMENDATIONS ─────────────────── -->
+        <!-- ── DESCRIPTION & TABS ────────────────────────────────── -->
         <div class="cinema-desc-section" style="margin:0 24px 24px;">
-          <div class="section-header" style="margin-bottom:14px;">
-            <h2 style="font-size:16px; font-weight:700; color:var(--text-main); display:flex; align-items:center; gap:8px;">
-              <i class="fa-solid fa-sparkles" style="color:#00F0FF;"></i> More Like This
-            </h2>
-          </div>
-          <div id="watchRecommendationsGrid">
-            <!-- SSR_RECOMMENDATIONS -->
-          </div>
-        </div>
-
-        <!-- ── RESOURCES SIDEBAR ─────────────────────────────────── -->
-        <div class="resources-container" id="resourcesContainer">
-          <div class="resources-header">
-            <span>Resources <span class="upload-by">By Streamfit</span></span>
-            <i class="fa-solid fa-circle-question info-icon"></i>
-          </div>
-
-          <!-- Dual Selectors: Dub + Season side-by-side -->
-          <div class="resources-controls-row">
-            <div class="dub-selector-wrapper" id="watchDubSelectorGroup" style="display:none;">
-              <select id="dubLanguageSelect" class="custom-select"></select>
+          <div class="watch-tabs-section">
+            <div class="watch-tabs-header">
+              <button class="tab-header-btn active" id="tabBtnForYou">For You</button>
+              <button class="tab-header-btn" id="tabBtnComments">Comments (99+)</button>
             </div>
-            <div class="season-selector-wrapper" id="watchSeasonSelectorGroup" style="display:none;">
-              <select id="seasonSelect" class="custom-select"></select>
+            <div class="watch-tabs-content">
+              <div class="tab-pane active" id="tabPaneForYou">
+                <div id="watchRecommendationsGrid">
+                  <!-- SSR_RECOMMENDATIONS -->
+                </div>
+              </div>
+              <div class="tab-pane" id="tabPaneComments">
+                <div class="comments-list">
+                  <div class="comment-item">
+                    <div class="comment-avatar"><i class="fa-solid fa-user"></i></div>
+                    <div class="comment-details">
+                      <div class="comment-meta">
+                        <span class="comment-author">apon_streamhit</span>
+                        <span class="comment-time">2 hours ago</span>
+                      </div>
+                      <p class="comment-text">Finally found a site that plays Hindi dub smooth and fast. Kudos!</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-
-          <!-- TV Season + Episode Selector -->
-          <div class="tv-episode-selector" id="watchTvSelector" style="display:none;">
-            <div class="season-tabs" id="watchSeasonTabs" style="display:none;"></div>
-            <div class="episode-grid scroll-y" id="watchEpisodeGrid"></div>
-          </div>
-
-          <!-- Live Stream Links (sports/tv) -->
-          <div class="live-stream-selector" id="watchLiveStreamSelector" style="display:none;"></div>
         </div>
 
       </div>
@@ -291,7 +330,7 @@
 <!-- Plyr JS -->
 <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.min.js"></script>
 <!-- App Logic -->
-<script src="/app.js?v=6.9"></script>
+<script src="/app.js?v=7.0"></script>
 
 </body>
 </html>

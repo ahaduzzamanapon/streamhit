@@ -1233,12 +1233,15 @@ async function initDetailsPage() {
         // TV / Show episode selector
         const isTv = isTvSubject(detail);
         const tvSelector = document.getElementById("watchTvSelector");
+        const movieInfoEl = document.getElementById("watchMovieStreamInfo");
         
         if (isTv) {
             if (tvSelector) tvSelector.style.display = "block";
+            if (movieInfoEl) movieInfoEl.style.display = "none";
             await loadSeasonEpisodes(subjectId, detailPath);
         } else {
             if (tvSelector) tvSelector.style.display = "none";
+            if (movieInfoEl) movieInfoEl.style.display = "block";
         }
 
         // Setup Dub / Language selector dropdown
@@ -2714,12 +2717,15 @@ async function initWatchPage() {
                         
                         const isTvNow = newDetail.subjectType !== 1 && (newDetail.seNum > 0 || newDetail.subjectType === 2);
                         const tvSelector = document.getElementById("watchTvSelector");
+                        const movieInfoEl = document.getElementById("watchMovieStreamInfo");
                         if (isTvNow) {
                             if (tvSelector) tvSelector.style.display = "block";
+                            if (movieInfoEl) movieInfoEl.style.display = "none";
                             await loadSeasonEpisodes(targetSubjectId, targetDetailPath || effectiveSlug);
                             await loadPlayResources(targetSubjectId, state.selectedSeason, state.selectedEpisode);
                         } else {
                             if (tvSelector) tvSelector.style.display = "none";
+                            if (movieInfoEl) movieInfoEl.style.display = "block";
                             await loadPlayResources(targetSubjectId);
                         }
                         
@@ -2751,11 +2757,14 @@ async function initWatchPage() {
         // TV Show episode selector
         const isTv = isTvSubject(detail);
         const tvSelector = document.getElementById("watchTvSelector");
+        const movieInfoEl = document.getElementById("watchMovieStreamInfo");
         if (isTv) {
             if (tvSelector) tvSelector.style.display = "block";
+            if (movieInfoEl) movieInfoEl.style.display = "none";
             await loadSeasonEpisodes(subjectId, detailPath);
         } else {
             if (tvSelector) tvSelector.style.display = "none";
+            if (movieInfoEl) movieInfoEl.style.display = "block";
         }
 
         // Load stream resources
