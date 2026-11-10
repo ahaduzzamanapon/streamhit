@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request, HTTPException, Query, Response
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, RedirectResponse, PlainTextResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 
@@ -1150,6 +1151,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # ── Active User Tracking & GeoIP ───────────────────────────────────────────
 import sqlite3
@@ -2361,8 +2363,170 @@ def serve_html(filename: str, meta_replacements=None, host: str = ""):
         for k, v in meta_replacements.items(): html = html.replace(k, v)
     return HTMLResponse(content=html)
 
+async def render_home_hero_ssr_html(host: str = "") -> str:
+    """Pre-renders the Hero Banner slide so the homepage has immediate 0ms paint."""
+    try:
+        banners = await get_latest_banners()
+        clean_banners = [b for b in banners if not is_blocked_content(b)]
+        if not clean_banners:
+            return ""
+
+        slides_html = []
+        dots_html = []
+        max_b = min(len(clean_banners), 5)
+        for i in range(max_b):
+            it = clean_banners[i]
+            title = html.escape(str(it.get("title") or "Featured Movie"))
+            cover = html.escape(str(it.get("cover") or it.get("image") or ""))
+            sid = str(it.get("subjectId") or "")
+            dpath = it.get("detailPath") or sid
+            subject_type = it.get("subjectType") or 1
+            type_seg = "tv" if subject_type == 2 else "movie"
+            rating = str(it.get("imdbRatingValue") or it.get("rating") or "8.2")
+            year = str(it.get("releaseDate") or "2026").split("-")[0]
+            raw_genres = it.get("genre") or "Action, Thriller"
+            if isinstance(raw_genres, list):
+                genres = ", ".join(raw_genres[:2])
+            else:
+                genres = ", ".join([g.strip() for g in str(raw_genres).split(",")[:2]])
+
+            target_url = f"/{type_seg}/{dpath}"
+            if sid:
+                target_url += f"?id={sid}"
+            watch_url = f"/watch/{type_seg}/{dpath}"
+            if sid:
+                watch_url += f"?id={sid}"
+
+            active_cls = "active" if i == 0 else ""
+            slides_html.append(f'''
+                <div class="hero-slide {active_cls}" style="background-image: url('{cover}');" data-slide="{i}">
+                    <div class="hero-overlay"></div>
+                    <div class="hero-content">
+                        <span class="hero-genre-badge">{html.escape(genres)}</span>
+                        <h1 class="hero-title"><a href="{target_url}" style="color: inherit; text-decoration: none;">{title}</a></h1>
+                        <div class="hero-meta">
+                            <span class="rating"><i class="fa-solid fa-star"></i> {rating}</span>
+                            <span>{year}</span>
+                            <span style="color:#00F0FF; font-weight:700;">Ultra HD 4K</span>
+                        </div>
+                        <div class="hero-buttons">
+                            <a href="{watch_url}" class="btn-primary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-play"></i> Watch Now
+                            </a>
+                            <a href="{target_url}" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px; margin-left: 10px; background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 12px 20px; border-radius: 8px; font-weight: 600;">
+                                <i class="fa-solid fa-circle-info"></i> Details
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            ''')
+            dots_html.append(f'<div class="hero-dot {active_cls}" onclick="goToSlide({i})"></div>')
+
+        return f'''
+            <div class="slider-container" style="width: 100%; height: 100%; position: relative;">
+                {"".join(slides_html)}
+            </div>
+            <div class="hero-dots">
+                {"".join(dots_html)}
+            </div>
+        '''
+    except Exception as e:
+        print(f"[SSR Hero Error]: {e}")
+        return ""
+
+async def render_home_trending_ssr_html() -> str:
+    """Pre-renders 12 top trending cards into the trending slider."""
+    try:
+        pool = await get_movies_pool()
+        cards = []
+        for it in pool[:14]:
+            if is_blocked_content(it):
+                continue
+            title = html.escape(str(it.get("title") or "Movie"))
+            cover = html.escape(str(it.get("cover") or it.get("coverUrl") or "/default-cover.png"))
+            sid = str(it.get("subjectId") or "")
+            dpath = it.get("detailPath") or sid
+            subject_type = it.get("subjectType") or 1
+            type_seg = "tv" if subject_type == 2 else "movie"
+            type_text = "TV Show" if subject_type == 2 else "Movie"
+            rating = str(it.get("imdbRatingValue") or "7.8")
+            year = str(it.get("releaseDate") or "2026").split("-")[0]
+
+            target_url = f"/{type_seg}/{dpath}"
+            if sid:
+                target_url += f"?id={sid}"
+
+            cards.append(f'''
+                <a href="{target_url}" class="content-card" data-id="{sid}" style="text-decoration: none;">
+                    <div class="card-poster">
+                        <img src="{cover}" alt="{title}" onerror="this.onerror=null; this.src='/default-cover.png';" loading="lazy">
+                        <div class="card-badges">
+                            <span class="card-badge quality">HD</span>
+                        </div>
+                        <div class="card-rating"><i class="fa-solid fa-star"></i> {rating}</div>
+                    </div>
+                    <div class="card-info">
+                        <h3 class="card-title" title="{title}">{title}</h3>
+                        <div class="card-meta">
+                            <span>{year}</span>
+                            <span>{type_text}</span>
+                        </div>
+                    </div>
+                </a>
+            ''')
+            if len(cards) >= 12:
+                break
+        return "".join(cards)
+    except Exception as e:
+        print(f"[SSR Trending Error]: {e}")
+        return ""
+
+async def render_home_schema_html(host: str = "") -> str:
+    """Generates ItemList schema for Google Search."""
+    try:
+        pool = await get_movies_pool()
+        brand = get_brand_config(host)
+        list_items = []
+        for i, it in enumerate(pool[:12]):
+            if is_blocked_content(it):
+                continue
+            title = str(it.get("title") or "")
+            cover = str(it.get("cover") or it.get("coverUrl") or "")
+            sid = str(it.get("subjectId") or "")
+            dpath = it.get("detailPath") or sid
+            type_seg = "tv" if it.get("subjectType") == 2 else "movie"
+            list_items.append({
+                "@type": "ListItem",
+                "position": i + 1,
+                "name": title,
+                "url": f"{brand['full_url']}/{type_seg}/{dpath}",
+                "image": cover
+            })
+        if not list_items:
+            return ""
+        schema_obj = {
+            "@context": "https://schema.org",
+            "@type": "ItemList",
+            "name": f"Trending Movies & TV Shows on {brand['name']}",
+            "itemListElement": list_items
+        }
+        return f'<script type="application/ld+json">{json.dumps(schema_obj)}</script>'
+    except Exception:
+        return ""
+
 @app.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
-async def index(request: Request): return serve_html("public/index.html", host=request.headers.get("host", ""))
+async def index(request: Request):
+    host = request.headers.get("host", "")
+    hero_html = await render_home_hero_ssr_html(host)
+    trending_html = await render_home_trending_ssr_html()
+    schema_html = await render_home_schema_html(host)
+
+    reps = {
+        '<!-- SSR_HERO_SLIDER -->': hero_html,
+        '<!-- SSR_TRENDING_CARDS -->': trending_html,
+        '<!-- SSR_HOME_SCHEMA -->': schema_html
+    }
+    return serve_html("public/index.html", reps, host=host)
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request):
@@ -2654,14 +2818,39 @@ async def watch(slug: str, request: Request):
     host = request.headers.get("host", "")
     brand = get_brand_config(host)
     meta = await get_subject_meta(slug, host=host)
+    subject = meta.get("subject") or {}
+
+    subject_type = 2 if "/tv/" in request.url.path else 1
+    sid = str(subject.get("subjectId") or "")
+    raw_title = str(subject.get("title") or meta.get("title") or "Movie")
+    clean_title = html.escape(raw_title)
+    clean_desc = html.escape(str(subject.get("description") or meta.get("description") or f"Watch {raw_title} online in HD free."))
+    clean_cover = html.escape(meta.get("cover") or "/default-cover.png")
+
+    rating_val = str(subject.get("imdbRatingValue") or subject.get("rating") or "--")
+    year_val = str(subject.get("releaseDate") or "----").split("-")[0]
+    country_val = html.escape(str(subject.get("countryName") or "USA"))
+    duration_val = html.escape(str(subject.get("duration") or "-- min"))
+
+    recs_html = await render_details_recommendations_html(subject_type, exclude_id=sid)
+    page_title = f"Watch {raw_title} Full Online Free HD — {brand['name']}"
+
     reps = {
-        '<title>Watch — Streamfit</title>': f'<title>Watching {meta["title"]}</title>',
-        'content="Watch free movies, TV shows, anime and live sports online."': f'content="{meta["description"]}"',
-        'content="Streamfit - Free Movies, TV Shows & Anime Streaming"': f'content="{meta["title"]}"',
-        'content="https://streamfit.ehealthfinder.com/"': f'content="{meta["url"]}"',
-        'content="https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=1200&q=80"': f'content="{meta["cover"]}"',
-        'content="website"': 'content="video.movie"',
-        '<!-- SCHEMA_PLACEHOLDER -->': meta.get("schema", "")
+        '<!-- TITLE_PLACEHOLDER -->': page_title,
+        '<!-- DESC_PLACEHOLDER -->': clean_desc[:160],
+        '<!-- CANONICAL_URL_PLACEHOLDER -->': meta["url"],
+        '<!-- COVER_PLACEHOLDER -->': clean_cover,
+        '<!-- SCHEMA_PLACEHOLDER -->': meta.get("schema", ""),
+        '<!-- CANONICAL_PLACEHOLDER -->': f'<link rel="canonical" href="{meta["url"]}">',
+        '<!-- SSR_LOADING_STYLE -->': 'style="display:none;"',
+        '<!-- SSR_WRAPPER_STYLE -->': 'style="display:block;"',
+        '<!-- SSR_TITLE_TEXT -->': clean_title,
+        '<!-- SSR_RATING -->': rating_val,
+        '<!-- SSR_YEAR -->': year_val,
+        '<!-- SSR_COUNTRY -->': country_val,
+        '<!-- SSR_DURATION -->': duration_val,
+        '<!-- SSR_DESCRIPTION -->': clean_desc,
+        '<!-- SSR_RECOMMENDATIONS -->': recs_html
     }
     return serve_html("public/watch.html", reps, host=host)
 

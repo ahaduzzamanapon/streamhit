@@ -320,8 +320,110 @@ if (isInitialHome) {
 // ==========================================================================
 // HOME PAGE LOGIC
 // ==========================================================================
+window.goToSlide = function(index) {
+    const slider = document.getElementById("heroSlider");
+    if (!slider) return;
+    const slides = slider.querySelectorAll(".hero-slide");
+    const dots = slider.querySelectorAll(".hero-dot");
+    if (slides.length === 0) return;
+    slides.forEach((s, idx) => {
+        if (idx === index) {
+            s.classList.add("active");
+            s.style.opacity = "1";
+            s.style.visibility = "visible";
+            s.style.zIndex = "1";
+        } else {
+            s.classList.remove("active");
+            s.style.opacity = "0";
+            s.style.visibility = "hidden";
+            s.style.zIndex = "0";
+        }
+    });
+    dots.forEach((d, idx) => {
+        if (idx === index) d.classList.add("active");
+        else d.classList.remove("active");
+    });
+};
+
+function initHomeCategoryPills() {
+    const pills = document.querySelectorAll("#homeCategoryPills .cat-pill");
+    if (!pills || pills.length === 0) return;
+
+    pills.forEach(pill => {
+        pill.addEventListener("click", async () => {
+            pills.forEach(p => p.classList.remove("active"));
+            pill.classList.add("active");
+            const filter = pill.dataset.filter;
+            const grid = document.getElementById("dynamicGrid");
+            const titleEl = document.getElementById("dynamicTitle");
+            if (!grid) return;
+
+            grid.innerHTML = '<div class="card-shimmer"></div><div class="card-shimmer"></div><div class="card-shimmer"></div><div class="card-shimmer"></div>';
+
+            try {
+                if (filter === "all") {
+                    if (titleEl) titleEl.textContent = "Latest Releases";
+                    if (state.homeItems && state.homeItems.length > 0) {
+                        renderExploreGrid(state.homeItems);
+                    } else {
+                        const res = await apiGet("/api/home?page=1&tabId=0");
+                        if (res && res.data && res.data.items) {
+                            state.homeItems = res.data.items;
+                            renderExploreGrid(res.data.items);
+                        }
+                    }
+                } else if (filter === "trending") {
+                    if (titleEl) titleEl.textContent = "🔥 Trending Blockbusters";
+                    const res = await apiPost("/api/filter", { subjectType: 1, sort: "RECOMMEND", page: 1, perPage: 24 });
+                    const items = (res && res.data && res.data.items) ? res.data.items : [];
+                    renderExploreGrid(items);
+                } else if (filter === "movies") {
+                    if (titleEl) titleEl.textContent = "🎬 Popular Movies";
+                    const res = await apiPost("/api/filter", { subjectType: 1, sort: "HOTTEST", page: 1, perPage: 24 });
+                    const items = (res && res.data && res.data.items) ? res.data.items : [];
+                    renderExploreGrid(items);
+                } else if (filter === "tv") {
+                    if (titleEl) titleEl.textContent = "📺 Top TV Series";
+                    const res = await apiPost("/api/filter", { subjectType: 2, sort: "HOTTEST", page: 1, perPage: 24 });
+                    const items = (res && res.data && res.data.items) ? res.data.items : [];
+                    renderExploreGrid(items);
+                } else if (filter === "bengali") {
+                    if (titleEl) titleEl.textContent = "🇧🇩 Bengali Dubbed & Specials";
+                    const res = await apiGet("/api/search?keyword=bengali&page=1");
+                    const items = (res && res.data && res.data.items) ? res.data.items : [];
+                    renderExploreGrid(items);
+                } else if (filter === "hindi") {
+                    if (titleEl) titleEl.textContent = "🇮🇳 Hindi Dubbed Specials";
+                    const res = await apiGet("/api/search?keyword=hindi&page=1");
+                    const items = (res && res.data && res.data.items) ? res.data.items : [];
+                    renderExploreGrid(items);
+                } else if (filter === "anime") {
+                    if (titleEl) titleEl.textContent = "✨ Anime & Animation";
+                    const res = await apiPost("/api/filter", { subjectType: 1, genre: "Animation", page: 1, perPage: 24 });
+                    const items = (res && res.data && res.data.items) ? res.data.items : [];
+                    renderExploreGrid(items);
+                }
+            } catch (err) {
+                console.error("Filter category error:", err);
+            }
+        });
+    });
+}
+
 async function initHomePage() {
     renderContinueWatchingSection();
+    initHomeCategoryPills();
+
+    // Setup auto-rotate on server-rendered hero slider if present
+    const existingSlides = document.querySelectorAll("#heroSlider .hero-slide");
+    if (existingSlides.length > 1 && !heroSliderInterval) {
+        let currentS = 0;
+        heroSliderInterval = setInterval(() => {
+            currentS = (currentS + 1) % existingSlides.length;
+            window.goToSlide(currentS);
+        }, 5500);
+    }
+
     // Check if query string contains keyword (forwarded search)
     const urlParams = new URLSearchParams(window.location.search);
     const keyword = urlParams.get("keyword");
@@ -347,6 +449,7 @@ async function initHomePage() {
     
     if (result && result.data && result.data.items) {
         const items = result.data.items;
+        state.homeItems = items;
         
         // Discover fresh banners from API and update local/UI display
         const bannerSection = items.find(sec => sec.type === "BANNER" && sec.banner && sec.banner.items && sec.banner.items.length > 0);
@@ -499,7 +602,6 @@ function renderHeroBanner(banners) {
 function renderTrending(items) {
     const grid = document.getElementById("trendingGrid");
     if (!grid) return;
-    grid.innerHTML = "";
 
     let trendingItems = [];
     const trendingSection = items.find(sec => sec.type === "SUBJECTS_MOVIE" || (sec.title && sec.title.includes("Trending")));
@@ -513,10 +615,13 @@ function renderTrending(items) {
         }
     }
 
-    trendingItems.slice(0, 10).forEach(item => {
-        const card = createContentCard(item);
-        grid.appendChild(card);
-    });
+    if (trendingItems && trendingItems.length > 0) {
+        grid.innerHTML = "";
+        trendingItems.slice(0, 14).forEach(item => {
+            const card = createContentCard(item);
+            grid.appendChild(card);
+        });
+    }
     setupSliderNavigation(grid);
 }
 
@@ -996,7 +1101,8 @@ function showShimmers(show) {
     const customSections = document.querySelectorAll('.custom-slider-section');
 
     if (show) {
-        if (trendingSection) trendingSection.style.display = 'none';
+        const hasTrending = document.querySelector("#trendingGrid .content-card");
+        if (trendingSection && !hasTrending) trendingSection.style.display = 'none';
         customSections.forEach(s => s.style.display = 'none');
         if (dynamicGrid && dynamicGrid.children.length === 0) {
             dynamicGrid.innerHTML = `

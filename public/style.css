@@ -649,10 +649,42 @@ input, select { font-family: inherit; }
 
 .categories-tabs {
   display: flex;
-  gap: 0;
+  gap: 10px;
   overflow-x: auto;
+  padding: 14px 0;
+  scrollbar-width: none;
 }
-.categories-tabs::-webkit-scrollbar { height: 0; }
+.categories-tabs::-webkit-scrollbar { display: none; }
+
+.cat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(10px);
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+}
+.cat-pill i { font-size: 13px; }
+.cat-pill:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+.cat-pill.active {
+  color: #00F0FF;
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.22), rgba(0, 240, 255, 0.06));
+  border: 1.5px solid #00F0FF;
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.35);
+}
 
 .cat-tab {
   padding: 14px 22px;

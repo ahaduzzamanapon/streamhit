@@ -98,7 +98,7 @@
     }
   ]
   </script>
-
+  <!-- SSR_HOME_SCHEMA -->
 </head>
 <body>
 <div class="app-container">
@@ -142,36 +142,31 @@
         <div class="search-dropdown" id="searchDropdown" style="display:none;"></div>
       </div>
       <div class="header-controls">
-        <div class="notification-bell" id="notificationBell" title="Notifications">
-          <i class="fa-solid fa-bell"></i>
-        </div>
-        <div class="language-selector">
-          <i class="fa-solid fa-globe"></i>
-          <span>ENGLISH</span>
-        </div>
-        <button class="share-app-btn" onclick="openAppShareModal()" title="Share App">
-          <i class="fa-solid fa-share-nodes"></i> <span>Share App</span>
-        </button>
-        <button class="download-app-btn" onclick="window.location.href='/download'">
-          <i class="fa-solid fa-arrow-down-to-bracket"></i> Get App
-        </button>
+        <a href="/download" class="download-app-btn" title="Download Official Android App">
+          <i class="fa-solid fa-arrow-down-to-bracket"></i> <span>Get App APK</span>
+        </a>
       </div>
     </header>
 
     <!-- Hero Banner Slider -->
     <section class="hero-slider" id="heroSlider">
-      <div class="hero-slide-placeholder">
+      <!-- SSR_HERO_SLIDER -->
+      <div class="hero-slide-placeholder" style="display:none;">
         <div class="shimmer-line title"></div>
         <div class="shimmer-line desc"></div>
       </div>
     </section>
 
-    <!-- Category Tabs -->
+    <!-- Category Filter Pills (App-Style) -->
     <section class="navigation-filters">
-      <div class="categories-tabs">
-        <button class="cat-tab active" onclick="window.location.href='/'">All</button>
-        <button class="cat-tab" onclick="window.location.href='/movies'">Movies</button>
-        <button class="cat-tab" onclick="window.location.href='/tv'">TV Shows</button>
+      <div class="categories-tabs" id="homeCategoryPills">
+        <button class="cat-pill active" data-filter="all"><i class="fa-solid fa-fire"></i> All</button>
+        <button class="cat-pill" data-filter="trending"><i class="fa-solid fa-bolt"></i> Trending</button>
+        <button class="cat-pill" data-filter="movies"><i class="fa-solid fa-film"></i> Movies</button>
+        <button class="cat-pill" data-filter="tv"><i class="fa-solid fa-tv"></i> TV Series</button>
+        <button class="cat-pill" data-filter="bengali"><i class="fa-solid fa-language"></i> Bengali</button>
+        <button class="cat-pill" data-filter="hindi"><i class="fa-solid fa-wand-magic-sparkles"></i> Hindi Dub</button>
+        <button class="cat-pill" data-filter="anime"><i class="fa-solid fa-dragon"></i> Anime</button>
       </div>
     </section>
 
@@ -203,15 +198,14 @@
     <section class="content-section" id="trendingSection">
       <div class="section-header">
         <h2><i class="fa-solid fa-bolt icon-trending"></i> Trending Now</h2>
+        <a href="/movies" style="font-size:13px; color:#00F0FF; text-decoration:none; font-weight:600; display:flex; align-items:center; gap:4px;">View All <i class="fa-solid fa-chevron-right"></i></a>
       </div>
       <div class="slider-wrapper">
-        <div class="content-slider" id="trendingGrid">
-          <div class="card-shimmer"></div>
-          <div class="card-shimmer"></div>
-          <div class="card-shimmer"></div>
-          <div class="card-shimmer"></div>
-          <div class="card-shimmer"></div>
+        <button class="slider-nav-btn prev-btn" onclick="document.getElementById('trendingGrid').scrollBy({left:-800,behavior:'smooth'})"><i class="fa-solid fa-chevron-left"></i></button>
+        <div class="content-slider scroll-x" id="trendingGrid">
+          <!-- SSR_TRENDING_CARDS -->
         </div>
+        <button class="slider-nav-btn next-btn" onclick="document.getElementById('trendingGrid').scrollBy({left:800,behavior:'smooth'})"><i class="fa-solid fa-chevron-right"></i></button>
       </div>
     </section>
 

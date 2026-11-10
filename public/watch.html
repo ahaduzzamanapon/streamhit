@@ -3,9 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Watch — Streamfit</title>
+  <title><!-- TITLE_PLACEHOLDER --></title>
   <meta name="robots" content="index, follow">
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <!-- CANONICAL_PLACEHOLDER -->
+  <link rel="icon" type="image/svg+xml" href="/favicon-nxly.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -22,20 +23,21 @@
 
   gtag('config', 'G-EGFDL2X6GY');
 </script>
-  <meta name="description" content="Watch free movies, TV shows, anime and live sports online.">
-  <meta name="keywords" content="movies, tv shows, streaming, streamfit, watch free, hd movies, hindi dub, bengali dub, watch online">
+  <meta name="description" content="<!-- DESC_PLACEHOLDER -->">
+  <meta name="keywords" content="movies, tv shows, streaming, nxly, watch free, hd movies, hindi dub, bengali dub, watch online">
   <!-- Open Graph / Facebook -->
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://streamfit.ehealthfinder.com/">
-  <meta property="og:title" content="Streamfit - Free Movies, TV Shows & Anime Streaming">
-  <meta property="og:description" content="Watch free movies, TV shows, anime and live sports online.">
-  <meta property="og:image" content="https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=1200&q=80">
+  <meta property="og:type" content="video.movie">
+  <meta property="og:url" content="<!-- CANONICAL_URL_PLACEHOLDER -->">
+  <meta property="og:site_name" content="NXLY">
+  <meta property="og:title" content="<!-- TITLE_PLACEHOLDER -->">
+  <meta property="og:description" content="<!-- DESC_PLACEHOLDER -->">
+  <meta property="og:image" content="<!-- COVER_PLACEHOLDER -->">
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
-  <meta property="twitter:url" content="https://streamfit.ehealthfinder.com/">
-  <meta property="twitter:title" content="Streamfit - Free Movies, TV Shows & Anime Streaming">
-  <meta property="twitter:description" content="Watch free movies, TV shows, anime and live sports online.">
-  <meta property="twitter:image" content="https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=1200&q=80">
+  <meta property="twitter:url" content="<!-- CANONICAL_URL_PLACEHOLDER -->">
+  <meta property="twitter:title" content="<!-- TITLE_PLACEHOLDER -->">
+  <meta property="twitter:description" content="<!-- DESC_PLACEHOLDER -->">
+  <meta property="twitter:image" content="<!-- COVER_PLACEHOLDER -->">
 
   <!-- SCHEMA_PLACEHOLDER -->
 </head>
@@ -76,13 +78,13 @@
     </header>
 
     <!-- Loading -->
-    <div id="watchPageLoading" class="watch-loading-container">
+    <div id="watchPageLoading" class="watch-loading-container" <!-- SSR_LOADING_STYLE -->>
       <div class="loading-spinner"></div>
       <p>Loading stream...</p>
     </div>
 
     <!-- Watch Content -->
-    <div class="watch-wrapper" id="watchWrapper" style="display:none;">
+    <div class="watch-wrapper" id="watchWrapper" <!-- SSR_WRAPPER_STYLE -->>
       <div class="watch-cinema-grid">
 
         <!-- ── PLAYER COLUMN ─────────────────────────────────────── -->
@@ -202,15 +204,6 @@
             </button>
           </div>
 
-          <!-- Infringement Disclaimer Strip (Below Player) -->
-          <div class="watch-disclaimer-strip">
-            <div class="disclaimer-text">
-              <i class="fa-solid fa-circle-exclamation"></i>
-              <span>Find any content infringes on your rights, please contact us.</span>
-            </div>
-            <button class="disclaimer-report-btn" id="reportContentBtn" onclick="alert('Thank you for reporting. Our moderation team has been notified.')">
-              <i class="fa-solid fa-flag"></i> Report
-            </button>
           </div>
         </div>
 
@@ -218,55 +211,38 @@
         <div class="cinema-meta-section">
           <div class="meta-header-row">
             <div class="meta-title-col">
-              <h1 id="watchMetaTitle"></h1>
+              <h1 id="watchMetaTitle"><!-- SSR_TITLE_TEXT --></h1>
               <div class="meta-row">
-                <span class="rating-badge" id="watchMetaRating"></span>
-                <span id="watchMetaYear"></span>
-                <span id="watchMetaCountry"></span>
-                <span id="watchMetaDuration"></span>
+                <span class="rating-badge" id="watchMetaRating"><i class="fa-solid fa-star"></i> <!-- SSR_RATING --></span>
+                <span id="watchMetaYear"><!-- SSR_YEAR --></span>
+                <span id="watchMetaCountry"><!-- SSR_COUNTRY --></span>
+                <span id="watchMetaDuration"><!-- SSR_DURATION --></span>
               </div>
             </div>
             <div class="meta-actions">
               <button id="watchBookmarkBtn" class="meta-action-btn" title="Add to Watchlist">
                 <i class="fa-regular fa-bookmark"></i> <span>Watchlist</span>
               </button>
-              <a id="watchDownloadBtn" href="#" class="meta-action-btn">
-                <i class="fa-solid fa-arrow-down-to-bracket"></i> <span>Download</span>
+              <a id="watchDownloadBtn" href="/download" class="meta-action-btn" style="text-decoration:none;">
+                <i class="fa-solid fa-arrow-down-to-bracket"></i> <span>Download App</span>
               </a>
               <button id="watchShareBtn" class="meta-action-btn">
                 <i class="fa-solid fa-share-nodes"></i> <span>Share</span>
               </button>
             </div>
           </div>
-          <p id="watchDescription" class="watch-synopsis"></p>
+          <p id="watchDescription" class="watch-synopsis"><!-- SSR_DESCRIPTION --></p>
         </div>
 
-        <!-- ── DESCRIPTION & TABS ────────────────────────────────── -->
+        <!-- ── MORE LIKE THIS / RECOMMENDATIONS ─────────────────── -->
         <div class="cinema-desc-section" style="margin:0 24px 24px;">
-          <div class="watch-tabs-section">
-            <div class="watch-tabs-header">
-              <button class="tab-header-btn active" id="tabBtnForYou">For You</button>
-              <button class="tab-header-btn" id="tabBtnComments">Comments (99+)</button>
-            </div>
-            <div class="watch-tabs-content">
-              <div class="tab-pane active" id="tabPaneForYou">
-                <div id="watchRecommendationsGrid"></div>
-              </div>
-              <div class="tab-pane" id="tabPaneComments">
-                <div class="comments-list">
-                  <div class="comment-item">
-                    <div class="comment-avatar"><i class="fa-solid fa-user"></i></div>
-                    <div class="comment-details">
-                      <div class="comment-meta">
-                        <span class="comment-author">apon_streamhit</span>
-                        <span class="comment-time">2 hours ago</span>
-                      </div>
-                      <p class="comment-text">Finally found a site that plays Hindi dub smooth and fast. Kudos!</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+          <div class="section-header" style="margin-bottom:14px;">
+            <h2 style="font-size:16px; font-weight:700; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+              <i class="fa-solid fa-sparkles" style="color:#00F0FF;"></i> More Like This
+            </h2>
+          </div>
+          <div id="watchRecommendationsGrid">
+            <!-- SSR_RECOMMENDATIONS -->
           </div>
         </div>
 
