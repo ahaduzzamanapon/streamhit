@@ -6,7 +6,9 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -39,8 +41,13 @@ fun MediaCard(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.94f else 1.0f,
+        targetValue = when {
+            isPressed -> 0.94f
+            isFocused -> 1.09f
+            else -> 1.0f
+        },
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessLow
@@ -54,12 +61,13 @@ fun MediaCard(
                 scaleX = scale
                 scaleY = scale
             }
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(12.dp))
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick
             )
+            .focusable(interactionSource = interactionSource)
     ) {
         // Poster Box with Aspect Ratio
         Box(
@@ -68,7 +76,11 @@ fun MediaCard(
                 .aspectRatio(2f / 2.9f)
                 .clip(RoundedCornerShape(12.dp))
                 .background(BgCard)
-                .border(0.8.dp, Color.White.copy(alpha = 0.09f), RoundedCornerShape(12.dp))
+                .border(
+                    width = if (isFocused) 3.dp else 0.8.dp,
+                    color = if (isFocused) Color(0xFF00F0FF) else Color.White.copy(alpha = 0.09f),
+                    shape = RoundedCornerShape(12.dp)
+                )
         ) {
             AsyncImage(
                 model = item.coverUrl,
@@ -245,9 +257,9 @@ fun MediaCard(
 
         Text(
             text = cleanTitle,
-            color = TextPrimary,
+            color = if (isFocused) Color(0xFF00F0FF) else TextPrimary,
             fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = if (isFocused) FontWeight.Black else FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )

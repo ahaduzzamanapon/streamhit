@@ -4,9 +4,12 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -406,6 +409,9 @@ fun DetailsScreen(
                         }
                     }
 
+                    val playBtnInteractionSource = remember { MutableInteractionSource() }
+                    val isPlayBtnFocused by playBtnInteractionSource.collectIsFocusedAsState()
+
                     Button(
                         onClick = {
                             if (hasResume) {
@@ -422,13 +428,15 @@ fun DetailsScreen(
                         ),
                         contentPadding = PaddingValues(),
                         shape = RoundedCornerShape(50.dp),
+                        border = if (isPlayBtnFocused) BorderStroke(3.5.dp, Color.White) else null,
+                        interactionSource = playBtnInteractionSource,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(if (isTvDevice) 52.dp else 46.dp)
                             .focusRequester(playButtonFocusRequester)
                             .graphicsLayer {
-                                scaleX = pulseScale
-                                scaleY = pulseScale
+                                scaleX = if (isPlayBtnFocused) 1.05f else pulseScale
+                                scaleY = if (isPlayBtnFocused) 1.05f else pulseScale
                             }
                             .background(
                                 Brush.horizontalGradient(listOf(Color(0xFF00E676), Color(0xFF00E5FF))),

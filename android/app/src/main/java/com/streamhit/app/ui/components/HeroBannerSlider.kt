@@ -7,6 +7,9 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -23,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -157,14 +161,29 @@ fun HeroBannerSlider(
                         }
 
                         // Watch Now Button (Electric Cyan/Emerald Gradient)
+                        val watchInteractionSource = remember { MutableInteractionSource() }
+                        val isWatchFocused by watchInteractionSource.collectIsFocusedAsState()
+
                         Box(
                             modifier = Modifier
                                 .height(34.dp)
+                                .graphicsLayer {
+                                    scaleX = if (isWatchFocused) 1.10f else 1.0f
+                                    scaleY = if (isWatchFocused) 1.10f else 1.0f
+                                }
                                 .clip(RoundedCornerShape(50.dp))
                                 .background(
                                     Brush.horizontalGradient(listOf(AccentEmerald, AccentCyan))
                                 )
-                                .clickable { onBannerClick(item) }
+                                .border(
+                                    BorderStroke(if (isWatchFocused) 2.5.dp else 0.dp, Color.White),
+                                    RoundedCornerShape(50.dp)
+                                )
+                                .clickable(
+                                    interactionSource = watchInteractionSource,
+                                    indication = null
+                                ) { onBannerClick(item) }
+                                .focusable(interactionSource = watchInteractionSource)
                                 .padding(horizontal = 16.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -188,13 +207,24 @@ fun HeroBannerSlider(
                         }
 
                         // Details Frosted Button
+                        val detailsInteractionSource = remember { MutableInteractionSource() }
+                        val isDetailsFocused by detailsInteractionSource.collectIsFocusedAsState()
+
                         Surface(
                             shape = RoundedCornerShape(50.dp),
-                            color = Color.White.copy(alpha = 0.12f),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.22f)),
+                            color = if (isDetailsFocused) Color(0xFF00F0FF).copy(alpha = 0.25f) else Color.White.copy(alpha = 0.12f),
+                            border = BorderStroke(if (isDetailsFocused) 2.5.dp else 1.dp, if (isDetailsFocused) Color(0xFF00F0FF) else Color.White.copy(alpha = 0.22f)),
                             modifier = Modifier
                                 .height(34.dp)
-                                .clickable { onBannerClick(item) }
+                                .graphicsLayer {
+                                    scaleX = if (isDetailsFocused) 1.10f else 1.0f
+                                    scaleY = if (isDetailsFocused) 1.10f else 1.0f
+                                }
+                                .clickable(
+                                    interactionSource = detailsInteractionSource,
+                                    indication = null
+                                ) { onBannerClick(item) }
+                                .focusable(interactionSource = detailsInteractionSource)
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 14.dp),

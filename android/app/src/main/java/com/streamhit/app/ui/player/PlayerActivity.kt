@@ -174,13 +174,7 @@ class PlayerActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         // On Smart TV / Android TV devices: start in landscape; on mobile phones: start in portrait
-        val isTvDevice = try {
-            val uiModeManager = getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
-            uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
-            packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
-        } catch (_: Exception) {
-            false
-        }
+        val isTvDevice = DeviceUtils.isTvDevice(this)
 
         if (isTvDevice) {
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
@@ -388,15 +382,7 @@ fun AdaptivePlayerScreen(
     var targetStartPositionMs by remember { mutableStateOf<Long?>(if (initialStartPositionMs > 1000L) initialStartPositionMs else null) }
     var pendingSeekMs by remember { mutableStateOf<Long?>(null) }
 
-    val isTvDevice = remember {
-        try {
-            val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
-            uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
-            context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
-        } catch (_: Exception) {
-            false
-        }
-    }
+    val isTvDevice = remember { DeviceUtils.isTvDevice(context) }
 
     // Orientation, Fullscreen, and Lock state (defaults to fullscreen landscape on TV devices)
     var isFullscreen by remember { mutableStateOf(isTvDevice) }
@@ -758,77 +744,177 @@ fun AdaptivePlayerScreen(
 
     // ── TV Remote Control Key Event Interceptor ──
     val playerActivity = context as? PlayerActivity
-    DisposableEffect(playerActivity, isLiveTv, liveChannels, currentChannelIndex, enteredChannelDigits, showControls, showTvSidePanel) {
-        if (playerActivity != null && isLiveTv) {
+    DisposableEffect(playerActivity, isLiveTv, liveChannels, currentChannelIndex, enteredChannelDigits, showControls, showTvSidePanel, isPlaying, exoPlayer) {
+        if (playerActivity != null) {
             playerActivity.onRemoteKeyEventListener = { event ->
                 if (event.action == KeyEvent.ACTION_DOWN) {
                     val code = event.keyCode
-                    when {
-                        // 0a. Close side panel on Back button
-                        code == KeyEvent.KEYCODE_BACK && showTvSidePanel -> {
-                            showTvSidePanel = false
-                            true
-                        }
-                        // 0b. Reset 6s auto-dismiss timer on any D-Pad navigation while panel is open
-                        showTvSidePanel && (code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN || code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT) -> {
-                            tvSidePanelInteractionTime = System.currentTimeMillis()
-                            false // Let Compose focus system navigate the list
-                        }
-                        // 1. Number keys 0-9 & Numpad 0-9
-                        (code in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) || (code in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9) -> {
-                            val digit = if (code in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) {
-                                code - KeyEvent.KEYCODE_0
-                            } else {
-                                code - KeyEvent.KEYCODE_NUMPAD_0
-                            }
-                            enteredChannelDigits = (enteredChannelDigits + digit.toString()).take(3)
-                            true
-                        }
-                        // 2. ENTER / DPAD_CENTER (Confirm entered number OR Toggle Live TV Playlist Side Panel)
-                        code == KeyEvent.KEYCODE_ENTER || code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_NUMPAD_ENTER -> {
-                            if (enteredChannelDigits.isNotEmpty()) {
-                                val num = enteredChannelDigits.toIntOrNull()
-                                if (num != null && liveChannels.isNotEmpty()) {
-                                    switchToChannelNumber(num)
-                                }
-                                enteredChannelDigits = ""
+                    if (isLiveTv) {
+                        when {
+                            // 0a. Close side panel on Back button
+                            code == KeyEvent.KEYCODE_BACK && showTvSidePanel -> {
+                                showTvSidePanel = false
                                 true
-                            } else {
-                                // Bring up side playlist panel while TV keeps playing smoothly!
-                                showTvSidePanel = !showTvSidePanel
+                            }
+                            // 0b. Reset 6s auto-dismiss timer on any D-Pad navigation while panel is open
+                            showTvSidePanel && (code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN || code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT) -> {
                                 tvSidePanelInteractionTime = System.currentTimeMillis()
+                                false // Let Compose focus system navigate the list
+                            }
+                            // 1. Number keys 0-9 & Numpad 0-9
+                            (code in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) || (code in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9) -> {
+                                val digit = if (code in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) {
+                                    code - KeyEvent.KEYCODE_0
+                                } else {
+                                    code - KeyEvent.KEYCODE_NUMPAD_0
+                                }
+                                enteredChannelDigits = (enteredChannelDigits + digit.toString()).take(3)
                                 true
                             }
+                            // 2. ENTER / DPAD_CENTER (Confirm entered number OR Toggle Live TV Playlist Side Panel)
+                            code == KeyEvent.KEYCODE_ENTER || code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                                if (enteredChannelDigits.isNotEmpty()) {
+                                    val num = enteredChannelDigits.toIntOrNull()
+                                    if (num != null && liveChannels.isNotEmpty()) {
+                                        switchToChannelNumber(num)
+                                    }
+                                    enteredChannelDigits = ""
+                                    true
+                                } else {
+                                    // Bring up side playlist panel while TV keeps playing smoothly!
+                                    showTvSidePanel = !showTvSidePanel
+                                    tvSidePanelInteractionTime = System.currentTimeMillis()
+                                    true
+                                }
+                            }
+                            // 3. Channel UP / PAGE UP / MEDIA NEXT
+                            code == KeyEvent.KEYCODE_CHANNEL_UP || code == KeyEvent.KEYCODE_PAGE_UP || code == KeyEvent.KEYCODE_MEDIA_NEXT -> {
+                                playNextChannel()
+                                true
+                            }
+                            // 4. Channel DOWN / PAGE DOWN / MEDIA PREVIOUS
+                            code == KeyEvent.KEYCODE_CHANNEL_DOWN || code == KeyEvent.KEYCODE_PAGE_DOWN || code == KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
+                                playPrevChannel()
+                                true
+                            }
+                            // 5. D-Pad UP / DOWN for Channel surfing when controls and side panel are hidden
+                            code == KeyEvent.KEYCODE_DPAD_UP && !showControls && !showTvSidePanel -> {
+                                playPrevChannel()
+                                true
+                            }
+                            code == KeyEvent.KEYCODE_DPAD_DOWN && !showControls && !showTvSidePanel -> {
+                                playNextChannel()
+                                true
+                            }
+                            // 6. D-Pad LEFT / RIGHT for Channel surfing when controls and side panel are hidden on Live TV
+                            code == KeyEvent.KEYCODE_DPAD_LEFT && !showControls && !showTvSidePanel -> {
+                                playPrevChannel()
+                                true
+                            }
+                            code == KeyEvent.KEYCODE_DPAD_RIGHT && !showControls && !showTvSidePanel -> {
+                                playNextChannel()
+                                true
+                            }
+                            else -> false
                         }
-                        // 3. Channel UP / PAGE UP / MEDIA NEXT
-                        code == KeyEvent.KEYCODE_CHANNEL_UP || code == KeyEvent.KEYCODE_PAGE_UP || code == KeyEvent.KEYCODE_MEDIA_NEXT -> {
-                            playNextChannel()
-                            true
+                    } else {
+                        // ── MOVIE & SERIES KEY HANDLING ──
+                        when {
+                            // 1. OK / DPAD_CENTER / ENTER -> Toggle Play/Pause & Show Controls
+                            code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER || code == KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                                exoPlayer?.let { p ->
+                                    if (p.isPlaying) {
+                                        p.pause()
+                                        isPlaying = false
+                                        showControls = true
+                                    } else {
+                                        p.play()
+                                        isPlaying = true
+                                        showControls = true
+                                    }
+                                }
+                                true
+                            }
+                            // 2. DPAD_LEFT -> Seek Backward 10 Seconds & Show Controls
+                            code == KeyEvent.KEYCODE_DPAD_LEFT -> {
+                                exoPlayer?.let { p ->
+                                    val target = (p.currentPosition - 10_000L).coerceAtLeast(0L)
+                                    p.seekTo(target)
+                                    currentPosition = target
+                                    showControls = true
+                                }
+                                true
+                            }
+                            // 3. DPAD_RIGHT -> Seek Forward 10 Seconds & Show Controls
+                            code == KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                                exoPlayer?.let { p ->
+                                    val dur = p.duration.coerceAtLeast(0L)
+                                    val target = if (dur > 0L) (p.currentPosition + 10_000L).coerceAtMost(dur) else p.currentPosition + 10_000L
+                                    p.seekTo(target)
+                                    currentPosition = target
+                                    showControls = true
+                                }
+                                true
+                            }
+                            // 4. DPAD_UP / DPAD_DOWN -> Toggle or Show Controls
+                            code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN -> {
+                                showControls = !showControls
+                                true
+                            }
+                            // 5. Media Play / Pause keys
+                            code == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || code == KeyEvent.KEYCODE_HEADSETHOOK -> {
+                                exoPlayer?.let { p ->
+                                    if (p.isPlaying) {
+                                        p.pause()
+                                        isPlaying = false
+                                        showControls = true
+                                    } else {
+                                        p.play()
+                                        isPlaying = true
+                                        showControls = true
+                                    }
+                                }
+                                true
+                            }
+                            code == KeyEvent.KEYCODE_MEDIA_PLAY -> {
+                                exoPlayer?.play()
+                                isPlaying = true
+                                showControls = true
+                                true
+                            }
+                            code == KeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                                exoPlayer?.pause()
+                                isPlaying = false
+                                showControls = true
+                                true
+                            }
+                            // 6. Media Fast Forward / Rewind keys
+                            code == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD || code == KeyEvent.KEYCODE_MEDIA_STEP_FORWARD -> {
+                                exoPlayer?.let { p ->
+                                    val dur = p.duration.coerceAtLeast(0L)
+                                    val target = if (dur > 0L) (p.currentPosition + 10_000L).coerceAtMost(dur) else p.currentPosition + 10_000L
+                                    p.seekTo(target)
+                                    currentPosition = target
+                                    showControls = true
+                                }
+                                true
+                            }
+                            code == KeyEvent.KEYCODE_MEDIA_REWIND || code == KeyEvent.KEYCODE_MEDIA_STEP_BACKWARD -> {
+                                exoPlayer?.let { p ->
+                                    val target = (p.currentPosition - 10_000L).coerceAtLeast(0L)
+                                    p.seekTo(target)
+                                    currentPosition = target
+                                    showControls = true
+                                }
+                                true
+                            }
+                            // 7. Back button: if controls are shown, hide them first
+                            code == KeyEvent.KEYCODE_BACK && showControls -> {
+                                showControls = false
+                                true
+                            }
+                            else -> false
                         }
-                        // 4. Channel DOWN / PAGE DOWN / MEDIA PREVIOUS
-                        code == KeyEvent.KEYCODE_CHANNEL_DOWN || code == KeyEvent.KEYCODE_PAGE_DOWN || code == KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
-                            playPrevChannel()
-                            true
-                        }
-                        // 5. D-Pad UP / DOWN for Channel surfing when controls and side panel are hidden
-                        code == KeyEvent.KEYCODE_DPAD_UP && !showControls && !showTvSidePanel -> {
-                            playPrevChannel()
-                            true
-                        }
-                        code == KeyEvent.KEYCODE_DPAD_DOWN && !showControls && !showTvSidePanel -> {
-                            playNextChannel()
-                            true
-                        }
-                        // 6. D-Pad LEFT / RIGHT for Channel surfing when controls and side panel are hidden on Live TV
-                        code == KeyEvent.KEYCODE_DPAD_LEFT && !showControls && !showTvSidePanel -> {
-                            playPrevChannel()
-                            true
-                        }
-                        code == KeyEvent.KEYCODE_DPAD_RIGHT && !showControls && !showTvSidePanel -> {
-                            playNextChannel()
-                            true
-                        }
-                        else -> false
                     }
                 } else false
             }
@@ -1530,9 +1616,9 @@ fun AdaptivePlayerScreen(
         }
     }
 
-    // Auto-hide controls after 4 seconds
-    LaunchedEffect(showControls) {
-        if (showControls && !isLocked) {
+    // Auto-hide controls after 4 seconds (only when playing, stay visible when paused)
+    LaunchedEffect(showControls, isPlaying) {
+        if (showControls && isPlaying && !isLocked) {
             delay(4000)
             showControls = false
         }

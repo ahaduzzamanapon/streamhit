@@ -6,7 +6,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.res.painterResource
@@ -501,29 +503,47 @@ fun HomeScreen(
                     val isSelected = selectedCategoryIndex == index
                     val interactionSource = remember { MutableInteractionSource() }
                     val isPressed by interactionSource.collectIsPressedAsState()
+                    val isFocused by interactionSource.collectIsFocusedAsState()
+
                     val chipScale by animateFloatAsState(
-                        targetValue = if (isPressed) 0.92f else 1.0f,
+                        targetValue = when {
+                            isPressed -> 0.92f
+                            isFocused -> 1.14f
+                            else -> 1.0f
+                        },
                         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
                         label = "catChipScale"
                     )
 
                     val bgColor by animateColorAsState(
-                        targetValue = if (isSelected) AccentEmerald.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.04f),
+                        targetValue = when {
+                            isFocused -> Color(0xFF00F0FF).copy(alpha = 0.30f)
+                            isSelected -> AccentEmerald.copy(alpha = 0.22f)
+                            else -> Color.White.copy(alpha = 0.04f)
+                        },
                         label = "catBg"
                     )
                     val borderColor by animateColorAsState(
-                        targetValue = if (isSelected) AccentEmerald else Color.White.copy(alpha = 0.10f),
+                        targetValue = when {
+                            isFocused -> Color(0xFF00F0FF)
+                            isSelected -> AccentEmerald
+                            else -> Color.White.copy(alpha = 0.10f)
+                        },
                         label = "catBorder"
                     )
                     val textColor by animateColorAsState(
-                        targetValue = if (isSelected) AccentEmerald else TextSecondary,
+                        targetValue = when {
+                            isFocused -> Color.White
+                            isSelected -> AccentEmerald
+                            else -> TextSecondary
+                        },
                         label = "catText"
                     )
 
                     Surface(
                         shape = RoundedCornerShape(14.dp),
                         color = bgColor,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
+                        border = androidx.compose.foundation.BorderStroke(if (isFocused) 2.5.dp else 1.dp, borderColor),
                         modifier = Modifier
                             .graphicsLayer {
                                 scaleX = chipScale
@@ -533,21 +553,22 @@ fun HomeScreen(
                                 interactionSource = interactionSource,
                                 indication = null
                             ) { selectedCategoryIndex = index }
+                            .focusable(interactionSource = interactionSource)
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
                             Text(
                                 text = categoryIcons[index],
-                                fontSize = 11.5.sp
+                                fontSize = if (isFocused) 13.sp else 11.5.sp
                             )
                             Text(
                                 text = cat,
                                 color = textColor,
-                                fontSize = 11.5.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                fontSize = if (isFocused) 12.5.sp else 11.5.sp,
+                                fontWeight = if (isSelected || isFocused) FontWeight.Black else FontWeight.Medium
                             )
                         }
                     }
@@ -998,12 +1019,37 @@ fun ContinueWatchingCard(
     onClick: () -> Unit,
     onResumeClick: () -> Unit = onClick
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = when {
+            isPressed -> 0.94f
+            isFocused -> 1.08f
+            else -> 1.0f
+        },
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "cwScale"
+    )
+
     Card(
         modifier = Modifier
             .width(150.dp)
-            .clickable(onClick = onClick),
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+            .focusable(interactionSource = interactionSource),
         shape = RoundedCornerShape(14.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+        border = androidx.compose.foundation.BorderStroke(
+            width = if (isFocused) 3.dp else 1.dp,
+            color = if (isFocused) Color(0xFF00F0FF) else Color.White.copy(alpha = 0.08f)
+        ),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF101422))
     ) {
         Column {
