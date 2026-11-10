@@ -2339,6 +2339,7 @@ async def get_subject_meta(slug: str, host: str = ""):
             schema_obj["duration"] = "PT120M"
         
         meta["schema"] = f'<script type="application/ld+json">{json.dumps(schema_obj)}</script>'
+        meta["subject"] = inner
     return meta
 
 def serve_html(filename: str, meta_replacements=None, host: str = ""):
@@ -2364,7 +2365,12 @@ def serve_html(filename: str, meta_replacements=None, host: str = ""):
 async def index(request: Request): return serve_html("public/index.html", host=request.headers.get("host", ""))
 
 @app.get("/admin", response_class=HTMLResponse)
-async def admin_page(request: Request): return serve_html("public/admin.html", host=request.headers.get("host", ""))
+async def admin_page(request: Request):
+    resp = serve_html("public/admin.html", host=request.headers.get("host", ""))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 async def render_seo_cards_html(subject_type: int = 1) -> str:
     """Pre-renders 24 rich movie/TV cards inside HTML to eliminate Google Search Console 'Soft 404'."""
@@ -2552,27 +2558,93 @@ async def google_verification_endpoint(verification_code: str):
             return HTMLResponse(content=f.read())
     return HTMLResponse(content=f"google-site-verification: google{verification_code}.html")
 
+async def render_details_recommendations_html(subject_type: int = 1, exclude_id: str = "") -> str:
+    cards = []
+    try:
+        pool = await (get_movies_pool() if subject_type == 1 else get_tv_pool())
+        for it in pool:
+            sid = str(it.get("subjectId") or "")
+            if (exclude_id and sid == exclude_id) or is_blocked_content(it):
+                continue
+            title = html.escape(str(it.get("title") or "Title"))
+            cover = html.escape(str(it.get("cover") or it.get("coverUrl") or "/default-cover.png"))
+            dpath = it.get("detailPath") or sid
+            type_seg = "tv" if subject_type == 2 else "movie"
+            cards.append(f'''
+                <a href="/{type_seg}/{dpath}" class="recommendation-card" style="display:flex; gap:12px; margin-bottom:12px; text-decoration:none; color:inherit; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); padding:8px; border-radius:8px;">
+                    <img src="{cover}" alt="{title}" style="width:48px; height:68px; object-fit:cover; border-radius:6px; flex-shrink:0;" loading="lazy">
+                    <div style="display:flex; flex-direction:column; justify-content:center; overflow:hidden;">
+                        <strong style="font-size:13px; color:#fff; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{title}</strong>
+                        <span style="font-size:11px; color:#00F0FF; margin-top:4px;">Watch Full HD</span>
+                    </div>
+                </a>
+            ''')
+            if len(cards) >= 8:
+                break
+    except Exception:
+        pass
+    return "".join(cards)
+
 @app.get("/movie/{slug}", response_class=HTMLResponse)
 @app.get("/tv/{slug}", response_class=HTMLResponse)
 async def details(slug: str, request: Request):
     host = request.headers.get("host", "")
     brand = get_brand_config(host)
     meta = await get_subject_meta(slug, host=host)
+    subject = meta.get("subject") or {}
+
+    subject_type = 2 if "/tv/" in request.url.path else 1
+    type_seg = "tv" if subject_type == 2 else "movie"
+
+    sid = str(subject.get("subjectId") or "")
+    raw_title = str(subject.get("title") or meta.get("title") or "Movie")
+    clean_title = html.escape(raw_title)
+    clean_desc = html.escape(str(subject.get("description") or meta.get("description") or f"Watch {raw_title} online in HD free."))
+    clean_cover = html.escape(meta.get("cover") or "/default-cover.png")
+
+    rating_val = str(subject.get("imdbRatingValue") or subject.get("rating") or "--")
+    year_val = str(subject.get("releaseDate") or "----").split("-")[0]
+    country_val = html.escape(str(subject.get("countryName") or "USA"))
+    duration_val = html.escape(str(subject.get("duration") or "-- min"))
+
+    raw_genres = subject.get("genre") or []
+    if isinstance(raw_genres, str):
+        genres_list = [g.strip() for g in raw_genres.split(",") if g.strip()]
+    elif isinstance(raw_genres, list):
+        genres_list = [str(g).strip() for g in raw_genres if str(g).strip()]
+    else:
+        genres_list = []
+
+    genres_html = "".join([f"<span>{html.escape(g)}</span>" for g in genres_list])
+    recs_html = await render_details_recommendations_html(subject_type, exclude_id=sid)
+
+    page_title = f"Watch {raw_title} Full Online Free HD — {brand['name']}"
+    watch_play_url = f"/watch/{type_seg}/{slug}"
+    if sid:
+        watch_play_url += f"?id={sid}"
+
+    play_btn_html = f'<a href="{watch_play_url}" class="btn-watch-now" id="btnDetailsPlay" style="display:inline-flex; align-items:center; justify-content:center; text-decoration:none;"><i class="fa-solid fa-play"></i> Watch Online</a>'
+
     reps = {
-        '<title>Details — Streamfit</title>': f'<title>{meta["title"]} — {brand["name"]}</title>',
-        'id="detailsTitle">Title': f'id="detailsTitle">{meta["title"]}',
-        'id="watchDescription">Description loading...': f'id="watchDescription">{meta["description"]}',
-        'src="/default-cover.png"': f'src="{meta["cover"]}"',
-        'content="Watch free movies, TV shows, anime and live sports online."': f'content="{meta["description"]}"',
-        'content="NXLY - Free Movies, TV Shows & Anime Streaming"': f'content="{meta["title"]} — {brand["name"]}"',
-        'content="Streamfit - Free Movies, TV Shows & Anime Streaming"': f'content="{meta["title"]} — {brand["name"]}"',
-        'content="https://nxly.online/"': f'content="{meta["url"]}"',
-        'content="https://streamfit.ehealthfinder.com/"': f'content="{meta["url"]}"',
-        'content="https://nxly.online/default-cover.png"': f'content="{meta["cover"]}"',
-        'content="https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=1200&q=80"': f'content="{meta["cover"]}"',
-        'content="website"': 'content="video.movie"',
+        '<!-- TITLE_PLACEHOLDER -->': page_title,
+        '<!-- DESC_PLACEHOLDER -->': clean_desc[:160],
+        '<!-- CANONICAL_URL_PLACEHOLDER -->': meta["url"],
+        '<!-- COVER_PLACEHOLDER -->': clean_cover,
         '<!-- SCHEMA_PLACEHOLDER -->': meta.get("schema", ""),
-        '<!-- CANONICAL_PLACEHOLDER -->': f'<link rel="canonical" href="{meta["url"]}">'
+        '<!-- CANONICAL_PLACEHOLDER -->': f'<link rel="canonical" href="{meta["url"]}">',
+        '<!-- SSR_LOADING_STYLE -->': 'style="display:none;"',
+        '<!-- SSR_WRAPPER_STYLE -->': 'style="display:block;"',
+        '<!-- SSR_BACKDROP_STYLE -->': f'style="background-image: url(\'{clean_cover}\');"',
+        '<!-- SSR_POSTER_SRC -->': clean_cover,
+        '<!-- SSR_TITLE_TEXT -->': clean_title,
+        '<!-- SSR_GENRES_HTML -->': genres_html,
+        '<!-- SSR_RATING -->': rating_val,
+        '<!-- SSR_YEAR -->': year_val,
+        '<!-- SSR_COUNTRY -->': country_val,
+        '<!-- SSR_DURATION -->': duration_val,
+        '<!-- SSR_PLAY_BTN -->': play_btn_html,
+        '<!-- SSR_DESCRIPTION -->': clean_desc,
+        '<!-- SSR_RECOMMENDATIONS -->': recs_html
     }
     return serve_html("public/details.html", reps, host=host)
 

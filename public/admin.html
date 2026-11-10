@@ -3,7 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>NXLY Stream — Admin Console</title>
+    <script>
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+        window.escapeHtml = escapeHtml;
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -3147,6 +3162,17 @@
         // ── CONTENT BLOCKLIST (MOVIE & SERIES FILTER) ────────────────────────
         let _allBlockedItems = [];
 
+        function _safeHtml(str) {
+            if (!str) return '';
+            if (typeof escapeHtml === 'function') return escapeHtml(str);
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         async function loadBlockedContents() {
             const tbody = document.getElementById('blockedContentsTableBody');
             const countEl = document.getElementById('blockedCount');
@@ -3167,22 +3193,23 @@
 
                 tbody.innerHTML = _allBlockedItems.map(b => {
                     const typeLabel = b.subject_type == 2 ? '📺 TV Series' : '🎬 Movie';
-                    const coverImg = b.cover ? `<img src="${b.cover}" style="width:40px; height:56px; object-fit:cover; border-radius:4px; background:#000;">` : `<div style="width:40px; height:56px; background:rgba(255,255,255,0.05); border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:16px;">🎬</div>`;
+                    const coverImg = b.cover ? `<img src="${_safeHtml(b.cover)}" style="width:40px; height:56px; object-fit:cover; border-radius:4px; background:#000;">` : `<div style="width:40px; height:56px; background:rgba(255,255,255,0.05); border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:16px;">🎬</div>`;
                     const dateFormatted = b.created_at ? new Date(b.created_at).toLocaleDateString('bn-BD', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '–';
+                    const encodedTitle = encodeURIComponent(b.title || '');
 
                     return `
                         <tr>
                             <td>${coverImg}</td>
                             <td>
-                                <strong style="color:#ffffff; font-size:13.5px;">${escapeHtml(b.title)}</strong>
-                                ${b.detail_path ? `<div style="font-size:11px; color:var(--text-muted); margin-top:2px;">/${escapeHtml(b.detail_path)}</div>` : ''}
+                                <strong style="color:#ffffff; font-size:13.5px;">${_safeHtml(b.title)}</strong>
+                                ${b.detail_path ? `<div style="font-size:11px; color:var(--text-muted); margin-top:2px;">/${_safeHtml(b.detail_path)}</div>` : ''}
                             </td>
                             <td><span style="font-size:11.5px; background:rgba(255,255,255,0.06); padding:3px 8px; border-radius:4px; font-weight:600;">${typeLabel}</span></td>
-                            <td><code style="color:var(--accent-cyan); font-size:12px;">${b.subject_id || '–'}</code></td>
-                            <td><span style="color:#f87171; font-size:12px;">${escapeHtml(b.reason || 'Blocked by Admin')}</span></td>
+                            <td><code style="color:var(--accent-cyan); font-size:12px;">${_safeHtml(b.subject_id || '–')}</code></td>
+                            <td><span style="color:#f87171; font-size:12px;">${_safeHtml(b.reason || 'Blocked by Admin')}</span></td>
                             <td style="font-size:12px; color:var(--text-muted);">${dateFormatted}</td>
                             <td style="text-align:center;">
-                                <button class="btn-secondary" style="font-size:11.5px; padding:4px 10px; color:#34d399; border-color:rgba(52,211,153,0.3);" onclick="unblockContentItem(${b.id}, '${escapeHtml(b.title)}')">✅ Unblock</button>
+                                <button class="btn-secondary" style="font-size:11.5px; padding:4px 10px; color:#34d399; border-color:rgba(52,211,153,0.3);" onclick="unblockContentItem(${b.id}, decodeURIComponent('${encodedTitle}'))">✅ Unblock</button>
                             </td>
                         </tr>
                     `;
@@ -3229,23 +3256,27 @@
                     const cover = it.coverUrl || it.cover || '';
                     const typeLabel = (it.subjectType == 2 || it.subject_type == 2) ? '📺 Series' : '🎬 Movie';
                     const detailPath = it.detailPath || it.detail_path || '';
+                    const encodedSid = encodeURIComponent(sid);
+                    const encodedTitle = encodeURIComponent(title);
+                    const encodedCover = encodeURIComponent(cover);
+                    const encodedPath = encodeURIComponent(detailPath);
 
                     return `
                         <div style="background:var(--bg-card); border:1px solid ${isBlocked ? 'rgba(239,68,68,0.5)' : 'var(--border-subtle)'}; border-radius:10px; overflow:hidden; display:flex; flex-direction:column; position:relative;">
                             ${isBlocked ? '<div style="position:absolute; top:6px; right:6px; background:#ef4444; color:#fff; font-size:10px; font-weight:700; padding:2px 7px; border-radius:4px; z-index:2;">BLOCKED</div>' : ''}
                             <div style="width:100%; height:160px; background:#000; overflow:hidden; position:relative;">
-                                ${cover ? `<img src="${cover}" style="width:100%; height:100%; object-fit:cover;">` : '<div style="display:flex; align-items:center; justify-content:center; height:100%; font-size:24px;">🎬</div>'}
+                                ${cover ? `<img src="${_safeHtml(cover)}" style="width:100%; height:100%; object-fit:cover;">` : '<div style="display:flex; align-items:center; justify-content:center; height:100%; font-size:24px;">🎬</div>'}
                                 <span style="position:absolute; bottom:6px; left:6px; background:rgba(0,0,0,0.7); font-size:10px; padding:2px 6px; border-radius:4px;">${typeLabel}</span>
                             </div>
                             <div style="padding:10px; flex:1; display:flex; flex-direction:column; justify-content:space-between;">
                                 <div>
-                                    <strong style="font-size:12.5px; color:#fff; display:block; line-height:1.3; margin-bottom:4px;" title="${escapeHtml(title)}">${escapeHtml(title)}</strong>
-                                    <div style="font-size:10.5px; color:var(--text-muted); margin-bottom:8px;">ID: ${sid || '–'}</div>
+                                    <strong style="font-size:12.5px; color:#fff; display:block; line-height:1.3; margin-bottom:4px;" title="${_safeHtml(title)}">${_safeHtml(title)}</strong>
+                                    <div style="font-size:10.5px; color:var(--text-muted); margin-bottom:8px;">ID: ${_safeHtml(sid || '–')}</div>
                                 </div>
                                 ${isBlocked ? `
-                                    <button class="btn-secondary" style="font-size:11px; padding:6px; width:100%; color:#34d399; border-color:rgba(52,211,153,0.3);" onclick="unblockContentBySubjectId('${sid}', '${escapeHtml(title)}')">✅ Unblock</button>
+                                    <button class="btn-secondary" style="font-size:11px; padding:6px; width:100%; color:#34d399; border-color:rgba(52,211,153,0.3);" onclick="unblockContentBySubjectId(decodeURIComponent('${encodedSid}'), decodeURIComponent('${encodedTitle}'))">✅ Unblock</button>
                                 ` : `
-                                    <button class="btn-danger" style="background:#ef4444; color:#fff; border:none; border-radius:6px; font-size:11px; padding:6px; width:100%; cursor:pointer; font-weight:700;" onclick="blockContentItem('${sid}', '${escapeHtml(title)}', ${it.subjectType||1}, '${escapeHtml(cover)}', '${escapeHtml(detailPath)}')">🚫 Block</button>
+                                    <button class="btn-danger" style="background:#ef4444; color:#fff; border:none; border-radius:6px; font-size:11px; padding:6px; width:100%; cursor:pointer; font-weight:700;" onclick="blockContentItem(decodeURIComponent('${encodedSid}'), decodeURIComponent('${encodedTitle}'), ${it.subjectType||1}, decodeURIComponent('${encodedCover}'), decodeURIComponent('${encodedPath}'))">🚫 Block</button>
                                 `}
                             </div>
                         </div>

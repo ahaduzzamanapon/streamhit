@@ -1104,7 +1104,8 @@ async function initDetailsPage() {
         // Watch Online button click handler
         const btnDetailsPlay = document.getElementById("btnDetailsPlay");
         if (btnDetailsPlay) {
-            btnDetailsPlay.onclick = () => {
+            btnDetailsPlay.onclick = (e) => {
+                if (e && e.preventDefault) e.preventDefault();
                 const typeSegment = isTvSubject(detail) ? 'tv' : 'movie';
                 let url = `/watch/${typeSegment}/${encodeURIComponent(detailPath)}`;
                 const q = [];

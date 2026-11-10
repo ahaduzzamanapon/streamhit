@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Details — Streamfit</title>
+  <title><!-- TITLE_PLACEHOLDER --></title>
   <meta name="robots" content="index, follow">
   <!-- CANONICAL_PLACEHOLDER -->
   <link rel="icon" type="image/svg+xml" href="/favicon-nxly.svg">
@@ -12,21 +12,21 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/style.css?v=6.8">
-  <meta name="description" content="Watch free movies, TV shows, anime and live sports online.">
+  <meta name="description" content="<!-- DESC_PLACEHOLDER -->">
   <meta name="keywords" content="movies, tv shows, streaming, nxly, watch free, hd movies, hindi dub, bengali dub, watch online">
   <!-- Open Graph / Facebook -->
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://nxly.online/">
+  <meta property="og:type" content="video.movie">
+  <meta property="og:url" content="<!-- CANONICAL_URL_PLACEHOLDER -->">
   <meta property="og:site_name" content="NXLY">
-  <meta property="og:title" content="NXLY - Free Movies, TV Shows & Anime Streaming">
-  <meta property="og:description" content="Watch free movies, TV shows, anime and live sports online.">
-  <meta property="og:image" content="https://nxly.online/default-cover.png">
+  <meta property="og:title" content="<!-- TITLE_PLACEHOLDER -->">
+  <meta property="og:description" content="<!-- DESC_PLACEHOLDER -->">
+  <meta property="og:image" content="<!-- COVER_PLACEHOLDER -->">
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
-  <meta property="twitter:url" content="https://nxly.online/">
-  <meta property="twitter:title" content="NXLY - Free Movies, TV Shows & Anime Streaming">
-  <meta property="twitter:description" content="Watch free movies, TV shows, anime and live sports online.">
-  <meta property="twitter:image" content="https://nxly.online/default-cover.png">
+  <meta property="twitter:url" content="<!-- CANONICAL_URL_PLACEHOLDER -->">
+  <meta property="twitter:title" content="<!-- TITLE_PLACEHOLDER -->">
+  <meta property="twitter:description" content="<!-- DESC_PLACEHOLDER -->">
+  <meta property="twitter:image" content="<!-- COVER_PLACEHOLDER -->">
 
   <!-- SCHEMA_PLACEHOLDER -->
 </head>
@@ -74,35 +74,33 @@
     </header>
 
     <!-- Loading State -->
-    <div id="watchPageLoading" class="watch-loading-container">
+    <div id="watchPageLoading" class="watch-loading-container" <!-- SSR_LOADING_STYLE -->>
       <div class="loading-spinner"></div>
       <p>Loading details...</p>
     </div>
 
-    <!-- Main Content (hidden until loaded) -->
-    <div class="watch-wrapper" id="watchWrapper" style="display:none;">
+    <!-- Main Content (hidden until loaded or pre-rendered by SSR) -->
+    <div class="watch-wrapper" id="watchWrapper" <!-- SSR_WRAPPER_STYLE -->>
       <div class="watch-cinema-grid">
 
         <!-- Hero Card — full width -->
         <div class="details-hero-card" id="detailsHeroCard" style="grid-column:1/-1;">
-          <div class="details-hero-backdrop" id="detailsHeroBackdrop"></div>
+          <div class="details-hero-backdrop" id="detailsHeroBackdrop" <!-- SSR_BACKDROP_STYLE -->></div>
           <div class="details-hero-content">
             <div class="details-poster-col">
-              <img id="detailsPoster" src="/default-cover.png" alt="Poster" onerror="this.onerror=null;this.src='/default-cover.png';">
+              <img id="detailsPoster" src="<!-- SSR_POSTER_SRC -->" alt="<!-- SSR_TITLE_TEXT -->" onerror="this.onerror=null;this.src='/default-cover.png';">
             </div>
             <div class="details-info-col">
-              <div class="genre-badge-list" id="detailsGenresList"></div>
-              <h1 class="details-hero-title" id="detailsTitle">Title</h1>
+              <div class="genre-badge-list" id="detailsGenresList"><!-- SSR_GENRES_HTML --></div>
+              <h1 class="details-hero-title" id="detailsTitle"><!-- SSR_TITLE_TEXT --></h1>
               <div class="details-hero-meta">
-                <span class="rating" id="detailsRating"><i class="fa-solid fa-star"></i> --</span>
-                <span id="detailsYear">----</span>
-                <span id="detailsCountry">Country</span>
-                <span id="detailsDuration">-- min</span>
+                <span class="rating" id="detailsRating"><i class="fa-solid fa-star"></i> <!-- SSR_RATING --></span>
+                <span id="detailsYear"><!-- SSR_YEAR --></span>
+                <span id="detailsCountry"><!-- SSR_COUNTRY --></span>
+                <span id="detailsDuration"><!-- SSR_DURATION --></span>
               </div>
               <div class="details-action-buttons">
-                <button class="btn-watch-now" id="btnDetailsPlay">
-                  <i class="fa-solid fa-play"></i> Watch Online
-                </button>
+                <!-- SSR_PLAY_BTN -->
                 <button class="btn-action-outline" id="actionShare">
                   <i class="fa-solid fa-share-nodes"></i> Share
                 </button>
@@ -116,7 +114,7 @@
           <div class="tag-container" id="watchGenres" style="display:none;"></div>
           <div class="description-box">
             <h3>Description</h3>
-            <p id="watchDescription">Loading description...</p>
+            <p id="watchDescription"><!-- SSR_DESCRIPTION --></p>
           </div>
           <div class="watch-tabs-section">
             <div class="watch-tabs-header">
@@ -125,7 +123,7 @@
             </div>
             <div class="watch-tabs-content">
               <div class="tab-pane active" id="tabPaneForYou">
-                <div id="watchRecommendationsGrid"></div>
+                <div id="watchRecommendationsGrid"><!-- SSR_RECOMMENDATIONS --></div>
               </div>
               <div class="tab-pane" id="tabPaneComments">
                 <div class="comments-list">
