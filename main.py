@@ -1405,6 +1405,15 @@ def _init_active_db():
                       AND (device_id LIKE 'web_%' OR app_version = 'Web')
                       AND (daily_active_seconds < 60)
                 """)
+                conn.execute("""
+                    UPDATE app_installations
+                    SET current_watching = 'Watching Video',
+                        last_watched_title = 'Watching Video'
+                    WHERE current_watching LIKE '%pbcdn%' 
+                       OR current_watching LIKE '%7B%'
+                       OR current_watching LIKE '%{%'
+                       OR current_watching LIKE '%http%'
+                """)
             except Exception as _mig_err:
                 pass
 
@@ -1824,8 +1833,12 @@ def record_active_user(request: Request):
             is_watching = 0
             if path.startswith("/watch/movie/") or path.startswith("/watch/tv/"):
                 w_path = path.replace("/watch/movie/", "").replace("/watch/tv/", "").strip()
-                c_watching = w_path.replace("-", " ").title()
-                is_watching = 1
+                if any(bad in w_path.lower() for bad in ("%7b", "{", "http", "pbcdn", "image", ".jpg", ".png", "url")):
+                    c_watching = "Watching Video"
+                    is_watching = 0
+                else:
+                    c_watching = w_path.replace("-", " ").title()
+                    is_watching = 1
             elif path.startswith("/watch"):
                 c_watching = "Watching Video"
                 is_watching = 1
@@ -1837,8 +1850,12 @@ def record_active_user(request: Request):
                 is_watching = 1
             elif path.startswith("/movie/"):
                 w_path = path.replace("/movie/", "").strip()
-                c_watching = f"Viewing: {w_path.replace('-', ' ').title()}"
-                is_watching = 0
+                if any(bad in w_path.lower() for bad in ("%7b", "{", "http", "pbcdn", "image", ".jpg", ".png", "url")):
+                    c_watching = "Browsing Site"
+                    is_watching = 0
+                else:
+                    c_watching = f"Viewing: {w_path.replace('-', ' ').title()}"
+                    is_watching = 0
             elif path in ("/", "/index.html"):
                 c_watching = "Browsing Homepage"
             elif path.startswith("/search"):
@@ -2035,6 +2052,9 @@ def get_app_users_list(limit: int = 5000, country_filter: str = ""):
                 last_title = str(row["last_watched_title"] if "last_watched_title" in row.keys() else "") or ""
                 if eff_title in ("", "Browsing Site", "Browsing Homepage", "Browsing", "Searching Movies", "Live TV", "Live Sports"):
                     eff_title = last_title or eff_title
+
+                if any(bad in eff_title.lower() for bad in ("%7b", "{", "http", "pbcdn", "image", ".jpg", ".png", "url")):
+                    eff_title = "Watching Video" if is_online else ""
 
                 users.append({
                     "device_id": dev_id,
@@ -2472,6 +2492,21 @@ def serve_html(filename: str, meta_replacements=None, host: str = ""):
         for k, v in meta_replacements.items(): html = html.replace(k, v)
     return HTMLResponse(content=html)
 
+def _extract_cover_url(it: dict, default: str = "/default-cover.png") -> str:
+    if not it or not isinstance(it, dict):
+        return default
+    cov = it.get("cover") or it.get("coverUrl") or it.get("image") or it.get("poster")
+    if isinstance(cov, dict):
+        return str(cov.get("url") or cov.get("cover") or default).strip()
+    if isinstance(cov, str) and cov.strip():
+        cov_s = cov.strip()
+        if cov_s.startswith("{") and "http" in cov_s:
+            m = re.search(r"https?://[^\s'\",}]+", cov_s)
+            if m:
+                return m.group(0)
+        return cov_s
+    return default
+
 async def render_home_hero_ssr_html(host: str = "") -> str:
     """Pre-renders the Hero Banner slide so the homepage has immediate 0ms paint."""
     try:
@@ -2486,7 +2521,7 @@ async def render_home_hero_ssr_html(host: str = "") -> str:
         for i in range(max_b):
             it = clean_banners[i]
             title = html.escape(str(it.get("title") or "Featured Movie"))
-            cover = html.escape(str(it.get("cover") or it.get("image") or ""))
+            cover = html.escape(_extract_cover_url(it, "/default-cover.png"))
             sid = str(it.get("subjectId") or "")
             dpath = it.get("detailPath") or sid
             subject_type = it.get("subjectType") or 1
@@ -2552,7 +2587,7 @@ async def render_home_trending_ssr_html() -> str:
             if is_blocked_content(it):
                 continue
             title = html.escape(str(it.get("title") or "Movie"))
-            cover = html.escape(str(it.get("cover") or it.get("coverUrl") or "/default-cover.png"))
+            cover = html.escape(_extract_cover_url(it, "/default-cover.png"))
             sid = str(it.get("subjectId") or "")
             dpath = it.get("detailPath") or sid
             subject_type = it.get("subjectType") or 1
@@ -2600,7 +2635,7 @@ async def render_home_schema_html(host: str = "") -> str:
             if is_blocked_content(it):
                 continue
             title = str(it.get("title") or "")
-            cover = str(it.get("cover") or it.get("coverUrl") or "")
+            cover = _extract_cover_url(it, "/default-cover.png")
             sid = str(it.get("subjectId") or "")
             dpath = it.get("detailPath") or sid
             type_seg = "tv" if it.get("subjectType") == 2 else "movie"
@@ -2840,7 +2875,7 @@ async def render_details_recommendations_html(subject_type: int = 1, exclude_id:
             if (exclude_id and sid == exclude_id) or is_blocked_content(it):
                 continue
             title = html.escape(str(it.get("title") or "Title"))
-            cover = html.escape(str(it.get("cover") or it.get("coverUrl") or "/default-cover.png"))
+            cover = html.escape(_extract_cover_url(it, "/default-cover.png"))
             dpath = it.get("detailPath") or sid
             type_seg = "tv" if subject_type == 2 else "movie"
             cards.append(f'''
