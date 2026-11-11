@@ -1664,16 +1664,23 @@ def record_app_device(
                 if is_real_watch:
                     c_watching = current_watching
                     w_path = watching_detail_path
-                    w_flag = is_watching
+                    w_flag = 1
                     last_title = current_watching
                 else:
-                    w_flag = 0
                     last_title = prev_last_title
                     if current_watching != "":
                         c_watching = current_watching
                     else:
                         c_watching = prev_last_title or (row["current_watching"] or "")
                     w_path = watching_detail_path or (row["watching_detail_path"] or "")
+
+                    # Preserve active watching state on passive background requests
+                    prev_is_w = row["is_watching"] if ("is_watching" in row.keys() and row["is_watching"]) else 0
+                    is_media = (c_watching != "" and c_watching not in ("Browsing Site", "Browsing Homepage", "Browsing", "Searching Movies"))
+                    if (now - prev_last_seen < 300) and (prev_is_w == 1 or is_media):
+                        w_flag = 1
+                    else:
+                        w_flag = is_watching
 
                 c_name = country if country else (row["country"] if "country" in row.keys() else "")
                 c_code = country_code if country_code else (row["country_code"] if "country_code" in row.keys() else "")
@@ -1933,7 +1940,8 @@ def get_active_users_stats():
             cur.execute(f"SELECT COUNT(*) FROM app_installations WHERE {base_cond}")
             total_installs = cur.fetchone()[0] or 0
 
-            cur.execute("SELECT COUNT(*) FROM app_installations WHERE is_watching = 1 AND last_seen >= ?", (cutoff,))
+            watch_cond = "(is_watching = 1 OR (current_watching != '' AND current_watching NOT IN ('Browsing Site', 'Browsing Homepage', 'Browsing', 'Searching Movies')))"
+            cur.execute(f"SELECT COUNT(*) FROM app_installations WHERE {base_cond} AND {watch_cond} AND last_seen >= ?", (cutoff,))
             watching_count = cur.fetchone()[0] or 0
             db_success = True
     except Exception:
@@ -1994,7 +2002,8 @@ def get_app_users_list(limit: int = 5000, country_filter: str = ""):
             cur.execute(f"SELECT COUNT(*) as cnt FROM app_installations WHERE {base_cond} AND last_seen >= ?", (cutoff,))
             live_count = cur.fetchone()["cnt"]
 
-            cur.execute(f"SELECT COUNT(*) as cnt FROM app_installations WHERE last_seen >= ? AND is_watching = 1", (cutoff,))
+            watch_cond = "(is_watching = 1 OR (current_watching != '' AND current_watching NOT IN ('Browsing Site', 'Browsing Homepage', 'Browsing', 'Searching Movies')))"
+            cur.execute(f"SELECT COUNT(*) as cnt FROM app_installations WHERE {base_cond} AND {watch_cond} AND last_seen >= ?", (cutoff,))
             watching_count = cur.fetchone()["cnt"]
 
             cur.execute(f"SELECT COUNT(*) as cnt FROM app_installations WHERE {base_cond} AND last_seen >= ?", (today_start,))
@@ -2056,6 +2065,13 @@ def get_app_users_list(limit: int = 5000, country_filter: str = ""):
                 if any(bad in eff_title.lower() for bad in ("%7b", "{", "http", "pbcdn", "image", ".jpg", ".png", "url")):
                     eff_title = "Watching Video" if is_online else ""
 
+                has_media = (
+                    eff_title != "" and 
+                    eff_title not in ("", "Browsing Site", "Browsing Homepage", "Browsing", "Searching Movies") and
+                    not any(bad in eff_title.lower() for bad in ("%7b", "{", "http", "pbcdn", "image", ".jpg", ".png", "url"))
+                )
+                user_is_watching = bool(is_online and (row["is_watching"] == 1 or has_media))
+
                 users.append({
                     "device_id": dev_id,
                     "ip": row["ip"] or "",
@@ -2069,7 +2085,7 @@ def get_app_users_list(limit: int = 5000, country_filter: str = ""):
                     "daily_active_seconds": int(row["daily_active_seconds"] or 0),
                     "current_watching": eff_title,
                     "watching_detail_path": row["watching_detail_path"] or "",
-                    "is_watching": (row["is_watching"] == 1 and is_online),
+                    "is_watching": user_is_watching,
                     "is_online": is_online,
                     "country": c_name or "Unknown",
                     "country_code": c_code or ""
