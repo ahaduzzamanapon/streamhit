@@ -7,6 +7,10 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>NXLY Stream — Admin Console</title>
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon.png">
+    <link rel="icon" type="image/svg+xml" href="/favicon-nxly.svg">
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     <script>
         function escapeHtml(str) {
             if (!str) return '';
@@ -796,7 +800,7 @@
     <!-- ── SIDEBAR ────────────────────────────────────────────────────────── -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-brand">
-            <div class="brand-logo-icon">N</div>
+            <img src="/favicon.png" alt="NXLY" style="width:38px; height:38px; border-radius:10px; object-fit:contain; flex-shrink:0;">
             <div class="brand-text">
                 <h1>NXLY Stream</h1>
                 <span>Admin Console</span>
@@ -1454,6 +1458,7 @@
                         <button type="button" class="btn-secondary active" id="btnFilterAll" onclick="setUserTypeFilter('all')">👥 All Users (<span id="userStatAll">0</span>)</button>
                         <button type="button" class="btn-secondary" id="btnFilterApp" onclick="setUserTypeFilter('app')">📱 App (<span id="userStatApp">0</span>)</button>
                         <button type="button" class="btn-secondary" id="btnFilterWeb" onclick="setUserTypeFilter('web')">🌐 Web (<span id="userStatWeb">0</span>)</button>
+                        <button type="button" class="btn-secondary" id="btnFilterWatching" onclick="setUserTypeFilter('watching')" style="color:#00F0FF;"><i class="fa-solid fa-play"></i> Watching (<span id="userStatWatching">0</span>)</button>
                     </div>
 
                     <!-- Country Filter Pills & Selector -->
@@ -2932,9 +2937,11 @@
             const btnAll = document.getElementById('btnFilterAll');
             const btnApp = document.getElementById('btnFilterApp');
             const btnWeb = document.getElementById('btnFilterWeb');
+            const btnWatching = document.getElementById('btnFilterWatching');
             if (btnAll) btnAll.classList.toggle('active', type === 'all');
             if (btnApp) btnApp.classList.toggle('active', type === 'app');
             if (btnWeb) btnWeb.classList.toggle('active', type === 'web');
+            if (btnWatching) btnWatching.classList.toggle('active', type === 'watching');
             renderUsersTablePage(1);
         }
 
@@ -2991,9 +2998,11 @@
                 const appCount = d.app_count !== undefined ? d.app_count : _allUsers.filter(u => u.user_type === 'app').length;
                 const webCount = d.web_count !== undefined ? d.web_count : _allUsers.filter(u => u.user_type === 'web').length;
                 const totalCount = d.total_installs !== undefined ? d.total_installs : _allUsers.length;
+                const watchingCount = d.watching_count !== undefined ? d.watching_count : _allUsers.filter(u => u.is_watching).length;
                 if (document.getElementById('userStatAll')) document.getElementById('userStatAll').innerText = totalCount;
                 if (document.getElementById('userStatApp')) document.getElementById('userStatApp').innerText = appCount;
                 if (document.getElementById('userStatWeb')) document.getElementById('userStatWeb').innerText = webCount;
+                if (document.getElementById('userStatWatching')) document.getElementById('userStatWatching').innerText = watchingCount;
                 renderCountryFilters(_countryStats);
                 renderUsersTablePage(page);
             } catch(e) {}
@@ -3003,7 +3012,9 @@
             _usersCurrentPage = page;
             const filterVal = (document.getElementById('usersFilterInput')?.value || '').toLowerCase().trim();
             let filtered = _allUsers;
-            if (_userTypeFilter !== 'all') {
+            if (_userTypeFilter === 'watching') {
+                filtered = filtered.filter(u => u.is_watching);
+            } else if (_userTypeFilter !== 'all') {
                 filtered = filtered.filter(u => u.user_type === _userTypeFilter);
             }
             if (_userCountryFilter !== 'all') {
@@ -3164,7 +3175,6 @@
 
         function _safeHtml(str) {
             if (!str) return '';
-            if (typeof escapeHtml === 'function') return escapeHtml(str);
             return String(str)
                 .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
@@ -3172,6 +3182,7 @@
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
         }
+        window.escapeHtml = _safeHtml;
 
         async function loadBlockedContents() {
             const tbody = document.getElementById('blockedContentsTableBody');

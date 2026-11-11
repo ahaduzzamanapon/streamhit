@@ -111,6 +111,19 @@ input, select { font-family: inherit; }
   transition: var(--transition);
 }
 
+.play-logo:has(img) {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.play-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+}
+
 .brand:hover .play-logo {
   box-shadow: 0 0 24px rgba(0,230,118,0.6);
   transform: scale(1.05);

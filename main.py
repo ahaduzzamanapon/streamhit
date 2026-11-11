@@ -1289,7 +1289,8 @@ def backfill_missing_countries():
             cur = conn.cursor()
             cur.execute("""
                 SELECT DISTINCT ip FROM app_installations 
-                WHERE (country = '' OR country IS NULL) 
+                WHERE (has_watched = 1 OR is_watching = 1)
+                  AND (country = '' OR country IS NULL) 
                   AND ip != '' AND ip NOT LIKE '127.%' AND ip NOT LIKE '192.168.%' AND ip NOT LIKE '10.%'
                 LIMIT 500
             """)
@@ -1369,12 +1370,43 @@ def _init_active_db():
                 ("watching_detail_path", "TEXT DEFAULT ''"),
                 ("is_watching", "INTEGER DEFAULT 0"),
                 ("country", "TEXT DEFAULT ''"),
-                ("country_code", "TEXT DEFAULT ''")
+                ("country_code", "TEXT DEFAULT ''"),
+                ("has_watched", "INTEGER DEFAULT 0"),
+                ("last_watched_title", "TEXT DEFAULT ''")
             ]:
                 try:
                     conn.execute(f"ALTER TABLE app_installations ADD COLUMN {col} {col_def}")
                 except Exception:
                     pass
+
+            try:
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_installs_has_watched ON app_installations(has_watched)")
+            except Exception:
+                pass
+
+            # One-time migration: mark real users who have watched and purge non-watching crawler bots
+            try:
+                conn.execute("""
+                    UPDATE app_installations
+                    SET has_watched = 1,
+                        last_watched_title = CASE 
+                            WHEN (last_watched_title IS NULL OR last_watched_title = '') AND current_watching NOT IN ('', 'Browsing Site', 'Browsing Homepage', 'Browsing', 'Searching Movies', 'Live TV', 'Live Sports') THEN current_watching
+                            ELSE last_watched_title 
+                        END
+                    WHERE is_watching = 1
+                       OR (current_watching != '' AND current_watching NOT IN ('Browsing Site', 'Browsing Homepage', 'Browsing', 'Searching Movies', 'Live TV', 'Live Sports'))
+                       OR (daily_active_seconds >= 60 AND (device_id NOT LIKE 'web_%' AND app_version != 'Web'))
+                """)
+                conn.execute("""
+                    DELETE FROM app_installations
+                    WHERE (has_watched = 0 OR has_watched IS NULL)
+                      AND (is_watching = 0 OR is_watching IS NULL)
+                      AND (current_watching = '' OR current_watching IN ('Browsing Site', 'Browsing Homepage', 'Browsing', 'Searching Movies', 'Live TV', 'Live Sports'))
+                      AND (device_id LIKE 'web_%' OR app_version = 'Web')
+                      AND (daily_active_seconds < 60)
+                """)
+            except Exception as _mig_err:
+                pass
 
             # Pre-load known IP-to-country mapping into memory cache
             try:
@@ -1553,20 +1585,34 @@ def record_app_device(
         return
     now = time.time()
     today_str = datetime.datetime.fromtimestamp(now).strftime("%Y-%m-%d")
-    if device_id.startswith("web_"):
+    is_web = device_id.startswith("web_") or "web" in app_version.lower()
+    if is_web:
         _active_web_users[device_id] = now
     else:
         _active_app_users[device_id] = now
+
+    is_real_watch = (
+        is_watching == 1 or 
+        (current_watching != "" and current_watching not in (
+            "Browsing Site", "Browsing Homepage", "Browsing", "Searching Movies", "Live TV", "Live Sports"
+        ))
+    )
+
     try:
         with sqlite3.connect(_ACTIVE_DB_PATH, timeout=2) as conn:
             conn.row_factory = sqlite3.Row
             cur = conn.cursor()
             cur.execute("""
                 SELECT first_seen, session_start, last_seen, daily_active_seconds, today_date,
-                       current_watching, watching_detail_path, is_watching, country, country_code
+                       current_watching, watching_detail_path, is_watching, country, country_code,
+                       has_watched, last_watched_title
                 FROM app_installations WHERE device_id = ?
             """, (device_id,))
             row = cur.fetchone()
+
+            # Web bot prevention: if web visitor has never watched and not in DB, ignore!
+            if not row and is_web and not is_real_watch:
+                return
 
             if not row:
                 first_seen = now
@@ -1578,12 +1624,18 @@ def record_app_device(
                 w_flag = is_watching
                 c_name = country
                 c_code = country_code
+                has_w = 1 if is_real_watch else 0
+                last_title = current_watching if is_real_watch else ""
             else:
                 first_seen = row["first_seen"] or now
                 prev_last_seen = row["last_seen"] or now
                 prev_session_start = row["session_start"] or now
                 prev_daily_sec = row["daily_active_seconds"] or 0.0
                 prev_today_date = row["today_date"] or ""
+                prev_has_w = row["has_watched"] if "has_watched" in row.keys() and row["has_watched"] else 0
+                prev_last_title = row["last_watched_title"] if "last_watched_title" in row.keys() and row["last_watched_title"] else ""
+
+                has_w = 1 if (is_real_watch or prev_has_w == 1) else 0
 
                 # New session if away for more than 5 minutes (300 seconds)
                 if (now - prev_last_seen) > 300:
@@ -1600,14 +1652,19 @@ def record_app_device(
                     daily_active_seconds = prev_daily_sec + delta
                     today_date = today_str
 
-                if current_watching != "":
+                if is_real_watch:
                     c_watching = current_watching
                     w_path = watching_detail_path
                     w_flag = is_watching
+                    last_title = current_watching
                 else:
-                    c_watching = row["current_watching"] or ""
-                    w_path = row["watching_detail_path"] or ""
-                    w_flag = row["is_watching"] or 0
+                    w_flag = 0
+                    last_title = prev_last_title
+                    if current_watching != "":
+                        c_watching = current_watching
+                    else:
+                        c_watching = prev_last_title or (row["current_watching"] or "")
+                    w_path = watching_detail_path or (row["watching_detail_path"] or "")
 
                 c_name = country if country else (row["country"] if "country" in row.keys() else "")
                 c_code = country_code if country_code else (row["country_code"] if "country_code" in row.keys() else "")
@@ -1617,8 +1674,8 @@ def record_app_device(
                     device_id, ip, device_model, os_version, app_version,
                     first_seen, session_start, last_seen, daily_active_seconds, today_date,
                     current_watching, watching_detail_path, is_watching,
-                    country, country_code
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    country, country_code, has_watched, last_watched_title
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(device_id) DO UPDATE SET
                     ip = excluded.ip,
                     device_model = CASE WHEN excluded.device_model != '' THEN excluded.device_model ELSE app_installations.device_model END,
@@ -1628,22 +1685,34 @@ def record_app_device(
                     last_seen = excluded.last_seen,
                     daily_active_seconds = excluded.daily_active_seconds,
                     today_date = excluded.today_date,
-                    current_watching = excluded.current_watching,
-                    watching_detail_path = excluded.watching_detail_path,
+                    current_watching = CASE 
+                        WHEN excluded.is_watching = 1 THEN excluded.current_watching 
+                        WHEN excluded.current_watching NOT IN ('', 'Browsing Site', 'Browsing Homepage', 'Browsing', 'Searching Movies', 'Live TV', 'Live Sports') THEN excluded.current_watching
+                        WHEN app_installations.last_watched_title != '' THEN app_installations.last_watched_title
+                        ELSE excluded.current_watching 
+                    END,
+                    watching_detail_path = CASE WHEN excluded.watching_detail_path != '' THEN excluded.watching_detail_path ELSE app_installations.watching_detail_path END,
                     is_watching = excluded.is_watching,
                     country = CASE WHEN excluded.country != '' THEN excluded.country ELSE app_installations.country END,
-                    country_code = CASE WHEN excluded.country_code != '' THEN excluded.country_code ELSE app_installations.country_code END
+                    country_code = CASE WHEN excluded.country_code != '' THEN excluded.country_code ELSE app_installations.country_code END,
+                    has_watched = MAX(app_installations.has_watched, excluded.has_watched),
+                    last_watched_title = CASE 
+                        WHEN excluded.last_watched_title != '' THEN excluded.last_watched_title 
+                        ELSE app_installations.last_watched_title 
+                    END
             """, (
                 device_id, ip, device_model, os_version, app_version,
                 first_seen, session_start, now, daily_active_seconds, today_date,
                 c_watching, w_path, w_flag,
-                c_name, c_code
+                c_name, c_code, has_w, last_title
             ))
-            u_type = "web" if device_id.startswith("web_") else "app"
+            u_type = "web" if is_web else "app"
             conn.execute(
                 "INSERT OR REPLACE INTO active_sessions (user_id, user_type, last_seen) VALUES (?, ?, ?)",
                 (device_id, u_type, now)
             )
+    except Exception:
+        pass
     except Exception:
         pass
 
@@ -1709,6 +1778,16 @@ def record_active_user(request: Request):
             
         raw_ua = request.headers.get("User-Agent", "")
         user_agent = raw_ua.lower()
+
+        # Bot and crawler detection: DO NOT track bot crawlers!
+        if any(b in user_agent for b in [
+            "bot", "spider", "crawl", "slurp", "headless", "lighthouse",
+            "semrush", "ahrefs", "bytespider", "yandex", "petalbot",
+            "curl", "python", "wget", "httpclient", "go-http-client",
+            "postman", "node-fetch", "axios", "censys", "shodan", "netcraft"
+        ]):
+            return
+
         app_dev_id = request.headers.get("X-App-Device-Id") or request.headers.get("device_id")
         
         is_app = (app_dev_id is not None or 
@@ -1743,39 +1822,48 @@ def record_active_user(request: Request):
             c_watching = ""
             w_path = ""
             is_watching = 0
-            if path.startswith("/movie/"):
-                w_path = path.replace("/movie/", "").strip()
+            if path.startswith("/watch/movie/") or path.startswith("/watch/tv/"):
+                w_path = path.replace("/watch/movie/", "").replace("/watch/tv/", "").strip()
                 c_watching = w_path.replace("-", " ").title()
+                is_watching = 1
+            elif path.startswith("/watch"):
+                c_watching = "Watching Video"
                 is_watching = 1
             elif path.startswith("/play"):
                 c_watching = "Playing Video"
                 is_watching = 1
+            elif path.startswith("/sports"):
+                c_watching = "Live Sports"
+                is_watching = 1
+            elif path.startswith("/movie/"):
+                w_path = path.replace("/movie/", "").strip()
+                c_watching = f"Viewing: {w_path.replace('-', ' ').title()}"
+                is_watching = 0
             elif path in ("/", "/index.html"):
                 c_watching = "Browsing Homepage"
             elif path.startswith("/search"):
                 c_watching = "Searching Movies"
-            elif path.startswith("/sports"):
-                c_watching = "Live Sports"
             elif path.startswith("/tv"):
                 c_watching = "Live TV"
-            elif path.startswith("/api/"):
-                c_watching = "Browsing Site"
+            # NOTE: Do NOT set c_watching for /api/ to prevent wiping out watch status!
 
             # Record web device install telemetry throttled every 20s
-            if now - _last_db_sync.get(web_dev_id, 0) > 20:
-                _last_db_sync[web_dev_id] = now
-                record_app_device(
-                    device_id=web_dev_id,
-                    ip=client_ip,
-                    device_model=dev_model,
-                    os_version=dev_os,
-                    app_version="Web",
-                    current_watching=c_watching,
-                    watching_detail_path=w_path,
-                    is_watching=is_watching,
-                    country=c_name,
-                    country_code=c_code
-                )
+            # ONLY record web devices into app_installations if they are actually watching!
+            if is_watching == 1:
+                if now - _last_db_sync.get(web_dev_id, 0) > 20:
+                    _last_db_sync[web_dev_id] = now
+                    record_app_device(
+                        device_id=web_dev_id,
+                        ip=client_ip,
+                        device_model=dev_model,
+                        os_version=dev_os,
+                        app_version="Web",
+                        current_watching=c_watching,
+                        watching_detail_path=w_path,
+                        is_watching=is_watching,
+                        country=c_name,
+                        country_code=c_code
+                    )
 
         # Throttle DB writes to once every 20s per user to minimize disk I/O
         if now - _last_db_sync.get(user_id, 0) > 20:
@@ -1798,7 +1886,10 @@ def get_active_users_stats():
     web_count = 0
     app_count = 0
     total_installs = 0
+    watching_count = 0
     db_success = False
+
+    base_cond = "(has_watched = 1 OR is_watching = 1 OR (current_watching != '' AND current_watching NOT IN ('Browsing Site', 'Browsing Homepage', 'Browsing', 'Searching Movies', 'Live TV', 'Live Sports')))"
 
     try:
         with sqlite3.connect(_ACTIVE_DB_PATH, timeout=3) as conn:
@@ -1817,13 +1908,16 @@ def get_active_users_stats():
                 elif utype == "app":
                     app_count = cnt
 
-            # Also check app_installations for live apps
-            cur.execute("SELECT COUNT(DISTINCT device_id) FROM app_installations WHERE last_seen >= ?", (cutoff,))
+            # Also check app_installations for live apps and watching users
+            cur.execute(f"SELECT COUNT(DISTINCT device_id) FROM app_installations WHERE {base_cond} AND last_seen >= ?", (cutoff,))
             installed_live = cur.fetchone()[0] or 0
             app_count = max(app_count, installed_live)
 
-            cur.execute("SELECT COUNT(*) FROM app_installations")
+            cur.execute(f"SELECT COUNT(*) FROM app_installations WHERE {base_cond}")
             total_installs = cur.fetchone()[0] or 0
+
+            cur.execute("SELECT COUNT(*) FROM app_installations WHERE is_watching = 1 AND last_seen >= ?", (cutoff,))
+            watching_count = cur.fetchone()[0] or 0
             db_success = True
     except Exception:
         pass
@@ -1842,10 +1936,15 @@ def get_active_users_stats():
         web_count = 1
 
     return {
+        "code": 0,
+        "status": "ok",
         "total": web_count + app_count,
+        "active_users": web_count + app_count,
+        "total_users": total_installs,
+        "total_installs": total_installs,
+        "watching_users": watching_count,
         "web": web_count,
-        "app": app_count,
-        "total_installs": total_installs
+        "app": app_count
     }
 
 def get_app_users_list(limit: int = 5000, country_filter: str = ""):
@@ -1861,32 +1960,36 @@ def get_app_users_list(limit: int = 5000, country_filter: str = ""):
     app_total = 0
     country_stats = []
 
+    # Strictly filter for genuine users who have gone into Watching at least once
+    base_cond = "(has_watched = 1 OR is_watching = 1 OR (current_watching != '' AND current_watching NOT IN ('Browsing Site', 'Browsing Homepage', 'Browsing', 'Searching Movies', 'Live TV', 'Live Sports')))"
+
     try:
         with sqlite3.connect(_ACTIVE_DB_PATH, timeout=5) as conn:
             conn.row_factory = sqlite3.Row
             cur = conn.cursor()
-            cur.execute("SELECT COUNT(*) as cnt FROM app_installations")
+            cur.execute(f"SELECT COUNT(*) as cnt FROM app_installations WHERE {base_cond}")
             total_installs = cur.fetchone()["cnt"]
 
-            cur.execute("SELECT COUNT(*) as cnt FROM app_installations WHERE device_id LIKE 'web_%' OR app_version LIKE '%web%'")
+            cur.execute(f"SELECT COUNT(*) as cnt FROM app_installations WHERE {base_cond} AND (device_id LIKE 'web_%' OR app_version LIKE '%web%')")
             web_total = cur.fetchone()["cnt"]
             app_total = max(0, total_installs - web_total)
 
-            cur.execute("SELECT COUNT(*) as cnt FROM app_installations WHERE last_seen >= ?", (cutoff,))
+            cur.execute(f"SELECT COUNT(*) as cnt FROM app_installations WHERE {base_cond} AND last_seen >= ?", (cutoff,))
             live_count = cur.fetchone()["cnt"]
 
-            cur.execute("SELECT COUNT(*) as cnt FROM app_installations WHERE last_seen >= ? AND is_watching = 1", (cutoff,))
+            cur.execute(f"SELECT COUNT(*) as cnt FROM app_installations WHERE last_seen >= ? AND is_watching = 1", (cutoff,))
             watching_count = cur.fetchone()["cnt"]
 
-            cur.execute("SELECT COUNT(*) as cnt FROM app_installations WHERE last_seen >= ?", (today_start,))
+            cur.execute(f"SELECT COUNT(*) as cnt FROM app_installations WHERE {base_cond} AND last_seen >= ?", (today_start,))
             today_count = cur.fetchone()["cnt"]
 
-            # Aggregate country statistics across ALL users in database
-            cur.execute("""
+            # Aggregate country statistics across watching users
+            cur.execute(f"""
                 SELECT CASE WHEN country != '' AND country IS NOT NULL THEN country ELSE 'Unknown' END as c_name,
                        CASE WHEN country_code != '' AND country_code IS NOT NULL THEN country_code ELSE '' END as c_code,
                        COUNT(*) as cnt
                 FROM app_installations
+                WHERE {base_cond}
                 GROUP BY c_name, c_code
                 ORDER BY cnt DESC
             """)
@@ -1897,16 +2000,17 @@ def get_app_users_list(limit: int = 5000, country_filter: str = ""):
                     "count": crow["cnt"]
                 })
 
-            query = """
+            query = f"""
                 SELECT device_id, ip, device_model, os_version, app_version,
                        first_seen, session_start, last_seen, daily_active_seconds,
-                       current_watching, watching_detail_path, is_watching,
+                       current_watching, watching_detail_path, is_watching, has_watched, last_watched_title,
                        country, country_code
                 FROM app_installations
+                WHERE {base_cond}
             """
             params = []
             if country_filter and country_filter.lower() not in ("all", "*"):
-                query += " WHERE LOWER(country) = LOWER(?) OR LOWER(country_code) = LOWER(?)"
+                query += " AND (LOWER(country) = LOWER(?) OR LOWER(country_code) = LOWER(?))"
                 params.extend([country_filter, country_filter])
 
             query += " ORDER BY last_seen DESC"
@@ -1927,6 +2031,11 @@ def get_app_users_list(limit: int = 5000, country_filter: str = ""):
                 if not c_name and row["ip"] in _ip_country_cache:
                     c_name, c_code = _ip_country_cache[row["ip"]]
 
+                eff_title = str(row["current_watching"] or "").strip()
+                last_title = str(row["last_watched_title"] if "last_watched_title" in row.keys() else "") or ""
+                if eff_title in ("", "Browsing Site", "Browsing Homepage", "Browsing", "Searching Movies", "Live TV", "Live Sports"):
+                    eff_title = last_title or eff_title
+
                 users.append({
                     "device_id": dev_id,
                     "ip": row["ip"] or "",
@@ -1938,7 +2047,7 @@ def get_app_users_list(limit: int = 5000, country_filter: str = ""):
                     "session_start": row["session_start"] or last,
                     "last_seen": last,
                     "daily_active_seconds": int(row["daily_active_seconds"] or 0),
-                    "current_watching": row["current_watching"] or "",
+                    "current_watching": eff_title,
                     "watching_detail_path": row["watching_detail_path"] or "",
                     "is_watching": (row["is_watching"] == 1 and is_online),
                     "is_online": is_online,
@@ -2277,8 +2386,8 @@ def get_brand_config(host: str = "") -> dict:
             "name_html": 'NX<span>LY</span>',
             "domain": "nxly.online",
             "full_url": "https://nxly.online",
-            "favicon": "/favicon-nxly.svg",
-            "logo_icon": '<span class="logo-nx-glyph">NX</span>',
+            "favicon": "/favicon.png",
+            "logo_icon": '<img src="/favicon.png" alt="NXLY" style="width:28px;height:28px;border-radius:6px;object-fit:cover;vertical-align:middle;">',
             "by_brand": "By NXLY"
         }
     return {
@@ -2286,8 +2395,8 @@ def get_brand_config(host: str = "") -> dict:
         "name_html": 'Stream<span>fit</span>',
         "domain": "streamfit.ehealthfinder.com",
         "full_url": "https://streamfit.ehealthfinder.com",
-        "favicon": "/favicon.svg",
-        "logo_icon": '<i class="fa-solid fa-play"></i>',
+        "favicon": "/favicon.png",
+        "logo_icon": '<img src="/favicon.png" alt="Streamfit" style="width:28px;height:28px;border-radius:6px;object-fit:cover;vertical-align:middle;">',
         "by_brand": "By Streamfit"
     }
 

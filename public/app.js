@@ -2223,10 +2223,61 @@ async function initWatchPage() {
         }
     });
 
+    let _webHeartbeatTimer = null;
+    function sendWebWatchHeartbeat(isPlaying = true) {
+        try {
+            let devId = localStorage.getItem("streamfit_web_device_id");
+            if (!devId) {
+                devId = "web_" + Math.random().toString(36).substring(2, 14);
+                localStorage.setItem("streamfit_web_device_id", devId);
+            }
+            let currentTitle = "";
+            if (state.selectedSubject) {
+                const isTv = state.selectedSubject.subjectType === 2 || (state.selectedSubject.seNum && state.selectedSubject.seNum > 0);
+                if (isTv) {
+                    const se = state.playingSeason || state.selectedSeason || 1;
+                    const ep = state.playingEpisode || state.selectedEpisode || 1;
+                    currentTitle = `${state.selectedSubject.title} - S${se}E${String(ep).padStart(2, '0')}`;
+                } else {
+                    currentTitle = state.selectedSubject.title;
+                }
+            }
+            if (!currentTitle) {
+                const el = document.getElementById("playerMediaTitle") || document.getElementById("watchMetaTitle");
+                currentTitle = el ? el.textContent.trim() : "Watching Video";
+            }
+
+            const pathParts = window.location.pathname.split("/");
+            const slug = decodeURIComponent(pathParts[pathParts.length - 1] || "");
+
+            fetch('/api/app/heartbeat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    device_id: devId,
+                    device_model: /Mobi|Android/i.test(navigator.userAgent) ? "Android Phone (Web)" : (navigator.userAgent.includes("iPhone") ? "iPhone (Web)" : "PC (Chrome)"),
+                    os_version: navigator.platform || "Web",
+                    app_version: "Web",
+                    current_watching: currentTitle,
+                    detail_path: slug,
+                    is_watching: isPlaying ? "1" : "0"
+                })
+            }).catch(() => {});
+        } catch(e) {}
+    }
+
     playerInstance.on('seeking', showLoader);
     playerInstance.on('seeked', hideLoader);
     playerInstance.on('playing', hideLoader);
     playerInstance.on('playing', () => {
+        sendWebWatchHeartbeat(true);
+        if (!_webHeartbeatTimer) {
+            _webHeartbeatTimer = setInterval(() => {
+                if (playerInstance && !playerInstance.paused) {
+                    sendWebWatchHeartbeat(true);
+                }
+            }, 25000);
+        }
         if (state.pendingResumeTime !== null) {
             const seekTime = state.pendingResumeTime;
             state.pendingResumeTime = null; // Clear immediately
@@ -2399,14 +2450,29 @@ async function initWatchPage() {
         }
     });
 
-    playerInstance.on('pause', saveProgress);
+    playerInstance.on('pause', () => {
+        saveProgress();
+        sendWebWatchHeartbeat(false);
+        if (_webHeartbeatTimer) {
+            clearInterval(_webHeartbeatTimer);
+            _webHeartbeatTimer = null;
+        }
+    });
 
-    window.addEventListener('beforeunload', saveProgress);
+    window.addEventListener('beforeunload', () => {
+        saveProgress();
+        sendWebWatchHeartbeat(false);
+    });
 
     // Auto-Play next episode event listener
     // Only trigger if video actually played (duration > 0) to avoid firing on failed streams
     playerInstance.on('ended', () => {
         saveProgress();
+        sendWebWatchHeartbeat(false);
+        if (_webHeartbeatTimer) {
+            clearInterval(_webHeartbeatTimer);
+            _webHeartbeatTimer = null;
+        }
         const currentDuration = playerInstance ? playerInstance.duration : 0;
         if (!currentDuration || currentDuration < 5) return; // not a real playback end
         const isTv = state.selectedSubject && (state.selectedSubject.seNum > 0 || state.selectedSubject.subjectType === 2);
