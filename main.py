@@ -1482,6 +1482,38 @@ def record_sponsor_ad_event(event_type: str, device_id: str, device_model: str, 
     except Exception as e:
         print(f"[AdTracker] Error saving ad event: {e}")
 
+def get_sponsor_placements_config() -> dict:
+    default_placements = {
+        "download_turbo": {"enabled": True, "url": "", "title": "3 Simultaneous Downloads Unlock"},
+        "player_start": {"enabled": True, "url": "", "title": "Video Playback Start"},
+        "player_interval": {"enabled": True, "interval_minutes": 25, "url": "", "title": "Periodic Playback Interval"},
+        "download_single": {"enabled": True, "url": "", "title": "Start Download (Single/Batch)"},
+        "livetv": {"enabled": False, "url": "", "title": "Live TV Channel Playback"},
+        "app_launch": {"enabled": False, "url": "", "title": "App Launch Interstitial"},
+    }
+    raw_json = get_sponsor_setting("placements_json", "")
+    if raw_json:
+        try:
+            saved = json.loads(raw_json)
+            for k, v in saved.items():
+                if k in default_placements and isinstance(v, dict):
+                    default_placements[k].update(v)
+        except Exception:
+            pass
+    for k in default_placements:
+        k_enabled = get_sponsor_setting(f"placement_{k}_enabled", "")
+        if k_enabled != "":
+            default_placements[k]["enabled"] = (k_enabled == "1" or str(k_enabled).lower() == "true")
+        k_url = get_sponsor_setting(f"placement_{k}_url", "")
+        if k_url:
+            default_placements[k]["url"] = k_url
+    try:
+        interval_min = int(get_sponsor_setting("playback_interval_minutes", "25"))
+        default_placements["player_interval"]["interval_minutes"] = max(1, min(180, interval_min))
+    except Exception:
+        pass
+    return default_placements
+
 def get_sponsor_ad_stats():
     now = time.time()
     today_str = datetime.datetime.fromtimestamp(now).strftime("%Y-%m-%d")
@@ -1547,6 +1579,12 @@ def get_sponsor_ad_stats():
         duration_no_click = int(get_sponsor_setting("duration_no_click", "30"))
     except Exception:
         duration_no_click = 30
+    try:
+        playback_interval_minutes = int(get_sponsor_setting("playback_interval_minutes", "25"))
+    except Exception:
+        playback_interval_minutes = 25
+    
+    placements = get_sponsor_placements_config()
     
     return {
         "code": 0,
@@ -1562,7 +1600,71 @@ def get_sponsor_ad_stats():
         "duration": duration_clicked,
         "duration_clicked": duration_clicked,
         "duration_no_click": duration_no_click,
+        "playback_interval_minutes": playback_interval_minutes,
+        "placements": placements,
         "recent_clicks": recent_clicks
+    }
+
+def get_app_popup_setting(key: str, default: str = "") -> str:
+    try:
+        with sqlite3.connect(_ACTIVE_DB_PATH, timeout=5) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS app_popup_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+            """)
+            cur = conn.cursor()
+            cur.execute("SELECT value FROM app_popup_settings WHERE key = ?", (key,))
+            row = cur.fetchone()
+            if row:
+                return str(row[0])
+    except Exception:
+        pass
+    return default
+
+def set_app_popup_setting(key: str, value: str):
+    try:
+        with sqlite3.connect(_ACTIVE_DB_PATH, timeout=5) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS app_popup_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+            """)
+            conn.execute("""
+                INSERT INTO app_popup_settings (key, value)
+                VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+            """, (key, str(value)))
+    except Exception as e:
+        print(f"[PopupSettings] Error setting {key}: {e}")
+
+def get_app_popup_config() -> dict:
+    enabled = get_app_popup_setting("enabled", "0") == "1"
+    title = get_app_popup_setting("title", "গুরুত্বপূর্ণ নোটিশ")
+    message = get_app_popup_setting("message", "NXLY Stream অ্যাপ ব্যবহারের জন্য ধন্যবাদ। সর্বশেষ আপডেট পেতে আমাদের সাথে যুক্ত থাকুন।")
+    image_url = get_app_popup_setting("image_url", "")
+    show_cancel = get_app_popup_setting("show_cancel", "1") == "1"
+    cancel_text = get_app_popup_setting("cancel_text", "বন্ধ করুন")
+    btn1_text = get_app_popup_setting("btn1_text", "টেলিগ্রাম চ্যানেলে যুক্ত হন")
+    btn1_url = get_app_popup_setting("btn1_url", "https://t.me/nxlystream")
+    btn2_enabled = get_app_popup_setting("btn2_enabled", "0") == "1"
+    btn2_text = get_app_popup_setting("btn2_text", "ওয়েবসাইট ভিজিট করুন")
+    btn2_url = get_app_popup_setting("btn2_url", "https://nxly.online")
+    return {
+        "code": 0,
+        "enabled": enabled,
+        "title": title,
+        "message": message,
+        "image_url": image_url,
+        "show_cancel": show_cancel,
+        "cancel_text": cancel_text,
+        "btn1_text": btn1_text,
+        "btn1_url": btn1_url,
+        "btn2_enabled": btn2_enabled,
+        "btn2_text": btn2_text,
+        "btn2_url": btn2_url
     }
 
 def clear_all_app_installations():
@@ -2186,6 +2288,11 @@ async def api_ad_config():
         duration_no_click = int(get_sponsor_setting("duration_no_click", "30"))
     except Exception:
         duration_no_click = 30
+    try:
+        playback_interval_minutes = int(get_sponsor_setting("playback_interval_minutes", "25"))
+    except Exception:
+        playback_interval_minutes = 25
+    placements = get_sponsor_placements_config()
     return {
         "code": 0,
         "sponsor_url": sponsor_url,
@@ -2193,11 +2300,17 @@ async def api_ad_config():
         "duration": duration_clicked,
         "duration_clicked": duration_clicked,
         "duration_no_click": duration_no_click,
+        "playback_interval_minutes": playback_interval_minutes,
+        "placements": placements,
         "dialog_title": "অটোমেটেড অ্যাড সেন্টার",
         "dialog_message": f"যেকোনো কিছুতে ক্লিক করলে {duration_clicked} সেকেন্ডে অটো প্লে হবে, না করলে {duration_no_click} সেকেন্ড অপেক্ষা করতে হবে।",
         "button_text": f"🚀 অ্যাড দেখুন ({duration_clicked}s)",
         "cancel_text": "✕ সরাসরি দেখুন"
     }
+
+@app.get("/api/app/popup")
+async def api_app_popup():
+    return get_app_popup_config()
 
 @app.get("/api/ping")
 async def api_ping(request: Request):

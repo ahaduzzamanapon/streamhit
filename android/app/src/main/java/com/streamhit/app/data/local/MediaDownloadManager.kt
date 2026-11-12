@@ -7,6 +7,7 @@ import android.os.Environment
 import android.os.StatFs
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.streamhit.app.util.SponsorAdManager
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -86,6 +87,8 @@ data class DownloadItem(
 object MediaDownloadManager {
     private const val PREF_NAME = "streamhit_downloads_pref"
     private const val KEY_DOWNLOADS = "download_items_json"
+    private const val KEY_MAX_CONCURRENT = "key_max_concurrent_downloads"
+    private const val KEY_TURBO_UNLOCKED_UNTIL = "key_turbo_unlocked_until"
     private val gson = Gson()
 
     private val downloadScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -94,7 +97,19 @@ object MediaDownloadManager {
     private val _downloadsFlow = MutableStateFlow<List<DownloadItem>>(emptyList())
     val downloadsFlow: StateFlow<List<DownloadItem>> = _downloadsFlow.asStateFlow()
 
+    private val _maxConcurrentFlow = MutableStateFlow(1)
+    val maxConcurrentFlow: StateFlow<Int> = _maxConcurrentFlow.asStateFlow()
+
     private var isInitialized = false
+    private var lastAddedTimeMs = 0L
+
+    @Synchronized
+    private fun getNextAddedTime(): Long {
+        val now = System.currentTimeMillis()
+        val time = if (now <= lastAddedTimeMs) lastAddedTimeMs + 1 else now
+        lastAddedTimeMs = time
+        return time
+    }
 
     private val okHttpClient by lazy {
         OkHttpClient.Builder()
@@ -109,6 +124,64 @@ object MediaDownloadManager {
         return context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
     }
 
+    fun isTurboUnlocked(context: Context): Boolean {
+        if (!SponsorAdManager.isEnabled || !SponsorAdManager.isPlacementEnabled(SponsorAdManager.PLACEMENT_DOWNLOAD_TURBO)) return true
+        val until = getPrefs(context).getLong(KEY_TURBO_UNLOCKED_UNTIL, 0L)
+        return System.currentTimeMillis() < until
+    }
+
+    fun unlockTurbo(context: Context, durationHours: Int = 24) {
+        val until = System.currentTimeMillis() + (durationHours * 60 * 60 * 1000L)
+        getPrefs(context).edit().putLong(KEY_TURBO_UNLOCKED_UNTIL, until).apply()
+        setMaxConcurrentDownloads(context, 3)
+    }
+
+    fun getMaxConcurrentDownloads(context: Context): Int {
+        val isUnlocked = isTurboUnlocked(context)
+        val saved = getPrefs(context).getInt(KEY_MAX_CONCURRENT, 1)
+        val limit = if (saved == 3 && !isUnlocked) 1 else saved
+        if (_maxConcurrentFlow.value != limit) {
+            _maxConcurrentFlow.value = limit
+        }
+        return limit
+    }
+
+    fun setMaxConcurrentDownloads(context: Context, limit: Int) {
+        val targetLimit = if (limit == 3) 3 else 1
+        getPrefs(context).edit().putInt(KEY_MAX_CONCURRENT, targetLimit).apply()
+        _maxConcurrentFlow.value = targetLimit
+        processQueue(context.applicationContext)
+    }
+
+    fun isTurboUnlocked(context: Context): Boolean {
+        if (!SponsorAdManager.isEnabled || !SponsorAdManager.isPlacementEnabled(SponsorAdManager.PLACEMENT_DOWNLOAD_TURBO)) return true
+        val until = getPrefs(context).getLong(KEY_TURBO_UNLOCKED_UNTIL, 0L)
+        return System.currentTimeMillis() < until
+    }
+
+    fun unlockTurbo(context: Context, durationHours: Int = 24) {
+        val until = System.currentTimeMillis() + (durationHours * 60 * 60 * 1000L)
+        getPrefs(context).edit().putLong(KEY_TURBO_UNLOCKED_UNTIL, until).apply()
+        setMaxConcurrentDownloads(context, 3)
+    }
+
+    fun getMaxConcurrentDownloads(context: Context): Int {
+        val isUnlocked = isTurboUnlocked(context)
+        val saved = getPrefs(context).getInt(KEY_MAX_CONCURRENT, 1)
+        val limit = if (saved == 3 && !isUnlocked) 1 else saved
+        if (_maxConcurrentFlow.value != limit) {
+            _maxConcurrentFlow.value = limit
+        }
+        return limit
+    }
+
+    fun setMaxConcurrentDownloads(context: Context, limit: Int) {
+        val targetLimit = if (limit == 3) 3 else 1
+        getPrefs(context).edit().putInt(KEY_MAX_CONCURRENT, targetLimit).apply()
+        _maxConcurrentFlow.value = targetLimit
+        processQueue(context.applicationContext)
+    }
+
     @Synchronized
     fun getAllDownloads(context: Context): List<DownloadItem> {
         val list = try {
@@ -120,6 +193,7 @@ object MediaDownloadManager {
         }
         if (!isInitialized) {
             _downloadsFlow.value = list
+            _maxConcurrentFlow.value = getMaxConcurrentDownloads(context)
             isInitialized = true
         }
         return list
@@ -169,6 +243,38 @@ object MediaDownloadManager {
     }
 
     @Synchronized
+    fun processQueue(context: Context) {
+        val items = (_downloadsFlow.value.ifEmpty { getAllDownloads(context) }).toMutableList()
+        val maxAllowed = getMaxConcurrentDownloads(context)
+
+        // Count how many items are DOWNLOADING and actively have running coroutine jobs
+        val activeCount = items.count { it.status == DownloadStatus.DOWNLOADING && activeJobs.containsKey(it.downloadId) }
+        val slotsAvailable = maxAllowed - activeCount
+
+        if (slotsAvailable > 0) {
+            val pendingCandidates = items.filter { it.status == DownloadStatus.PENDING }
+                .sortedBy { it.addedTime }
+                .take(slotsAvailable)
+
+            if (pendingCandidates.isNotEmpty()) {
+                var changed = false
+                for (pending in pendingCandidates) {
+                    val idx = items.indexOfFirst { it.downloadId == pending.downloadId }
+                    if (idx >= 0) {
+                        items[idx] = items[idx].copy(status = DownloadStatus.DOWNLOADING)
+                        changed = true
+                        val targetFile = File(items[idx].localFilePath)
+                        executeDownload(context.applicationContext, items[idx], targetFile)
+                    }
+                }
+                if (changed) {
+                    saveDownloads(context, items)
+                }
+            }
+        }
+    }
+
+    @Synchronized
     fun startDownload(
         context: Context,
         subjectId: String,
@@ -209,12 +315,12 @@ object MediaDownloadManager {
                 quality = quality,
                 downloadUrl = fullDownloadUrl,
                 localFilePath = targetFile.absolutePath,
-                status = DownloadStatus.DOWNLOADING,
+                status = DownloadStatus.PENDING,
                 isSeries = isSeries,
                 seriesTitle = if (seriesTitle.isNotBlank()) seriesTitle else title,
                 seasonNum = seasonNum,
                 episodeNum = episodeNum,
-                addedTime = System.currentTimeMillis()
+                addedTime = getNextAddedTime()
             )
 
             val list = (_downloadsFlow.value.ifEmpty { getAllDownloads(context) }).toMutableList()
@@ -223,10 +329,10 @@ object MediaDownloadManager {
             } else {
                 list.removeAll { it.subjectId == subjectId && it.quality == quality }
             }
-            list.add(0, item)
+            list.add(item)
             saveDownloads(context, list)
 
-            executeDownload(context.applicationContext, item, targetFile)
+            processQueue(context.applicationContext)
             try {
                 com.streamhit.app.service.DownloadForegroundService.startService(context.applicationContext)
             } catch (_: Exception) {}
@@ -315,6 +421,7 @@ object MediaDownloadManager {
                 updateStatus(context, item.downloadId, DownloadStatus.FAILED)
             } finally {
                 activeJobs.remove(item.downloadId)
+                processQueue(context.applicationContext)
             }
         }
         activeJobs[item.downloadId] = job
@@ -378,16 +485,19 @@ object MediaDownloadManager {
 
     @Synchronized
     fun resumeDownload(context: Context, downloadId: Long) {
-        val items = _downloadsFlow.value.ifEmpty { getAllDownloads(context) }
-        val target = items.firstOrNull { it.downloadId == downloadId } ?: return
+        val items = (_downloadsFlow.value.ifEmpty { getAllDownloads(context) }).toMutableList()
+        val idx = items.indexOfFirst { it.downloadId == downloadId }
+        if (idx < 0) return
+        val target = items[idx]
         if (target.status == DownloadStatus.COMPLETED) return
 
         activeJobs[downloadId]?.cancel()
-        target.status = DownloadStatus.DOWNLOADING
-        updateItemProgress(context, target, forcePersist = true)
+        activeJobs.remove(downloadId)
 
-        val targetFile = File(target.localFilePath)
-        executeDownload(context.applicationContext, target, targetFile)
+        items[idx] = target.copy(status = DownloadStatus.PENDING)
+        saveDownloads(context, items)
+
+        processQueue(context.applicationContext)
         try {
             com.streamhit.app.service.DownloadForegroundService.startService(context.applicationContext)
         } catch (_: Exception) {}
@@ -398,6 +508,7 @@ object MediaDownloadManager {
         activeJobs[downloadId]?.cancel()
         activeJobs.remove(downloadId)
         updateStatus(context, downloadId, DownloadStatus.PAUSED)
+        processQueue(context.applicationContext)
     }
 
     @Synchronized
@@ -405,17 +516,19 @@ object MediaDownloadManager {
         val items = (_downloadsFlow.value.ifEmpty { getAllDownloads(context) }).toMutableList()
         var changed = false
 
-        for (item in items) {
+        for (i in items.indices) {
+            val item = items[i]
             val file = File(item.localFilePath)
             if (item.status == DownloadStatus.COMPLETED) {
                 if (!file.exists() || file.length() == 0L) {
-                    item.status = DownloadStatus.FAILED
+                    items[i] = item.copy(status = DownloadStatus.FAILED)
                     changed = true
                 }
             } else if (item.status == DownloadStatus.DOWNLOADING) {
                 if (!activeJobs.containsKey(item.downloadId)) {
-                    // Re-attach active job if it was downloading but app restarted
-                    executeDownload(context.applicationContext, item, file)
+                    // Reset to PENDING so processQueue can cleanly manage concurrency
+                    items[i] = item.copy(status = DownloadStatus.PENDING)
+                    changed = true
                 }
             }
         }
@@ -425,6 +538,8 @@ object MediaDownloadManager {
         } else {
             _downloadsFlow.value = items
         }
+
+        processQueue(context.applicationContext)
         return items
     }
 
@@ -442,6 +557,7 @@ object MediaDownloadManager {
                 items.remove(target)
                 saveDownloads(context, items)
             }
+            processQueue(context.applicationContext)
         } catch (e: Exception) {
             e.printStackTrace()
         }

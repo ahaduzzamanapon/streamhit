@@ -1038,7 +1038,7 @@ fun DetailsScreen(
                     onDismiss = { showDownloadSheet = false },
                     onDownloadSelected = { res ->
                         showDownloadSheet = false
-                        if (SponsorAdManager.isEnabled) {
+                        if (SponsorAdManager.isPlacementEnabled(SponsorAdManager.PLACEMENT_DOWNLOAD_SINGLE)) {
                             pendingDownloadRes = res
                             showDownloadSponsorDialog = true
                         } else {
@@ -1140,7 +1140,7 @@ fun DetailsScreen(
                 videoTitle = "${detail?.title ?: ""} (${pendingDownloadRes?.displayResolution})",
                 onSupportClick = {
                     val intent = Intent(context, SponsorWebViewActivity::class.java).apply {
-                        putExtra("EXTRA_TARGET_URL", SponsorAdManager.sponsorUrl)
+                        putExtra("EXTRA_TARGET_URL", SponsorAdManager.getPlacementUrl(SponsorAdManager.PLACEMENT_DOWNLOAD_SINGLE))
                         putExtra("EXTRA_IS_DOWNLOAD_AD", true)
                     }
                     downloadSponsorLauncher.launch(intent)

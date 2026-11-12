@@ -972,6 +972,7 @@ async def admin_save_ad_config(request: Request):
     check_admin_auth(request)
     data = await request.json()
     from main import set_sponsor_setting
+    import json
     if "sponsor_url" in data:
         set_sponsor_setting("sponsor_url", str(data["sponsor_url"]).strip())
     if "enabled" in data:
@@ -996,6 +997,60 @@ async def admin_save_ad_config(request: Request):
             set_sponsor_setting("duration_no_click", str(dur_nc))
         except Exception:
             pass
+    if "playback_interval_minutes" in data:
+        try:
+            p_int = max(1, min(180, int(data["playback_interval_minutes"])))
+            set_sponsor_setting("playback_interval_minutes", str(p_int))
+        except Exception:
+            pass
+    if "placements" in data and isinstance(data["placements"], dict):
+        try:
+            set_sponsor_setting("placements_json", json.dumps(data["placements"]))
+            for k, v in data["placements"].items():
+                if isinstance(v, dict):
+                    if "enabled" in v:
+                        set_sponsor_setting(f"placement_{k}_enabled", "1" if v["enabled"] else "0")
+                    if "url" in v:
+                        set_sponsor_setting(f"placement_{k}_url", str(v["url"]).strip())
+                    if "interval_minutes" in v:
+                        set_sponsor_setting(f"placement_{k}_interval", str(v["interval_minutes"]))
+        except Exception as e:
+            print(f"[AdminAdConfig] Placements save error: {e}")
+    return {"code": 0, "status": "ok"}
+
+@router.get("/api/admin/popup")
+async def admin_get_popup(request: Request):
+    check_admin_auth(request)
+    from main import get_app_popup_config
+    return get_app_popup_config()
+
+@router.post("/api/admin/popup")
+async def admin_save_popup(request: Request):
+    check_admin_auth(request)
+    data = await request.json()
+    from main import set_app_popup_setting
+    if "enabled" in data:
+        set_app_popup_setting("enabled", "1" if data["enabled"] else "0")
+    if "title" in data:
+        set_app_popup_setting("title", str(data["title"]).strip())
+    if "message" in data:
+        set_app_popup_setting("message", str(data["message"]).strip())
+    if "image_url" in data:
+        set_app_popup_setting("image_url", str(data["image_url"]).strip())
+    if "show_cancel" in data:
+        set_app_popup_setting("show_cancel", "1" if data["show_cancel"] else "0")
+    if "cancel_text" in data:
+        set_app_popup_setting("cancel_text", str(data["cancel_text"]).strip())
+    if "btn1_text" in data:
+        set_app_popup_setting("btn1_text", str(data["btn1_text"]).strip())
+    if "btn1_url" in data:
+        set_app_popup_setting("btn1_url", str(data["btn1_url"]).strip())
+    if "btn2_enabled" in data:
+        set_app_popup_setting("btn2_enabled", "1" if data["btn2_enabled"] else "0")
+    if "btn2_text" in data:
+        set_app_popup_setting("btn2_text", str(data["btn2_text"]).strip())
+    if "btn2_url" in data:
+        set_app_popup_setting("btn2_url", str(data["btn2_url"]).strip())
     return {"code": 0, "status": "ok"}
 
 @router.get("/api/admin/active-users")

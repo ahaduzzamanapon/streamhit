@@ -8,8 +8,17 @@ import com.streamhit.app.data.api.RetrofitClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.json.JSONObject
+import java.util.concurrent.ConcurrentHashMap
 
 object SponsorAdManager {
+
+    const val PLACEMENT_DOWNLOAD_TURBO = "download_turbo"
+    const val PLACEMENT_PLAYER_START = "player_start"
+    const val PLACEMENT_PLAYER_INTERVAL = "player_interval"
+    const val PLACEMENT_DOWNLOAD_SINGLE = "download_single"
+    const val PLACEMENT_LIVETV = "livetv"
+    const val PLACEMENT_APP_LAUNCH = "app_launch"
 
     private const val PREFS_NAME = "streamhit_sponsor_ad_prefs"
     private const val KEY_ADMIN_SPONSOR_URL = "admin_sponsor_url"
@@ -17,6 +26,8 @@ object SponsorAdManager {
     private const val KEY_AD_DURATION = "admin_ad_duration"
     private const val KEY_DURATION_CLICKED = "admin_duration_clicked"
     private const val KEY_DURATION_NO_CLICK = "admin_duration_no_click"
+    private const val KEY_PLAYBACK_INTERVAL_MINUTES = "admin_playback_interval_minutes"
+    private const val KEY_PLACEMENTS_JSON = "admin_placements_json"
     private const val KEY_DIALOG_TITLE = "admin_dialog_title"
     private const val KEY_DIALOG_MESSAGE = "admin_dialog_message"
     private const val KEY_BUTTON_TEXT = "admin_button_text"
@@ -25,11 +36,23 @@ object SponsorAdManager {
     // Initial fallback only if phone is completely offline on first launch
     private const val FALLBACK_URL = "https://uplcm.com/4/12189723"
 
+    data class PlacementConfig(
+        val enabled: Boolean = true,
+        val url: String = "",
+        val intervalMinutes: Int = 25
+    )
+
+    private val placementsMap = ConcurrentHashMap<String, PlacementConfig>()
+
     @Volatile
     var isSessionUnlocked: Boolean = false
 
     @Volatile
     var lastAdUnlockTimeMs: Long = 0L
+
+    @Volatile
+    var playbackIntervalMinutes: Int = 25
+        private set
 
     @Volatile
     var adDurationSeconds: Int = 10
@@ -45,14 +68,41 @@ object SponsorAdManager {
 
     /**
      * Checks if ad is currently unlocked.
-     * When unlocked, allows 30 minutes of uninterrupted playback before prompting again.
+     * When unlocked, allows playback interval (default 25 min) of uninterrupted playback before prompting again.
      */
     fun isAdUnlocked(): Boolean {
+        return isPlaybackIntervalUnlocked()
+    }
+
+    fun isPlaybackIntervalUnlocked(): Boolean {
         if (!isEnabled) return true
+        if (!isPlacementEnabled(PLACEMENT_PLAYER_INTERVAL)) return true
         if (!isSessionUnlocked) return false
         val elapsed = System.currentTimeMillis() - lastAdUnlockTimeMs
-        val intervalMs = 30 * 60 * 1000L // 30 minutes
+        val intervalMs = getPlaybackIntervalMinutes() * 60 * 1000L
         return elapsed < intervalMs
+    }
+
+    fun isPlacementEnabled(placement: String): Boolean {
+        if (!isEnabled) return false
+        val cfg = placementsMap[placement]
+        return cfg?.enabled ?: true
+    }
+
+    fun getPlacementUrl(placement: String): String {
+        val customUrl = placementsMap[placement]?.url?.trim()
+        if (!customUrl.isNullOrBlank() && (customUrl.startsWith("http://") || customUrl.startsWith("https://"))) {
+            return customUrl
+        }
+        return sponsorUrl.ifBlank { FALLBACK_URL }
+    }
+
+    fun getPlaybackIntervalMinutes(placement: String = PLACEMENT_PLAYER_INTERVAL): Int {
+        val cfg = placementsMap[placement]
+        if (cfg != null && cfg.intervalMinutes in 1..180) {
+            return cfg.intervalMinutes
+        }
+        return playbackIntervalMinutes.coerceIn(1, 180)
     }
 
     /**
@@ -101,6 +151,26 @@ object SponsorAdManager {
             durationClickedSeconds = prefs.getInt(KEY_DURATION_CLICKED, prefs.getInt(KEY_AD_DURATION, 10))
             durationNoClickSeconds = prefs.getInt(KEY_DURATION_NO_CLICK, 30)
             adDurationSeconds = durationClickedSeconds
+            playbackIntervalMinutes = prefs.getInt(KEY_PLAYBACK_INTERVAL_MINUTES, 25).coerceIn(1, 180)
+
+            val savedPlacementsJson = prefs.getString(KEY_PLACEMENTS_JSON, null)
+            if (!savedPlacementsJson.isNullOrBlank()) {
+                try {
+                    val rootObj = JSONObject(savedPlacementsJson)
+                    val keys = rootObj.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        val obj = rootObj.optJSONObject(key)
+                        if (obj != null) {
+                            val enabled = obj.optBoolean("enabled", true)
+                            val url = obj.optString("url", "")
+                            val interval = obj.optInt("interval_minutes", 25)
+                            placementsMap[key] = PlacementConfig(enabled, url, interval)
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+
             prefs.getString(KEY_DIALOG_TITLE, null)?.let { if (it.isNotBlank()) dialogTitle = it }
             prefs.getString(KEY_DIALOG_MESSAGE, null)?.let { if (it.isNotBlank()) dialogMessage = it }
             prefs.getString(KEY_BUTTON_TEXT, null)?.let { if (it.isNotBlank()) buttonText = it }
@@ -169,6 +239,48 @@ object SponsorAdManager {
                         }
                     }
 
+                    val remotePlaybackInterval = body?.get("playback_interval_minutes")
+                    if (remotePlaybackInterval != null) {
+                        val parsedInterval = when (remotePlaybackInterval) {
+                            is Number -> remotePlaybackInterval.toInt()
+                            is String -> remotePlaybackInterval.toDoubleOrNull()?.toInt() ?: 25
+                            else -> 25
+                        }
+                        if (parsedInterval in 1..180) {
+                            playbackIntervalMinutes = parsedInterval
+                        }
+                    }
+
+                    var placementsJsonStr: String? = null
+                    val remotePlacements = body?.get("placements")
+                    if (remotePlacements is Map<*, *>) {
+                        val jsonPlacements = JSONObject()
+                        for ((k, v) in remotePlacements) {
+                            val key = k?.toString() ?: continue
+                            if (v is Map<*, *>) {
+                                val enabled = when (val en = v["enabled"]) {
+                                    is Boolean -> en
+                                    is Number -> en.toInt() == 1
+                                    is String -> en.equals("true", ignoreCase = true) || en == "1"
+                                    else -> true
+                                }
+                                val url = v["url"]?.toString()?.trim() ?: ""
+                                val interval = when (val iv = v["interval_minutes"]) {
+                                    is Number -> iv.toInt()
+                                    is String -> iv.toDoubleOrNull()?.toInt() ?: 25
+                                    else -> 25
+                                }
+                                placementsMap[key] = PlacementConfig(enabled, url, interval)
+                                val obj = JSONObject()
+                                obj.put("enabled", enabled)
+                                obj.put("url", url)
+                                obj.put("interval_minutes", interval)
+                                jsonPlacements.put(key, obj)
+                            }
+                        }
+                        placementsJsonStr = jsonPlacements.toString()
+                    }
+
                     val rTitle = body?.get("dialog_title")?.toString()?.trim()
                     if (!rTitle.isNullOrBlank()) dialogTitle = rTitle
 
@@ -189,17 +301,21 @@ object SponsorAdManager {
                     context?.let { ctx ->
                         try {
                             val prefs = ctx.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                            prefs.edit()
+                            val editor = prefs.edit()
                                 .putString(KEY_ADMIN_SPONSOR_URL, sponsorUrl)
                                 .putBoolean(KEY_IS_ENABLED, isEnabled)
                                 .putInt(KEY_AD_DURATION, durationClickedSeconds)
                                 .putInt(KEY_DURATION_CLICKED, durationClickedSeconds)
                                 .putInt(KEY_DURATION_NO_CLICK, durationNoClickSeconds)
+                                .putInt(KEY_PLAYBACK_INTERVAL_MINUTES, playbackIntervalMinutes)
                                 .putString(KEY_DIALOG_TITLE, dialogTitle)
                                 .putString(KEY_DIALOG_MESSAGE, dialogMessage)
                                 .putString(KEY_BUTTON_TEXT, buttonText)
                                 .putString(KEY_CANCEL_TEXT, cancelText)
-                                .apply()
+                            if (placementsJsonStr != null) {
+                                editor.putString(KEY_PLACEMENTS_JSON, placementsJsonStr)
+                            }
+                            editor.apply()
                         } catch (_: Exception) {}
                     }
                 }

@@ -58,7 +58,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import com.streamhit.app.service.AppFirebaseMessagingService
 import com.streamhit.app.ui.components.AppShareDialog
 import com.streamhit.app.ui.components.SponsorSupportDialog
+import com.streamhit.app.ui.components.AppNoticeDialog
 import com.streamhit.app.util.SponsorAdManager
+import com.streamhit.app.util.AppNoticePopupManager
+import com.streamhit.app.ui.splash.SplashScreen
 import com.streamhit.app.util.DeviceUtils
 import com.streamhit.app.ui.tv.TvPortalScreen
 import com.streamhit.app.ui.theme.*
@@ -80,6 +83,7 @@ class MainActivity : ComponentActivity() {
         AppAnalyticsManager.getDeviceId(this)
         AppAnalyticsManager.startHeartbeat(this, lifecycleScope)
         SponsorAdManager.init(this)
+        AppNoticePopupManager.init(this)
 
         // Handle incoming deep link or notification intent
         handleIncomingIntent(intent)
@@ -99,38 +103,49 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             StreamfitTheme {
-                MainAppScreen(
-                    repository = repository,
-                    pendingDeepLink = pendingDeepLink.value,
-                    onClearDeepLink = { pendingDeepLink.value = null },
-                    pendingShareDialog = pendingShareDialog.value,
-                    onClearShareDialog = { pendingShareDialog.value = false },
-                    onPlayVideo = { url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPositionMs, dubLanguage, dubSubjectId, dubDetailPath, dubName ->
-                        val intent = Intent(this, PlayerActivity::class.java).apply {
-                            putExtra("EXTRA_STREAM_URL", url)
-                            putExtra("EXTRA_VIDEO_TITLE", title)
-                            putExtra("EXTRA_SUBJECT_ID", subjectId)
-                            putExtra("EXTRA_DETAIL_PATH", detailPath)
-                            putExtra("EXTRA_COVER_URL", coverUrl)
-                            putExtra("EXTRA_SEASON_NUM", seasonNum)
-                            putExtra("EXTRA_EPISODE_NUM", episodeNum)
-                            putExtra("EXTRA_START_POSITION_MS", startPositionMs)
-                            if (!dubLanguage.isNullOrBlank()) putExtra("EXTRA_DUB_LANGUAGE", dubLanguage)
-                            if (!dubSubjectId.isNullOrBlank()) putExtra("EXTRA_DUB_SUBJECT_ID", dubSubjectId)
-                            if (!dubDetailPath.isNullOrBlank()) putExtra("EXTRA_DUB_DETAIL_PATH", dubDetailPath)
-                            if (!dubName.isNullOrBlank()) putExtra("EXTRA_DUB_NAME", dubName)
+                var showSplash by remember { mutableStateOf(true) }
+
+                if (showSplash) {
+                    SplashScreen(
+                        onSplashFinished = {
+                            showSplash = false
                         }
-                        startActivity(intent)
-                    }
-                )
+                    )
+                } else {
+                    MainAppScreen(
+                        repository = repository,
+                        pendingDeepLink = pendingDeepLink.value,
+                        onClearDeepLink = { pendingDeepLink.value = null },
+                        pendingShareDialog = pendingShareDialog.value,
+                        onClearShareDialog = { pendingShareDialog.value = false },
+                        onPlayVideo = { url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPositionMs, dubLanguage, dubSubjectId, dubDetailPath, dubName ->
+                            val intent = Intent(this, PlayerActivity::class.java).apply {
+                                putExtra("EXTRA_STREAM_URL", url)
+                                putExtra("EXTRA_VIDEO_TITLE", title)
+                                putExtra("EXTRA_SUBJECT_ID", subjectId)
+                                putExtra("EXTRA_DETAIL_PATH", detailPath)
+                                putExtra("EXTRA_COVER_URL", coverUrl)
+                                putExtra("EXTRA_SEASON_NUM", seasonNum)
+                                putExtra("EXTRA_EPISODE_NUM", episodeNum)
+                                putExtra("EXTRA_START_POSITION_MS", startPositionMs)
+                                if (!dubLanguage.isNullOrBlank()) putExtra("EXTRA_DUB_LANGUAGE", dubLanguage)
+                                if (!dubSubjectId.isNullOrBlank()) putExtra("EXTRA_DUB_SUBJECT_ID", dubSubjectId)
+                                if (!dubDetailPath.isNullOrBlank()) putExtra("EXTRA_DUB_DETAIL_PATH", dubDetailPath)
+                                if (!dubName.isNullOrBlank()) putExtra("EXTRA_DUB_NAME", dubName)
+                            }
+                            startActivity(intent)
+                        }
+                    )
+                }
             }
         }
     }
 
     override fun onResume() {
         super.onResume()
-        // Synchronize latest dynamic sponsor settings from admin panel
+        // Synchronize latest dynamic sponsor settings and in-app popup from admin panel
         SponsorAdManager.fetchRemoteConfig(this)
+        AppNoticePopupManager.fetchRemoteConfig(this)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -222,7 +237,8 @@ data class PendingPlayRequest(
     val dubLanguage: String?,
     val dubSubjectId: String?,
     val dubDetailPath: String?,
-    val dubName: String?
+    val dubName: String?,
+    val placement: String = SponsorAdManager.PLACEMENT_PLAYER_START
 )
 
 @Composable
@@ -239,13 +255,42 @@ fun MainAppScreen(
     var lastBackPressedTime by remember { mutableLongStateOf(0L) }
     var showAppShareModal by remember { mutableStateOf(false) }
 
+    var showNoticePopup by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        if (!AppNoticePopupManager.hasShownInCurrentSession && AppNoticePopupManager.isEnabled) {
+            AppNoticePopupManager.hasShownInCurrentSession = true
+            showNoticePopup = true
+        }
+    }
+
     var pendingPlayRequest by remember { mutableStateOf<PendingPlayRequest?>(null) }
+    var showAppLaunchSponsorDialog by remember { mutableStateOf(false) }
+    var hasCheckedAppLaunchAd by remember { mutableStateOf(false) }
+
+    val appLaunchSponsorLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            SponsorAdManager.recordAdUnlock()
+        }
+        showAppLaunchSponsorDialog = false
+    }
+
+    LaunchedEffect(Unit) {
+        if (!hasCheckedAppLaunchAd) {
+            hasCheckedAppLaunchAd = true
+            if (SponsorAdManager.isPlacementEnabled(SponsorAdManager.PLACEMENT_APP_LAUNCH) && !SponsorAdManager.isPlaybackIntervalUnlocked()) {
+                showAppLaunchSponsorDialog = true
+            }
+        }
+    }
 
     val sponsorActivityLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == android.app.Activity.RESULT_OK) {
-            // Successfully completed 15 seconds on sponsor page!
+            // Successfully completed sponsor visit!
             SponsorAdManager.recordAdUnlock()
             pendingPlayRequest?.let { toPlay ->
                 pendingPlayRequest = null
@@ -256,16 +301,16 @@ fun MainAppScreen(
                 )
             }
         } else {
-            // User backed out before 15 seconds: session remains locked!
+            // User backed out: session remains locked!
         }
     }
 
     val triggerPlayWithSponsorCheck: (String, String, String, String, String, Int, Int, Long, String?, String?, String?, String?) -> Unit = { url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPositionMs, dubLanguage, dubSubjectId, dubDetailPath, dubName ->
-        if (!SponsorAdManager.isEnabled || SponsorAdManager.isAdUnlocked()) {
-            // If sponsor ads disabled in admin OR ad currently unlocked for 30 minutes: play directly!
+        if (!SponsorAdManager.isPlacementEnabled(SponsorAdManager.PLACEMENT_PLAYER_START) || SponsorAdManager.isPlaybackIntervalUnlocked()) {
+            // If sponsor ads disabled in admin OR ad currently unlocked: play directly!
             onPlayVideo(url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPositionMs, dubLanguage, dubSubjectId, dubDetailPath, dubName)
         } else {
-            // Ad locked: prompt user to complete 15-second sponsor visit to unlock
+            // Ad locked: prompt user to complete sponsor visit to unlock
             pendingPlayRequest = PendingPlayRequest(
                 url = url,
                 title = title,
@@ -278,7 +323,8 @@ fun MainAppScreen(
                 dubLanguage = dubLanguage,
                 dubSubjectId = dubSubjectId,
                 dubDetailPath = dubDetailPath,
-                dubName = dubName
+                dubName = dubName,
+                placement = SponsorAdManager.PLACEMENT_PLAYER_START
             )
         }
     }
@@ -593,7 +639,25 @@ fun MainAppScreen(
                         )
                         Screen.LiveTv -> LiveTvScreen(
                             onPlayStream = { url, title ->
-                                triggerPlayWithSponsorCheck(url, title, "", "", "", 1, 1, 0L, null, null, null, null)
+                                if (SponsorAdManager.isPlacementEnabled(SponsorAdManager.PLACEMENT_LIVETV) && !SponsorAdManager.isPlaybackIntervalUnlocked()) {
+                                    pendingPlayRequest = PendingPlayRequest(
+                                        url = url,
+                                        title = title,
+                                        subjectId = "",
+                                        detailPath = "",
+                                        coverUrl = "",
+                                        seasonNum = 1,
+                                        episodeNum = 1,
+                                        startPositionMs = 0L,
+                                        dubLanguage = null,
+                                        dubSubjectId = null,
+                                        dubDetailPath = null,
+                                        dubName = null,
+                                        placement = SponsorAdManager.PLACEMENT_LIVETV
+                                    )
+                                } else {
+                                    onPlayVideo(url, title, "", "", "", 1, 1, 0L, null, null, null, null)
+                                }
                             }
                         )
                         Screen.Explore -> ExploreScreen(
@@ -939,6 +1003,35 @@ fun MainAppScreen(
                 AppShareDialog(onDismiss = { showAppShareModal = false })
             }
 
+            // In-App Notice Pop-up (Admin controlled)
+            if (showNoticePopup) {
+                AppNoticeDialog(
+                    onDismiss = {
+                        showNoticePopup = false
+                    }
+                )
+            }
+
+            // App Launch Sponsor Dialog (if enabled in admin)
+            if (showAppLaunchSponsorDialog) {
+                LaunchedEffect(Unit) {
+                    SponsorAdManager.recordSponsorEvent(context, "impression", "App Launch")
+                }
+                SponsorSupportDialog(
+                    videoTitle = "NXLY Stream VIP Access",
+                    onSupportClick = {
+                        val sponsorIntent = Intent(context, SponsorWebViewActivity::class.java).apply {
+                            putExtra("EXTRA_TARGET_URL", SponsorAdManager.getPlacementUrl(SponsorAdManager.PLACEMENT_APP_LAUNCH))
+                        }
+                        appLaunchSponsorLauncher.launch(sponsorIntent)
+                    },
+                    onCancel = {
+                        showAppLaunchSponsorDialog = false
+                        SponsorAdManager.recordSponsorEvent(context, "cancel", "App Launch")
+                    }
+                )
+            }
+
             // Mandatory Sponsor Unlock Dialog for this session
             if (pendingPlayRequest != null) {
                 val req = pendingPlayRequest!!
@@ -949,7 +1042,7 @@ fun MainAppScreen(
                     videoTitle = req.title,
                     onSupportClick = {
                         val sponsorIntent = Intent(context, SponsorWebViewActivity::class.java).apply {
-                            putExtra("EXTRA_TARGET_URL", SponsorAdManager.sponsorUrl)
+                            putExtra("EXTRA_TARGET_URL", SponsorAdManager.getPlacementUrl(req.placement))
                         }
                         sponsorActivityLauncher.launch(sponsorIntent)
                     },

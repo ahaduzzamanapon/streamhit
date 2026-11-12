@@ -100,7 +100,19 @@ fun SeriesDownloadBottomSheet(
 
     var isBatchDownloading by remember { mutableStateOf(false) }
     var showDownloadSponsorDialog by remember { mutableStateOf(false) }
+    var showTurboUnlockDialog by remember { mutableStateOf(false) }
     var showBgPermissionDialog by remember { mutableStateOf(false) }
+
+    val turboUnlockLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            showTurboUnlockDialog = false
+            MediaDownloadManager.unlockTurbo(context)
+            MediaDownloadManager.setMaxConcurrentDownloads(context, 3)
+            Toast.makeText(context, "🎉 একসাথে ৩টি ভিডিও ডাউনলোড আনলক হয়েছে!", Toast.LENGTH_LONG).show()
+        }
+    }
 
     fun executeBatchDownload(episodesToDownload: List<Int>) {
         if (episodesToDownload.isEmpty()) {
@@ -170,9 +182,10 @@ fun SeriesDownloadBottomSheet(
             isBatchDownloading = false
             onDismiss()
             if (queuedCount > 0) {
+                val speedDesc = if (MediaDownloadManager.getMaxConcurrentDownloads(context) == 3) "একসাথে ৩টি করে" else "১টি করে"
                 Toast.makeText(
                     context,
-                    "Started downloading $queuedCount episodes in background!",
+                    "$queuedCountটি পর্ব ডাউনলোড লাইনে যুক্ত হয়েছে ($speedDesc)!",
                     Toast.LENGTH_LONG
                 ).show()
                 if (!BackgroundDownloadHelper.isBatteryOptimizationIgnored(context) && !BackgroundDownloadHelper.hasPromptedInitialPermission(context)) {
@@ -479,6 +492,82 @@ fun SeriesDownloadBottomSheet(
 
             Spacer(modifier = Modifier.height(14.dp))
 
+            // Download Speed Option: 1 by 1 vs 3 at a time (Turbo)
+            val maxConcurrent by MediaDownloadManager.maxConcurrentFlow.collectAsState()
+            val isTurboUnlocked = MediaDownloadManager.isTurboUnlocked(context)
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Download Mode:",
+                    color = TextMuted,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val is1Active = maxConcurrent == 1
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (is1Active) AccentEmerald.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.05f),
+                        border = BorderStroke(1.dp, if (is1Active) AccentEmerald else Color.White.copy(alpha = 0.1f)),
+                        modifier = Modifier.clickable {
+                            MediaDownloadManager.setMaxConcurrentDownloads(context, 1)
+                        }
+                    ) {
+                        Text(
+                            text = "1 by 1 (Normal)",
+                            color = if (is1Active) AccentEmerald else TextSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
+                        )
+                    }
+
+                    val is3Active = maxConcurrent == 3
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (is3Active) AccentCyan.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.05f),
+                        border = BorderStroke(1.dp, if (is3Active) AccentCyan else Color.White.copy(alpha = 0.1f)),
+                        modifier = Modifier.clickable {
+                            if (MediaDownloadManager.isTurboUnlocked(context)) {
+                                MediaDownloadManager.setMaxConcurrentDownloads(context, 3)
+                                Toast.makeText(context, "⚡ একসাথে ৩টি ভিডিও ডাউনলোড সক্রিয়!", Toast.LENGTH_SHORT).show()
+                            } else {
+                                showTurboUnlockDialog = true
+                            }
+                        }
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
+                        ) {
+                            Text(
+                                text = "⚡ 3 at a time",
+                                color = if (is3Active) AccentCyan else TextPrimary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            if (!is3Active && !isTurboUnlocked) {
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "VIP",
+                                    color = AccentGold,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Black
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
             // Bottom Green Action Button: "Download (N Episodes)"
             Button(
                 onClick = {
@@ -489,7 +578,7 @@ fun SeriesDownloadBottomSheet(
                     }
                     pendingEpisodesToDownload = toDownload
 
-                    if (SponsorAdManager.isEnabled) {
+                    if (SponsorAdManager.isPlacementEnabled(SponsorAdManager.PLACEMENT_DOWNLOAD_SINGLE)) {
                         showDownloadSponsorDialog = true
                     } else {
                         executeBatchDownload(toDownload)
@@ -539,13 +628,30 @@ fun SeriesDownloadBottomSheet(
                 videoTitle = "${detail.title} (S${selectedSeasonNum})",
                 onSupportClick = {
                     val intent = Intent(context, SponsorWebViewActivity::class.java).apply {
-                        putExtra("EXTRA_TARGET_URL", SponsorAdManager.sponsorUrl)
+                        putExtra("EXTRA_TARGET_URL", SponsorAdManager.getPlacementUrl(SponsorAdManager.PLACEMENT_DOWNLOAD_SINGLE))
                         putExtra("EXTRA_IS_DOWNLOAD_AD", true)
                     }
                     downloadSponsorLauncher.launch(intent)
                 },
                 onCancel = {
                     showDownloadSponsorDialog = false
+                }
+            )
+        }
+
+        // Sponsor gate for Turbo 3-concurrent downloads
+        if (showTurboUnlockDialog) {
+            SponsorSupportDialog(
+                videoTitle = "একসাথে ৩টি ভিডিও ডাউনলোড",
+                onSupportClick = {
+                    val intent = Intent(context, SponsorWebViewActivity::class.java).apply {
+                        putExtra("EXTRA_TARGET_URL", SponsorAdManager.getPlacementUrl(SponsorAdManager.PLACEMENT_DOWNLOAD_TURBO))
+                        putExtra("EXTRA_IS_DOWNLOAD_AD", true)
+                    }
+                    turboUnlockLauncher.launch(intent)
+                },
+                onCancel = {
+                    showTurboUnlockDialog = false
                 }
             )
         }

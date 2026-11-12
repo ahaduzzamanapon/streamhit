@@ -74,4 +74,8 @@ interface ApiService {
 
     @GET("api/ad/config")
     suspend fun getAdConfig(): Response<Map<String, Any>>
+
+    // Dynamic In-App Notice Pop-up Configuration
+    @GET("api/app/popup")
+    suspend fun getAppPopupConfig(): Response<Map<String, Any>>
 }

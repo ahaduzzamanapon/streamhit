@@ -834,9 +834,19 @@
                 <span class="icon">📺</span> Live TV Channels
             </a>
 
+            <div class="menu-heading">Monetization & Ads</div>
+            <a class="nav-item" onclick="switchNavTab('sponsors')">
+                <span class="icon">💖</span> Sponsor & Ads Manager
+                <span class="badge-pill" style="color:#00F5D4;border-color:rgba(0,245,212,0.3);">Multi-Link</span>
+            </a>
+
             <div class="menu-heading">System & Growth</div>
             <a class="nav-item" onclick="switchNavTab('notifications')">
                 <span class="icon">🔔</span> Push Notifications
+            </a>
+            <a class="nav-item" onclick="switchNavTab('popup')">
+                <span class="icon">📢</span> App Notice Pop-up
+                <span class="badge-pill" id="badgePopupStatus" style="color:#00F5D4;border-color:rgba(0,245,212,0.3);">Live</span>
             </a>
             <a class="nav-item" onclick="switchNavTab('version')">
                 <span class="icon">🚀</span> App Releases & Update
@@ -945,86 +955,23 @@
                     </div>
                 </div>
 
-                <!-- 💖 SPONSOR AD & MONETIZATION TRACKING CARD -->
-                <div class="card" style="margin-top:20px;">
-                    <div class="card-header">
-                        <div>
-                            <h2>💖 Sponsor Ads & Monetization Tracking</h2>
-                            <div class="subtitle">Video Play time sponsor link performance & live click tracking</div>
-                        </div>
-                        <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap;">
-                            <!-- Interactive ON/OFF Switch -->
-                            <div style="display:flex; align-items:center; gap:10px; background:rgba(255,255,255,0.05); padding:6px 14px; border-radius:30px; border:1px solid rgba(255,255,255,0.1);">
-                                <span style="font-size:12px; font-weight:600; color:#A0AEC0;">Sponsor Ad:</span>
-                                <div id="adToggleBg" onclick="toggleAdStatus()" style="position:relative; width:44px; height:22px; background:#00F5D4; border-radius:12px; cursor:pointer; transition:background 0.25s ease;">
-                                    <div id="adToggleKnob" style="position:absolute; top:2px; left:2px; width:18px; height:18px; background:#000000; border-radius:50%; transition:transform 0.25s ease; transform:translateX(22px);"></div>
+                <!-- Quick Sponsor Overview Widget -->
+                <div class="card" style="margin-top:20px; background:linear-gradient(135deg, rgba(255,42,84,0.06), rgba(0,245,212,0.06)); border:1px solid rgba(255,255,255,0.1);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+                        <div style="display:flex; align-items:center; gap:14px;">
+                            <div style="font-size:32px;">💖</div>
+                            <div>
+                                <div style="font-size:16px; font-weight:700; color:#fff;">Sponsor Ads & Multi-Link Monetization</div>
+                                <div style="font-size:12.5px; color:#A0AEC0; margin-top:2px;">
+                                    Status: <b id="dashSponsorSummaryStatus" style="color:#00F5D4;">ACTIVE</b> | 
+                                    Total Clicks: <b id="dashSponsorSummaryClicks" style="color:#FF2A54;">–</b> | 
+                                    CTR: <b id="dashSponsorSummaryCtr" style="color:#00F5D4;">–</b>
                                 </div>
-                                <span id="adToggleLabel" style="font-size:12px; font-weight:700; color:#00F5D4; min-width:26px;">ON</span>
-                            </div>
-                            <button class="btn-secondary" onclick="loadAdStats()" style="padding:6px 14px; font-size:12px;">🔄 Refresh Stats</button>
-                        </div>
-                    </div>
-
-                    <!-- 4 Stat Pill Counters -->
-                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:14px; margin-bottom:20px;">
-                        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
-                            <div style="font-size:12px; color:#A0AEC0; margin-bottom:6px;">💖 Total Clicks (মোট কতজন ক্লিক করেছে)</div>
-                            <div style="font-size:24px; font-weight:700; color:#FF2A54;" id="statTotalClicks">0</div>
-                        </div>
-                        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
-                            <div style="font-size:12px; color:#A0AEC0; margin-bottom:6px;">🔥 Clicks Today (আজকে ক্লিক)</div>
-                            <div style="font-size:24px; font-weight:700; color:#00F5D4;" id="statTodayClicks">0</div>
-                        </div>
-                        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
-                            <div style="font-size:12px; color:#A0AEC0; margin-bottom:6px;">👁️ Total Shown (পপআপ দেখানো হয়েছে)</div>
-                            <div style="font-size:24px; font-weight:700; color:#FFFFFF;" id="statTotalViews">0</div>
-                        </div>
-                        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
-                            <div style="font-size:12px; color:#A0AEC0; margin-bottom:6px;">✕ Direct Watch / Cancel (সরাসরি দেখেছে)</div>
-                            <div style="font-size:24px; font-weight:700; color:#A0AEC0;" id="statTotalCancels">0</div>
-                        </div>
-                    </div>
-
-                    <!-- Sponsor Link & Duration Configuration Box -->
-                    <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:14px; padding:18px; margin-bottom:20px;">
-                        <div style="display:grid; grid-template-columns:1.5fr 1fr 1fr auto; gap:16px; align-items:flex-end;">
-                            <div>
-                                <div style="font-size:13px; font-weight:600; color:#E2E8F0; margin-bottom:8px;">🔗 Active Sponsor Link (স্পন্সর লিংক)</div>
-                                <input type="text" id="inputSponsorUrl" style="width:100%; box-sizing:border-box; padding:10px 14px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.15); border-radius:10px; color:#fff; font-size:13px;" placeholder="https://uplcm.com/4/12189723">
-                            </div>
-                            <div>
-                                <div style="font-size:13px; font-weight:600; color:#00F5D4; margin-bottom:8px;">⚡ ক্লিক করলে অপেক্ষা (s)</div>
-                                <input type="number" id="inputSponsorDurationClicked" min="3" max="180" style="width:100%; box-sizing:border-box; padding:10px 12px; background:rgba(0,0,0,0.3); border:1px solid rgba(0,245,212,0.3); border-radius:10px; color:#00F5D4; font-weight:700; font-size:14px; text-align:center;" placeholder="10">
-                            </div>
-                            <div>
-                                <div style="font-size:13px; font-weight:600; color:#FF2A54; margin-bottom:8px;">⏳ ক্লিক না করলে অপেক্ষা (s)</div>
-                                <input type="number" id="inputSponsorDurationNoClick" min="5" max="300" style="width:100%; box-sizing:border-box; padding:10px 12px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,42,84,0.3); border-radius:10px; color:#FF2A54; font-weight:700; font-size:14px; text-align:center;" placeholder="30">
-                            </div>
-                            <div>
-                                <button class="btn-primary" onclick="saveSponsorUrl()" style="padding:10px 22px; font-size:13px; white-space:nowrap; height:42px;">💾 Save Settings</button>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- Recent Clicks Table -->
-                    <div style="margin-top:10px;">
-                        <div style="font-size:14px; font-weight:600; color:#E2E8F0; margin-bottom:12px;">📊 Recent Clicks Log (কারা কখন ক্লিক করেছে)</div>
-                        <div style="overflow-x:auto;">
-                            <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left;">
-                                <thead>
-                                    <tr style="border-bottom:1px solid rgba(255,255,255,0.1); color:#A0AEC0;">
-                                        <th style="padding:10px;">Time</th>
-                                        <th style="padding:10px;">Video / Movie</th>
-                                        <th style="padding:10px;">Device</th>
-                                        <th style="padding:10px;">Country</th>
-                                        <th style="padding:10px;">IP</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="recentClicksTableBody">
-                                    <tr><td colspan="5" style="padding:16px; text-align:center; color:#A0AEC0;">No clicks recorded yet.</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
+                        <button class="btn-primary" onclick="switchNavTab('sponsors')" style="padding:10px 20px; font-size:13px; font-weight:700;">
+                            ⚙️ Open Sponsor & Ads Manager
+                        </button>
                     </div>
                 </div>
 
@@ -1040,6 +987,243 @@
                         <p>• <strong>Database Cache:</strong> <span style="color:var(--accent-cyan);">Active (MySQL 24-Hour TTL on stream_resources)</span></p>
                         <p>• <strong>AI Auto-Dubbing TTS:</strong> <span style="color:var(--accent-green);">Operational (/api/tts cloud proxy)</span></p>
                         <p>• <strong>Latest App Release:</strong> <span id="dashVersionLabel">Loading version info...</span></p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 💖 SPONSOR & ADS MANAGER PANEL ──────────────────────── -->
+            <section class="tab-panel" id="panel-sponsors">
+                <!-- Master Header & Switch Card -->
+                <div class="card">
+                    <div class="card-header" style="flex-wrap:wrap; gap:16px;">
+                        <div>
+                            <h2>💖 Sponsor & Ads Manager</h2>
+                            <div class="subtitle">ফিচার অনুযায়ী আলাদা আলাদা লিংক ও অন/অফ কন্ট্রোল (Granular Multi-Link Monetization)</div>
+                        </div>
+                        <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap;">
+                            <!-- Global Master Switch -->
+                            <div style="display:flex; align-items:center; gap:12px; background:rgba(255,255,255,0.06); padding:8px 16px; border-radius:30px; border:1px solid rgba(255,255,255,0.12);">
+                                <span style="font-size:13px; font-weight:700; color:#fff;">Master Ad Switch:</span>
+                                <div id="adToggleBg" onclick="toggleAdStatus()" style="position:relative; width:48px; height:24px; background:#00F5D4; border-radius:14px; cursor:pointer; transition:background 0.25s ease;">
+                                    <div id="adToggleKnob" style="position:absolute; top:2px; left:2px; width:20px; height:20px; background:#000000; border-radius:50%; transition:transform 0.25s ease; transform:translateX(24px);"></div>
+                                </div>
+                                <span id="adToggleLabel" style="font-size:13px; font-weight:800; color:#00F5D4; min-width:30px;">ON</span>
+                            </div>
+                            <button class="btn-secondary" onclick="loadAdStats()" style="padding:8px 16px; font-size:13px;">🔄 Refresh Stats</button>
+                            <button class="btn-primary" onclick="saveAllSponsorSettings()" style="padding:8px 20px; font-size:13px;">💾 Save All Settings</button>
+                        </div>
+                    </div>
+
+                    <!-- 4 Stat Counters -->
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:14px; margin-top:16px; margin-bottom:10px;">
+                        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
+                            <div style="font-size:12px; color:#A0AEC0; margin-bottom:6px;">💖 Total Clicks (মোট ক্লিক)</div>
+                            <div style="font-size:24px; font-weight:700; color:#FF2A54;" id="statTotalClicks">0</div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
+                            <div style="font-size:12px; color:#A0AEC0; margin-bottom:6px;">🔥 Clicks Today (আজকে ক্লিক)</div>
+                            <div style="font-size:24px; font-weight:700; color:#00F5D4;" id="statTodayClicks">0</div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
+                            <div style="font-size:12px; color:#A0AEC0; margin-bottom:6px;">👁️ Total Shown (পপআপ দেখানো হয়েছে)</div>
+                            <div style="font-size:24px; font-weight:700; color:#FFFFFF;" id="statTotalViews">0</div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
+                            <div style="font-size:12px; color:#A0AEC0; margin-bottom:6px;">✕ Direct Watch / Skip</div>
+                            <div style="font-size:24px; font-weight:700; color:#A0AEC0;" id="statTotalCancels">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Global Default Settings Card -->
+                <div class="card" style="margin-top:18px;">
+                    <div class="card-header">
+                        <div>
+                            <h2>🌐 Global Default Link & Countdown Timers</h2>
+                            <div class="subtitle">যেকোনো ফিচারের নিজস্ব লিংক খালি থাকলে এই ডিফল্ট লিংকটি কাজ করবে</div>
+                        </div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:16px;">
+                        <div>
+                            <div style="font-size:12px; font-weight:700; color:#E2E8F0; margin-bottom:8px;">🔗 Global Default Sponsor Link (মূল ডিফল্ট লিংক)</div>
+                            <input type="text" id="inputSponsorUrl" class="form-control" placeholder="https://uplcm.com/4/12189723">
+                        </div>
+                        <div>
+                            <div style="font-size:12px; font-weight:700; color:#00F5D4; margin-bottom:8px;">⚡ ক্লিক করলে অপেক্ষা (সেকেন্ড)</div>
+                            <input type="number" id="inputSponsorDurationClicked" class="form-control" min="3" max="180" placeholder="10">
+                        </div>
+                        <div>
+                            <div style="font-size:12px; font-weight:700; color:#FF2A54; margin-bottom:8px;">⏳ ক্লিক না করলে অপেক্ষা (সেকেন্ড)</div>
+                            <input type="number" id="inputSponsorDurationNoClick" class="form-control" min="5" max="300" placeholder="30">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Granular Placement Controls (এক এক ফিচারের অ্যাড কন্ট্রোল ও লিংক) -->
+                <div class="card" style="margin-top:18px;">
+                    <div class="card-header">
+                        <div>
+                            <h2>🎯 Feature-Specific Ad Placements (আলাদা আলাদা অ্যাড ও লিংক কন্ট্রোল)</h2>
+                            <div class="subtitle">প্রতিটি ফিচারের অ্যাড আলাদাভাবে অন/অফ করতে পারবেন এবং ভিন্ন ভিন্ন লিংক সেট করতে পারবেন</div>
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(360px, 1fr)); gap:16px; margin-top:10px;">
+                        
+                        <!-- Placement 1: 3 Simultaneous Downloads (Turbo Mode) -->
+                        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span style="font-size:18px;">⚡</span>
+                                    <div>
+                                        <div style="font-size:14px; font-weight:700; color:#fff;">৩টি ভিডিও একসাথে ডাউনলোড (Turbo VIP)</div>
+                                        <div style="font-size:11px; color:#A0AEC0;">একসাথে ৩টি ডাউনলোড আনলক করতে স্পন্সর পেজ দেখানো হবে কি না</div>
+                                    </div>
+                                </div>
+                                <label class="switch-toggle">
+                                    <input type="checkbox" id="toggle_placement_download_turbo" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <label style="font-size:11px; font-weight:600; color:#A0AEC0;">Custom Sponsor Link (খালি রাখলে ডিফল্ট লিংক কাজ করবে):</label>
+                            <input type="text" id="url_placement_download_turbo" class="form-control" style="margin-top:4px;" placeholder="Default Global Link">
+                        </div>
+
+                        <!-- Placement 2: Video Playback Start -->
+                        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span style="font-size:18px;">🎬</span>
+                                    <div>
+                                        <div style="font-size:14px; font-weight:700; color:#fff;">ভিডিও দেখার শুরুতে অ্যাড (Video Play Start)</div>
+                                        <div style="font-size:11px; color:#A0AEC0;">ভিডিও চালু করার আগে স্পন্সর ডায়লগ আসবে কি না</div>
+                                    </div>
+                                </div>
+                                <label class="switch-toggle">
+                                    <input type="checkbox" id="toggle_placement_player_start" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <label style="font-size:11px; font-weight:600; color:#A0AEC0;">Custom Sponsor Link (খালি রাখলে ডিফল্ট লিংক কাজ করবে):</label>
+                            <input type="text" id="url_placement_player_start" class="form-control" style="margin-top:4px;" placeholder="Default Global Link">
+                        </div>
+
+                        <!-- Placement 3: Periodic Playback Interval Ads (Mid-roll) -->
+                        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span style="font-size:18px;">⏳</span>
+                                    <div>
+                                        <div style="font-size:14px; font-weight:700; color:#fff;">ভিডিও চলার মাঝে প্রতি X মিনিট পর পর অ্যাড</div>
+                                        <div style="font-size:11px; color:#A0AEC0;">ভিডিও চলাকালীন কত মিনিট পর পর স্পন্সর আসবে</div>
+                                    </div>
+                                </div>
+                                <label class="switch-toggle">
+                                    <input type="checkbox" id="toggle_placement_player_interval" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div style="display:grid; grid-template-columns:1fr 2fr; gap:10px; margin-top:6px;">
+                                <div>
+                                    <label style="font-size:11px; font-weight:600; color:#00F5D4;">মিনিট পর পর (Interval):</label>
+                                    <input type="number" id="interval_placement_player_interval_minutes" class="form-control" min="1" max="180" style="margin-top:4px; text-align:center; font-weight:700; color:#00F5D4;" placeholder="25">
+                                </div>
+                                <div>
+                                    <label style="font-size:11px; font-weight:600; color:#A0AEC0;">Custom Link:</label>
+                                    <input type="text" id="url_placement_player_interval" class="form-control" style="margin-top:4px;" placeholder="Default Global Link">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Placement 4: Start Download (Single / Batch) -->
+                        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span style="font-size:18px;">📥</span>
+                                    <div>
+                                        <div style="font-size:14px; font-weight:700; color:#fff;">সিনেমা/সিরিজ ডাউনলোড শুরু করার সময়</div>
+                                        <div style="font-size:11px; color:#A0AEC0;">ভিডিও ডাউনলোড বাটনে চাপলে অ্যাড আসবে কি না</div>
+                                    </div>
+                                </div>
+                                <label class="switch-toggle">
+                                    <input type="checkbox" id="toggle_placement_download_single" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <label style="font-size:11px; font-weight:600; color:#A0AEC0;">Custom Sponsor Link (খালি রাখলে ডিফল্ট লিংক কাজ করবে):</label>
+                            <input type="text" id="url_placement_download_single" class="form-control" style="margin-top:4px;" placeholder="Default Global Link">
+                        </div>
+
+                        <!-- Placement 5: Live TV Channel Playback -->
+                        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span style="font-size:18px;">📺</span>
+                                    <div>
+                                        <div style="font-size:14px; font-weight:700; color:#fff;">লাইভ টিভি চ্যানেল প্লেয়ার (Live TV Stream)</div>
+                                        <div style="font-size:11px; color:#A0AEC0;">লাইভ টিভি চ্যানেল চালানোর আগে অ্যাড আসবে কি না</div>
+                                    </div>
+                                </div>
+                                <label class="switch-toggle">
+                                    <input type="checkbox" id="toggle_placement_livetv">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <label style="font-size:11px; font-weight:600; color:#A0AEC0;">Custom Sponsor Link (খালি রাখলে ডিফল্ট লিংক কাজ করবে):</label>
+                            <input type="text" id="url_placement_livetv" class="form-control" style="margin-top:4px;" placeholder="Default Global Link">
+                        </div>
+
+                        <!-- Placement 6: App Launch Interstitial -->
+                        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span style="font-size:18px;">📱</span>
+                                    <div>
+                                        <div style="font-size:14px; font-weight:700; color:#fff;">অ্যাপ ওপেন / লঞ্চ অ্যাড (App Launch)</div>
+                                        <div style="font-size:11px; color:#A0AEC0;">অ্যাপে ঢোকার সাথে সাথে স্পন্সর ডায়লগ দেখাবে কি না</div>
+                                    </div>
+                                </div>
+                                <label class="switch-toggle">
+                                    <input type="checkbox" id="toggle_placement_app_launch">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <label style="font-size:11px; font-weight:600; color:#A0AEC0;">Custom Sponsor Link (খালি রাখলে ডিফল্ট লিংক কাজ করবে):</label>
+                            <input type="text" id="url_placement_app_launch" class="form-control" style="margin-top:4px;" placeholder="Default Global Link">
+                        </div>
+
+                    </div>
+
+                    <div style="margin-top:20px; display:flex; justify-content:flex-end;">
+                        <button class="btn-primary" onclick="saveAllSponsorSettings()" style="padding:12px 28px; font-size:14px;">
+                            💾 Save All Sponsor & Ad Settings
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Recent Clicks Table Card -->
+                <div class="card" style="margin-top:18px;">
+                    <div class="card-header">
+                        <div>
+                            <h2>📊 Recent Clicks Log (কারা কখন স্পন্সরে ক্লিক করেছে)</h2>
+                            <div class="subtitle">লাইভ টেলিমেট্রি ও ডিভাইস মডেলসহ ক্লিকের বিস্তারিত তথ্য</div>
+                        </div>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left;">
+                            <thead>
+                                <tr style="border-bottom:1px solid rgba(255,255,255,0.1); color:#A0AEC0;">
+                                    <th style="padding:10px;">Time</th>
+                                    <th style="padding:10px;">Placement / Video</th>
+                                    <th style="padding:10px;">Device Model</th>
+                                    <th style="padding:10px;">Country</th>
+                                    <th style="padding:10px;">IP Address</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentClicksTableBody">
+                                <tr><td colspan="5" style="padding:16px; text-align:center; color:#A0AEC0;">No clicks recorded yet.</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </section>
@@ -1706,6 +1890,165 @@
                 </div>
             </section>
 
+            <!-- 9. APP NOTICE POP-UP ──────────────────────────────────────── -->
+            <section class="tab-panel" id="panel-popup">
+                <div class="card" style="background: linear-gradient(135deg, rgba(0,245,212,0.06), rgba(0,180,216,0.06)); border: 1px solid rgba(0,245,212,0.2);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+                        <div>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <span style="font-size:26px;">📢</span>
+                                <div>
+                                    <h2 style="font-size:18px; margin:0; color:#fff;">In-App Notice Pop-up (অ্যাপে প্রবেশের সময় ডায়লগ/বিজ্ঞপ্তি)</h2>
+                                    <div class="subtitle" style="margin-top:2px;">ইউজার অ্যাপ ওপেন করলেই যে পপ-আপ ডায়লগ আসবে তা এখান থেকে রিয়েল-টাইমে অন/অফ ও নিয়ন্ত্রণ করুন</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <div style="display:flex; align-items:center; gap:8px; background:rgba(0,0,0,0.3); padding:6px 14px; border-radius:24px; border:1px solid rgba(255,255,255,0.08);">
+                                <span style="font-size:12px; font-weight:700; color:#A0AEC0;">পপ-আপ স্ট্যাটাস:</span>
+                                <label class="switch-toggle" style="margin:0;">
+                                    <input type="checkbox" id="popupMasterEnabled" onchange="updatePopupLivePreview()">
+                                    <span class="slider"></span>
+                                </label>
+                                <span id="popupMasterStatusLabel" style="font-size:12px; font-weight:800; color:#FF2A54;">OFF</span>
+                            </div>
+                            <button class="btn-secondary" onclick="loadAppPopupSettings()" style="padding:8px 16px; font-size:13px;">🔄 Refresh</button>
+                            <button class="btn-primary" onclick="saveAppPopupSettings()" style="padding:8px 20px; font-size:13px;">💾 Save Pop-up Settings</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns:1.2fr 0.8fr; gap:20px; margin-top:20px; align-items:start;">
+                    <!-- Left Column: Form Settings -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <h2>⚙️ Pop-up Content & Actions (কন্টেন্ট ও বাটন কনফিগারেশন)</h2>
+                                <div class="subtitle">টাইটেল, মেসেজ, বাটন সংখ্যা এবং এক্সটার্নাল লিংক সেট করুন</div>
+                            </div>
+                        </div>
+
+                        <div class="form-grid" style="grid-template-columns:1fr; gap:14px;">
+                            <div class="form-group">
+                                <label style="font-weight:700; color:#E2E8F0;">শিরোনাম (Pop-up Title):</label>
+                                <input type="text" id="popupTitle" class="form-control" placeholder="যেমন: গুরুত্বপূর্ণ নোটিশ / নতুন ফিচার যুক্ত হয়েছে" oninput="updatePopupLivePreview()">
+                            </div>
+
+                            <div class="form-group">
+                                <label style="font-weight:700; color:#E2E8F0;">বার্তা / বিবরণ (Announcement Message):</label>
+                                <textarea id="popupMessage" class="form-control" rows="4" placeholder="ব্যবহারকারীদের উদ্দেশ্যে যা বলতে চান লিখুন..." oninput="updatePopupLivePreview()" style="resize:vertical;"></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label style="font-weight:700; color:#A0AEC0;">ব্যানার / ইমেজ লিংক (Optional Image URL):</label>
+                                <input type="text" id="popupImageUrl" class="form-control" placeholder="https://example.com/banner.png (খালি রাখলে শুধু টেক্সট থাকবে)" oninput="updatePopupLivePreview()">
+                            </div>
+                        </div>
+
+                        <!-- Buttons Configuration Section -->
+                        <div style="margin-top:22px; padding-top:16px; border-top:1px solid rgba(255,255,255,0.08);">
+                            <h3 style="font-size:14px; color:#00F5D4; margin-bottom:12px;">🔘 বাটন ১ সেটিংস (Primary Action Button)</h3>
+                            <div style="display:grid; grid-template-columns:1fr 2fr; gap:12px;">
+                                <div class="form-group">
+                                    <label>বাটন টেক্সট:</label>
+                                    <input type="text" id="popupBtn1Text" class="form-control" placeholder="টেলিগ্রাম চ্যানেলে যুক্ত হন" oninput="updatePopupLivePreview()">
+                                </div>
+                                <div class="form-group">
+                                    <label>বাটন URL (ক্লিক করলে ব্রাউজার/অ্যাপে চলে যাবে):</label>
+                                    <input type="text" id="popupBtn1Url" class="form-control" placeholder="https://t.me/yourgroup" oninput="updatePopupLivePreview()">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top:18px; padding-top:16px; border-top:1px solid rgba(255,255,255,0.08);">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                                <h3 style="font-size:14px; color:#00B4D8; margin:0;">🔘 বাটন ২ সেটিংস (Secondary Action Button - কয়টি বাটন থাকবে)</h3>
+                                <label class="switch-toggle" style="margin:0;">
+                                    <input type="checkbox" id="popupBtn2Enabled" onchange="updatePopupLivePreview()">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div id="popupBtn2Fields" style="display:grid; grid-template-columns:1fr 2fr; gap:12px;">
+                                <div class="form-group">
+                                    <label>২য় বাটন টেক্সট:</label>
+                                    <input type="text" id="popupBtn2Text" class="form-control" placeholder="ওয়েবসাইট দেখুন" oninput="updatePopupLivePreview()">
+                                </div>
+                                <div class="form-group">
+                                    <label>২য় বাটন URL:</label>
+                                    <input type="text" id="popupBtn2Url" class="form-control" placeholder="https://nxly.online" oninput="updatePopupLivePreview()">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top:18px; padding-top:16px; border-top:1px solid rgba(255,255,255,0.08);">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                                <h3 style="font-size:14px; color:#A0AEC0; margin:0;">✕ ক্যানসেল / ডিসমিস বাটন (Cancel Button থাকবে কি না)</h3>
+                                <label class="switch-toggle" style="margin:0;">
+                                    <input type="checkbox" id="popupShowCancel" checked onchange="updatePopupLivePreview()">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div id="popupCancelFields">
+                                <div class="form-group">
+                                    <label>ক্যানসেল বাটন টেক্সট:</label>
+                                    <input type="text" id="popupCancelText" class="form-control" placeholder="বন্ধ করুন / পরে দেখব" oninput="updatePopupLivePreview()">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top:20px; display:flex; justify-content:flex-end;">
+                            <button class="btn-primary" onclick="saveAppPopupSettings()" style="padding:12px 28px; font-size:14px;">
+                                💾 Save Pop-up Settings
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Live Android Mockup Preview -->
+                    <div class="card" style="position:sticky; top:20px;">
+                        <div class="card-header">
+                            <div>
+                                <h2>📱 Live App Preview</h2>
+                                <div class="subtitle">অ্যান্ড্রয়েড ফোনে ইউজার এটি ঠিক যেভাবে দেখবে</div>
+                            </div>
+                        </div>
+
+                        <!-- Phone Mockup Frame -->
+                        <div style="background:#080C16; border:2px solid rgba(0,245,212,0.3); border-radius:24px; padding:20px 14px; box-shadow:0 12px 35px rgba(0,0,0,0.6); position:relative; min-height:420px; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+                            
+                            <!-- Not Active Overlay -->
+                            <div id="previewDisabledNotice" style="position:absolute; top:12px; right:12px; font-size:11px; padding:3px 10px; background:rgba(255,42,84,0.15); border:1px solid #FF2A54; color:#FF2A54; border-radius:12px; font-weight:700;">
+                                Pop-up is currently DISABLED
+                            </div>
+
+                            <!-- Mockup Popup Card -->
+                            <div style="width:100%; max-width:320px; background:#0F1728; border:1px solid rgba(0,245,212,0.25); border-radius:18px; padding:20px 16px; box-shadow:0 14px 40px rgba(0,0,0,0.8); text-align:center;">
+                                <div id="previewImageWrapper" style="display:none; margin-bottom:12px;">
+                                    <img id="previewImage" src="" style="width:100%; max-height:130px; object-fit:cover; border-radius:12px; border:1px solid rgba(255,255,255,0.08);">
+                                </div>
+                                <div style="font-size:30px; margin-bottom:6px;" id="previewIcon">📢</div>
+                                <div id="previewTitle" style="font-size:16px; font-weight:800; color:#FFFFFF; margin-bottom:8px;">গুরুত্বপূর্ণ নোটিশ</div>
+                                <div id="previewMessage" style="font-size:13px; color:#B0C4DE; line-height:1.5; margin-bottom:18px; max-height:140px; overflow-y:auto; word-break:break-word;">
+                                    NXLY Stream অ্যাপ ব্যবহারের জন্য ধন্যবাদ। সর্বশেষ আপডেট পেতে আমাদের সাথে যুক্ত থাকুন।
+                                </div>
+
+                                <div style="display:flex; flex-direction:column; gap:8px;">
+                                    <button id="previewBtn1" style="width:100%; padding:10px 14px; background:linear-gradient(135deg, #00C6FF, #0164FF); color:#fff; border:none; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer;">
+                                        টেলিগ্রাম চ্যানেলে যুক্ত হন
+                                    </button>
+                                    <button id="previewBtn2" style="display:none; width:100%; padding:9px 14px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); color:#00E5FF; border-radius:10px; font-size:12.5px; font-weight:700; cursor:pointer;">
+                                        ওয়েবসাইট ভিজিট করুন
+                                    </button>
+                                    <button id="previewCancel" style="width:100%; padding:7px 14px; background:transparent; border:none; color:#6B7F9E; font-size:12px; font-weight:600; cursor:pointer;">
+                                        ✕ বন্ধ করুন
+                                    </button>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- 10. SETTINGS & ACCESS ─────────────────────────────────────── -->
             <section class="tab-panel" id="panel-settings">
                 <div class="card">
@@ -2208,6 +2551,7 @@
             // Update top title
             const titles = {
                 dashboard: ['Dashboard Overview', 'Real-time telemetry, app traffic, and quick actions'],
+                sponsors: ['Sponsor & Ads Manager', 'Feature-level toggles, periodic intervals, and multi-link sponsor control'],
                 automation: ['Content Automation', 'Unified visual workflow, multi-select queue, and social publishing'],
                 reels: ['Reels & Shorts Creator', 'AI vertical video cutter with anti-copyright filters'],
                 facebook: ['Facebook Auto-Pilot Bot', 'Automated 10-minute posting cycle with 1st comment link'],
@@ -2219,6 +2563,7 @@
                 sports: ['Live Sports Streaming', 'Manage live matches and streaming feeds'],
                 tv: ['Live TV Channels', 'IPTV live channels and M3U playlist importer'],
                 notifications: ['Push Notifications', 'Firebase FCM notifications to all Android users'],
+                popup: ['In-App Notice Pop-up', 'Startup announcement dialog, message, custom buttons and external URLs'],
                 version: ['App Version & Update', 'Manage version updates and APK releases'],
                 settings: ['Settings & Security', 'Console access and credentials']
             };
@@ -2263,6 +2608,8 @@
                 case 'tv': fetchTvChannels(); break;
                 case 'version': fetchAppVersion(); break;
                 case 'notifications': fetchPushStats(); break;
+                case 'sponsors': loadAdStats(); break;
+                case 'popup': loadAppPopupSettings(); break;
             }
         }
 
@@ -2346,6 +2693,17 @@
                     if (document.getElementById('dashSponsorCtr')) {
                         document.getElementById('dashSponsorCtr').innerText = `${ctr} (${views} Views)`;
                     }
+                    if (document.getElementById('dashSponsorSummaryStatus')) {
+                        const statusEl = document.getElementById('dashSponsorSummaryStatus');
+                        statusEl.innerText = d.enabled ? 'ACTIVE' : 'DISABLED';
+                        statusEl.style.color = d.enabled ? '#00F5D4' : '#FF2A54';
+                    }
+                    if (document.getElementById('dashSponsorSummaryClicks')) {
+                        document.getElementById('dashSponsorSummaryClicks').innerText = `${clicks} (${today} Today)`;
+                    }
+                    if (document.getElementById('dashSponsorSummaryCtr')) {
+                        document.getElementById('dashSponsorSummaryCtr').innerText = `${ctr} (${views} Views)`;
+                    }
                     if (document.getElementById('statTotalClicks')) document.getElementById('statTotalClicks').innerText = clicks;
                     if (document.getElementById('statTodayClicks')) document.getElementById('statTodayClicks').innerText = today;
                     if (document.getElementById('statTotalViews')) document.getElementById('statTotalViews').innerText = views;
@@ -2366,6 +2724,27 @@
                     const durNoClickInput = document.getElementById('inputSponsorDurationNoClick');
                     if (durNoClickInput && !durNoClickInput.matches(':focus')) {
                         durNoClickInput.value = d.duration_no_click || 30;
+                    }
+
+                    // Populate Placement Controls
+                    const placements = d.placements || {};
+                    const placementKeys = ['download_turbo', 'player_start', 'player_interval', 'download_single', 'livetv', 'app_launch'];
+                    placementKeys.forEach(k => {
+                        const p = placements[k];
+                        const toggleEl = document.getElementById(`toggle_placement_${k}`);
+                        const urlEl = document.getElementById(`url_placement_${k}`);
+                        if (toggleEl && p && typeof p.enabled !== 'undefined') {
+                            toggleEl.checked = !!p.enabled;
+                        }
+                        if (urlEl && p && !urlEl.matches(':focus')) {
+                            urlEl.value = p.url || '';
+                        }
+                    });
+
+                    const intervalEl = document.getElementById('interval_placement_player_interval_minutes');
+                    if (intervalEl && !intervalEl.matches(':focus')) {
+                        const intVal = (placements.player_interval && placements.player_interval.interval_minutes) || d.playback_interval_minutes || 25;
+                        intervalEl.value = intVal;
                     }
 
                     const tbody = document.getElementById('recentClicksTableBody');
@@ -2416,13 +2795,229 @@
                 });
                 const d = await res.json();
                 if (d.code === 0) {
-                    alert(`Sponsor settings updated!\nLink: ${url}\nক্লিক করলে: ${durationClicked}s\nক্লিক না করলে: ${durationNoClick}s`);
+                    showToast('✅ গ্লোবাল স্পন্সর লিংক সেভ হয়েছে!');
                     loadAdStats();
                 } else {
                     alert('Failed to update sponsor settings.');
                 }
             } catch(e) {
                 alert('Error updating sponsor settings: ' + e);
+            }
+        }
+
+        async function saveAllSponsorSettings() {
+            const urlInput = document.getElementById('inputSponsorUrl');
+            const url = urlInput ? urlInput.value.trim() : '';
+            if (!url) {
+                alert('Please enter a valid global sponsor URL');
+                return;
+            }
+            const durClickedInput = document.getElementById('inputSponsorDurationClicked');
+            const durationClicked = Math.max(3, Math.min(180, parseInt(durClickedInput ? durClickedInput.value : '10') || 10));
+            const durNoClickInput = document.getElementById('inputSponsorDurationNoClick');
+            const durationNoClick = Math.max(5, Math.min(300, parseInt(durNoClickInput ? durNoClickInput.value : '30') || 30));
+
+            const intervalInput = document.getElementById('interval_placement_player_interval_minutes');
+            const playbackInterval = Math.max(1, Math.min(180, parseInt(intervalInput ? intervalInput.value : '25') || 25));
+
+            const keys = ['download_turbo', 'player_start', 'player_interval', 'download_single', 'livetv', 'app_launch'];
+            const placements = {};
+            keys.forEach(k => {
+                const toggleEl = document.getElementById(`toggle_placement_${k}`);
+                const customUrlEl = document.getElementById(`url_placement_${k}`);
+                placements[k] = {
+                    enabled: toggleEl ? toggleEl.checked : true,
+                    url: customUrlEl ? customUrlEl.value.trim() : ''
+                };
+            });
+            if (placements['player_interval']) {
+                placements['player_interval'].interval_minutes = playbackInterval;
+            }
+
+            try {
+                const res = await fetch('/api/admin/ad/config', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        sponsor_url: url, 
+                        duration_clicked: durationClicked, 
+                        duration_no_click: durationNoClick,
+                        duration: durationClicked, 
+                        playback_interval_minutes: playbackInterval,
+                        enabled: _currentAdEnabled,
+                        placements: placements
+                    })
+                });
+                const d = await res.json();
+                if (d.code === 0) {
+                    showToast('✅ সকল স্পন্সর ও অ্যাড সেটিংস সফলভাবে সেভ হয়েছে!');
+                    loadAdStats();
+                } else {
+                    alert('Failed to update sponsor settings.');
+                }
+            } catch(e) {
+                alert('Error updating sponsor settings: ' + e);
+            }
+        }
+
+        // ── IN-APP NOTICE POP-UP SETTINGS ──────────────────────────────────────
+        async function loadAppPopupSettings() {
+            try {
+                const res = await fetch('/api/admin/popup', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.status === 401) return;
+                const d = await res.json();
+                if (d.code === 0) {
+                    const masterToggle = document.getElementById('popupMasterEnabled');
+                    if (masterToggle) masterToggle.checked = !!d.enabled;
+
+                    const titleInput = document.getElementById('popupTitle');
+                    if (titleInput && !titleInput.matches(':focus')) titleInput.value = d.title || '';
+
+                    const msgInput = document.getElementById('popupMessage');
+                    if (msgInput && !msgInput.matches(':focus')) msgInput.value = d.message || '';
+
+                    const imgInput = document.getElementById('popupImageUrl');
+                    if (imgInput && !imgInput.matches(':focus')) imgInput.value = d.image_url || '';
+
+                    const btn1TextInput = document.getElementById('popupBtn1Text');
+                    if (btn1TextInput && !btn1TextInput.matches(':focus')) btn1TextInput.value = d.btn1_text || '';
+
+                    const btn1UrlInput = document.getElementById('popupBtn1Url');
+                    if (btn1UrlInput && !btn1UrlInput.matches(':focus')) btn1UrlInput.value = d.btn1_url || '';
+
+                    const btn2Toggle = document.getElementById('popupBtn2Enabled');
+                    if (btn2Toggle) btn2Toggle.checked = !!d.btn2_enabled;
+
+                    const btn2TextInput = document.getElementById('popupBtn2Text');
+                    if (btn2TextInput && !btn2TextInput.matches(':focus')) btn2TextInput.value = d.btn2_text || '';
+
+                    const btn2UrlInput = document.getElementById('popupBtn2Url');
+                    if (btn2UrlInput && !btn2UrlInput.matches(':focus')) btn2UrlInput.value = d.btn2_url || '';
+
+                    const cancelToggle = document.getElementById('popupShowCancel');
+                    if (cancelToggle) cancelToggle.checked = (typeof d.show_cancel !== 'undefined' ? !!d.show_cancel : true);
+
+                    const cancelTextInput = document.getElementById('popupCancelText');
+                    if (cancelTextInput && !cancelTextInput.matches(':focus')) cancelTextInput.value = d.cancel_text || 'বন্ধ করুন';
+
+                    updatePopupLivePreview();
+                }
+            } catch (e) {
+                console.error("Error loading popup settings:", e);
+            }
+        }
+
+        function updatePopupLivePreview() {
+            const isMasterEnabled = document.getElementById('popupMasterEnabled')?.checked;
+            const statusLabel = document.getElementById('popupMasterStatusLabel');
+            const disabledNotice = document.getElementById('previewDisabledNotice');
+            const badge = document.getElementById('badgePopupStatus');
+
+            if (statusLabel) {
+                statusLabel.innerText = isMasterEnabled ? 'ON' : 'OFF';
+                statusLabel.style.color = isMasterEnabled ? '#00F5D4' : '#FF2A54';
+            }
+            if (disabledNotice) {
+                disabledNotice.style.display = isMasterEnabled ? 'none' : 'block';
+            }
+            if (badge) {
+                badge.innerText = isMasterEnabled ? 'Active' : 'Disabled';
+                badge.style.color = isMasterEnabled ? '#00F5D4' : '#FF2A54';
+                badge.style.borderColor = isMasterEnabled ? 'rgba(0,245,212,0.3)' : 'rgba(255,42,84,0.3)';
+            }
+
+            const title = document.getElementById('popupTitle')?.value.trim() || 'গুরুত্বপূর্ণ নোটিশ';
+            const msg = document.getElementById('popupMessage')?.value.trim() || 'কোনো বার্তা সেট করা হয়নি।';
+            const imgUrl = document.getElementById('popupImageUrl')?.value.trim() || '';
+
+            const btn1Text = document.getElementById('popupBtn1Text')?.value.trim() || 'বাটন ১';
+            const btn2Enabled = document.getElementById('popupBtn2Enabled')?.checked;
+            const btn2Text = document.getElementById('popupBtn2Text')?.value.trim() || 'বাটন ২';
+            const showCancel = document.getElementById('popupShowCancel')?.checked;
+            const cancelText = document.getElementById('popupCancelText')?.value.trim() || 'বন্ধ করুন';
+
+            const previewTitle = document.getElementById('previewTitle');
+            if (previewTitle) previewTitle.innerText = title;
+
+            const previewMsg = document.getElementById('previewMessage');
+            if (previewMsg) previewMsg.innerText = msg;
+
+            const previewImgWrap = document.getElementById('previewImageWrapper');
+            const previewImg = document.getElementById('previewImage');
+            const previewIcon = document.getElementById('previewIcon');
+            if (imgUrl && previewImgWrap && previewImg) {
+                previewImg.src = imgUrl;
+                previewImgWrap.style.display = 'block';
+                if (previewIcon) previewIcon.style.display = 'none';
+            } else {
+                if (previewImgWrap) previewImgWrap.style.display = 'none';
+                if (previewIcon) previewIcon.style.display = 'block';
+            }
+
+            const previewBtn1 = document.getElementById('previewBtn1');
+            if (previewBtn1) previewBtn1.innerText = btn1Text;
+
+            const previewBtn2 = document.getElementById('previewBtn2');
+            if (previewBtn2) {
+                previewBtn2.innerText = btn2Text;
+                previewBtn2.style.display = btn2Enabled ? 'block' : 'none';
+            }
+
+            const previewCancel = document.getElementById('previewCancel');
+            if (previewCancel) {
+                previewCancel.innerText = '✕ ' + cancelText;
+                previewCancel.style.display = showCancel ? 'block' : 'none';
+            }
+        }
+
+        async function saveAppPopupSettings() {
+            const masterEnabled = document.getElementById('popupMasterEnabled')?.checked || false;
+            const title = document.getElementById('popupTitle')?.value.trim() || '';
+            const msg = document.getElementById('popupMessage')?.value.trim() || '';
+            const imgUrl = document.getElementById('popupImageUrl')?.value.trim() || '';
+            const btn1Text = document.getElementById('popupBtn1Text')?.value.trim() || '';
+            const btn1Url = document.getElementById('popupBtn1Url')?.value.trim() || '';
+            const btn2Enabled = document.getElementById('popupBtn2Enabled')?.checked || false;
+            const btn2Text = document.getElementById('popupBtn2Text')?.value.trim() || '';
+            const btn2Url = document.getElementById('popupBtn2Url')?.value.trim() || '';
+            const showCancel = document.getElementById('popupShowCancel')?.checked || false;
+            const cancelText = document.getElementById('popupCancelText')?.value.trim() || 'বন্ধ করুন';
+
+            try {
+                const res = await fetch('/api/admin/popup', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        enabled: masterEnabled,
+                        title: title,
+                        message: msg,
+                        image_url: imgUrl,
+                        btn1_text: btn1Text,
+                        btn1_url: btn1Url,
+                        btn2_enabled: btn2Enabled,
+                        btn2_text: btn2Text,
+                        btn2_url: btn2Url,
+                        show_cancel: showCancel,
+                        cancel_text: cancelText
+                    })
+                });
+                const d = await res.json();
+                if (d.code === 0) {
+                    showToast('✅ অ্যাপ নোটিশ পপ-আপ সেটিংস সফলভাবে সেভ হয়েছে!');
+                    loadAppPopupSettings();
+                } else {
+                    alert('Failed to save settings: ' + (d.message || 'Unknown error'));
+                }
+            } catch (e) {
+                alert('Error saving popup settings: ' + e);
             }
         }
 

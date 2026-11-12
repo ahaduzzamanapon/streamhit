@@ -1603,8 +1603,8 @@ fun AdaptivePlayerScreen(
                     showWatchLockDialog = true
                 }
 
-                // 30-minute automated sponsor ad gate
-                if (!isOffline && SponsorAdManager.isEnabled && !SponsorAdManager.isAdUnlocked() && !showPeriodicSponsorDialog) {
+                // Automated periodic sponsor ad gate (Mid-roll)
+                if (!isOffline && SponsorAdManager.isPlacementEnabled(SponsorAdManager.PLACEMENT_PLAYER_INTERVAL) && !SponsorAdManager.isPlaybackIntervalUnlocked() && !showPeriodicSponsorDialog) {
                     p.pause()
                     showPeriodicSponsorDialog = true
                 }
@@ -1671,7 +1671,7 @@ fun AdaptivePlayerScreen(
                 onDismiss = { showDownloadSheet = false },
                 onDownloadSelected = { res ->
                     showDownloadSheet = false
-                    if (SponsorAdManager.isEnabled) {
+                    if (SponsorAdManager.isPlacementEnabled(SponsorAdManager.PLACEMENT_DOWNLOAD_SINGLE)) {
                         pendingPlayerDownloadRes = res
                         showPlayerDownloadSponsorDialog = true
                     } else {
@@ -2116,7 +2116,7 @@ fun AdaptivePlayerScreen(
                 videoTitle = currentVideoTitle,
                 onSupportClick = {
                     val intent = Intent(context, SponsorWebViewActivity::class.java).apply {
-                        putExtra("EXTRA_TARGET_URL", SponsorAdManager.sponsorUrl)
+                        putExtra("EXTRA_TARGET_URL", SponsorAdManager.getPlacementUrl(SponsorAdManager.PLACEMENT_PLAYER_INTERVAL))
                     }
                     periodicSponsorLauncher.launch(intent)
                 },
@@ -2132,7 +2132,7 @@ fun AdaptivePlayerScreen(
                 videoTitle = "${currentVideoTitle} (${pendingPlayerDownloadRes?.displayResolution})",
                 onSupportClick = {
                     val intent = Intent(context, SponsorWebViewActivity::class.java).apply {
-                        putExtra("EXTRA_TARGET_URL", SponsorAdManager.sponsorUrl)
+                        putExtra("EXTRA_TARGET_URL", SponsorAdManager.getPlacementUrl(SponsorAdManager.PLACEMENT_DOWNLOAD_SINGLE))
                         putExtra("EXTRA_IS_DOWNLOAD_AD", true)
                     }
                     playerDownloadSponsorLauncher.launch(intent)

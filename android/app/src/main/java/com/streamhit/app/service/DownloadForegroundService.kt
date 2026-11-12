@@ -79,18 +79,32 @@ class DownloadForegroundService : Service() {
         serviceScope.launch {
             MediaDownloadManager.downloadsFlow.collectLatest { list ->
                 val activeDownloads = list.filter { it.status == DownloadStatus.DOWNLOADING }
+                val pendingDownloads = list.filter { it.status == DownloadStatus.PENDING }
+
                 if (activeDownloads.isNotEmpty()) {
                     val current = activeDownloads.first()
                     val now = System.currentTimeMillis()
                     // Throttle notification updates to at most once every 500ms to avoid UI stutter
                     if (now - lastUpdateMs >= 500L || current.progressPercent == 100) {
                         lastUpdateMs = now
-                        val title = current.title
+                        val title = if (activeDownloads.size > 1) {
+                            "${current.title} (+${activeDownloads.size - 1} simultaneous)"
+                        } else {
+                            current.title
+                        }
                         val progress = current.progressPercent
-                        val infoText = "$progress% • ${DownloadItem.formatFileSize(current.downloadedBytes)} / ${DownloadItem.formatFileSize(current.totalBytes)}"
+                        val queueInfo = if (pendingDownloads.isNotEmpty()) " • ${pendingDownloads.size} in queue" else ""
+                        val infoText = "$progress% • ${DownloadItem.formatFileSize(current.downloadedBytes)} / ${DownloadItem.formatFileSize(current.totalBytes)}$queueInfo"
                         val updatedNotification = buildNotification(title, progress, infoText)
                         notificationManager.notify(NOTIFICATION_ID, updatedNotification)
                     }
+                } else if (pendingDownloads.isNotEmpty()) {
+                    // Pending downloads remain in queue! Promote next if queue stalled
+                    MediaDownloadManager.processQueue(applicationContext)
+                    val firstPending = pendingDownloads.first()
+                    val infoText = "Waiting in queue (${pendingDownloads.size} remaining)"
+                    val updatedNotification = buildNotification(firstPending.title, 0, infoText)
+                    notificationManager.notify(NOTIFICATION_ID, updatedNotification)
                 } else {
                     // Check if all downloads finished
                     val hasCompleted = list.any { it.status == DownloadStatus.COMPLETED }

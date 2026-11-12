@@ -1,7 +1,10 @@
 package com.streamhit.app.ui.downloads
 
+import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -38,7 +41,10 @@ import com.streamhit.app.data.repository.MovieRepository
 import com.streamhit.app.ui.components.AppShareDialog
 import com.streamhit.app.ui.components.BackgroundDownloadPermissionDialog
 import com.streamhit.app.ui.components.MediaCard
+import com.streamhit.app.ui.components.SponsorSupportDialog
+import com.streamhit.app.ui.sponsor.SponsorWebViewActivity
 import com.streamhit.app.util.BackgroundDownloadHelper
+import com.streamhit.app.util.SponsorAdManager
 import com.streamhit.app.ui.theme.*
 import kotlinx.coroutines.delay
 
@@ -51,13 +57,26 @@ fun DownloadsScreen(
 ) {
     val context = LocalContext.current
     val downloadItems by MediaDownloadManager.downloadsFlow.collectAsState()
+    val maxConcurrent by MediaDownloadManager.maxConcurrentFlow.collectAsState()
     var availableStorage by remember { mutableStateOf("") }
     var recommendations by remember { mutableStateOf<List<SubjectSummary>>(emptyList()) }
     var selectedFilterIndex by remember { mutableStateOf(0) }
     var selectedSeriesForDetail by remember { mutableStateOf<String?>(null) }
     var showShareDialog by remember { mutableStateOf(false) }
+    var showTurboSponsorDialog by remember { mutableStateOf(false) }
     var isBgDownloadActive by remember { mutableStateOf(BackgroundDownloadHelper.isBatteryOptimizationIgnored(context)) }
     var showBgDownloadPermissionDialog by remember { mutableStateOf(false) }
+
+    val turboSponsorLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            showTurboSponsorDialog = false
+            MediaDownloadManager.unlockTurbo(context)
+            MediaDownloadManager.setMaxConcurrentDownloads(context, 3)
+            Toast.makeText(context, "🎉 একসাথে ৩টি ভিডিও ডাউনলোড আনলক হয়েছে!", Toast.LENGTH_LONG).show()
+        }
+    }
 
     // Intercept back button when inside a Series Download Detail view
     BackHandler(enabled = selectedSeriesForDetail != null) {
@@ -84,7 +103,17 @@ fun DownloadsScreen(
 
     val downloadingList = downloadItems.filter {
         it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.PENDING || it.status == DownloadStatus.PAUSED || it.status == DownloadStatus.FAILED
-    }
+    }.sortedWith(
+        compareBy<DownloadItem> {
+            when (it.status) {
+                DownloadStatus.DOWNLOADING -> 0
+                DownloadStatus.PENDING -> 1
+                DownloadStatus.PAUSED -> 2
+                DownloadStatus.FAILED -> 3
+                else -> 4
+            }
+        }.thenBy { it.addedTime }
+    )
     val completedList = downloadItems.filter { it.status == DownloadStatus.COMPLETED }
 
     // Helper to extract series name
@@ -389,6 +418,29 @@ fun DownloadsScreen(
                 )
             }
 
+            // Download Concurrency Mode Switcher (1 at a time vs 3 at a time)
+            item {
+                DownloadConcurrencySelectorCard(
+                    maxConcurrent = maxConcurrent,
+                    isTurboUnlocked = MediaDownloadManager.isTurboUnlocked(context),
+                    activeCount = downloadItems.count { it.status == DownloadStatus.DOWNLOADING },
+                    pendingCount = downloadItems.count { it.status == DownloadStatus.PENDING },
+                    onSelectLimit = { limit ->
+                        if (limit == 3) {
+                            if (MediaDownloadManager.isTurboUnlocked(context)) {
+                                MediaDownloadManager.setMaxConcurrentDownloads(context, 3)
+                                Toast.makeText(context, "⚡ একসাথে ৩টি ভিডিও ডাউনলোড সক্রিয় করা হয়েছে!", Toast.LENGTH_SHORT).show()
+                            } else {
+                                showTurboSponsorDialog = true
+                            }
+                        } else {
+                            MediaDownloadManager.setMaxConcurrentDownloads(context, 1)
+                            Toast.makeText(context, "১টি করে ডাউনলোড মোড সক্রিয় করা হয়েছে।", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                )
+            }
+
             // Section: Downloading (Active tasks)
             if (downloadingList.isNotEmpty()) {
                 item {
@@ -665,7 +717,169 @@ fun DownloadsScreen(
             }
         )
     }
+
+    if (showTurboSponsorDialog) {
+        SponsorSupportDialog(
+            videoTitle = "একসাথে ৩টি ভিডিও ডাউনলোড",
+            onSupportClick = {
+                val intent = Intent(context, SponsorWebViewActivity::class.java).apply {
+                    putExtra("EXTRA_TARGET_URL", SponsorAdManager.getPlacementUrl(SponsorAdManager.PLACEMENT_DOWNLOAD_TURBO))
+                    putExtra("EXTRA_IS_DOWNLOAD_AD", true)
+                }
+                turboSponsorLauncher.launch(intent)
+            },
+            onCancel = {
+                showTurboSponsorDialog = false
+            }
+        )
+    }
 }
+}
+
+@Composable
+fun DownloadConcurrencySelectorCard(
+    maxConcurrent: Int,
+    isTurboUnlocked: Boolean,
+    activeCount: Int,
+    pendingCount: Int,
+    onSelectLimit: (Int) -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = Color(0xFF0F172A),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Speed,
+                        contentDescription = "Speed",
+                        tint = if (maxConcurrent == 3) AccentCyan else AccentEmerald,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "ডাউনলোড কিউ স্পিড",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                if (activeCount > 0 || pendingCount > 0) {
+                    Text(
+                        text = "${activeCount}টি চলছে${if (pendingCount > 0) " • ${pendingCount}টি লাইনে" else ""}",
+                        color = if (maxConcurrent == 3) AccentCyan else AccentEmerald,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val is1Selected = maxConcurrent == 1
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (is1Selected) AccentEmerald.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.04f),
+                    border = BorderStroke(
+                        1.dp,
+                        if (is1Selected) AccentEmerald else Color.White.copy(alpha = 0.08f)
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onSelectLimit(1) }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        if (is1Selected) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                tint = AccentEmerald,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                        }
+                        Text(
+                            text = "১টি করে (Normal)",
+                            color = if (is1Selected) AccentEmerald else TextSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = if (is1Selected) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
+                }
+
+                val is3Selected = maxConcurrent == 3
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (is3Selected) AccentCyan.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.04f),
+                    border = BorderStroke(
+                        1.dp,
+                        if (is3Selected) AccentCyan else Color.White.copy(alpha = 0.08f)
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onSelectLimit(3) }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "⚡ একসাথে ৩টি (VIP)",
+                            color = if (is3Selected) AccentCyan else TextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = if (is3Selected) FontWeight.Bold else FontWeight.Medium
+                        )
+                        if (is3Selected) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                tint = AccentCyan,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        } else if (!isTurboUnlocked) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = AccentGold.copy(alpha = 0.2f)
+                            ) {
+                                Text(
+                                    text = "AD",
+                                    color = AccentGold,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Black,
+                                    modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -988,7 +1202,7 @@ fun DownloadingItemCard(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 LinearProgressIndicator(
-                    progress = { item.progressPercent / 100f },
+                    progress = { if (item.status == DownloadStatus.PENDING) 0f else (item.progressPercent / 100f) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(4.dp)
@@ -997,6 +1211,7 @@ fun DownloadingItemCard(
                         DownloadStatus.FAILED -> Color(0xFFFF5252)
                         DownloadStatus.PAUSED -> AccentGold
                         DownloadStatus.COMPLETED -> AccentEmerald
+                        DownloadStatus.PENDING -> Color(0xFF6B7280)
                         else -> AccentCyan
                     },
                     trackColor = Color.White.copy(alpha = 0.1f)
@@ -1011,12 +1226,14 @@ fun DownloadingItemCard(
                         DownloadStatus.FAILED -> "Failed • Tap to retry"
                         DownloadStatus.PAUSED -> "Paused • ${item.formattedSize}"
                         DownloadStatus.COMPLETED -> "Completed"
+                        DownloadStatus.PENDING -> "In Queue (Waiting...)"
                         else -> "${item.formattedSize} • ${item.progressPercent}%"
                     }
                     val statusColor = when (item.status) {
                         DownloadStatus.FAILED -> Color(0xFFFF5252)
                         DownloadStatus.PAUSED -> AccentGold
                         DownloadStatus.COMPLETED -> AccentEmerald
+                        DownloadStatus.PENDING -> Color(0xFF9CA3AF)
                         else -> TextMuted
                     }
                     Text(
@@ -1048,7 +1265,7 @@ fun DownloadingItemCard(
                                 )
                             }
                         }
-                        DownloadStatus.DOWNLOADING -> {
+                        DownloadStatus.DOWNLOADING, DownloadStatus.PENDING -> {
                             IconButton(onClick = onPauseClick, modifier = Modifier.size(20.dp)) {
                                 Icon(
                                     imageVector = Icons.Default.Pause,
