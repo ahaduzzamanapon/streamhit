@@ -153,35 +153,6 @@ object MediaDownloadManager {
         processQueue(context.applicationContext)
     }
 
-    fun isTurboUnlocked(context: Context): Boolean {
-        if (!SponsorAdManager.isEnabled || !SponsorAdManager.isPlacementEnabled(SponsorAdManager.PLACEMENT_DOWNLOAD_TURBO)) return true
-        val until = getPrefs(context).getLong(KEY_TURBO_UNLOCKED_UNTIL, 0L)
-        return System.currentTimeMillis() < until
-    }
-
-    fun unlockTurbo(context: Context, durationHours: Int = 24) {
-        val until = System.currentTimeMillis() + (durationHours * 60 * 60 * 1000L)
-        getPrefs(context).edit().putLong(KEY_TURBO_UNLOCKED_UNTIL, until).apply()
-        setMaxConcurrentDownloads(context, 3)
-    }
-
-    fun getMaxConcurrentDownloads(context: Context): Int {
-        val isUnlocked = isTurboUnlocked(context)
-        val saved = getPrefs(context).getInt(KEY_MAX_CONCURRENT, 1)
-        val limit = if (saved == 3 && !isUnlocked) 1 else saved
-        if (_maxConcurrentFlow.value != limit) {
-            _maxConcurrentFlow.value = limit
-        }
-        return limit
-    }
-
-    fun setMaxConcurrentDownloads(context: Context, limit: Int) {
-        val targetLimit = if (limit == 3) 3 else 1
-        getPrefs(context).edit().putInt(KEY_MAX_CONCURRENT, targetLimit).apply()
-        _maxConcurrentFlow.value = targetLimit
-        processQueue(context.applicationContext)
-    }
-
     @Synchronized
     fun getAllDownloads(context: Context): List<DownloadItem> {
         val list = try {

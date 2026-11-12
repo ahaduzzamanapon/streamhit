@@ -83,7 +83,9 @@ class MainActivity : ComponentActivity() {
         AppAnalyticsManager.getDeviceId(this)
         AppAnalyticsManager.startHeartbeat(this, lifecycleScope)
         SponsorAdManager.init(this)
+        SponsorAdManager.startRealtimeSync(this)
         AppNoticePopupManager.init(this)
+        AppNoticePopupManager.startRealtimeSync(this)
 
         // Handle incoming deep link or notification intent
         handleIncomingIntent(intent)
@@ -256,34 +258,27 @@ fun MainAppScreen(
     var showAppShareModal by remember { mutableStateOf(false) }
 
     var showNoticePopup by remember { mutableStateOf(false) }
+    var showAppLaunchSponsorDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
+    val adConfigVersion = SponsorAdManager.configVersion
+    val popupConfigVersion = AppNoticePopupManager.popupVersion
+
+    LaunchedEffect(adConfigVersion, popupConfigVersion) {
         if (!AppNoticePopupManager.hasShownInCurrentSession && AppNoticePopupManager.isEnabled) {
             AppNoticePopupManager.hasShownInCurrentSession = true
             showNoticePopup = true
+        } else if (!SponsorAdManager.hasShownLaunchAdInSession && SponsorAdManager.isPlacementEnabled(SponsorAdManager.PLACEMENT_APP_LAUNCH)) {
+            SponsorAdManager.hasShownLaunchAdInSession = true
+            showAppLaunchSponsorDialog = true
         }
     }
 
     var pendingPlayRequest by remember { mutableStateOf<PendingPlayRequest?>(null) }
-    var showAppLaunchSponsorDialog by remember { mutableStateOf(false) }
-    var hasCheckedAppLaunchAd by remember { mutableStateOf(false) }
 
     val appLaunchSponsorLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == android.app.Activity.RESULT_OK) {
-            SponsorAdManager.recordAdUnlock()
-        }
+    ) { _ ->
         showAppLaunchSponsorDialog = false
-    }
-
-    LaunchedEffect(Unit) {
-        if (!hasCheckedAppLaunchAd) {
-            hasCheckedAppLaunchAd = true
-            if (SponsorAdManager.isPlacementEnabled(SponsorAdManager.PLACEMENT_APP_LAUNCH) && !SponsorAdManager.isPlaybackIntervalUnlocked()) {
-                showAppLaunchSponsorDialog = true
-            }
-        }
     }
 
     val sponsorActivityLauncher = rememberLauncherForActivityResult(
@@ -291,7 +286,6 @@ fun MainAppScreen(
     ) { result ->
         if (result.resultCode == android.app.Activity.RESULT_OK) {
             // Successfully completed sponsor visit!
-            SponsorAdManager.recordAdUnlock()
             pendingPlayRequest?.let { toPlay ->
                 pendingPlayRequest = null
                 onPlayVideo(
@@ -301,16 +295,17 @@ fun MainAppScreen(
                 )
             }
         } else {
-            // User backed out: session remains locked!
+            // User backed out
+            pendingPlayRequest = null
         }
     }
 
     val triggerPlayWithSponsorCheck: (String, String, String, String, String, Int, Int, Long, String?, String?, String?, String?) -> Unit = { url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPositionMs, dubLanguage, dubSubjectId, dubDetailPath, dubName ->
-        if (!SponsorAdManager.isPlacementEnabled(SponsorAdManager.PLACEMENT_PLAYER_START) || SponsorAdManager.isPlaybackIntervalUnlocked()) {
-            // If sponsor ads disabled in admin OR ad currently unlocked: play directly!
+        if (!SponsorAdManager.isPlacementEnabled(SponsorAdManager.PLACEMENT_PLAYER_START)) {
+            // If sponsor ad disabled in admin: play directly!
             onPlayVideo(url, title, subjectId, detailPath, coverUrl, seasonNum, episodeNum, startPositionMs, dubLanguage, dubSubjectId, dubDetailPath, dubName)
         } else {
-            // Ad locked: prompt user to complete sponsor visit to unlock
+            // Ad enabled in admin: prompt user to complete sponsor visit to unlock
             pendingPlayRequest = PendingPlayRequest(
                 url = url,
                 title = title,
@@ -453,11 +448,30 @@ fun MainAppScreen(
                 currentTab = Screen.Home
             },
             onSelectLiveTv = { channel, streamUrl ->
-                val intent = Intent(context, PlayerActivity::class.java).apply {
-                    putExtra("EXTRA_STREAM_URL", streamUrl)
-                    putExtra("EXTRA_VIDEO_TITLE", channel?.name ?: "Live TV")
+                val title = channel?.name ?: "Live TV"
+                if (SponsorAdManager.isPlacementEnabled(SponsorAdManager.PLACEMENT_LIVETV)) {
+                    pendingPlayRequest = PendingPlayRequest(
+                        url = streamUrl,
+                        title = title,
+                        subjectId = "",
+                        detailPath = "",
+                        coverUrl = "",
+                        seasonNum = 1,
+                        episodeNum = 1,
+                        startPositionMs = 0L,
+                        dubLanguage = null,
+                        dubSubjectId = null,
+                        dubDetailPath = null,
+                        dubName = null,
+                        placement = SponsorAdManager.PLACEMENT_LIVETV
+                    )
+                } else {
+                    val intent = Intent(context, PlayerActivity::class.java).apply {
+                        putExtra("EXTRA_STREAM_URL", streamUrl)
+                        putExtra("EXTRA_VIDEO_TITLE", title)
+                    }
+                    context.startActivity(intent)
                 }
-                context.startActivity(intent)
             }
         )
         return
@@ -639,7 +653,7 @@ fun MainAppScreen(
                         )
                         Screen.LiveTv -> LiveTvScreen(
                             onPlayStream = { url, title ->
-                                if (SponsorAdManager.isPlacementEnabled(SponsorAdManager.PLACEMENT_LIVETV) && !SponsorAdManager.isPlaybackIntervalUnlocked()) {
+                                if (SponsorAdManager.isPlacementEnabled(SponsorAdManager.PLACEMENT_LIVETV)) {
                                     pendingPlayRequest = PendingPlayRequest(
                                         url = url,
                                         title = title,
@@ -1008,6 +1022,10 @@ fun MainAppScreen(
                 AppNoticeDialog(
                     onDismiss = {
                         showNoticePopup = false
+                        if (!SponsorAdManager.hasShownLaunchAdInSession && SponsorAdManager.isPlacementEnabled(SponsorAdManager.PLACEMENT_APP_LAUNCH)) {
+                            SponsorAdManager.hasShownLaunchAdInSession = true
+                            showAppLaunchSponsorDialog = true
+                        }
                     }
                 )
             }

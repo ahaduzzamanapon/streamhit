@@ -1488,8 +1488,8 @@ def get_sponsor_placements_config() -> dict:
         "player_start": {"enabled": True, "url": "", "title": "Video Playback Start"},
         "player_interval": {"enabled": True, "interval_minutes": 25, "url": "", "title": "Periodic Playback Interval"},
         "download_single": {"enabled": True, "url": "", "title": "Start Download (Single/Batch)"},
-        "livetv": {"enabled": False, "url": "", "title": "Live TV Channel Playback"},
-        "app_launch": {"enabled": False, "url": "", "title": "App Launch Interstitial"},
+        "livetv": {"enabled": True, "url": "", "title": "Live TV Channel Playback"},
+        "app_launch": {"enabled": True, "url": "", "title": "App Launch Interstitial"},
     }
     raw_json = get_sponsor_setting("placements_json", "")
     if raw_json:

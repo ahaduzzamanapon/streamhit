@@ -3,9 +3,15 @@ package com.streamhit.app.util
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import com.streamhit.app.data.api.RetrofitClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 object AppNoticePopupManager {
@@ -22,6 +28,9 @@ object AppNoticePopupManager {
     private const val KEY_BTN2_ENABLED = "popup_btn2_enabled"
     private const val KEY_BTN2_TEXT = "popup_btn2_text"
     private const val KEY_BTN2_URL = "popup_btn2_url"
+
+    var popupVersion by mutableIntStateOf(0)
+        private set
 
     @Volatile
     var isEnabled: Boolean = false
@@ -69,6 +78,23 @@ object AppNoticePopupManager {
 
     @Volatile
     var hasShownInCurrentSession: Boolean = false
+
+    private var syncJob: Job? = null
+
+    /**
+     * Start background polling (every 15 seconds) so admin changes take effect in real time.
+     */
+    fun startRealtimeSync(context: Context) {
+        if (syncJob?.isActive == true) return
+        syncJob = CoroutineScope(Dispatchers.IO).launch {
+            while (isActive) {
+                delay(15000)
+                try {
+                    fetchRemoteConfig(context)
+                } catch (_: Exception) {}
+            }
+        }
+    }
 
     fun init(context: Context) {
         try {
@@ -130,6 +156,10 @@ object AppNoticePopupManager {
                     btn2Text = body["btn2_text"]?.toString()?.trim() ?: ""
                     btn2Url = body["btn2_url"]?.toString()?.trim() ?: ""
 
+                    CoroutineScope(Dispatchers.Main).launch {
+                        popupVersion++
+                    }
+
                     context?.let { ctx ->
                         try {
                             val prefs = ctx.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -174,4 +204,3 @@ object AppNoticePopupManager {
         }
     }
 }
-

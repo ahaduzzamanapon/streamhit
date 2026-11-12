@@ -503,6 +503,7 @@ fun AdaptivePlayerScreen(
     val maxSystemVolume = remember { audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).toFloat() }
 
     var showPeriodicSponsorDialog by remember { mutableStateOf(false) }
+    var lastMidrollAdTimestampMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var pendingPlayerDownloadRes by remember { mutableStateOf<StreamResource?>(null) }
     var showPlayerDownloadSponsorDialog by remember { mutableStateOf(false) }
     var showPlayerBgPermissionDialog by remember { mutableStateOf(false) }
@@ -510,9 +511,9 @@ fun AdaptivePlayerScreen(
     val periodicSponsorLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
+        lastMidrollAdTimestampMs = System.currentTimeMillis()
+        showPeriodicSponsorDialog = false
         if (result.resultCode == android.app.Activity.RESULT_OK) {
-            SponsorAdManager.recordAdUnlock()
-            showPeriodicSponsorDialog = false
             exoPlayer?.play()
         }
     }
@@ -1604,9 +1605,13 @@ fun AdaptivePlayerScreen(
                 }
 
                 // Automated periodic sponsor ad gate (Mid-roll)
-                if (!isOffline && SponsorAdManager.isPlacementEnabled(SponsorAdManager.PLACEMENT_PLAYER_INTERVAL) && !SponsorAdManager.isPlaybackIntervalUnlocked() && !showPeriodicSponsorDialog) {
-                    p.pause()
-                    showPeriodicSponsorDialog = true
+                val intervalMinutes = SponsorAdManager.getPlaybackIntervalMinutes(SponsorAdManager.PLACEMENT_PLAYER_INTERVAL)
+                val intervalMs = intervalMinutes * 60 * 1000L
+                if (!isOffline && SponsorAdManager.isPlacementEnabled(SponsorAdManager.PLACEMENT_PLAYER_INTERVAL) && !showPeriodicSponsorDialog) {
+                    if (System.currentTimeMillis() - lastMidrollAdTimestampMs >= intervalMs) {
+                        p.pause()
+                        showPeriodicSponsorDialog = true
+                    }
                 }
 
                 // Real-time AI Audio Translation synchronization
@@ -2121,7 +2126,9 @@ fun AdaptivePlayerScreen(
                     periodicSponsorLauncher.launch(intent)
                 },
                 onCancel = {
-                    // Stays paused until ad viewed
+                    lastMidrollAdTimestampMs = System.currentTimeMillis()
+                    showPeriodicSponsorDialog = false
+                    exoPlayer?.play()
                 }
             )
         }

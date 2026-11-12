@@ -3,10 +3,16 @@ package com.streamhit.app.util
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import com.streamhit.app.data.analytics.AppAnalyticsManager
 import com.streamhit.app.data.api.RetrofitClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
@@ -42,7 +48,20 @@ object SponsorAdManager {
         val intervalMinutes: Int = 25
     )
 
-    private val placementsMap = ConcurrentHashMap<String, PlacementConfig>()
+    private val placementsMap = ConcurrentHashMap<String, PlacementConfig>().apply {
+        put(PLACEMENT_DOWNLOAD_TURBO, PlacementConfig(enabled = true))
+        put(PLACEMENT_PLAYER_START, PlacementConfig(enabled = true))
+        put(PLACEMENT_PLAYER_INTERVAL, PlacementConfig(enabled = true, intervalMinutes = 25))
+        put(PLACEMENT_DOWNLOAD_SINGLE, PlacementConfig(enabled = true))
+        put(PLACEMENT_LIVETV, PlacementConfig(enabled = true))
+        put(PLACEMENT_APP_LAUNCH, PlacementConfig(enabled = true))
+    }
+
+    @Volatile
+    var hasShownLaunchAdInSession: Boolean = false
+
+    var configVersion by mutableIntStateOf(0)
+        private set
 
     @Volatile
     var isSessionUnlocked: Boolean = false
@@ -67,8 +86,7 @@ object SponsorAdManager {
         private set
 
     /**
-     * Checks if ad is currently unlocked.
-     * When unlocked, allows playback interval (default 25 min) of uninterrupted playback before prompting again.
+     * Checks if ad is currently unlocked for playback intervals.
      */
     fun isAdUnlocked(): Boolean {
         return isPlaybackIntervalUnlocked()
@@ -79,7 +97,7 @@ object SponsorAdManager {
         if (!isPlacementEnabled(PLACEMENT_PLAYER_INTERVAL)) return true
         if (!isSessionUnlocked) return false
         val elapsed = System.currentTimeMillis() - lastAdUnlockTimeMs
-        val intervalMs = getPlaybackIntervalMinutes() * 60 * 1000L
+        val intervalMs = getPlaybackIntervalMinutes(PLACEMENT_PLAYER_INTERVAL) * 60 * 1000L
         return elapsed < intervalMs
     }
 
@@ -137,6 +155,23 @@ object SponsorAdManager {
     var cancelText: String = "✕ সরাসরি দেখুন"
         private set
 
+    private var syncJob: Job? = null
+
+    /**
+     * Starts background real-time sync polling (every 15 seconds) while app is active.
+     */
+    fun startRealtimeSync(context: Context) {
+        if (syncJob?.isActive == true) return
+        syncJob = CoroutineScope(Dispatchers.IO).launch {
+            while (isActive) {
+                delay(15000) // Poll every 15s for instant admin responsiveness
+                try {
+                    fetchRemoteConfig(context)
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
     /**
      * Initialize dynamic settings from local cache and fetch latest from Admin Panel.
      */
@@ -178,7 +213,7 @@ object SponsorAdManager {
             prefs.getString(KEY_CANCEL_TEXT, null)?.let { if (it.isNotBlank()) cancelText = it }
         } catch (_: Exception) {}
 
-        // Fetch latest dynamic configuration from Admin Panel API
+        // Fetch latest dynamic configuration from Admin Panel API immediately
         fetchRemoteConfig(context)
     }
 
@@ -195,7 +230,6 @@ object SponsorAdManager {
                     if (!remoteUrl.isNullOrBlank() && remoteUrl.startsWith("http")) {
                         if (remoteUrl != sponsorUrl) {
                             sponsorUrl = remoteUrl
-                            // When admin updates sponsor link, instantly reset session unlock so user gets the new ad!
                             isSessionUnlocked = false
                         }
                     }
@@ -297,7 +331,12 @@ object SponsorAdManager {
                     val rCancel = body?.get("cancel_text")?.toString()?.trim()
                     if (!rCancel.isNullOrBlank()) cancelText = rCancel
 
-                    // Save to SharedPreferences so admin link is permanently active on user's device
+                    // Trigger Compose UI update in real time
+                    CoroutineScope(Dispatchers.Main).launch {
+                        configVersion++
+                    }
+
+                    // Save to SharedPreferences
                     context?.let { ctx ->
                         try {
                             val prefs = ctx.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -342,7 +381,7 @@ object SponsorAdManager {
     }
 
     /**
-     * Open the sponsor URL (dynamically retrieved from Admin Panel) in user's browser.
+     * Open the sponsor URL in user's browser.
      */
     fun openSponsorLink(context: Context): Boolean {
         return try {

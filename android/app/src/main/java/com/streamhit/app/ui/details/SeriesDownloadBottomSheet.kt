@@ -4,6 +4,7 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -185,7 +186,7 @@ fun SeriesDownloadBottomSheet(
                 val speedDesc = if (MediaDownloadManager.getMaxConcurrentDownloads(context) == 3) "একসাথে ৩টি করে" else "১টি করে"
                 Toast.makeText(
                     context,
-                    "$queuedCountটি পর্ব ডাউনলোড লাইনে যুক্ত হয়েছে ($speedDesc)!",
+                    "${queuedCount}টি পর্ব ডাউনলোড লাইনে যুক্ত হয়েছে ($speedDesc)!",
                     Toast.LENGTH_LONG
                 ).show()
                 if (!BackgroundDownloadHelper.isBatteryOptimizationIgnored(context) && !BackgroundDownloadHelper.hasPromptedInitialPermission(context)) {
