@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.streamhit.app.data.model.LiveSportItem
 import com.streamhit.app.ui.components.ShareAppBannerCard
 import com.streamhit.app.ui.components.AppShareDialog
 import androidx.media3.common.util.UnstableApi
@@ -558,6 +559,9 @@ fun PortraitMediaDetails(
     currentVideoTitle: String,
     isLiveStream: Boolean,
     isOffline: Boolean = false,
+    isLiveEvent: Boolean = false,
+    liveEvents: List<LiveSportItem> = emptyList(),
+    onSwitchLiveEvent: (LiveSportItem) -> Unit = {},
     currentChannel: LiveTvChannel?,
     activeServers: List<StreamLinkItem>,
     currentServerIndex: Int,
@@ -598,7 +602,189 @@ fun PortraitMediaDetails(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        if (isLiveStream && !isOffline) {
+        if (isLiveEvent && !isOffline) {
+            // Live Sports Event Details
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .background(Color(0xFFEF4444).copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                            .border(1.dp, Color(0xFFEF4444).copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text("LIVE EVENT", color = Color(0xFFEF4444), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Text("🏏 Cricket & World Sports", color = TextMuted, fontSize = 11.sp)
+                }
+
+                IconButton(
+                    onClick = {
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, "Watch $currentVideoTitle live on NXLY Sports: https://nxly.online")
+                        }
+                        context.startActivity(Intent.createChooser(shareIntent, "Share with"))
+                    },
+                    modifier = Modifier.size(32.dp).background(BgCard, CircleShape)
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(15.dp))
+                }
+            }
+
+            // Alternative Streaming Servers
+            if (activeServers.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Streaming Servers", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text("${activeServers.size} Servers Available", color = TextMuted, fontSize = 11.sp)
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(activeServers.size) { idx ->
+                        val srv = activeServers[idx]
+                        val isSelected = currentServerIndex == idx
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) AccentCyan.copy(alpha = 0.2f) else BgCard,
+                            border = BorderStroke(
+                                1.dp,
+                                if (isSelected) AccentCyan else Color.White.copy(alpha = 0.08f)
+                            ),
+                            modifier = Modifier
+                                .height(36.dp)
+                                .clickable { onSwitchLiveServer(idx) }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .background(if (isSelected) AccentCyan else TextMuted, CircleShape)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = srv.label,
+                                    color = if (isSelected) AccentCyan else Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Related / Other Live Sports Matches
+            val otherEvents = remember(liveEvents, currentVideoTitle) {
+                liveEvents.filter { !it.matchTitle.equals(currentVideoTitle, ignoreCase = true) }
+            }
+            if (otherEvents.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("🏏 Live & Upcoming Matches", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("(${otherEvents.size})", color = TextMuted, fontSize = 12.sp)
+                    }
+                    Text(
+                        text = "Sports",
+                        color = Color(0xFF00E5FF),
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+
+                otherEvents.forEach { ev ->
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { onSwitchLiveEvent(ev) },
+                        color = Color(0xFF1E293B),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    val isEvLive = ev.matchTime == "LIVE NOW" || ev.title.contains("Live", ignoreCase = true)
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(if (isEvLive) Color(0xFFEF4444).copy(alpha = 0.2f) else Color(0xFF38BDF8).copy(alpha = 0.2f))
+                                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isEvLive) "LIVE" else ev.matchTime.ifBlank { "UPCOMING" },
+                                            color = if (isEvLive) Color(0xFFEF4444) else Color(0xFF38BDF8),
+                                            fontSize = 9.5.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = ev.league.ifBlank { "Sports" },
+                                        color = TextMuted,
+                                        fontSize = 10.5.sp,
+                                        maxLines = 1
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = ev.matchTitle,
+                                    color = Color.White,
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                val sc = ev.streamLinks.size
+                                Text(
+                                    text = if (sc > 1) "$sc Servers Available" else "1 Server Available",
+                                    color = if (sc > 1) Color(0xFF10B981) else Color(0xFF64748B),
+                                    fontSize = 11.sp
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = "Play",
+                                tint = Color(0xFF00E5FF),
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+        } else if (isLiveStream && !isOffline) {
             // Live TV Details
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -634,7 +820,7 @@ fun PortraitMediaDetails(
             }
 
             // Alternative Streaming Servers
-            if (activeServers.size > 1) {
+            if (activeServers.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(10.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -645,11 +831,12 @@ fun PortraitMediaDetails(
                     Text("${activeServers.size} Servers Available", color = TextMuted, fontSize = 11.sp)
                 }
                 Spacer(modifier = Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    activeServers.forEachIndexed { idx, srv ->
+                    items(activeServers.size) { idx ->
+                        val srv = activeServers[idx]
                         val isSelected = currentServerIndex == idx
                         Surface(
                             shape = RoundedCornerShape(8.dp),
@@ -659,12 +846,11 @@ fun PortraitMediaDetails(
                                 if (isSelected) AccentEmerald else Color.White.copy(alpha = 0.08f)
                             ),
                             modifier = Modifier
-                                .weight(1f)
                                 .height(36.dp)
                                 .clickable { onSwitchLiveServer(idx) }
                         ) {
                             Row(
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier.padding(horizontal = 12.dp),
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {

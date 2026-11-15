@@ -184,7 +184,7 @@ fun HomeScreen(
     ) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _ -> },
     onNavigateToSearch: () -> Unit = {},
     onNavigateToLiveEvents: () -> Unit = {},
-    onSelectLiveEvent: (com.streamhit.app.data.model.LiveSportItem) -> Unit = {},
+    onSelectLiveEvent: (com.streamhit.app.data.model.LiveSportItem, List<com.streamhit.app.data.model.LiveSportItem>) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -682,7 +682,7 @@ fun HomeScreen(
                         items(liveSports.take(8)) { sport ->
                             HomeLiveEventCard(
                                 item = sport,
-                                onClick = { onSelectLiveEvent(sport) }
+                                onClick = { onSelectLiveEvent(sport, liveSports) }
                             )
                         }
                     }
@@ -1210,6 +1210,7 @@ fun HomeLiveEventCard(
     Surface(
         modifier = Modifier
             .width(220.dp)
+            .height(118.dp)
             .clip(RoundedCornerShape(14.dp))
             .clickable { onClick() },
         color = Color(0xFF0F172A),
@@ -1219,7 +1220,12 @@ fun HomeLiveEventCard(
         ),
         shape = RoundedCornerShape(14.dp)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1256,18 +1262,14 @@ fun HomeLiveEventCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
             Text(
                 text = item.matchTitle,
-                fontSize = 13.5.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
-
-            Spacer(modifier = Modifier.height(10.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),

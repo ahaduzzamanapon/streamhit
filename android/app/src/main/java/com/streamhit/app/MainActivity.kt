@@ -481,6 +481,7 @@ fun MainAppScreen(
                     putExtra("EXTRA_VIDEO_TITLE", event.matchTitle)
                     putExtra("EXTRA_IS_LIVE_EVENT", true)
                     putExtra("EXTRA_SERVERS_JSON", com.google.gson.Gson().toJson(event.streamLinks))
+                    putExtra("EXTRA_ALL_EVENTS_JSON", com.google.gson.Gson().toJson(listOf(event)))
                 }
                 context.startActivity(intent)
             }
@@ -664,13 +665,14 @@ fun MainAppScreen(
                             onNavigateToLiveEvents = {
                                 switchTab(Screen.LiveEvents)
                             },
-                            onSelectLiveEvent = { event ->
+                            onSelectLiveEvent = { event, allEvents ->
                                 val sUrl = event.streamLinks.firstOrNull()?.url ?: ""
                                 val intent = Intent(context, PlayerActivity::class.java).apply {
                                     putExtra("EXTRA_STREAM_URL", sUrl)
                                     putExtra("EXTRA_VIDEO_TITLE", event.matchTitle)
                                     putExtra("EXTRA_IS_LIVE_EVENT", true)
                                     putExtra("EXTRA_SERVERS_JSON", com.google.gson.Gson().toJson(event.streamLinks))
+                                    putExtra("EXTRA_ALL_EVENTS_JSON", com.google.gson.Gson().toJson(allEvents))
                                 }
                                 context.startActivity(intent)
                             }
@@ -683,6 +685,7 @@ fun MainAppScreen(
                                     putExtra("EXTRA_VIDEO_TITLE", title)
                                     putExtra("EXTRA_IS_LIVE_EVENT", true)
                                     putExtra("EXTRA_SERVERS_JSON", com.google.gson.Gson().toJson(servers))
+                                    putExtra("EXTRA_ALL_EVENTS_JSON", com.google.gson.Gson().toJson(allEvents))
                                 }
                                 context.startActivity(intent)
                             }

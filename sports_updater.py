@@ -44,6 +44,34 @@ def _fetch_url(url: str, headers: dict = None, timeout: int = 8) -> str:
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return resp.read().decode("utf-8", errors="ignore")
 
+def is_stream_alive(url: str, custom_headers: dict = None, timeout: float = 3.5) -> bool:
+    if not url or not url.startswith(("http://", "https://")):
+        return False
+    req_headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "*/*",
+        "Connection": "keep-alive",
+        "Range": "bytes=0-1024"
+    }
+    if custom_headers and isinstance(custom_headers, dict):
+        for k, v in custom_headers.items():
+            if k and v:
+                req_headers[str(k)] = str(v)
+
+    if "tapmad.com" in url and "Referer" not in req_headers:
+        req_headers["Referer"] = "https://www.tapmad.com/"
+
+    try:
+        req = urllib.request.Request(url, headers=req_headers)
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.getcode() < 400
+    except urllib.error.HTTPError as e:
+        if e.code in (200, 206, 301, 302, 307, 308, 416):
+            return True
+        return False
+    except Exception:
+        return False
+
 def extract_teams_and_key(title: str):
     if not title:
         return "unknown", "Live Event", "", "", "Sports"
@@ -148,7 +176,45 @@ def fetch_aggregated_sports_sync() -> dict:
     except Exception as e:
         logger.debug(f"SonyLIV error: {e}")
 
-    # 3. Willow Cricket (ClearKey & Dash)
+    # 3. Willow Live Sports JSON & Multi-CDN DASH (ClearKey)
+    try:
+        willow_json_url = "https://raw.githubusercontent.com/srhady/willow-event/refs/heads/main/live_sports.json"
+        content = _fetch_url(willow_json_url, timeout=8)
+        w_data = json.loads(content)
+        for m in w_data.get("Matches", []):
+            st = (m.get("status") or "").lower()
+            if st in ["completed", "ended", "finished"]:
+                continue
+            title = m.get("title", "")
+            if not title:
+                continue
+            key, clean_title, t1, t2, sport = extract_teams_and_key(title)
+            thumb = m.get("cover_image", "")
+            match_time = "LIVE NOW" if st == "live" else (m.get("time") or "UPCOMING")
+            drm_key = (m.get("drm_key") or "").strip()
+
+            item = ensure_item(key, clean_title, t1, t2, "Cricket", thumb, "Willow Cricket HD", st if st else "live", match_time)
+            if thumb and (not item.get("thumbnail") or "unsplash" in item.get("thumbnail", "")):
+                item["thumbnail"] = thumb
+                item["logo"] = thumb
+
+            stream_dict = m.get("stream_url_alpha") or {}
+            if isinstance(stream_dict, dict):
+                for srv_name, srv_url in stream_dict.items():
+                    if srv_url and srv_url not in item["server_urls"]:
+                        item["server_urls"].append(srv_url)
+                        label = f"Server {len(item['stream_links']) + 1} ({srv_name})"
+                        s_link = {
+                            "label": label,
+                            "url": srv_url
+                        }
+                        if drm_key:
+                            s_link["license_key"] = drm_key
+                        item["stream_links"].append(s_link)
+    except Exception as e:
+        logger.debug(f"Willow JSON error: {e}")
+
+    # 3b. Willow Cricket M3U Feed (ClearKey & Dash)
     try:
         willow_url = "https://raw.githubusercontent.com/srhady/willow-event/refs/heads/main/live_sports.m3u"
         content = _fetch_url(willow_url, timeout=7)
@@ -256,6 +322,38 @@ def fetch_aggregated_sports_sync() -> dict:
                 ensure_item(key, clean_title, t1, t2, sport_name, "", "FanCode Live", status_val, match_time_val)
     except Exception as e:
         logger.debug(f"FanCode error: {e}")
+
+    # 6. Pre-validate every streaming link with headers & cookies before saving
+    all_unique_streams = {}
+    for ev in grouped.values():
+        for sl in ev.get("stream_links", []):
+            u = sl.get("url")
+            if u and u not in all_unique_streams:
+                all_unique_streams[u] = sl.get("headers")
+
+    if all_unique_streams:
+        from concurrent.futures import ThreadPoolExecutor
+        logger.info(f"Validating {len(all_unique_streams)} streams before saving...")
+        with ThreadPoolExecutor(max_workers=20) as executor:
+            check_results = dict(executor.map(
+                lambda item: (item[0], is_stream_alive(item[0], item[1])),
+                all_unique_streams.items()
+            ))
+
+        for ev in grouped.values():
+            alive_links = []
+            for sl in ev.get("stream_links", []):
+                u = sl.get("url")
+                if check_results.get(u, False):
+                    alive_links.append(sl)
+
+            for idx, sl in enumerate(alive_links):
+                m_sub = re.search(r'\((.*?)\)', sl.get("label", ""))
+                sub_label = f" ({m_sub.group(1)})" if m_sub else ""
+                sl["label"] = f"Server {idx + 1}{sub_label}"
+
+            ev["stream_links"] = alive_links
+            ev["server_urls"] = [sl["url"] for sl in alive_links]
 
     # Convert to list and re-index
     events = list(grouped.values())

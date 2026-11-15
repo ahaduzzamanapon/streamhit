@@ -215,11 +215,22 @@ class PlayerActivity : ComponentActivity() {
         val dubDetailPath = intent.getStringExtra("EXTRA_DUB_DETAIL_PATH") ?: ""
         val dubName = intent.getStringExtra("EXTRA_DUB_NAME") ?: ""
         val isOffline = intent.getBooleanExtra("EXTRA_IS_OFFLINE", false)
+        val isLiveEvent = intent.getBooleanExtra("EXTRA_IS_LIVE_EVENT", false)
         val extraServersJson = intent.getStringExtra("EXTRA_SERVERS_JSON") ?: ""
         val extraServersList: List<com.streamhit.app.data.model.StreamLinkItem> = try {
             if (extraServersJson.isNotBlank()) {
                 val listType = object : com.google.gson.reflect.TypeToken<List<com.streamhit.app.data.model.StreamLinkItem>>() {}.type
                 com.google.gson.Gson().fromJson(extraServersJson, listType) ?: emptyList()
+            } else emptyList()
+        } catch (_: Exception) {
+            emptyList()
+        }
+
+        val allEventsJson = intent.getStringExtra("EXTRA_ALL_EVENTS_JSON") ?: ""
+        val allEventsList: List<com.streamhit.app.data.model.LiveSportItem> = try {
+            if (allEventsJson.isNotBlank()) {
+                val listType = object : com.google.gson.reflect.TypeToken<List<com.streamhit.app.data.model.LiveSportItem>>() {}.type
+                com.google.gson.Gson().fromJson(allEventsJson, listType) ?: emptyList()
             } else emptyList()
         } catch (_: Exception) {
             emptyList()
@@ -241,6 +252,8 @@ class PlayerActivity : ComponentActivity() {
                     initialDubDetailPath = dubDetailPath,
                     initialDubName = dubName,
                     initialIsOffline = isOffline,
+                    initialIsLiveEvent = isLiveEvent,
+                    initialLiveEvents = allEventsList,
                     extraServers = extraServersList,
                     onBack = { finish() },
                     onEnterPip = { enterPipMode() }
@@ -383,6 +396,8 @@ fun AdaptivePlayerScreen(
     initialDubDetailPath: String = "",
     initialDubName: String = "",
     initialIsOffline: Boolean = false,
+    initialIsLiveEvent: Boolean = false,
+    initialLiveEvents: List<com.streamhit.app.data.model.LiveSportItem> = emptyList(),
     extraServers: List<com.streamhit.app.data.model.StreamLinkItem> = emptyList(),
     onBack: () -> Unit,
     onEnterPip: () -> Unit
@@ -558,7 +573,19 @@ fun AdaptivePlayerScreen(
         }
     }
 
-    val isLiveTv = subjectId.isBlank() && detailPath.isBlank()
+    val isLiveEvent = initialIsLiveEvent
+    val isLiveTv = !isLiveEvent && subjectId.isBlank() && detailPath.isBlank()
+    var liveEvents by remember { mutableStateOf(initialLiveEvents) }
+    var currentExtraServers by remember { mutableStateOf(extraServers) }
+
+    LaunchedEffect(isLiveEvent) {
+        if (isLiveEvent && liveEvents.isEmpty()) {
+            try {
+                liveEvents = repository.getLiveSports()
+            } catch (_: Exception) {}
+        }
+    }
+
     val liveTvRepository = remember { LiveTvRepository() }
     var liveChannels by remember { mutableStateOf<List<LiveTvChannel>>(emptyList()) }
     var currentChannel by remember { mutableStateOf<LiveTvChannel?>(null) }
@@ -625,27 +652,24 @@ fun AdaptivePlayerScreen(
     }
 
     fun switchLiveServer(index: Int) {
-        val servers = currentChannel?.activeServers ?: emptyList()
-        val s = servers.getOrNull(index) ?: return
+        val s = if (isLiveEvent) {
+            currentExtraServers.getOrNull(index)
+        } else {
+            val servers = currentChannel?.activeServers ?: emptyList()
+            val srv = servers.getOrNull(index)
+            if (srv != null && currentChannel != null) {
+                DeviceUtils.saveLastPlayedLiveChannel(context, currentChannel!!, index)
+            }
+            srv
+        } ?: return
+
         currentServerIndex = index
         currentStreamUrl = s.url
-        currentChannel?.let {
-            DeviceUtils.saveLastPlayedLiveChannel(context, it, index)
-        }
         hasPlaybackError = false
         playbackErrorMessage = null
         isBuffering = true
         val directUrl = resolveDirectPlayableUrl(s.url)
-        val mediaItem = MediaItem.Builder()
-            .setUri(Uri.parse(directUrl))
-            .setLiveConfiguration(
-                MediaItem.LiveConfiguration.Builder()
-                    .setTargetOffsetMs(3500L)
-                    .setMinPlaybackSpeed(0.97f)
-                    .setMaxPlaybackSpeed(1.03f)
-                    .build()
-            )
-            .build()
+        val mediaItem = buildPlayableMediaItem(directUrl, isLive = true, licenseKey = s.licenseKey)
         exoPlayer?.apply {
             stop()
             clearMediaItems()
@@ -654,6 +678,28 @@ fun AdaptivePlayerScreen(
             play()
         }
         Toast.makeText(context, "📡 ${s.label} চালু করা হয়েছে", Toast.LENGTH_SHORT).show()
+    }
+
+    fun switchLiveEvent(event: com.streamhit.app.data.model.LiveSportItem) {
+        val s = event.streamLinks.firstOrNull() ?: return
+        currentVideoTitle = event.matchTitle
+        currentExtraServers = event.streamLinks
+        currentServerIndex = 0
+        currentStreamUrl = s.url
+        failedStreamUrls.clear()
+        hasPlaybackError = false
+        playbackErrorMessage = null
+        isBuffering = true
+        val directUrl = resolveDirectPlayableUrl(s.url)
+        val mediaItem = buildPlayableMediaItem(directUrl, isLive = true, licenseKey = s.licenseKey)
+        exoPlayer?.apply {
+            stop()
+            clearMediaItems()
+            setMediaItem(mediaItem)
+            prepare()
+            play()
+        }
+        Toast.makeText(context, "🏏 ${event.matchTitle} চালু করা হয়েছে", Toast.LENGTH_SHORT).show()
     }
 
     val relatedChannels = remember(liveChannels, currentChannel) {
@@ -691,16 +737,7 @@ fun AdaptivePlayerScreen(
         playbackErrorMessage = null
         isBuffering = true
         val directUrl = resolveDirectPlayableUrl(s.url)
-        val mediaItem = MediaItem.Builder()
-            .setUri(Uri.parse(directUrl))
-            .setLiveConfiguration(
-                MediaItem.LiveConfiguration.Builder()
-                    .setTargetOffsetMs(3500L)
-                    .setMinPlaybackSpeed(0.97f)
-                    .setMaxPlaybackSpeed(1.03f)
-                    .build()
-            )
-            .build()
+        val mediaItem = buildPlayableMediaItem(directUrl, isLive = true, licenseKey = s.licenseKey)
         exoPlayer?.apply {
             stop()
             clearMediaItems()
@@ -1349,21 +1386,19 @@ fun AdaptivePlayerScreen(
             .setLoadControl(loadControl)
             .setSeekParameters(SeekParameters.CLOSEST_SYNC)
             .build().apply {
-                val mediaItem = if (isLiveTv) {
-                    MediaItem.Builder()
-                        .setUri(Uri.parse(resolvedUrl))
-                        .setLiveConfiguration(
-                            MediaItem.LiveConfiguration.Builder()
-                                .setTargetOffsetMs(8000L)
-                                .setMinPlaybackSpeed(0.97f)
-                                .setMaxPlaybackSpeed(1.03f)
-                                .build()
-                        )
-                        .build()
+                val initialLicenseKey = if (isLiveEvent) {
+                    currentExtraServers.firstOrNull { it.url == resolvedUrl || it.url == initialStreamUrl }?.licenseKey
+                        ?: currentExtraServers.firstOrNull()?.licenseKey ?: ""
+                } else if (isLiveTv) {
+                    currentChannel?.activeServers?.firstOrNull { it.url == resolvedUrl || it.url == initialStreamUrl }?.licenseKey ?: ""
+                } else ""
+
+                val mediaItem = if (isLiveTv || isLiveEvent) {
+                    buildPlayableMediaItem(resolvedUrl, isLive = true, licenseKey = initialLicenseKey)
                 } else {
                     MediaItem.fromUri(Uri.parse(resolvedUrl))
                 }
-                setMediaItem(mediaItem, if (isLiveTv) 0L else initialStartMs)
+                setMediaItem(mediaItem, if (isLiveTv || isLiveEvent) 0L else initialStartMs)
                 prepare()
                 playWhenReady = true
             }
@@ -1481,16 +1516,7 @@ fun AdaptivePlayerScreen(
                         android.util.Log.w("StreamHitPlayer", "Live TV Auto-failover: Switching to ${nextServer.label} (${nextServer.url})")
                         Toast.makeText(context, "⚠️ সার্ভার বিচ্ছিন্ন। ${nextServer.label}-এ অটো সুইচ করা হচ্ছে...", Toast.LENGTH_SHORT).show()
                         val directUrl = resolveDirectPlayableUrl(nextServer.url)
-                        val mediaItem = MediaItem.Builder()
-                            .setUri(Uri.parse(directUrl))
-                            .setLiveConfiguration(
-                                MediaItem.LiveConfiguration.Builder()
-                                    .setTargetOffsetMs(8000L)
-                                    .setMinPlaybackSpeed(0.97f)
-                                    .setMaxPlaybackSpeed(1.03f)
-                                    .build()
-                            )
-                            .build()
+                        val mediaItem = buildPlayableMediaItem(directUrl, isLive = true, licenseKey = nextServer.licenseKey)
                         player.stop()
                         player.clearMediaItems()
                         player.setMediaItem(mediaItem)
@@ -1501,10 +1527,10 @@ fun AdaptivePlayerScreen(
                 }
 
                 // Step 2.6: Live Events / Multi-Server Auto-Failover
-                if (isLiveTv && extraServers.isNotEmpty()) {
-                    val untriedServerIdx = extraServers.indexOfFirst { it.url.isNotBlank() && !failedStreamUrls.contains(it.url) }
+                if (isLiveEvent && currentExtraServers.isNotEmpty()) {
+                    val untriedServerIdx = currentExtraServers.indexOfFirst { it.url.isNotBlank() && !failedStreamUrls.contains(it.url) }
                     if (untriedServerIdx >= 0) {
-                        val nextServer = extraServers[untriedServerIdx]
+                        val nextServer = currentExtraServers[untriedServerIdx]
                         currentServerIndex = untriedServerIdx
                         currentStreamUrl = nextServer.url
                         isBuffering = true
@@ -1512,16 +1538,7 @@ fun AdaptivePlayerScreen(
                         android.util.Log.w("StreamHitPlayer", "Live Event Auto-failover: Switching to ${nextServer.label} (${nextServer.url})")
                         Toast.makeText(context, "⚠️ সার্ভার সমস্যা। ${nextServer.label}-এ অটো সুইচ করা হচ্ছে...", Toast.LENGTH_SHORT).show()
                         val directUrl = resolveDirectPlayableUrl(nextServer.url)
-                        val mediaItem = MediaItem.Builder()
-                            .setUri(Uri.parse(directUrl))
-                            .setLiveConfiguration(
-                                MediaItem.LiveConfiguration.Builder()
-                                    .setTargetOffsetMs(8000L)
-                                    .setMinPlaybackSpeed(0.97f)
-                                    .setMaxPlaybackSpeed(1.03f)
-                                    .build()
-                            )
-                            .build()
+                        val mediaItem = buildPlayableMediaItem(directUrl, isLive = true, licenseKey = nextServer.licenseKey)
                         player.stop()
                         player.clearMediaItems()
                         player.setMediaItem(mediaItem)
@@ -1659,7 +1676,8 @@ fun AdaptivePlayerScreen(
                 val pos = p.currentPosition.coerceAtLeast(0L)
                 val dur = p.duration.coerceAtLeast(0L)
                 val buf = p.bufferedPosition.coerceAtLeast(pos)
-                val ahead = (buf - pos).coerceAtLeast(0L)
+                val rawAhead = buf - pos
+                val ahead = if (rawAhead in 0L..600_000L) rawAhead else 0L
 
                 currentPosition = pos
                 totalDuration = dur
@@ -1674,7 +1692,7 @@ fun AdaptivePlayerScreen(
 
                 // 20-minute forced watch lock / share-to-continue for Movies and TV Series
                 val isOffline = initialIsOffline || initialStreamUrl.startsWith("content://") || initialStreamUrl.startsWith("file://") || initialStreamUrl.startsWith("/")
-                val isLiveStream = !isOffline && (subjectId.isBlank() && detailPath.isBlank())
+                val isLiveStream = !isOffline && (isLiveTv || isLiveEvent)
                 if (!isLiveStream && !hasSharedToUnlock && pos >= 20 * 60 * 1000L) {
                     p.pause()
                     showWatchLockDialog = true
@@ -1902,17 +1920,17 @@ fun AdaptivePlayerScreen(
                 audioSyncOffsetMs = audioSyncOffsetMs,
                 onOpenAudioSync = { showAudioSyncDialog = true },
                 onOpenTranslator = { showTranslatorDialog = true },
-                isLiveStream = isLiveTv,
-                channelNumber = currentChannelIndex + 1,
-                onNextChannel = { playNextChannel() },
-                onPrevChannel = { playPrevChannel() },
+                isLiveStream = isLiveTv || isLiveEvent,
+                channelNumber = if (isLiveTv) currentChannelIndex + 1 else 0,
+                onNextChannel = if (isLiveTv) { { playNextChannel() } } else null,
+                onPrevChannel = if (isLiveTv) { { playPrevChannel() } } else null,
                 onSwitchLiveServer = { switchLiveServer(it) },
                 currentServerIndex = currentServerIndex,
-                serverCount = currentChannel?.activeServers?.size ?: 0
+                serverCount = if (isLiveEvent) currentExtraServers.size else (currentChannel?.activeServers?.size ?: 0)
             )
         } else {
             val isOffline = initialIsOffline || initialStreamUrl.startsWith("content://") || initialStreamUrl.startsWith("file://") || initialStreamUrl.startsWith("/")
-            val isLiveStream = !isOffline && (subjectId.isBlank() && detailPath.isBlank())
+            val isLiveStream = !isOffline && (isLiveTv || isLiveEvent)
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1958,12 +1976,12 @@ fun AdaptivePlayerScreen(
                     },
                     gestureDetector = gestureDetector,
                     isLiveStream = isLiveStream,
-                    channelNumber = currentChannelIndex + 1,
-                    onNextChannel = { playNextChannel() },
-                    onPrevChannel = { playPrevChannel() },
+                    channelNumber = if (isLiveTv) currentChannelIndex + 1 else 0,
+                    onNextChannel = if (isLiveTv) { { playNextChannel() } } else null,
+                    onPrevChannel = if (isLiveTv) { { playPrevChannel() } } else null,
                     onSwitchLiveServer = { switchLiveServer(it) },
                     currentServerIndex = currentServerIndex,
-                    serverCount = currentChannel?.activeServers?.size ?: 0,
+                    serverCount = if (isLiveEvent) currentExtraServers.size else (currentChannel?.activeServers?.size ?: 0),
                     audioSyncOffsetMs = audioSyncOffsetMs,
                     onOpenAudioSync = { showAudioSyncDialog = true }
                 )
@@ -1974,8 +1992,11 @@ fun AdaptivePlayerScreen(
                     currentVideoTitle = currentVideoTitle,
                     isLiveStream = isLiveStream,
                     isOffline = isOffline,
+                    isLiveEvent = isLiveEvent,
+                    liveEvents = liveEvents,
+                    onSwitchLiveEvent = { switchLiveEvent(it) },
                     currentChannel = currentChannel,
-                    activeServers = currentChannel?.activeServers ?: emptyList(),
+                    activeServers = if (isLiveEvent) currentExtraServers else (currentChannel?.activeServers ?: emptyList()),
                     currentServerIndex = currentServerIndex,
                     onSwitchLiveServer = { switchLiveServer(it) },
                     relatedChannels = relatedChannels,
@@ -2130,7 +2151,7 @@ fun AdaptivePlayerScreen(
 
         // ── LIVE TV CHANNEL SWITCH BANNER (Auto-hides) ──
         AnimatedVisibility(
-            visible = channelOverlayBanner != null,
+            visible = isLiveTv && channelOverlayBanner != null,
             enter = fadeIn() + slideInVertically(initialOffsetY = { -it / 2 }),
             exit = fadeOut() + slideOutVertically(targetOffsetY = { -it / 2 }),
             modifier = Modifier
@@ -2275,8 +2296,88 @@ fun formatDuration(millis: Long): String {
     }
 }
 
+fun buildClearKeyDataUri(hexKeyId: String, hexKey: String): String {
+    fun hexToBytes(hex: String): ByteArray {
+        val s = hex.trim().replace("-", "")
+        val len = s.length
+        val data = ByteArray(len / 2)
+        for (i in 0 until len step 2) {
+            data[i / 2] = ((Character.digit(s[i], 16) shl 4) + Character.digit(s[i + 1], 16)).toByte()
+        }
+        return data
+    }
+    val kidBytes = hexToBytes(hexKeyId)
+    val keyBytes = hexToBytes(hexKey)
+    val kidB64 = android.util.Base64.encodeToString(kidBytes, android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING or android.util.Base64.NO_WRAP)
+    val keyB64 = android.util.Base64.encodeToString(keyBytes, android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING or android.util.Base64.NO_WRAP)
+    val jwkJson = "{\"keys\":[{\"kty\":\"oct\",\"k\":\"$keyB64\",\"kid\":\"$kidB64\"}],\"type\":\"temporary\"}"
+    val jwkB64 = android.util.Base64.encodeToString(jwkJson.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
+    return "data:application/json;base64,$jwkB64"
+}
+
+fun buildPlayableMediaItem(
+    url: String,
+    isLive: Boolean,
+    licenseKey: String = ""
+): MediaItem {
+    val builder = MediaItem.Builder().setUri(Uri.parse(url))
+    if (url.contains(".mpd", ignoreCase = true)) {
+        builder.setMimeType(androidx.media3.common.MimeTypes.APPLICATION_MPD)
+    } else if (url.contains(".m3u8", ignoreCase = true)) {
+        builder.setMimeType(androidx.media3.common.MimeTypes.APPLICATION_M3U8)
+    }
+
+    if (isLive) {
+        builder.setLiveConfiguration(
+            MediaItem.LiveConfiguration.Builder()
+                .setTargetOffsetMs(8000L)
+                .setMinPlaybackSpeed(0.97f)
+                .setMaxPlaybackSpeed(1.03f)
+                .build()
+        )
+    }
+
+    val key = licenseKey.trim()
+    if (key.isNotBlank()) {
+        try {
+            val licenseUri: Uri? = when {
+                key.startsWith("http://", ignoreCase = true) || key.startsWith("https://", ignoreCase = true) -> {
+                    Uri.parse(key)
+                }
+                key.startsWith("data:") -> {
+                    Uri.parse(key)
+                }
+                key.startsWith("{") -> {
+                    val b64 = android.util.Base64.encodeToString(key.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
+                    Uri.parse("data:application/json;base64,$b64")
+                }
+                key.contains(":") -> {
+                    val parts = key.split(":")
+                    if (parts.size >= 2 && parts[0].isNotBlank() && parts[1].isNotBlank()) {
+                        Uri.parse(buildClearKeyDataUri(parts[0], parts[1]))
+                    } else null
+                }
+                else -> null
+            }
+
+            if (licenseUri != null && licenseUri != Uri.EMPTY) {
+                val drmConfig = MediaItem.DrmConfiguration.Builder(C.CLEARKEY_UUID)
+                    .setLicenseUri(licenseUri)
+                    .setMultiSession(true)
+                    .build()
+                builder.setDrmConfiguration(drmConfig)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("StreamHitPlayer", "Failed to configure ClearKey DRM for stream: $key", e)
+        }
+    }
+
+    return builder.build()
+}
+
 fun formatBufferedAhead(aheadMs: Long): String {
-    val totalSecs = (aheadMs.coerceAtLeast(0L) / 1000L)
+    if (aheadMs <= 0L || aheadMs > 600_000L) return "0s ahead"
+    val totalSecs = (aheadMs / 1000L)
     val mins = totalSecs / 60
     val secs = totalSecs % 60
     return if (mins > 0) "${mins}m ${secs}s ahead" else "${secs}s ahead"

@@ -447,8 +447,15 @@ data class LiveTvChannel(
 
 data class StreamLinkItem(
     @SerializedName("label") val label: String = "Server 1",
-    @SerializedName("url") val url: String = ""
-)
+    @SerializedName("url") val url: String = "",
+    @SerializedName("license_key") val licenseKeySnake: String? = null,
+    @SerializedName("licenseKey") val licenseKeyCamel: String? = null,
+    @SerializedName("drm_key") val drmKey: String? = null,
+    @SerializedName("headers") val headers: Map<String, String>? = null
+) {
+    val licenseKey: String
+        get() = (licenseKeyCamel ?: licenseKeySnake ?: drmKey ?: "").trim()
+}
 
 // Version Control model
 data class AppVersionResponse(
