@@ -603,33 +603,64 @@ async def admin_get_sports(request: Request):
     check_admin_auth(request)
     from main import get_db_pool
     pool = await get_db_pool()
-    if not pool: return {"list": []}
+    items = []
+    if pool:
+        async with pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+                await cur.execute("SELECT * FROM live_sports ORDER BY created_at DESC")
+                rows = await cur.fetchall()
+                for r in rows:
+                    try:
+                        links = json.loads(r["stream_links"])
+                    except Exception:
+                        links = []
+                    items.append({
+                        "id": r["id"],
+                        "title": r["title"],
+                        "logo": r["logo"] or "",
+                        "team1Name": r["team1_name"] or "",
+                        "team1Logo": r["team1_logo"] or "",
+                        "team2Name": r["team2_name"] or "",
+                        "team2Logo": r["team2_logo"] or "",
+                        "streamLinks": links,
+                        "referer": r["referer"] or "",
+                        "origin": r["origin"] or "",
+                        "useBdProxy": bool(r["use_bd_proxy"]),
+                        "isCustom": True
+                    })
     
-    async with pool.acquire() as conn:
-        async with conn.cursor(aiomysql.DictCursor) as cur:
-            await cur.execute("SELECT * FROM live_sports ORDER BY created_at DESC")
-            rows = await cur.fetchall()
-            
-            items = []
-            for r in rows:
-                try:
-                    links = json.loads(r["stream_links"])
-                except Exception:
-                    links = []
-                items.append({
-                    "id": r["id"],
-                    "title": r["title"],
-                    "logo": r["logo"] or "",
-                    "team1Name": r["team1_name"] or "",
-                    "team1Logo": r["team1_logo"] or "",
-                    "team2Name": r["team2_name"] or "",
-                    "team2Logo": r["team2_logo"] or "",
-                    "streamLinks": links,
-                    "referer": r["referer"] or "",
-                    "origin": r["origin"] or "",
-                    "useBdProxy": bool(r["use_bd_proxy"])
-                })
-            return {"list": items}
+    aggregated = []
+    try:
+        from sports_updater import get_live_sports_data_async
+        agg_data = await get_live_sports_data_async(pool=None)
+        aggregated = agg_data.get("list", [])
+    except Exception as e:
+        logger.debug(f"Admin fetch aggregated sports error: {e}")
+
+    return {
+        "list": items,
+        "aggregated": aggregated,
+        "total_matches": len(items) + len(aggregated),
+        "live_count": len([x for x in aggregated if x.get("status") == "live"]) + len(items)
+    }
+
+@router.post("/api/admin/sports/sync")
+async def admin_sync_sports(request: Request):
+    check_admin_auth(request)
+    try:
+        from sports_updater import get_live_sports_data_async
+        from main import get_db_pool
+        pool = await get_db_pool()
+        data = await get_live_sports_data_async(pool=pool, force_refresh=True)
+        return {
+            "success": True,
+            "message": "Live sports synchronized successfully",
+            "total": data.get("total_matches", 0),
+            "live_count": data.get("live_count", 0),
+            "upcoming_count": data.get("upcoming_count", 0)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/api/admin/sports")
 async def admin_save_sport(data: dict, request: Request):

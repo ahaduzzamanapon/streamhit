@@ -1781,7 +1781,10 @@
                             <h2>⚽ Live Sports Streams Manager</h2>
                             <div class="subtitle">Broadcast live cricket, football, and events</div>
                         </div>
-                        <button class="btn-primary" onclick="showAddSportModal()">+ Add New Match</button>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn-secondary" onclick="syncLiveSports()" style="background:var(--bg-surface); border:1px solid var(--border-subtle); color:#fff; padding:6px 14px; border-radius:6px; cursor:pointer;">🔄 Sync Now (10m Cycle)</button>
+                            <button class="btn-primary" onclick="showAddSportModal()">+ Add New Match</button>
+                        </div>
                     </div>
                     <div id="sportsListContainer" style="display:flex; flex-direction:column; gap:12px;">
                         <p style="color:var(--text-muted);">Loading matches...</p>
@@ -3977,20 +3980,76 @@
                 const res = await fetch('/api/admin/sports', { headers: { 'Authorization': `Bearer ${token}` } });
                 const d = await res.json();
                 const container = document.getElementById('sportsListContainer');
-                if (!d.list || d.list.length === 0) {
-                    container.innerHTML = '<p style="color:var(--text-muted);">No live matches scheduled.</p>';
-                    return;
-                }
-                container.innerHTML = d.list.map(s => `
-                    <div style="background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:14px; display:flex; justify-content:space-between; align-items:center;">
-                        <div>
-                            <strong style="color:#fff; font-size:14px;">${s.title}</strong>
-                            <div style="font-size:12px; color:var(--text-muted);">${s.team1_name || 'Team 1'} vs ${s.team2_name || 'Team 2'}</div>
+                const customList = d.list || [];
+                const aggregatedList = d.aggregated || [];
+
+                let html = `
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:16px;">
+                        <div style="background:var(--bg-surface); padding:12px; border-radius:var(--radius-sm); border:1px solid var(--border-subtle);">
+                            <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Live Matches</div>
+                            <div style="font-size:22px; font-weight:bold; color:#10b981;">${d.live_count || 0}</div>
                         </div>
-                        <button class="btn-danger" onclick="deleteSportMatch(${s.id})">Delete</button>
+                        <div style="background:var(--bg-surface); padding:12px; border-radius:var(--radius-sm); border:1px solid var(--border-subtle);">
+                            <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Total Events</div>
+                            <div style="font-size:22px; font-weight:bold; color:#3b82f6;">${d.total_matches || 0}</div>
+                        </div>
+                        <div style="background:var(--bg-surface); padding:12px; border-radius:var(--radius-sm); border:1px solid var(--border-subtle);">
+                            <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Auto Feeds (10m)</div>
+                            <div style="font-size:13px; font-weight:bold; color:#f59e0b; margin-top:4px;">SonyLIV, Willow, Tapmad, FanCode</div>
+                        </div>
                     </div>
-                `).join('');
-            } catch(e) {}
+                `;
+
+                if (customList.length > 0) {
+                    html += `<h4 style="margin:12px 0 8px 0; color:#fff; font-size:14px;">Custom Broadcasts (${customList.length})</h4>`;
+                    html += customList.map(s => `
+                        <div style="background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:14px; display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <div>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span style="background:rgba(16,185,129,0.2); color:#10b981; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:4px;">CUSTOM</span>
+                                    <strong style="color:#fff; font-size:14px;">${s.title}</strong>
+                                </div>
+                                <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">${s.team1Name || 'Team 1'} vs ${s.team2Name || 'Team 2'} • ${s.streamLinks ? s.streamLinks.length : 1} Servers</div>
+                            </div>
+                            <button class="btn-danger" onclick="deleteSportMatch(${s.id})">Delete</button>
+                        </div>
+                    `).join('');
+                }
+
+                if (aggregatedList.length > 0) {
+                    html += `<h4 style="margin:16px 0 8px 0; color:#fff; font-size:14px;">Auto-Aggregated Live & Upcoming Events (${aggregatedList.length})</h4>`;
+                    html += aggregatedList.map(s => {
+                        const isLive = (s.status === 'live');
+                        const badgeColor = isLive ? '#ef4444' : '#64748b';
+                        const badgeBg = isLive ? 'rgba(239,68,68,0.2)' : 'rgba(100,116,139,0.2)';
+                        const serverBadges = (s.stream_links || []).map(sl => `<span style="background:rgba(255,255,255,0.06); padding:2px 6px; border-radius:4px; font-size:10px; color:#cbd5e1;">${sl.label}</span>`).join(' ');
+                        return `
+                            <div style="background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:12px; margin-bottom:8px;">
+                                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                                    <div>
+                                        <div style="display:flex; align-items:center; gap:8px;">
+                                            <span style="background:${badgeBg}; color:${badgeColor}; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:4px;">${s.status_display || 'LIVE'}</span>
+                                            <strong style="color:#fff; font-size:13.5px;">${s.title}</strong>
+                                        </div>
+                                        <div style="font-size:11.5px; color:var(--text-muted); margin-top:4px;">
+                                            ${s.league || s.sport} • ${s.stream_links ? s.stream_links.length : 0} Available Servers
+                                        </div>
+                                    </div>
+                                    <span style="font-size:11px; color:#94a3b8; background:rgba(255,255,255,0.04); padding:3px 8px; border-radius:6px;">${s.match_time || ''}</span>
+                                </div>
+                                ${serverBadges ? `<div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">${serverBadges}</div>` : ''}
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                if (customList.length === 0 && aggregatedList.length === 0) {
+                    html = '<p style="color:var(--text-muted);">No live matches scheduled.</p>';
+                }
+                container.innerHTML = html;
+            } catch(e) {
+                console.error("fetchSports error:", e);
+            }
         }
 
         function showAddSportModal() {
@@ -4010,6 +4069,25 @@
             await fetch(`/api/admin/sports/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
             showToast('Match deleted');
             fetchSports();
+        }
+
+        async function syncLiveSports() {
+            showToast('Syncing live sports feeds...');
+            try {
+                const res = await fetch('/api/admin/sports/sync', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const d = await res.json();
+                if (d.success) {
+                    showToast(`Synced ${d.total} matches (${d.live_count} Live)!`);
+                    fetchSports();
+                } else {
+                    showToast('Sync failed: ' + (d.detail || 'error'));
+                }
+            } catch(e) {
+                showToast('Sync network error');
+            }
         }
 
         // ── TV CHANNELS TAB ──────────────────────────────────────────────────

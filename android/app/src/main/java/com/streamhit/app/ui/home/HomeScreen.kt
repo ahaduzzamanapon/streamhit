@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.SportsCricket
 import com.streamhit.app.data.model.SubjectSummary
 import com.streamhit.app.ui.components.AppShareDialog
 import com.streamhit.app.ui.components.AppBrandHeader
@@ -182,12 +183,15 @@ fun HomeScreen(
         dubName: String?
     ) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _ -> },
     onNavigateToSearch: () -> Unit = {},
+    onNavigateToLiveEvents: () -> Unit = {},
+    onSelectLiveEvent: (com.streamhit.app.data.model.LiveSportItem) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var banners by remember { mutableStateOf<List<BannerItem>>(emptyList()) }
     var sections by remember { mutableStateOf<List<HomeSection>>(emptyList()) }
     var recentHistory by remember { mutableStateOf<List<WatchHistoryItem>>(emptyList()) }
+    var liveSports by remember { mutableStateOf<List<com.streamhit.app.data.model.LiveSportItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var selectedCategoryIndex by remember { mutableStateOf(0) }
     var showShareDialog by remember { mutableStateOf(false) }
@@ -341,6 +345,9 @@ fun HomeScreen(
         if (!categoryData.containsKey(0)) {
             fetchCategory(0, page = 1)
         }
+        try {
+            liveSports = repository.getLiveSports()
+        } catch (_: Exception) {}
     }
 
     if (isLoading) {
@@ -623,6 +630,59 @@ fun HomeScreen(
                                         item.dubName
                                     )
                                 }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Live Sports & Events Section (After Continue Watching)
+        if (liveSports.isNotEmpty() && selectedCategoryIndex == 0) {
+            item {
+                Column(modifier = Modifier.padding(vertical = 10.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFEF4444))
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "LIVE EVENTS",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color.White,
+                                letterSpacing = 0.5.sp
+                            )
+                        }
+                        Text(
+                            text = "View All →",
+                            color = Color(0xFF00E5FF),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .clickable { onNavigateToLiveEvents() }
+                                .padding(4.dp)
+                        )
+                    }
+
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(liveSports.take(8)) { sport ->
+                            HomeLiveEventCard(
+                                item = sport,
+                                onClick = { onSelectLiveEvent(sport) }
                             )
                         }
                     }
@@ -1132,6 +1192,107 @@ fun ContinueWatchingCard(
                         text = "${item.progressPercent}%",
                         color = TextMuted,
                         fontSize = 10.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun HomeLiveEventCard(
+    item: com.streamhit.app.data.model.LiveSportItem,
+    onClick: () -> Unit
+) {
+    val isLive = item.matchTime == "LIVE NOW" || item.title.contains("Live", ignoreCase = true)
+    val serverCount = item.streamLinks.size
+
+    Surface(
+        modifier = Modifier
+            .width(220.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .clickable { onClick() },
+        color = Color(0xFF0F172A),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (isLive) Color(0xFFEF4444).copy(alpha = 0.45f) else Color.White.copy(alpha = 0.08f)
+        ),
+        shape = RoundedCornerShape(14.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = item.league.ifBlank { "International" },
+                    fontSize = 10.5.sp,
+                    color = Color(0xFF94A3B8),
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f)
+                )
+                if (isLive) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFFEF4444).copy(alpha = 0.2f))
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "LIVE",
+                            color = Color(0xFFEF4444),
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                } else {
+                    Text(
+                        text = item.matchTime.ifBlank { "UPCOMING" },
+                        color = Color(0xFF38BDF8),
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = item.matchTitle,
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (serverCount > 1) "$serverCount Servers" else "1 Server",
+                    fontSize = 10.5.sp,
+                    color = if (serverCount > 1) Color(0xFF10B981) else Color(0xFF64748B),
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(if (isLive) Color(0xFFEF4444) else Color(0xFF0284C7)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp)
                     )
                 }
             }

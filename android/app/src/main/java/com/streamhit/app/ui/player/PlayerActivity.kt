@@ -71,6 +71,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.upstream.DefaultAllocator
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection
+import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import androidx.media3.ui.AspectRatioFrameLayout
 import coil.compose.AsyncImage
 import com.streamhit.app.data.analytics.AppAnalyticsManager
@@ -212,6 +215,15 @@ class PlayerActivity : ComponentActivity() {
         val dubDetailPath = intent.getStringExtra("EXTRA_DUB_DETAIL_PATH") ?: ""
         val dubName = intent.getStringExtra("EXTRA_DUB_NAME") ?: ""
         val isOffline = intent.getBooleanExtra("EXTRA_IS_OFFLINE", false)
+        val extraServersJson = intent.getStringExtra("EXTRA_SERVERS_JSON") ?: ""
+        val extraServersList: List<com.streamhit.app.data.model.StreamLinkItem> = try {
+            if (extraServersJson.isNotBlank()) {
+                val listType = object : com.google.gson.reflect.TypeToken<List<com.streamhit.app.data.model.StreamLinkItem>>() {}.type
+                com.google.gson.Gson().fromJson(extraServersJson, listType) ?: emptyList()
+            } else emptyList()
+        } catch (_: Exception) {
+            emptyList()
+        }
 
         setContent {
             StreamfitTheme {
@@ -229,6 +241,7 @@ class PlayerActivity : ComponentActivity() {
                     initialDubDetailPath = dubDetailPath,
                     initialDubName = dubName,
                     initialIsOffline = isOffline,
+                    extraServers = extraServersList,
                     onBack = { finish() },
                     onEnterPip = { enterPipMode() }
                 )
@@ -370,6 +383,7 @@ fun AdaptivePlayerScreen(
     initialDubDetailPath: String = "",
     initialDubName: String = "",
     initialIsOffline: Boolean = false,
+    extraServers: List<com.streamhit.app.data.model.StreamLinkItem> = emptyList(),
     onBack: () -> Unit,
     onEnterPip: () -> Unit
 ) {
@@ -1258,10 +1272,10 @@ fun AdaptivePlayerScreen(
             DefaultLoadControl.Builder()
                 .setAllocator(allocator)
                 .setBufferDurationsMs(
-                    6_000,    // minBufferMs (6s buffer for Live TV eliminates continuous stalls)
-                    20_000,   // maxBufferMs (20s buffer max)
-                    800,      // bufferForPlaybackMs (Instant 0.8s start for Live TV)
-                    1_500     // bufferForPlaybackAfterRebufferMs (1.5s recovery)
+                    12_000,   // minBufferMs (12s buffer for Live TV eliminates continuous stalls)
+                    45_000,   // maxBufferMs (45s forward buffer)
+                    1_500,    // bufferForPlaybackMs (1.5s playback buffer)
+                    2_500     // bufferForPlaybackAfterRebufferMs (2.5s recovery)
                 )
                 .setTargetBufferBytes(C.LENGTH_UNSET)
                 .setPrioritizeTimeOverSizeThresholds(true)
@@ -1271,10 +1285,10 @@ fun AdaptivePlayerScreen(
             DefaultLoadControl.Builder()
                 .setAllocator(allocator)
                 .setBufferDurationsMs(
-                    60_000,   // minBufferMs (Aggressive continuous buffer for VOD)
-                    900_000,  // maxBufferMs (15 minutes continuous ahead buffer: 15m buffer!)
-                    500,      // bufferForPlaybackMs (Starts playback instantly with 0.5s buffer)
-                    1_200     // bufferForPlaybackAfterRebufferMs (Fast rebuffer recovery)
+                    30_000,   // minBufferMs (30s continuous buffer for VOD Movies & Series)
+                    300_000,  // maxBufferMs (5 minutes forward buffer)
+                    1_000,    // bufferForPlaybackMs (Starts playback instantly with 1.0s buffer)
+                    2_000     // bufferForPlaybackAfterRebufferMs (Fast rebuffer recovery)
                 )
                 .setTargetBufferBytes(C.LENGTH_UNSET)
                 .setPrioritizeTimeOverSizeThresholds(true)
@@ -1314,7 +1328,23 @@ fun AdaptivePlayerScreen(
         val renderersFactory = CustomRenderersFactory(context, audioSyncProcessor)
         audioSyncProcessor.setAudioOffsetMs(audioSyncOffsetMs)
 
+        val bandwidthMeter = DefaultBandwidthMeter.getSingletonInstance(context)
+        val adaptiveTrackFactory = AdaptiveTrackSelection.Factory(
+            3000, // minDurationForQualityIncreaseMs: 3s
+            1500, // maxDurationForQualityDecreaseMs: 1.5s (drops quality quickly on slow network to prevent buffering)
+            2500, // minDurationToRetainAfterDiscardMs
+            0.75f // bandwidthFraction (safety headroom against network jitter)
+        )
+        val trackSelector = DefaultTrackSelector(context, adaptiveTrackFactory).apply {
+            parameters = buildUponParameters()
+                .setAllowVideoMixedMimeTypeAdaptiveness(true)
+                .setAllowVideoNonSeamlessAdaptiveness(true)
+                .build()
+        }
+
         val player = ExoPlayer.Builder(context, renderersFactory)
+            .setTrackSelector(trackSelector)
+            .setBandwidthMeter(bandwidthMeter)
             .setMediaSourceFactory(mediaSourceFactory)
             .setLoadControl(loadControl)
             .setSeekParameters(SeekParameters.CLOSEST_SYNC)
@@ -1324,7 +1354,7 @@ fun AdaptivePlayerScreen(
                         .setUri(Uri.parse(resolvedUrl))
                         .setLiveConfiguration(
                             MediaItem.LiveConfiguration.Builder()
-                                .setTargetOffsetMs(3500L)
+                                .setTargetOffsetMs(8000L)
                                 .setMinPlaybackSpeed(0.97f)
                                 .setMaxPlaybackSpeed(1.03f)
                                 .build()
@@ -1379,7 +1409,15 @@ fun AdaptivePlayerScreen(
                         isBuffering = true
                         if (firstFrameRendered) {
                             rebufferCount++
-                            android.util.Log.d("StreamHitPlayer", "Rebuffering started at pos=${player.currentPosition}ms (count=$rebufferCount)")
+                            val estBitrate = bandwidthMeter.bitrateEstimate
+                            android.util.Log.d("StreamHitPlayer", "Rebuffering started at pos=${player.currentPosition}ms (count=$rebufferCount, bitrate=$estBitrate)")
+                            if (rebufferCount >= 1 && estBitrate in 1..2_200_000) {
+                                // YouTube style auto-downgrade on slow connection
+                                android.util.Log.w("StreamHitPlayer", "Slow network detected (${estBitrate / 1000} Kbps), adapting to normal rendition (480p) to stop buffering")
+                                trackSelector.parameters = trackSelector.buildUponParameters()
+                                    .setMaxVideoSize(854, 480)
+                                    .build()
+                            }
                         }
                     }
                     Player.STATE_READY -> {
@@ -1390,6 +1428,13 @@ fun AdaptivePlayerScreen(
                             firstFrameRendered = true
                             val startupLatency = System.currentTimeMillis() - prepareStartTimeMs
                             android.util.Log.d("StreamHitPlayer", "Startup time: ${startupLatency}ms. BufferedPos=${player.bufferedPosition}ms")
+                        }
+                        val estBitrate = bandwidthMeter.bitrateEstimate
+                        if (rebufferCount > 0 && estBitrate > 3_800_000) {
+                            // Fast network recovered: restore full high resolution
+                            trackSelector.parameters = trackSelector.buildUponParameters()
+                                .clearVideoSizeConstraints()
+                                .build()
                         }
                     }
                     Player.STATE_ENDED -> {
@@ -1440,7 +1485,38 @@ fun AdaptivePlayerScreen(
                             .setUri(Uri.parse(directUrl))
                             .setLiveConfiguration(
                                 MediaItem.LiveConfiguration.Builder()
-                                    .setTargetOffsetMs(3500L)
+                                    .setTargetOffsetMs(8000L)
+                                    .setMinPlaybackSpeed(0.97f)
+                                    .setMaxPlaybackSpeed(1.03f)
+                                    .build()
+                            )
+                            .build()
+                        player.stop()
+                        player.clearMediaItems()
+                        player.setMediaItem(mediaItem)
+                        player.prepare()
+                        player.play()
+                        return
+                    }
+                }
+
+                // Step 2.6: Live Events / Multi-Server Auto-Failover
+                if (isLiveTv && extraServers.isNotEmpty()) {
+                    val untriedServerIdx = extraServers.indexOfFirst { it.url.isNotBlank() && !failedStreamUrls.contains(it.url) }
+                    if (untriedServerIdx >= 0) {
+                        val nextServer = extraServers[untriedServerIdx]
+                        currentServerIndex = untriedServerIdx
+                        currentStreamUrl = nextServer.url
+                        isBuffering = true
+                        triedProxyFallback = false
+                        android.util.Log.w("StreamHitPlayer", "Live Event Auto-failover: Switching to ${nextServer.label} (${nextServer.url})")
+                        Toast.makeText(context, "⚠️ সার্ভার সমস্যা। ${nextServer.label}-এ অটো সুইচ করা হচ্ছে...", Toast.LENGTH_SHORT).show()
+                        val directUrl = resolveDirectPlayableUrl(nextServer.url)
+                        val mediaItem = MediaItem.Builder()
+                            .setUri(Uri.parse(directUrl))
+                            .setLiveConfiguration(
+                                MediaItem.LiveConfiguration.Builder()
+                                    .setTargetOffsetMs(8000L)
                                     .setMinPlaybackSpeed(0.97f)
                                     .setMaxPlaybackSpeed(1.03f)
                                     .build()

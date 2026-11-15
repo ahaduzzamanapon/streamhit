@@ -1,0 +1,32 @@
+{
+  "playlist_name": "Custom Sports",
+  "channels_amount": 1,
+  "live_count": 1,
+  "last_update": "01:09 PM 12-11-2026 BST",
+  "events": [
+    {
+      "match_id": "4001",
+      "title": "IPL 2026: CSK vs RCB",
+      "synopsis": "IPL 2026: CSK vs RCB",
+      "status": "LIVE",
+      "time": "12/11/2026 08:00 PM BST",
+      "cover_image": "https://img.csk.png",
+      "match_url": "https://stream.example.com/live/master.m3u8",
+      "is_free": false,
+      "stream_url": {
+        "Server 1 (FHD)": "https://stream.example.com/live/master.m3u8",
+        "Server 2 (HD)": "https://stream2.example.com/live/master.mpd"
+      },
+      "streams": [
+        {
+          "name": "Server 1 (FHD)",
+          "link": "https://stream.example.com/live/master.m3u8"
+        },
+        {
+          "name": "Server 2 (HD)",
+          "link": "https://stream2.example.com/live/master.mpd"
+        }
+      ]
+    }
+  ]
+}

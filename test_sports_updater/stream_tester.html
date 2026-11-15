@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Sports Events Player (Auto-Loaded)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.7.11/shaka-player.compiled.js"></script>
+  <style>
+    :root {
+      --bg: #0b0e14;
+      --card: #151a23;
+      --card-hover: #1c2330;
+      --border: #262f3f;
+      --accent: #22c55e;
+      --accent-hover: #16a34a;
+      --text: #94a3b8;
+      --text-bright: #f8fafc;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --blue: #38bdf8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 16px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1300px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 16px;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    h1 {
+      font-size: 20px;
+      color: var(--text-bright);
+      font-weight: 700;
+    }
+
+    .live-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      background: var(--danger);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--danger);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(1.2); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 450px;
+      gap: 16px;
+    }
+
+    @media (max-width: 960px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* LEFT: Video Player */
+    .player-section {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .player-wrapper {
+      background: #000;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      aspect-ratio: 16 / 9;
+      position: relative;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .now-playing-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .now-playing-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-bright);
+    }
+
+    .now-playing-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 13px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .badge-live {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--danger);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+
+    .badge-server {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--blue);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    .stream-url-display {
+      font-family: monospace;
+      font-size: 11px;
+      color: #64748b;
+      background: #0b0e14;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      word-break: break-all;
+    }
+
+    /* RIGHT: Event List Panel */
+    .events-panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100vh - 110px);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .panel-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .panel-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-bright);
+    }
+
+    .source-tabs {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .tab-btn {
+      padding: 5px 10px;
+      background: #1e2634;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 12px;
+      color: var(--text);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    .tab-btn:hover {
+      background: #2a3447;
+      color: var(--text-bright);
+    }
+
+    .tab-btn.active {
+      background: var(--blue);
+      color: #0b0e14;
+      border-color: var(--blue);
+      font-weight: 700;
+    }
+
+    .events-list {
+      padding: 12px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+    }
+
+    .event-card {
+      background: #10141d;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .event-card:hover {
+      background: var(--card-hover);
+      border-color: var(--blue);
+      transform: translateY(-1px);
+    }
+
+    .event-card.active {
+      border-color: var(--accent);
+      background: rgba(34, 197, 94, 0.08);
+    }
+
+    .event-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .event-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-bright);
+      line-height: 1.3;
+    }
+
+    .event-time {
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    .server-buttons-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .server-btn {
+      background: #1e2634;
+      color: var(--blue);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s;
+    }
+
+    .server-btn:hover {
+      background: var(--blue);
+      color: #000;
+    }
+
+    .server-btn.active-server {
+      background: var(--accent);
+      color: #000;
+      border-color: var(--accent);
+    }
+
+    /* Diagnostics Log Drawer */
+    .log-bar {
+      padding: 10px 14px;
+      background: #090c12;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #64748b;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="header-left">
+      <span class="live-dot"></span>
+      <h1>Live Sports Events Streamer</h1>
+      <span class="badge badge-server" id="totalMatchesBadge">0 Matches</span>
+    </div>
+    <div id="playerStatus" style="font-size: 13px; font-weight: 600; color: var(--blue);">Loading events...</div>
+  </header>
+
+  <div class="main-grid">
+    <!-- LEFT: Main Player Area -->
+    <div class="player-section">
+      <div class="player-wrapper">
+        <video id="videoPlayer" controls autoplay></video>
+      </div>
+
+      <div class="now-playing-card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div class="now-playing-title" id="nowTitle">ম্যাচ সিলেক্ট করুন</div>
+          <span class="badge badge-live" id="nowStatus">LIVE</span>
+        </div>
+        <div class="now-playing-meta">
+          <span id="nowServer" class="badge badge-server">Server 1</span>
+          <span id="nowTime" style="color: #64748b; font-size: 12px;">--:--</span>
+          <span id="nowRes" style="color: var(--accent); font-weight: 600; font-size: 12px;">0x0</span>
+        </div>
+        <div class="stream-url-display" id="nowUrl">কোনো স্ট্রিম সিলেক্ট করা হয়নি</div>
+      </div>
+
+      <!-- Compact Diagnostics -->
+      <div class="log-bar">
+        <span id="logText">⚡ সিস্টেম রেডি।</span>
+        <button onclick="refreshEvents()" style="background: none; border: none; color: var(--blue); cursor: pointer; font-size: 11px; text-decoration: underline;">⟳ Refresh List</button>
+      </div>
+    </div>
+
+    <!-- RIGHT: Events List -->
+    <div class="events-panel">
+      <div class="panel-header">
+        <div class="panel-title-row">
+          <span class="panel-title">🏆 আজকের লাইভ ইভেন্টসমূহ</span>
+          <span style="font-size: 11px; color: #64748b;">ক্লিক করলেই প্লে হবে</span>
+        </div>
+        <div class="source-tabs">
+          <button class="tab-btn active" onclick="switchSource('live_channels.json', this)">📺 Live TV & Sports (370)</button>
+          <button class="tab-btn" onclick="switchSource('live_events.json', this)">🌟 Verified Sports</button>
+          <button class="tab-btn" onclick="switchSource('tapmad_sports.json', this)">Tapmad</button>
+          <button class="tab-btn" onclick="switchSource('sony_liv_sports.json', this)">Sony LIV</button>
+        </div>
+      </div>
+
+      <div class="events-list" id="eventsListContainer">
+        <div style="text-align: center; padding: 40px; color: #64748b;">ইভেন্ট লোড হচ্ছে...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let player = null;
+  const video = document.getElementById('videoPlayer');
+  let currentEvents = [];
+  let currentMatchIdx = -1;
+  let activeSourceFile = 'live_channels.json';
+
+  function updateLog(msg, isError = false) {
+    const el = document.getElementById('logText');
+    el.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    el.style.color = isError ? '#ef4444' : '#64748b';
+  }
+
+  async function initPlayer() {
+    shaka.polyfill.installAll();
+    if (!shaka.Player.isBrowserSupported()) {
+      updateLog('Browser does not support Shaka MSE/EME', true);
+      return;
+    }
+
+    player = new shaka.Player(video);
+    player.addEventListener('error', onPlayerError);
+
+    video.addEventListener('loadedmetadata', () => {
+      document.getElementById('nowRes').innerText = `${video.videoWidth}x${video.videoHeight}`;
+      document.getElementById('playerStatus').innerText = 'Playing';
+      document.getElementById('playerStatus').style.color = '#22c55e';
+      updateLog(`Stream playing: ${video.videoWidth}x${video.videoHeight}`);
+    });
+
+    video.addEventListener('waiting', () => {
+      document.getElementById('playerStatus').innerText = 'Buffering...';
+      document.getElementById('playerStatus').style.color = '#f59e0b';
+    });
+
+    video.addEventListener('playing', () => {
+      document.getElementById('playerStatus').innerText = 'Live Streaming';
+      document.getElementById('playerStatus').style.color = '#22c55e';
+    });
+
+    // Auto-load events immediately
+    await loadEventsFromFile(activeSourceFile);
+  }
+
+  function onPlayerError(evt) {
+    const err = evt.detail;
+    document.getElementById('playerStatus').innerText = 'Error';
+    document.getElementById('playerStatus').style.color = '#ef4444';
+    updateLog(`Stream Error ${err.code}: ${err.message || 'Check link/CORS/DRM'}`, true);
+  }
+
+  async function switchSource(fileName, btn) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    activeSourceFile = fileName;
+    await loadEventsFromFile(fileName);
+  }
+
+  async function refreshEvents() {
+    await loadEventsFromFile(activeSourceFile);
+  }
+
+  async function loadEventsFromFile(fileName) {
+    const container = document.getElementById('eventsListContainer');
+    container.innerHTML = '<div style="text-align:center; padding:30px; color:#64748b;">লোড হচ্ছে...</div>';
+    updateLog(`Fetching ${fileName}...`);
+
+    try {
+      const res = await fetch(`/${fileName}?t=${Date.now()}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      currentEvents = data.channels || data.events || [];
+
+      document.getElementById('totalMatchesBadge').innerText = `${currentEvents.length} Channels`;
+      renderEventsList();
+
+      if (currentEvents.length > 0) {
+        // Automatically play the first event
+        playEvent(0);
+      }
+    } catch (err) {
+      container.innerHTML = `<div style="text-align:center; padding:30px; color:#ef4444;">❌ ফাইল লোড হতে সমস্যা: ${err.message}</div>`;
+      updateLog(`Error loading ${fileName}: ${err.message}`, true);
+    }
+  }
+
+  function renderEventsList() {
+    const container = document.getElementById('eventsListContainer');
+    container.innerHTML = '';
+
+    if (currentEvents.length === 0) {
+      container.innerHTML = '<div style="text-align:center; padding:30px; color:#64748b;">কোনো ম্যাচ পাওয়া যায়নি।</div>';
+      return;
+    }
+
+    currentEvents.forEach((ev, idx) => {
+      const card = document.createElement('div');
+      card.className = `event-card ${idx === currentMatchIdx ? 'active' : ''}`;
+      card.id = `card-${idx}`;
+
+      const title = ev.title || ev.name || 'Live Match';
+      const time = ev.time || ev.schedule_time || '24/7';
+      const status = ev.status || 'LIVE';
+
+      // Streams map
+      let servers = [];
+      if (typeof ev.stream_url === 'string') {
+        servers.push(['Server 1', ev.stream_url]);
+      } else if (ev.stream_url && typeof ev.stream_url === 'object') {
+        servers = Object.entries(ev.stream_url);
+      }
+      if (servers.length === 0 && ev.match_url) {
+        servers.push(['Server 1', ev.match_url]);
+      }
+
+      let serverButtonsHtml = '';
+      servers.forEach(([sName, sUrl]) => {
+        serverButtonsHtml += `<button class="server-btn" onclick="event.stopPropagation(); playSpecificServer(${idx}, '${sName.replace(/'/g, "\\'")}', '${sUrl.replace(/'/g, "\\'")}')">▶ ${sName}</button>`;
+      });
+
+      card.innerHTML = `
+        <div class="event-card-top">
+          <div class="event-name">${title}</div>
+          <span class="badge ${status === 'LIVE' ? 'badge-live' : 'badge-server'}">${status}</span>
+        </div>
+        <div class="event-time">🕒 ${time}</div>
+        <div class="server-buttons-row">
+          ${serverButtonsHtml || '<span style="color:#ef4444; font-size:11px;">No Stream Url</span>'}
+        </div>
+      `;
+
+      card.onclick = () => playEvent(idx);
+      container.appendChild(card);
+    });
+  }
+
+  function playEvent(idx) {
+    if (!currentEvents[idx]) return;
+    currentMatchIdx = idx;
+
+    // Highlight card
+    document.querySelectorAll('.event-card').forEach((c, i) => {
+      c.classList.toggle('active', i === idx);
+    });
+
+    const ev = currentEvents[idx];
+    let targetUrl = '';
+    let targetServerName = 'Server 1';
+
+    if (typeof ev.stream_url === 'string') {
+      targetUrl = ev.stream_url;
+    } else if (ev.stream_url && typeof ev.stream_url === 'object') {
+      const servers = Object.entries(ev.stream_url);
+      if (servers.length > 0) {
+        targetServerName = servers[0][0];
+        targetUrl = servers[0][1];
+      }
+    } else if (ev.match_url) {
+      targetUrl = ev.match_url;
+    }
+
+    playSpecificServer(idx, targetServerName, targetUrl);
+  }
+
+  async function playSpecificServer(matchIdx, serverName, rawUrl) {
+    currentMatchIdx = matchIdx;
+    const ev = currentEvents[matchIdx] || {};
+
+    // Update UI details
+    document.getElementById('nowTitle').innerText = ev.name || ev.title || 'Live Match';
+    document.getElementById('nowStatus').innerText = ev.status || 'LIVE';
+    document.getElementById('nowStatus').className = `badge ${ev.status === 'LIVE' ? 'badge-live' : 'badge-server'}`;
+    document.getElementById('nowServer').innerText = serverName;
+    document.getElementById('nowTime').innerText = ev.category ? `📁 ${ev.category}` : (ev.time ? `🕒 ${ev.time}` : '');
+    document.getElementById('nowUrl').innerText = rawUrl;
+    document.getElementById('nowRes').innerText = 'Loading...';
+
+    // Highlight card
+    document.querySelectorAll('.event-card').forEach((c, i) => {
+      c.classList.toggle('active', i === matchIdx);
+    });
+
+    // Extract DRM ClearKey if present
+    let clearKeyVal = '';
+    if (ev.drm_key) {
+      clearKeyVal = ev.drm_key;
+    } else if (ev.clearkey) {
+      clearKeyVal = ev.clearkey;
+    }
+
+    let cleanUrl = rawUrl;
+    if (rawUrl.includes('|')) {
+      cleanUrl = rawUrl.split('|')[0].trim();
+    }
+
+    // Configure Shaka DRM
+    const config = { drm: { clearKeys: {} } };
+    if (clearKeyVal && clearKeyVal.includes(':')) {
+      const [kid, k] = clearKeyVal.split(':');
+      config.drm.clearKeys[kid.trim()] = k.trim();
+      updateLog(`Configured ClearKey: ${kid}`);
+    }
+    player.configure(config);
+
+    updateLog(`Playing: ${ev.title} [${serverName}]`);
+    try {
+      await player.load(cleanUrl);
+      video.play().catch(e => {
+        updateLog(`Click player to unmute/start (${e.message})`);
+      });
+    } catch (e) {
+      onPlayerError({ detail: e });
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', initPlayer);
+</script>
+</body>
+</html>

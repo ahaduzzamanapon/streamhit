@@ -1,0 +1,60 @@
+{
+  "playlist_name": "Verified Working Live Sports Streams",
+  "channels_amount": 4,
+  "live_count": 4,
+  "last_update": "01:28 PM 12-11-2026 BST",
+  "events": [
+    {
+      "match_id": "sp_101",
+      "title": "Red Bull Sports HD (Extreme Live Sports & Action)",
+      "synopsis": "Live extreme sports, racing, motorsport, and action coverage",
+      "status": "LIVE",
+      "time": "24/7 LIVE",
+      "cover_image": "https://img.redbull.com/images/c_crop,x_0,y_0,h_1080,w_1920/c_fill,w_650/q_auto:low,f_auto/redbullcom/2020/6/2/ug7evoxwazuvp95oen4r/red-bull-tv-logo",
+      "match_url": "https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8",
+      "is_free": true,
+      "stream_url": {
+        "Server 1 (FHD Akamai 1080p)": "https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8"
+      }
+    },
+    {
+      "match_id": "sp_102",
+      "title": "ACC Digital Sports Network (College Football & Basketball Live)",
+      "synopsis": "Live American Football, College Basketball and Sports Championships",
+      "status": "LIVE",
+      "time": "LIVE NOW",
+      "cover_image": "https://raycom-accdn-firetv.amagi.tv/logo.png",
+      "match_url": "https://raycom-accdn-firetv.amagi.tv/playlist.m3u8",
+      "is_free": true,
+      "stream_url": {
+        "Server 1 (CloudFront HD)": "https://raycom-accdn-firetv.amagi.tv/playlist.m3u8"
+      }
+    },
+    {
+      "match_id": "sp_103",
+      "title": "Africa 24 Sport HD (Football & Global Sports)",
+      "synopsis": "International Football leagues, Athletics and Sports updates",
+      "status": "LIVE",
+      "time": "LIVE NOW",
+      "cover_image": "https://africa24tv.com/wp-content/uploads/2023/12/LOGO-AFRICASPORT-4-HD-sans-fond.png",
+      "match_url": "https://edge13.vedge.infomaniak.com/livecast/ik:africa24sport/manifest.m3u8",
+      "is_free": true,
+      "stream_url": {
+        "Server 1 (Direct HLS HD)": "https://edge13.vedge.infomaniak.com/livecast/ik:africa24sport/manifest.m3u8"
+      }
+    },
+    {
+      "match_id": "sp_104",
+      "title": "World Tour Golf & Sports Championship (Live)",
+      "synopsis": "Professional Golf tours, open tournaments and live coverage",
+      "status": "LIVE",
+      "time": "LIVE NOW",
+      "cover_image": "https://30a-tv.com/feeds/vidaa/golf.jpg",
+      "match_url": "https://30a-tv.com/feeds/vidaa/golf.m3u8",
+      "is_free": true,
+      "stream_url": {
+        "Server 1 (HLS Stream)": "https://30a-tv.com/feeds/vidaa/golf.m3u8"
+      }
+    }
+  ]
+}

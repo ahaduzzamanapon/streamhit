@@ -47,8 +47,10 @@ import com.streamhit.app.ui.downloads.DownloadsScreen
 import com.streamhit.app.ui.explore.ExploreScreen
 import com.streamhit.app.ui.home.HomeScreen
 import com.streamhit.app.ui.livetv.LiveTvScreen
+import com.streamhit.app.ui.liveevents.LiveEventsScreen
 import com.streamhit.app.ui.player.PlayerActivity
 import com.streamhit.app.ui.search.SearchScreen
+import androidx.compose.material.icons.filled.SportsCricket
 import android.net.Uri
 import android.os.Build
 import android.content.pm.PackageManager
@@ -220,11 +222,11 @@ class MainActivity : ComponentActivity() {
 
 sealed class Screen(val title: String, val icon: ImageVector) {
     object Home : Screen("Home", Icons.Default.Home)
+    object LiveEvents : Screen("Live Events", Icons.Default.SportsCricket)
     object LiveTv : Screen("Live TV", Icons.Default.Tv)
-    object Explore : Screen("Explore", Icons.Default.Movie)
     object Downloads : Screen("Downloads", Icons.Default.FileDownload)
-    object Search : Screen("Search", Icons.Default.Search)
     object Account : Screen("Account", Icons.Default.Person)
+    object Search : Screen("Search", Icons.Default.Search)
 }
 
 data class PendingPlayRequest(
@@ -472,6 +474,15 @@ fun MainAppScreen(
                     }
                     context.startActivity(intent)
                 }
+            },
+            onSelectLiveEvent = { event, streamUrl ->
+                val intent = Intent(context, PlayerActivity::class.java).apply {
+                    putExtra("EXTRA_STREAM_URL", streamUrl)
+                    putExtra("EXTRA_VIDEO_TITLE", event.matchTitle)
+                    putExtra("EXTRA_IS_LIVE_EVENT", true)
+                    putExtra("EXTRA_SERVERS_JSON", com.google.gson.Gson().toJson(event.streamLinks))
+                }
+                context.startActivity(intent)
             }
         )
         return
@@ -523,7 +534,7 @@ fun MainAppScreen(
                             horizontalArrangement = Arrangement.SpaceAround,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            val tabs = listOf(Screen.Home, Screen.LiveTv, Screen.Explore, Screen.Downloads, Screen.Search, Screen.Account)
+                            val tabs = listOf(Screen.Home, Screen.LiveEvents, Screen.LiveTv, Screen.Downloads, Screen.Account)
                             tabs.forEach { tab ->
                                 val isSelected = currentTab == tab
                                 val iconScale by animateFloatAsState(
@@ -649,6 +660,31 @@ fun MainAppScreen(
                             },
                             onNavigateToSearch = {
                                 switchTab(Screen.Search)
+                            },
+                            onNavigateToLiveEvents = {
+                                switchTab(Screen.LiveEvents)
+                            },
+                            onSelectLiveEvent = { event ->
+                                val sUrl = event.streamLinks.firstOrNull()?.url ?: ""
+                                val intent = Intent(context, PlayerActivity::class.java).apply {
+                                    putExtra("EXTRA_STREAM_URL", sUrl)
+                                    putExtra("EXTRA_VIDEO_TITLE", event.matchTitle)
+                                    putExtra("EXTRA_IS_LIVE_EVENT", true)
+                                    putExtra("EXTRA_SERVERS_JSON", com.google.gson.Gson().toJson(event.streamLinks))
+                                }
+                                context.startActivity(intent)
+                            }
+                        )
+                        Screen.LiveEvents -> LiveEventsScreen(
+                            repository = repository,
+                            onPlayEvent = { title, streamUrl, servers, allEvents ->
+                                val intent = Intent(context, PlayerActivity::class.java).apply {
+                                    putExtra("EXTRA_STREAM_URL", streamUrl)
+                                    putExtra("EXTRA_VIDEO_TITLE", title)
+                                    putExtra("EXTRA_IS_LIVE_EVENT", true)
+                                    putExtra("EXTRA_SERVERS_JSON", com.google.gson.Gson().toJson(servers))
+                                }
+                                context.startActivity(intent)
                             }
                         )
                         Screen.LiveTv -> LiveTvScreen(
@@ -672,12 +708,6 @@ fun MainAppScreen(
                                 } else {
                                     onPlayVideo(url, title, "", "", "", 1, 1, 0L, null, null, null, null)
                                 }
-                            }
-                        )
-                        Screen.Explore -> ExploreScreen(
-                            repository = repository,
-                            onMediaClick = { path, id, _ ->
-                                navigateToDetails(path, id)
                             }
                         )
                         Screen.Downloads -> DownloadsScreen(

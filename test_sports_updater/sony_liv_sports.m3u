@@ -1,0 +1,10 @@
+#EXTM3U
+# Playlist Name  : Sony LIV Sports
+# Channels Amount: 1
+# Live Count     : 1
+# Last Update    : 01:09 PM 12-11-2026 BST
+
+#EXTINF:-1 tvg-name="El Clasico 2026" tvg-logo="" group-title="Sony LIV Sports",El Clasico 2026
+#KODIPROP:inputstream=inputstream.adaptive
+#KODIPROP:inputstream.adaptive.manifest_type=mpd
+https://live.sonyliv.com/live/ch1/master.mpd

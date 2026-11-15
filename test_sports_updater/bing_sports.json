@@ -1,0 +1,24 @@
+{
+  "playlist_name": "Bing Sports",
+  "channels_amount": 1,
+  "live_count": 1,
+  "last_update": "01:09 PM 12-11-2026 BST",
+  "events": [
+    {
+      "match_id": "3001",
+      "title": "Arsenal vs Chelsea",
+      "synopsis": "Premier League - Arsenal vs Chelsea",
+      "status": "LIVE",
+      "time": "12/11/2026 08:30 PM BST",
+      "cover_image": "https://cdn.bing.com/arsenal_chelsea.png",
+      "match_url": "https://stream.bing.com/hls/live1.m3u8|http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36&http-referrer=https://iframe.rumsport11.site/",
+      "is_free": false,
+      "stream_url": {
+        "Server 1 (English 1080p)": "https://stream.bing.com/hls/live1.m3u8|http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36&http-referrer=https://iframe.rumsport11.site/",
+        "Server 2 (Bangla 720p)": "https://stream.bing.com/hls/live2.m3u8|http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36&http-referrer=https://iframe.rumsport11.site/"
+      },
+      "referer": "https://iframe.rumsport11.site/",
+      "extracted_links": []
+    }
+  ]
+}

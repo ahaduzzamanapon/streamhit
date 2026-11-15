@@ -18,7 +18,7 @@ class LiveTvRepository {
     private val m3uUrl = "https://raw.githubusercontent.com/saeidrahmanbd/BDIX-IPTV/main/IPTV-Playlist.m3u"
     private val worldSportsUrls = listOf(
         "https://raw.githubusercontent.com/sportlive18/Sportlink-Live/main/api/world-sports.json",
-        "https://streamhit.online/api/sports/live"
+        "https://nxly.online/api/sports/live"
     )
     private val gson = Gson()
 

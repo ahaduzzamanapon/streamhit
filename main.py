@@ -1136,9 +1136,22 @@ async def run_sitemap_generator_background():
     except Exception as e:
         print(f"[Sitemap] Failed to start background sitemap generator: {e}")
 
+async def run_sports_updater_background():
+    await asyncio.sleep(5)
+    while True:
+        try:
+            from sports_updater import get_live_sports_data_async
+            pool = await get_db_pool()
+            await get_live_sports_data_async(pool=pool, force_refresh=True)
+            logger.info("[Sports] Auto-refreshed latest sports events (10 min cycle)")
+        except Exception as e:
+            logger.error(f"[Sports] Background update error: {e}")
+        await asyncio.sleep(600)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     asyncio.create_task(run_sitemap_generator_background())
+    asyncio.create_task(run_sports_updater_background())
     yield
     await http_client.aclose()
     global db_pool
@@ -3585,46 +3598,14 @@ def _build_sports_feed_url() -> str:
 
 @app.get("/api/sports/live")
 async def api_sports():
-    global _cached_world_sports
-    now = time.time()
-    if _cached_world_sports["data"] and (now - _cached_world_sports["timestamp"] < 120):
-        return _cached_world_sports["data"]
-
-    feed_url = _build_sports_feed_url()
     try:
-        import urllib.request as _ureq
-        req = _ureq.Request(feed_url, headers={"User-Agent": "Mozilla/5.0"})
-        with _ureq.urlopen(req, timeout=6) as resp:
-            raw_data = json.loads(resp.read().decode())
-            matches = raw_data.get("matches", [])
-            response_data = {
-                "code": 0,
-                "total_matches": len(matches),
-                "live_count": raw_data.get("live_count", len(matches)),
-                "upcoming_count": raw_data.get("upcoming_count", 0),
-                "matches": matches,
-                "list": [
-                    {
-                        "id": idx + 1,
-                        "title": m.get("title", ""),
-                        "league": m.get("league", ""),
-                        "logo": m.get("thumbnail", ""),
-                        "stream_links": [
-                            {"label": f"Server {i+1}", "url": u}
-                            for i, u in enumerate(m.get("server_urls", []))
-                        ]
-                    }
-                    for idx, m in enumerate(matches)
-                ]
-            }
-            _cached_world_sports = {"data": response_data, "timestamp": now}
-            return response_data
+        from sports_updater import get_live_sports_data_async
+        pool = await get_db_pool()
+        data = await get_live_sports_data_async(pool=pool)
+        return data
     except Exception as e:
-        logger.error(f"Sports feed error: {e}")
-
-    if _cached_world_sports["data"]:
-        return _cached_world_sports["data"]
-    return {"code": 0, "total_matches": 0, "matches": [], "list": []}
+        logger.error(f"Live sports API error: {e}")
+        return {"code": 0, "total_matches": 0, "live_count": 0, "upcoming_count": 0, "matches": [], "list": []}
 
 @app.get("/api/search/suggest")
 async def search_suggest(q: str = ""):

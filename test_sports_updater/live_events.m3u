@@ -1,0 +1,30 @@
+#EXTM3U
+# Playlist Name  : Live Sports Events
+# Channels Amount: 4
+# Live Count     : 4
+# Last Update    : 01:09 PM 12-11-2026 BST
+
+#EXTINF:-1 tvg-name="Cricket - Bangladesh vs Sri Lanka 1st ODI (Live Match)" tvg-logo="https://img.tapmad.com/bd_sl.jpg" group-title="Live Sports Events",Cricket - Bangladesh vs Sri Lanka 1st ODI (Live Match)
+https://live.tapmad.com/live/stream1/master.m3u8
+#EXTINF:-1 tvg-name="El Clasico 2026" tvg-logo="" group-title="Live Sports Events",El Clasico 2026
+#KODIPROP:inputstream=inputstream.adaptive
+#KODIPROP:inputstream.adaptive.manifest_type=mpd
+https://live.sonyliv.com/live/ch1/master.mpd
+#EXTINF:-1 tvg-name="Arsenal vs Chelsea (Server 1 (English 1080p))" tvg-logo="https://cdn.bing.com/arsenal_chelsea.png" group-title="Live Sports Events",Arsenal vs Chelsea (Server 1 (English 1080p))
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36
+#EXTVLCOPT:http-referrer=https://iframe.rumsport11.site/
+#KODIPROP:inputstream.adaptive.manifest_headers=User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36&Referer=https://iframe.rumsport11.site/
+#KODIPROP:inputstream.adaptive.stream_headers=User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36&Referer=https://iframe.rumsport11.site/
+https://stream.bing.com/hls/live1.m3u8|User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36&Referer=https://iframe.rumsport11.site/
+#EXTINF:-1 tvg-name="Arsenal vs Chelsea (Server 2 (Bangla 720p))" tvg-logo="https://cdn.bing.com/arsenal_chelsea.png" group-title="Live Sports Events",Arsenal vs Chelsea (Server 2 (Bangla 720p))
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36
+#EXTVLCOPT:http-referrer=https://iframe.rumsport11.site/
+#KODIPROP:inputstream.adaptive.manifest_headers=User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36&Referer=https://iframe.rumsport11.site/
+#KODIPROP:inputstream.adaptive.stream_headers=User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36&Referer=https://iframe.rumsport11.site/
+https://stream.bing.com/hls/live2.m3u8|User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36&Referer=https://iframe.rumsport11.site/
+#EXTINF:-1 tvg-name="IPL 2026: CSK vs RCB (Server 1 (FHD))" tvg-logo="https://img.csk.png" group-title="Live Sports Events",IPL 2026: CSK vs RCB (Server 1 (FHD))
+https://stream.example.com/live/master.m3u8
+#EXTINF:-1 tvg-name="IPL 2026: CSK vs RCB (Server 2 (HD))" tvg-logo="https://img.csk.png" group-title="Live Sports Events",IPL 2026: CSK vs RCB (Server 2 (HD))
+#KODIPROP:inputstream=inputstream.adaptive
+#KODIPROP:inputstream.adaptive.manifest_type=mpd
+https://stream2.example.com/live/master.mpd

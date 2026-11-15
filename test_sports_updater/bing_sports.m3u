@@ -1,0 +1,18 @@
+#EXTM3U
+# Playlist Name  : Bing Sports
+# Channels Amount: 1
+# Live Count     : 1
+# Last Update    : 01:09 PM 12-11-2026 BST
+
+#EXTINF:-1 tvg-name="Arsenal vs Chelsea (Server 1 (English 1080p))" tvg-logo="https://cdn.bing.com/arsenal_chelsea.png" group-title="Bing Sports",Arsenal vs Chelsea (Server 1 (English 1080p))
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36
+#EXTVLCOPT:http-referrer=https://iframe.rumsport11.site/
+#KODIPROP:inputstream.adaptive.manifest_headers=User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36&Referer=https://iframe.rumsport11.site/
+#KODIPROP:inputstream.adaptive.stream_headers=User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36&Referer=https://iframe.rumsport11.site/
+https://stream.bing.com/hls/live1.m3u8|User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36&Referer=https://iframe.rumsport11.site/
+#EXTINF:-1 tvg-name="Arsenal vs Chelsea (Server 2 (Bangla 720p))" tvg-logo="https://cdn.bing.com/arsenal_chelsea.png" group-title="Bing Sports",Arsenal vs Chelsea (Server 2 (Bangla 720p))
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36
+#EXTVLCOPT:http-referrer=https://iframe.rumsport11.site/
+#KODIPROP:inputstream.adaptive.manifest_headers=User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36&Referer=https://iframe.rumsport11.site/
+#KODIPROP:inputstream.adaptive.stream_headers=User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36&Referer=https://iframe.rumsport11.site/
+https://stream.bing.com/hls/live2.m3u8|User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36&Referer=https://iframe.rumsport11.site/

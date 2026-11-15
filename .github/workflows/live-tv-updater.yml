@@ -1,0 +1,60 @@
+name: Automated All-in-One Live TV & Sports JSON Updater
+
+on:
+  schedule:
+    - cron: '0 */2 * * *'  # প্রতি ২ ঘন্টা পর পর স্বয়ংক্রিয়ভাবে চলবে
+  workflow_dispatch:        # গিটহাব থেকে ম্যানুয়ালি ১-ক্লিকে চালানোর জন্য
+
+permissions:
+  contents: write
+
+jobs:
+  update-tv-channels:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          pip install requests pytz
+
+      - name: Fetch, Validate Streams & Generate All-in-One JSON & M3U
+        run: |
+          python scripts/update_live_tv.py
+
+      - name: Commit and Push Updated Playlists
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          git add live_channels.json public/live_channels.json live_channels.m3u public/live_channels.m3u
+          
+          if git diff --staged --quiet; then
+            echo "No changes in live channels to commit."
+            exit 0
+          fi
+          
+          git commit -m "chore(tv): auto-update live channels & sports playlist [2h sync]"
+          
+          for attempt in 1 2 3; do
+            git pull --rebase origin main || true
+            if git push origin main; then
+              echo "Successfully pushed live channels update!"
+              exit 0
+            fi
+            sleep 2
+          done
+          
+          echo "Failed to push changes after 3 attempts."
+          exit 1
+

@@ -1,0 +1,21 @@
+{
+  "playlist_name": "Sony LIV Sports",
+  "channels_amount": 1,
+  "live_count": 1,
+  "last_update": "01:09 PM 12-11-2026 BST",
+  "events": [
+    {
+      "match_id": "2001",
+      "title": "El Clasico 2026",
+      "synopsis": "Live Spanish La Liga Clash",
+      "status": "LIVE",
+      "time": "13/11/2026 01:00 AM BST",
+      "cover_image": "",
+      "match_url": "https://live.sonyliv.com/live/ch1/master.mpd",
+      "is_free": false,
+      "stream_url": {
+        "Original Server": "https://live.sonyliv.com/live/ch1/master.mpd"
+      }
+    }
+  ]
+}

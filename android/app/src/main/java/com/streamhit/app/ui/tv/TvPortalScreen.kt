@@ -17,6 +17,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.SportsCricket
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import com.streamhit.app.data.model.LiveSportItem
+import com.streamhit.app.data.repository.MovieRepository
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -48,7 +55,8 @@ import java.util.Locale
 @Composable
 fun TvPortalScreen(
     onSelectMovies: () -> Unit,
-    onSelectLiveTv: (channel: LiveTvChannel?, streamUrl: String) -> Unit
+    onSelectLiveTv: (channel: LiveTvChannel?, streamUrl: String) -> Unit,
+    onSelectLiveEvent: ((event: LiveSportItem, streamUrl: String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     var isSplashDone by remember { mutableStateOf(false) }
@@ -65,7 +73,8 @@ fun TvPortalScreen(
         TvHubMainContent(
             context = context,
             onSelectMovies = onSelectMovies,
-            onSelectLiveTv = onSelectLiveTv
+            onSelectLiveTv = onSelectLiveTv,
+            onSelectLiveEvent = onSelectLiveEvent
         )
     }
 }
@@ -155,16 +164,33 @@ fun TvSplashScreen() {
 }
 
 /**
- * Main TV Hub Screen with two massive remote-focus tiles: Movies & Series vs Live TV
+ * Main TV Hub Screen with three massive remote-focus tiles: Movies & Series, Live Events, and Live TV
  */
 @Composable
 fun TvHubMainContent(
     context: Context,
     onSelectMovies: () -> Unit,
-    onSelectLiveTv: (channel: LiveTvChannel?, streamUrl: String) -> Unit
+    onSelectLiveTv: (channel: LiveTvChannel?, streamUrl: String) -> Unit,
+    onSelectLiveEvent: ((event: LiveSportItem, streamUrl: String) -> Unit)? = null
 ) {
     val liveTvRepo = remember { LiveTvRepository() }
+    val movieRepo = remember { MovieRepository() }
     val moviesFocusRequester = remember { FocusRequester() }
+
+    var showEventsOverlay by remember { mutableStateOf(false) }
+    var liveEvents by remember { mutableStateOf<List<LiveSportItem>>(emptyList()) }
+    var isLoadingEvents by remember { mutableStateOf(false) }
+
+    // Fetch live sports from server (auto-cached 10 min)
+    LaunchedEffect(Unit) {
+        try {
+            isLoadingEvents = true
+            liveEvents = movieRepo.getLiveSports()
+        } catch (_: Exception) {
+        } finally {
+            isLoadingEvents = false
+        }
+    }
 
     // Live clock for TV top bar
     var currentTime by remember { mutableStateOf("") }
@@ -320,8 +346,8 @@ fun TvHubMainContent(
                 Spacer(modifier = Modifier.height(28.dp))
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(0.92f),
-                    horizontalArrangement = Arrangement.spacedBy(24.dp)
+                    modifier = Modifier.fillMaxWidth(0.96f),
+                    horizontalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
                     // ── Tile 1: Movies & Series ──
                     TvHubCard(
@@ -337,13 +363,26 @@ fun TvHubMainContent(
                         onClick = onSelectMovies
                     )
 
-                    // ── Tile 2: Live TV ──
+                    // ── Tile 2: Live Events (NEW) ──
+                    TvHubCard(
+                        modifier = Modifier.weight(1f),
+                        title = "লাইভ ইভেন্ট",
+                        subtitle = "লাইভ ক্রিকেট, ফুটবল ও স্পোর্টস ইভেন্ট",
+                        badgeText = "LIVE SPORTS",
+                        badgeColor = Color(0xFFEF4444),
+                        icon = Icons.Default.SportsCricket,
+                        accentGradient = listOf(Color(0xFF7F1D1D), Color(0xFF1A0A0A)),
+                        isLiveIndicator = true,
+                        onClick = { showEventsOverlay = true }
+                    )
+
+                    // ── Tile 3: Live TV ──
                     TvHubCard(
                         modifier = Modifier.weight(1f),
                         title = "লাইভ টিভি",
-                        subtitle = "ওয়ার্ল্ড স্পোর্টস, খেলাধুলা ও সকল টিভি চ্যানেল",
+                        subtitle = "সকল দেশি ও বিদেশি টিভি চ্যানেল ও সংবাদ",
                         badgeText = "LIVE NOW",
-                        badgeColor = Color(0xFFEF4444),
+                        badgeColor = Color(0xFF10B981),
                         icon = Icons.Default.Tv,
                         accentGradient = listOf(Color(0xFF064E3B), Color(0xFF09141D)),
                         isLiveIndicator = true,
@@ -363,6 +402,250 @@ fun TvHubMainContent(
                 TvRemoteKeyHint(keyLabel = "OK", desc = "ওপেন করুন")
                 Spacer(modifier = Modifier.width(20.dp))
                 TvRemoteKeyHint(keyLabel = "BACK", desc = "বাহির হন")
+            }
+        }
+
+        if (showEventsOverlay) {
+            TvLiveEventsOverlay(
+                events = liveEvents,
+                isLoading = isLoadingEvents,
+                onClose = { showEventsOverlay = false },
+                onPlay = { event, sUrl ->
+                    showEventsOverlay = false
+                    onSelectLiveEvent?.invoke(event, sUrl)
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun TvLiveEventsOverlay(
+    events: List<LiveSportItem>,
+    isLoading: Boolean,
+    onClose: () -> Unit,
+    onPlay: (event: LiveSportItem, streamUrl: String) -> Unit
+) {
+    androidx.activity.compose.BackHandler(enabled = true) {
+        onClose()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF020408).copy(alpha = 0.97f))
+            .padding(horizontal = 40.dp, vertical = 24.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onClose) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "LIVE & UPCOMING EVENTS",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color.White,
+                                letterSpacing = 1.sp
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFFEF4444).copy(alpha = 0.2f))
+                                    .border(1.dp, Color(0xFFEF4444).copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "TV EDITION",
+                                    color = Color(0xFFEF4444),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        Text(
+                            text = "লাইভ ক্রিকেট, ফুটবল ও স্পোর্টস ইভেন্ট • রিমোটের OK চেপে প্লে করুন",
+                            fontSize = 12.sp,
+                            color = Color(0xFF94A3B8)
+                        )
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TvRemoteKeyHint(keyLabel = "OK", desc = "প্লে করুন")
+                    Spacer(modifier = Modifier.width(14.dp))
+                    TvRemoteKeyHint(keyLabel = "BACK", desc = "বন্ধ করুন")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            if (isLoading && events.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Color(0xFFEF4444))
+                }
+            } else if (events.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "বর্তমানে কোনো লাইভ ইভেন্ট পাওয়া যায়নি।",
+                        color = Color.Gray,
+                        fontSize = 16.sp
+                    )
+                }
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(bottom = 20.dp)
+                ) {
+                    items(events, key = { it.id }) { item ->
+                        TvLiveEventCard(
+                            item = item,
+                            onPlay = {
+                                val sUrl = item.streamLinks.firstOrNull()?.url ?: ""
+                                onPlay(item, sUrl)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TvLiveEventCard(
+    item: LiveSportItem,
+    onPlay: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
+    val scale by animateFloatAsState(
+        targetValue = if (isFocused) 1.04f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
+        label = "tvEventCardScale"
+    )
+
+    val borderBrush = if (isFocused) {
+        Brush.horizontalGradient(listOf(Color(0xFFEF4444), Color(0xFFF59E0B)))
+    } else {
+        Brush.linearGradient(listOf(Color.White.copy(alpha = 0.08f), Color.White.copy(alpha = 0.04f)))
+    }
+
+    val isLive = item.matchTime == "LIVE NOW" || item.title.contains("Live", ignoreCase = true)
+    val serverCount = item.streamLinks.size
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(scale)
+            .clip(RoundedCornerShape(14.dp))
+            .border(
+                width = if (isFocused) 2.dp else 1.dp,
+                brush = borderBrush,
+                shape = RoundedCornerShape(14.dp)
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onPlay
+            )
+            .focusable(interactionSource = interactionSource),
+        color = if (isFocused) Color(0xFF1E1424) else Color(0xFF0F1524),
+        shape = RoundedCornerShape(14.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = item.league.ifBlank { "International Sports" },
+                    fontSize = 11.sp,
+                    color = Color(0xFF94A3B8),
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f)
+                )
+
+                if (isLive) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFFEF4444).copy(alpha = 0.25f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "LIVE NOW",
+                            color = Color(0xFFEF4444),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                } else {
+                    Text(
+                        text = item.matchTime.ifBlank { "UPCOMING" },
+                        color = Color(0xFF38BDF8),
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = item.matchTitle,
+                fontSize = 14.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isFocused) Color.White else Color(0xFFE2E8F0),
+                maxLines = 2
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (serverCount > 1) "$serverCount Servers (Auto-Failover)" else "1 Server Available",
+                    fontSize = 11.sp,
+                    color = if (serverCount > 1) Color(0xFF10B981) else Color(0xFF64748B),
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(if (isFocused) Color(0xFFEF4444) else Color(0xFF1E293B)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
         }
     }

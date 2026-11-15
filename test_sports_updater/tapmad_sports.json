@@ -1,0 +1,21 @@
+{
+  "playlist_name": "Tapmad Sports",
+  "channels_amount": 1,
+  "live_count": 1,
+  "last_update": "01:09 PM 12-11-2026 BST",
+  "events": [
+    {
+      "match_id": "1001",
+      "title": "Cricket - Bangladesh vs Sri Lanka 1st ODI (Live Match)",
+      "synopsis": "Cricket - Bangladesh vs Sri Lanka 1st ODI (Live Match)",
+      "status": "LIVE",
+      "time": "12/11/2026 03:00 PM BST",
+      "cover_image": "https://img.tapmad.com/bd_sl.jpg",
+      "match_url": "https://live.tapmad.com/live/stream1/master.m3u8",
+      "is_free": false,
+      "stream_url": {
+        "Server 1": "https://live.tapmad.com/live/stream1/master.m3u8"
+      }
+    }
+  ]
+}

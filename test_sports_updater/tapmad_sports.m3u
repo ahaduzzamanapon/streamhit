@@ -1,0 +1,8 @@
+#EXTM3U
+# Playlist Name  : Tapmad Sports
+# Channels Amount: 1
+# Live Count     : 1
+# Last Update    : 01:09 PM 12-11-2026 BST
+
+#EXTINF:-1 tvg-name="Cricket - Bangladesh vs Sri Lanka 1st ODI (Live Match)" tvg-logo="https://img.tapmad.com/bd_sl.jpg" group-title="Tapmad Sports",Cricket - Bangladesh vs Sri Lanka 1st ODI (Live Match)
+https://live.tapmad.com/live/stream1/master.m3u8
