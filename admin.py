@@ -752,33 +752,14 @@ async def admin_get_tv_channels(request: Request):
 @router.get("/api/sports/list")
 @router.get("/api/sports/live")
 async def public_get_sports():
-    from main import get_db_pool
-    pool = await get_db_pool()
-    if not pool: return {"code": 0, "list": []}
-    async with pool.acquire() as conn:
-        async with conn.cursor(aiomysql.DictCursor) as cur:
-            await cur.execute("SELECT * FROM live_sports ORDER BY created_at DESC")
-            rows = await cur.fetchall()
-            items = []
-            for r in rows:
-                try:
-                    links = json.loads(r["stream_links"])
-                except Exception:
-                    links = []
-                items.append({
-                    "id": r["id"],
-                    "title": r["title"],
-                    "logo": r["logo"] or "",
-                    "team1Name": r["team1_name"] or "",
-                    "team1Logo": r["team1_logo"] or "",
-                    "team2Name": r["team2_name"] or "",
-                    "team2Logo": r["team2_logo"] or "",
-                    "streamLinks": links,
-                    "referer": r["referer"] or "",
-                    "origin": r["origin"] or "",
-                    "useBdProxy": bool(r["use_bd_proxy"])
-                })
-            return {"code": 0, "list": items}
+    try:
+        from sports_updater import get_live_sports_data_async
+        from main import get_db_pool
+        pool = await get_db_pool()
+        return await get_live_sports_data_async(pool=pool)
+    except Exception as e:
+        logger.error(f"Error fetching live sports: {e}")
+        return {"code": 0, "total_matches": 0, "live_count": 0, "upcoming_count": 0, "matches": [], "list": []}
 
 @router.get("/api/tv/channels")
 async def public_get_tv_channels():

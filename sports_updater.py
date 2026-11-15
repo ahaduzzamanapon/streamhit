@@ -391,3 +391,15 @@ async def get_live_sports_data_async(pool=None, force_refresh: bool = False) -> 
             logger.debug(f"DB merge sports error: {e}")
 
     return data
+
+if __name__ == "__main__":
+    import sys
+    print("=" * 60)
+    print("Running sports updater cycle (10m crontab)...")
+    res = get_live_sports_data(force_refresh=True)
+    total = res.get("total_matches", 0)
+    live = res.get("live_count", 0)
+    upcoming = res.get("upcoming_count", 0)
+    print(f"Cycle completed successfully. Total: {total} (Live: {live}, Upcoming: {upcoming})")
+    print("=" * 60)
+
