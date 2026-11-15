@@ -1,23 +1,13 @@
 {
   "playlist_name": "All-in-One Live TV & Sports",
-  "total_channels": 374,
-  "last_updated": "10:49 PM 15-11-2026 BST",
+  "total_channels": 380,
+  "last_updated": "04:29 AM 16-11-2026 BST",
   "categories": [
     "Bangladesh",
     "Sports",
     "Kids"
   ],
   "channels": [
-    {
-      "id": "AamarBangla.in@SD",
-      "name": "Aamar Bangla (720p)",
-      "category": "Bangladesh",
-      "logo": "https://jiotvimages.cdn.jio.com/dare_images/images/Amaar_Bangla.png",
-      "stream_url": "https://app.ncare.live/c3VydmVyX8RpbEU9Mi8xNy8yMDE0GIDU6RgzQ6NTAgdEoaeFzbF92YWxIZTO0U0ezN1IzMyfvcGVMZEJCTEFWeVN3PTOmdFsaWRtaW51aiPhnPTI/amarbanglatv.stream/playlist.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
     {
       "id": "AnandaTV.bd@SD",
       "name": "Ananda TV (720p)",
@@ -169,6 +159,16 @@
       }
     },
     {
+      "id": "NexusTV.bd@SD",
+      "name": "Nexus TV (576p)",
+      "category": "Bangladesh",
+      "logo": "https://i.imgur.com/XcJZKg4.png",
+      "stream_url": "https://tvsen6.aynaott.com/Epm7WrFa/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "PeaceTVBangla.ae@SD",
       "name": "Peace TV Bangla (1080p)",
       "category": "Bangladesh",
@@ -284,16 +284,6 @@
       "category": "Sports",
       "logo": "https://channels2.digital.ugbb.net/wp-content/uploads/2022/04/logo-adriatic-sport-2.png",
       "stream_url": "http://sultanios.alwaysdata.net/vavo.php?ID=2665922581",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "AdriaticSport3.ba@SD",
-      "name": "Adriatic Sport 3",
-      "category": "Sports",
-      "logo": "https://channels2.digital.ugbb.net/wp-content/uploads/2022/04/logo-adriatic-sport-3.png",
-      "stream_url": "http://sultanios.alwaysdata.net/vavo.php?ID=2743527845",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -769,21 +759,21 @@
       }
     },
     {
-      "id": "DigiSport2.ro@HD",
-      "name": "Digi Sport 2 HD",
+      "id": "DigiSport1.ro@HD",
+      "name": "Digi Sport 1 HD",
       "category": "Sports",
-      "logo": "https://i.imgur.com/KWDUi3v.png",
-      "stream_url": "http://sultanios.alwaysdata.net/vavo.php?ID=867728420",
+      "logo": "https://i.imgur.com/5zMxDYq.png",
+      "stream_url": "http://sultanios.alwaysdata.net/vavo.php?ID=3174529991",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
     },
     {
-      "id": "DigiSport3.ro@HD",
-      "name": "Digi Sport 3 HD",
+      "id": "DigiSport2.ro@HD",
+      "name": "Digi Sport 2 HD",
       "category": "Sports",
-      "logo": "https://i.imgur.com/T1ci5UK.png",
-      "stream_url": "http://sultanios.alwaysdata.net/vavo.php?ID=4279401658",
+      "logo": "https://i.imgur.com/KWDUi3v.png",
+      "stream_url": "http://sultanios.alwaysdata.net/vavo.php?ID=867728420",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -904,6 +894,16 @@
       "category": "Sports",
       "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/ESPN_wordmark.svg/960px-ESPN_wordmark.svg.png",
       "stream_url": "http://168.228.44.241:9997/play/a06p/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "ESPNPremium.ar@SD",
+      "name": "ESPN Premium",
+      "category": "Sports",
+      "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/ESPN_Premium_logo.svg/960px-ESPN_Premium_logo.svg.png",
+      "stream_url": "http://45.134.141.161:2200/ARG/ESPN_Premium_Argentina_HD/tracks-v1a1/mono.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -1099,6 +1099,16 @@
       }
     },
     {
+      "id": "Eurosport1.fr@Spain",
+      "name": "Eurosport 1 Spain (576p)",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/olQJgm7.png",
+      "stream_url": "http://45.134.141.161:2200/ARG/Eurosport_1_HD/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "Eurosport1.fr@UK",
       "name": "Eurosport 1 UK (1080p)",
       "category": "Sports",
@@ -1184,6 +1194,16 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/f56dHgR.png",
       "stream_url": "https://s7.iptv-24.net/1452/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "Eurosport2.fr@Spain",
+      "name": "Eurosport 2 Spain (1080p)",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/f56dHgR.png",
+      "stream_url": "http://45.134.141.161:2200/ARG/Eurosport_2_HD/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -1754,6 +1774,16 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/l4oX0gf.png",
       "stream_url": "https://kwtsplta.cdn.mangomolo.com/spl/smil:spl.stream.smil/chunklist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "Kabaddi24x7.in@SD",
+      "name": "Kabaddi 24x7 (720p)",
+      "category": "Sports",
+      "logo": "https://papaji.freetvindia.com/media/kabaddi_24x7.png",
+      "stream_url": "https://samitaorigin.tangotv.in/KABADDI24X7/SAMITAORIGIN/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -3199,6 +3229,16 @@
       }
     },
     {
+      "id": "TNTSportsPremium.cl@HD",
+      "name": "TNT Sports Premium HD",
+      "category": "Sports",
+      "logo": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f4/TNT_Sports_Premium_%28Argentina%29.png/960px-TNT_Sports_Premium_%28Argentina%29.png?utm_source=es.wikipedia.org&utm_campaign=index&utm_content=thumbnail",
+      "stream_url": "https://play-fulltv.com.ar/playtvpre/tntsportschile.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "TRSport.it@SD",
       "name": "TR Sport (480p)",
       "category": "Sports",
@@ -3519,6 +3559,16 @@
       }
     },
     {
+      "id": "WinPlusFutbol.co@SD",
+      "name": "Win+ Futbol (1080p)",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/0UN87vB.png",
+      "stream_url": "http://181.78.12.119:16123/play/ch19/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "WorldPokerTour.us@US",
       "name": "World Poker Tour (1080p)",
       "category": "Sports",
@@ -3594,6 +3644,16 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/V562tpO.png",
       "stream_url": "https://dc1644a9jazgj.cloudfront.net/beIN_Sports_Xtra_Espanol.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "beINSports1Turk.tr@SD",
+      "name": "beIN Sports 1 Turk",
+      "category": "Sports",
+      "logo": "https://static.wikia.nocookie.net/logopedia/images/2/27/BeinSports1.svg/revision/latest?cb=20230910184457",
+      "stream_url": "http://57.129.0.61:1990/stream/117/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
