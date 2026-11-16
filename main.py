@@ -12,6 +12,8 @@ import datetime
 import base64
 import hashlib
 import hmac
+import secrets
+import math
 import aiomysql
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, HTTPException, Query, Response
@@ -1527,6 +1529,231 @@ def get_sponsor_placements_config() -> dict:
         pass
     return default_placements
 
+# ─── REFERRAL PROGRAM & VIP 3-DAY PASS ENGINE ─────────────────────────────────
+def init_referral_db():
+    try:
+        with sqlite3.connect(_ACTIVE_DB_PATH, timeout=5) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS referral_users (
+                    device_id TEXT PRIMARY KEY,
+                    referral_code TEXT UNIQUE,
+                    device_model TEXT DEFAULT '',
+                    referred_by_code TEXT DEFAULT '',
+                    premium_until REAL DEFAULT 0,
+                    total_referrals INTEGER DEFAULT 0,
+                    created_at REAL NOT NULL,
+                    last_active REAL NOT NULL
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_referral_code ON referral_users(referral_code)")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS referral_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    referrer_code TEXT NOT NULL,
+                    referrer_device_id TEXT NOT NULL,
+                    referee_code TEXT NOT NULL,
+                    referee_device_id TEXT NOT NULL,
+                    reward_days INTEGER DEFAULT 3,
+                    created_at REAL NOT NULL
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_ref_logs_referee ON referral_logs(referee_device_id)")
+    except Exception as e:
+        print(f"[ReferralDB] Error initializing referral db: {e}")
+
+def generate_unique_referral_code() -> str:
+    alphabet = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
+    for _ in range(50):
+        code = "".join(secrets.choice(alphabet) for _ in range(6))
+        try:
+            with sqlite3.connect(_ACTIVE_DB_PATH, timeout=3) as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT 1 FROM referral_users WHERE referral_code = ?", (code,))
+                if not cur.fetchone():
+                    return code
+        except Exception:
+            return code
+    return secrets.token_hex(3).upper()
+
+def sync_referral_user(device_id: str, device_model: str = "") -> dict:
+    init_referral_db()
+    device_id = (device_id or "").strip()
+    if not device_id:
+        return {"code": 1, "error": "Invalid device_id"}
+    
+    now = time.time()
+    try:
+        with sqlite3.connect(_ACTIVE_DB_PATH, timeout=5) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM referral_users WHERE device_id = ?", (device_id,))
+            row = cur.fetchone()
+            
+            if row:
+                conn.execute(
+                    "UPDATE referral_users SET last_active = ?, device_model = CASE WHEN ? != '' THEN ? ELSE device_model END WHERE device_id = ?",
+                    (now, device_model, device_model, device_id)
+                )
+                ref_code = row["referral_code"]
+                premium_until = float(row["premium_until"] or 0)
+                total_referrals = int(row["total_referrals"] or 0)
+                referred_by = row["referred_by_code"] or ""
+            else:
+                ref_code = generate_unique_referral_code()
+                premium_until = 0.0
+                total_referrals = 0
+                referred_by = ""
+                conn.execute(
+                    "INSERT INTO referral_users (device_id, referral_code, device_model, referred_by_code, premium_until, total_referrals, created_at, last_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (device_id, ref_code, device_model, "", premium_until, total_referrals, now, now)
+                )
+                
+        is_premium = (premium_until > now)
+        days_left = max(0, int(math.ceil((premium_until - now) / 86400))) if is_premium else 0
+        return {
+            "code": 0,
+            "device_id": device_id,
+            "referral_code": ref_code,
+            "is_premium": is_premium,
+            "premium_days_left": days_left,
+            "premium_until": premium_until,
+            "total_referrals": total_referrals,
+            "has_claimed": bool(referred_by)
+        }
+    except Exception as e:
+        print(f"[ReferralSync] Error: {e}")
+        return {"code": 1, "error": str(e)}
+
+def claim_referral_code(referee_device_id: str, code_to_claim: str, referee_model: str = "") -> dict:
+    init_referral_db()
+    referee_device_id = (referee_device_id or "").strip()
+    code_to_claim = (code_to_claim or "").strip().upper()
+    
+    if not referee_device_id:
+        return {"code": 1, "error": "Invalid device ID"}
+    if len(code_to_claim) != 6:
+        return {"code": 1, "error": "Referral code must be 6 characters"}
+    
+    now = time.time()
+    REWARD_SECONDS = 3 * 86400  # 3 Days
+    
+    try:
+        with sqlite3.connect(_ACTIVE_DB_PATH, timeout=5) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            
+            cur.execute("SELECT * FROM referral_users WHERE device_id = ?", (referee_device_id,))
+            referee = cur.fetchone()
+            if not referee:
+                sync_referral_user(referee_device_id, referee_model)
+                cur.execute("SELECT * FROM referral_users WHERE device_id = ?", (referee_device_id,))
+                referee = cur.fetchone()
+                
+            if referee["referred_by_code"]:
+                return {"code": 1, "error": "This device has already claimed a referral code."}
+                
+            if referee["referral_code"] == code_to_claim:
+                return {"code": 1, "error": "You cannot use your own referral code."}
+                
+            cur.execute("SELECT * FROM referral_users WHERE referral_code = ?", (code_to_claim,))
+            referrer = cur.fetchone()
+            if not referrer:
+                return {"code": 1, "error": "Invalid referral code. Please check and try again."}
+                
+            if referrer["device_id"] == referee_device_id:
+                return {"code": 1, "error": "You cannot use your own referral code."}
+                
+            # Stacking: add 3 days to current remaining time or now
+            referee_cur = float(referee["premium_until"] or 0)
+            referee_base = referee_cur if referee_cur > now else now
+            referee_new_prem = referee_base + REWARD_SECONDS
+            
+            referrer_cur = float(referrer["premium_until"] or 0)
+            referrer_base = referrer_cur if referrer_cur > now else now
+            referrer_new_prem = referrer_base + REWARD_SECONDS
+            
+            conn.execute(
+                "UPDATE referral_users SET referred_by_code = ?, premium_until = ?, last_active = ? WHERE device_id = ?",
+                (code_to_claim, referee_new_prem, now, referee_device_id)
+            )
+            
+            conn.execute(
+                "UPDATE referral_users SET premium_until = ?, total_referrals = total_referrals + 1 WHERE device_id = ?",
+                (referrer_new_prem, referrer["device_id"])
+            )
+            
+            conn.execute(
+                "INSERT INTO referral_logs (referrer_code, referrer_device_id, referee_code, referee_device_id, reward_days, created_at) VALUES (?, ?, ?, ?, 3, ?)",
+                (code_to_claim, referrer["device_id"], referee["referral_code"], referee_device_id, now)
+            )
+            
+        days_left = max(0, int(math.ceil((referee_new_prem - now) / 86400)))
+        return {
+            "code": 0,
+            "status": "ok",
+            "message": "Referral successful! 3 Days Ad-Free VIP Premium activated.",
+            "reward_days": 3,
+            "is_premium": True,
+            "premium_days_left": days_left,
+            "premium_until": referee_new_prem,
+            "has_claimed": True
+        }
+    except Exception as e:
+        print(f"[ReferralClaim] Error: {e}")
+        return {"code": 1, "error": str(e)}
+
+def get_referral_admin_stats() -> dict:
+    init_referral_db()
+    now = time.time()
+    try:
+        with sqlite3.connect(_ACTIVE_DB_PATH, timeout=5) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            
+            cur.execute("SELECT COUNT(*) as cnt FROM referral_users")
+            total_users = cur.fetchone()["cnt"]
+            
+            cur.execute("SELECT COUNT(*) as cnt FROM referral_logs")
+            total_claims = cur.fetchone()["cnt"]
+            
+            cur.execute("SELECT COUNT(*) as cnt FROM referral_users WHERE premium_until > ?", (now,))
+            active_premium_users = cur.fetchone()["cnt"]
+            
+            cur.execute("""
+                SELECT l.id, l.referrer_code, l.referrer_device_id, l.referee_code, l.referee_device_id, l.reward_days, l.created_at,
+                       u1.premium_until as referrer_premium_until,
+                       u2.premium_until as referee_premium_until
+                FROM referral_logs l
+                LEFT JOIN referral_users u1 ON l.referrer_device_id = u1.device_id
+                LEFT JOIN referral_users u2 ON l.referee_device_id = u2.device_id
+                ORDER BY l.id DESC LIMIT 100
+            """)
+            logs = []
+            for r in cur.fetchall():
+                c_time = datetime.datetime.fromtimestamp(r["created_at"]).strftime("%Y-%m-%d %H:%M:%S")
+                logs.append({
+                    "id": r["id"],
+                    "date": c_time,
+                    "referrer_code": r["referrer_code"],
+                    "referrer_device_id": (r["referrer_device_id"][:12] + "...") if r["referrer_device_id"] else "",
+                    "referee_code": r["referee_code"],
+                    "referee_device_id": (r["referee_device_id"][:12] + "...") if r["referee_device_id"] else "",
+                    "reward_days": r["reward_days"],
+                    "referrer_active": (r["referrer_premium_until"] or 0) > now,
+                    "referee_active": (r["referee_premium_until"] or 0) > now
+                })
+            
+            return {
+                "code": 0,
+                "total_users": total_users,
+                "total_claims": total_claims,
+                "active_premium_users": active_premium_users,
+                "logs": logs
+            }
+    except Exception as e:
+        print(f"[ReferralStats] Error: {e}")
+        return {"code": 1, "error": str(e), "total_users": 0, "total_claims": 0, "active_premium_users": 0, "logs": []}
+
 def get_sponsor_ad_stats():
     now = time.time()
     today_str = datetime.datetime.fromtimestamp(now).strftime("%Y-%m-%d")
@@ -2306,6 +2533,12 @@ async def api_ad_config():
     except Exception:
         playback_interval_minutes = 25
     placements = get_sponsor_placements_config()
+    
+    # STRICT AD ENFORCEMENT: If Master Switch is OFF, all placements MUST be disabled!
+    if not enabled:
+        for k in placements:
+            placements[k]["enabled"] = False
+            
     return {
         "code": 0,
         "sponsor_url": sponsor_url,
@@ -2315,11 +2548,32 @@ async def api_ad_config():
         "duration_no_click": duration_no_click,
         "playback_interval_minutes": playback_interval_minutes,
         "placements": placements,
-        "dialog_title": "অটোমেটেড অ্যাড সেন্টার",
-        "dialog_message": f"যেকোনো কিছুতে ক্লিক করলে {duration_clicked} সেকেন্ডে অটো প্লে হবে, না করলে {duration_no_click} সেকেন্ড অপেক্ষা করতে হবে।",
-        "button_text": f"🚀 অ্যাড দেখুন ({duration_clicked}s)",
-        "cancel_text": "✕ সরাসরি দেখুন"
+        "dialog_title": "VIP Sponsor Center",
+        "dialog_message": f"Support NXLY Stream! Wait {duration_clicked} seconds to auto-continue, or click to support directly.",
+        "button_text": f"🚀 Continue to Sponsor ({duration_clicked}s)",
+        "cancel_text": "✕ Watch Directly"
     }
+
+@app.post("/api/referral/sync")
+async def api_referral_sync(request: Request):
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    device_id = data.get("device_id", "")
+    device_model = data.get("device_model", "")
+    return sync_referral_user(device_id, device_model)
+
+@app.post("/api/referral/claim")
+async def api_referral_claim(request: Request):
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    device_id = data.get("device_id", "")
+    referral_code = data.get("referral_code", "")
+    device_model = data.get("device_model", "")
+    return claim_referral_code(device_id, referral_code, device_model)
 
 @app.get("/api/app/popup")
 async def api_app_popup():

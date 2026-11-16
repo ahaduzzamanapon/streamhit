@@ -37,7 +37,7 @@ object AppNoticePopupManager {
         private set
 
     @Volatile
-    var title: String = "গুরুত্বপূর্ণ নোটিশ"
+    var title: String = "Important Notice"
         private set
 
     @Volatile
@@ -53,11 +53,11 @@ object AppNoticePopupManager {
         private set
 
     @Volatile
-    var cancelText: String = "বন্ধ করুন"
+    var cancelText: String = "Close"
         private set
 
     @Volatile
-    var btn1Text: String = "টেলিগ্রামে যুক্ত হন"
+    var btn1Text: String = "Join Telegram"
         private set
 
     @Volatile
@@ -100,12 +100,12 @@ object AppNoticePopupManager {
         try {
             val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             isEnabled = prefs.getBoolean(KEY_ENABLED, false)
-            title = prefs.getString(KEY_TITLE, "গুরুত্বপূর্ণ নোটিশ") ?: "গুরুত্বপূর্ণ নোটিশ"
+            title = prefs.getString(KEY_TITLE, "Important Notice") ?: "Important Notice"
             message = prefs.getString(KEY_MESSAGE, "") ?: ""
             imageUrl = prefs.getString(KEY_IMAGE_URL, "") ?: ""
             showCancel = prefs.getBoolean(KEY_SHOW_CANCEL, true)
-            cancelText = prefs.getString(KEY_CANCEL_TEXT, "বন্ধ করুন") ?: "বন্ধ করুন"
-            btn1Text = prefs.getString(KEY_BTN1_TEXT, "টেলিগ্রামে যুক্ত হন") ?: "টেলিগ্রামে যুক্ত হন"
+            cancelText = prefs.getString(KEY_CANCEL_TEXT, "Close") ?: "Close"
+            btn1Text = prefs.getString(KEY_BTN1_TEXT, "Join Telegram") ?: "Join Telegram"
             btn1Url = prefs.getString(KEY_BTN1_URL, "") ?: ""
             btn2Enabled = prefs.getBoolean(KEY_BTN2_ENABLED, false)
             btn2Text = prefs.getString(KEY_BTN2_TEXT, "") ?: ""
@@ -129,7 +129,7 @@ object AppNoticePopupManager {
                         else -> false
                     }
 
-                    title = body["title"]?.toString()?.trim() ?: "গুরুত্বপূর্ণ নোটিশ"
+                    title = body["title"]?.toString()?.trim() ?: "Important Notice"
                     message = body["message"]?.toString()?.trim() ?: ""
                     imageUrl = body["image_url"]?.toString()?.trim() ?: ""
 
@@ -141,8 +141,8 @@ object AppNoticePopupManager {
                         else -> true
                     }
 
-                    cancelText = body["cancel_text"]?.toString()?.trim()?.ifBlank { "বন্ধ করুন" } ?: "বন্ধ করুন"
-                    btn1Text = body["btn1_text"]?.toString()?.trim()?.ifBlank { "টেলিগ্রামে যুক্ত হন" } ?: "টেলিগ্রামে যুক্ত হন"
+                    cancelText = body["cancel_text"]?.toString()?.trim()?.ifBlank { "Close" } ?: "Close"
+                    btn1Text = body["btn1_text"]?.toString()?.trim()?.ifBlank { "Join Telegram" } ?: "Join Telegram"
                     btn1Url = body["btn1_url"]?.toString()?.trim() ?: ""
 
                     val remoteBtn2Enabled = body["btn2_enabled"]

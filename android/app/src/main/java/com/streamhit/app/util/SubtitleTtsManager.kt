@@ -47,7 +47,7 @@ enum class VoiceGender(val label: String, val icon: String) {
 object SubtitleTtsManager {
 
     val SUPPORTED_LANGUAGES = listOf(
-        SupportedLanguage("bn", "Bengali", "বাংলা", "🇧🇩"),
+        SupportedLanguage("bn", "Bengali", "Bengali", "🇧🇩"),
         SupportedLanguage("hi", "Hindi", "हिन्दी", "🇮🇳"),
         SupportedLanguage("en", "English", "English", "🇺🇸"),
         SupportedLanguage("ur", "Urdu", "اردو", "🇵🇰"),

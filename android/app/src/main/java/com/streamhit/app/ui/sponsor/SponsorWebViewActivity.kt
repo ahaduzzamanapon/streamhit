@@ -65,13 +65,13 @@ class SponsorWebViewActivity : ComponentActivity() {
                 } else if (!hasClickedState) {
                     Toast.makeText(
                         this@SponsorWebViewActivity,
-                        "⚠️ যেকোনো কিছুতে ক্লিক করুন (${durationClickedState}s) অথবা অপেক্ষা করুন (${remainingSecondsState}s)!",
+                        "⚠️ Click any ad (${durationClickedState}s) or wait (${remainingSecondsState}s)!",
                         Toast.LENGTH_SHORT
                     ).show()
                 } else {
                     Toast.makeText(
                         this@SponsorWebViewActivity,
-                        "⚠️ ক্লিক সনাক্ত হয়েছে! আর মাত্র ${remainingSecondsState} সেকেন্ড অপেক্ষা করুন।",
+                        "⚠️ Click detected! Please wait ${remainingSecondsState} seconds.",
                         Toast.LENGTH_SHORT
                     ).show()
                 }
@@ -223,16 +223,16 @@ fun SponsorWebScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
-                            text = "NXLY Stream • স্পন্সর সেন্টার",
+                            text = "NXLY Stream • Sponsor Center",
                             color = Color.White,
                             fontSize = 13.5.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = when {
-                                isComplete -> "সফলভাবে সম্পন্ন হয়েছে! চালিয়ে যাচ্ছি..."
-                                hasClicked -> "✅ ক্লিক সনাক্ত হয়েছে! ${secondsRemaining}s অপেক্ষা করুন..."
-                                else -> "💡 যেকোনো কিছুতে ক্লিক করুন (${durationClicked}s এ শেষ হবে)"
+                                isComplete -> "Completed successfully! Returning..."
+                                hasClicked -> "✅ Click detected! Please wait ${secondsRemaining}s..."
+                                else -> "💡 Click any ad to finish in ${durationClicked}s"
                             },
                             color = when {
                                 isComplete || hasClicked -> Color(0xFF00F5D4)
@@ -266,7 +266,7 @@ fun SponsorWebScreen(
                 ) {
                     Text(
                         text = when {
-                            isComplete -> "✅ সম্পন্ন!"
+                            isComplete -> "✅ Done!"
                             hasClicked -> "⚡ ${secondsRemaining}s"
                             else -> "⏳ ${secondsRemaining}s"
                         },

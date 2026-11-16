@@ -1204,8 +1204,8 @@ fun HomeLiveEventCard(
     item: com.streamhit.app.data.model.LiveSportItem,
     onClick: () -> Unit
 ) {
-    val isLive = item.matchTime == "LIVE NOW" || item.title.contains("Live", ignoreCase = true)
     val serverCount = item.streamLinks.size
+    val isLive = (item.matchTime == "LIVE NOW" || item.title.contains("Live", ignoreCase = true)) && serverCount > 0
 
     Surface(
         modifier = Modifier
@@ -1220,82 +1220,110 @@ fun HomeLiveEventCard(
         ),
         shape = RoundedCornerShape(14.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = item.league.ifBlank { "International" },
-                    fontSize = 10.5.sp,
-                    color = Color(0xFF94A3B8),
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f)
+        Box(modifier = Modifier.fillMaxSize()) {
+            val imageToShow = item.coverUrl.ifBlank { item.thumbnailRaw ?: item.logo }
+            if (imageToShow.isNotBlank()) {
+                AsyncImage(
+                    model = coil.request.ImageRequest.Builder(LocalContext.current)
+                        .data(imageToShow)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = item.matchTitle,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
                 )
-                if (isLive) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color(0xFFEF4444).copy(alpha = 0.2f))
-                            .padding(horizontal = 5.dp, vertical = 2.dp)
-                    ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color.Black.copy(alpha = 0.55f),
+                                    Color(0xEE0B111E),
+                                    Color(0xFF0B111E)
+                                )
+                            )
+                        )
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = item.league.ifBlank { "International" },
+                        fontSize = 10.5.sp,
+                        color = Color(0xFF94A3B8),
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (isLive) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(0xFFEF4444).copy(alpha = 0.2f))
+                                .padding(horizontal = 5.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "LIVE",
+                                color = Color(0xFFEF4444),
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    } else {
                         Text(
-                            text = "LIVE",
-                            color = Color(0xFFEF4444),
+                            text = item.matchTime.ifBlank { "UPCOMING" },
+                            color = Color(0xFF38BDF8),
                             fontSize = 9.5.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
-                } else {
-                    Text(
-                        text = item.matchTime.ifBlank { "UPCOMING" },
-                        color = Color(0xFF38BDF8),
-                        fontSize = 9.5.sp,
-                        fontWeight = FontWeight.Bold
-                    )
                 }
-            }
 
-            Text(
-                text = item.matchTitle,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
                 Text(
-                    text = if (serverCount > 1) "$serverCount Servers" else "1 Server",
-                    fontSize = 10.5.sp,
-                    color = if (serverCount > 1) Color(0xFF10B981) else Color(0xFF64748B),
-                    fontWeight = FontWeight.SemiBold
+                    text = item.matchTitle,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
 
-                Box(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .clip(CircleShape)
-                        .background(if (isLive) Color(0xFFEF4444) else Color(0xFF0284C7)),
-                    contentAlignment = Alignment.Center
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(14.dp)
+                    Text(
+                        text = if (serverCount > 1) "$serverCount Servers" else if (serverCount == 1) "1 Server" else "Upcoming",
+                        fontSize = 10.5.sp,
+                        color = if (serverCount > 0) Color(0xFF10B981) else Color(0xFF64748B),
+                        fontWeight = FontWeight.SemiBold
                     )
+
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(if (isLive) Color(0xFFEF4444) else Color(0xFF0284C7)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
                 }
             }
         }

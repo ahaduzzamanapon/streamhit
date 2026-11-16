@@ -78,4 +78,11 @@ interface ApiService {
     // Dynamic In-App Notice Pop-up Configuration
     @GET("api/app/popup")
     suspend fun getAppPopupConfig(): Response<Map<String, Any>>
+
+    // Referral Program & VIP 3-Day Pass
+    @POST("api/referral/sync")
+    suspend fun syncReferral(@Body payload: Map<String, String>): Response<Map<String, Any>>
+
+    @POST("api/referral/claim")
+    suspend fun claimReferral(@Body payload: Map<String, String>): Response<Map<String, Any>>
 }

@@ -387,6 +387,11 @@ data class LiveSportItem(
     @SerializedName("league") val league: String = "",
     @SerializedName("match_time") val matchTime: String = "",
     @SerializedName("logo") val logo: String = "",
+    @SerializedName("cover_image") val coverImageRaw: String? = null,
+    @SerializedName("coverImage") val coverImageCamel: String? = null,
+    @SerializedName("thumbnail") val thumbnailRaw: String? = null,
+    @SerializedName("drm_key") val rootDrmKey: String? = null,
+    @SerializedName("drmKey") val rootDrmKeyCamel: String? = null,
     @SerializedName("team1_name") val team1NameRaw: String? = null,
     @SerializedName("team1Name") val team1NameCamel: String? = null,
     @SerializedName("team2_name") val team2NameRaw: String? = null,
@@ -401,6 +406,9 @@ data class LiveSportItem(
     val matchTitle: String
         get() = title.ifBlank { matchTitleRaw ?: "Live Match" }
 
+    val coverUrl: String
+        get() = (coverImageRaw ?: coverImageCamel ?: thumbnailRaw ?: logo).trim()
+
     val team1Name: String
         get() = team1NameCamel ?: team1NameRaw ?: ""
 
@@ -413,14 +421,31 @@ data class LiveSportItem(
     val team2Logo: String
         get() = team2LogoCamel ?: team2LogoRaw ?: ""
 
+    val defaultDrmKey: String
+        get() = (rootDrmKey ?: rootDrmKeyCamel ?: "").trim()
+
     val streamLinks: List<StreamLinkItem>
         get() {
-            if (!streamLinksList.isNullOrEmpty()) return streamLinksList
+            if (!streamLinksList.isNullOrEmpty()) {
+                return if (defaultDrmKey.isNotBlank()) {
+                    streamLinksList.map {
+                        if (it.licenseKey.isBlank()) it.copy(licenseKeySnake = defaultDrmKey) else it
+                    }
+                } else streamLinksList
+            }
             return when (streamLinksRaw) {
                 is List<*> -> streamLinksRaw.mapNotNull { it as? Map<*, *> }.map {
+                    val lbl = (it["label"] as? String) ?: "Server"
+                    val u = (it["url"] as? String) ?: ""
+                    val lic = (it["license_key"] as? String)
+                        ?: (it["licenseKey"] as? String)
+                        ?: (it["drm_key"] as? String)
+                        ?: (it["key"] as? String)
+                        ?: defaultDrmKey.takeIf { k -> k.isNotBlank() }
                     StreamLinkItem(
-                        label = (it["label"] as? String) ?: "Server",
-                        url = (it["url"] as? String) ?: ""
+                        label = lbl,
+                        url = u,
+                        licenseKeySnake = lic
                     )
                 }
                 else -> emptyList()

@@ -1030,6 +1030,12 @@ async def admin_save_ad_config(request: Request):
             print(f"[AdminAdConfig] Placements save error: {e}")
     return {"code": 0, "status": "ok"}
 
+@router.get("/api/admin/referrals/stats")
+async def admin_referral_stats(request: Request):
+    check_admin_auth(request)
+    from main import get_referral_admin_stats
+    return get_referral_admin_stats()
+
 @router.get("/api/admin/popup")
 async def admin_get_popup(request: Request):
     check_admin_auth(request)

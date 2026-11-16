@@ -44,15 +44,18 @@ def _fetch_url(url: str, headers: dict = None, timeout: int = 8) -> str:
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return resp.read().decode("utf-8", errors="ignore")
 
-def is_stream_alive(url: str, custom_headers: dict = None, timeout: float = 3.5) -> bool:
+def is_stream_alive(url: str, custom_headers: dict = None, timeout: float = 4.0) -> bool:
     if not url or not url.startswith(("http://", "https://")):
         return False
     req_headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         "Accept": "*/*",
-        "Connection": "keep-alive",
-        "Range": "bytes=0-1024"
+        "Connection": "keep-alive"
     }
+    # Only send byte range for media chunks, manifests like .mpd or .m3u8 often reject Range with 400/403
+    if not any(x in url.lower() for x in [".mpd", ".m3u8"]):
+        req_headers["Range"] = "bytes=0-1024"
+
     if custom_headers and isinstance(custom_headers, dict):
         for k, v in custom_headers.items():
             if k and v:
@@ -115,6 +118,7 @@ def fetch_aggregated_sports_sync() -> dict:
                 "status_display": "LIVE" if status.lower() == "live" else "UPCOMING",
                 "match_time": match_time,
                 "thumbnail": thumbnail or "https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=800&q=80",
+                "cover_image": thumbnail or "",
                 "logo": thumbnail or "https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=800&q=80",
                 "stream_links": [],
                 "server_urls": []
@@ -194,9 +198,11 @@ def fetch_aggregated_sports_sync() -> dict:
             drm_key = (m.get("drm_key") or "").strip()
 
             item = ensure_item(key, clean_title, t1, t2, "Cricket", thumb, "Willow Cricket HD", st if st else "live", match_time)
-            if thumb and (not item.get("thumbnail") or "unsplash" in item.get("thumbnail", "")):
-                item["thumbnail"] = thumb
-                item["logo"] = thumb
+            if thumb:
+                item["cover_image"] = thumb
+                if not item.get("thumbnail") or "unsplash" in item.get("thumbnail", ""):
+                    item["thumbnail"] = thumb
+                    item["logo"] = thumb
 
             stream_dict = m.get("stream_url_alpha") or {}
             if isinstance(stream_dict, dict):
@@ -246,6 +252,44 @@ def fetch_aggregated_sports_sync() -> dict:
                 cur_key = None
     except Exception as e:
         logger.debug(f"Willow error: {e}")
+
+    # 3c. Prime Video Sports M3U Feed (ClearKey & Dash)
+    try:
+        pv_url = "https://raw.githubusercontent.com/srhady/willow-event/main/primevideo_sports.m3u"
+        content = _fetch_url(pv_url, timeout=7)
+        cur_title = None
+        cur_logo = None
+        cur_key = None
+        for line in content.splitlines():
+            line = line.strip()
+            if line.startswith("#EXTINF"):
+                m_logo = re.search(r'tvg-logo="([^"]*)"', line)
+                cur_logo = m_logo.group(1) if m_logo else ""
+                cur_title = line.split(",")[-1].strip()
+            elif "license_key=" in line:
+                cur_key = line.split("license_key=")[-1].strip()
+            elif line.startswith("http"):
+                if cur_title:
+                    key, clean_title, t1, t2, sport = extract_teams_and_key(cur_title)
+                    item = ensure_item(key, clean_title, t1, t2, "Cricket", cur_logo, "Prime Video Sports", "live")
+                    if cur_logo:
+                        item["cover_image"] = cur_logo
+                        if not item.get("thumbnail") or "unsplash" in item.get("thumbnail", ""):
+                            item["thumbnail"] = cur_logo
+                            item["logo"] = cur_logo
+                    if line not in item["server_urls"]:
+                        item["server_urls"].append(line)
+                        s_entry = {
+                            "label": f"Server {len(item['stream_links']) + 1} (Prime Video HD)",
+                            "url": line
+                        }
+                        if cur_key:
+                            s_entry["license_key"] = cur_key
+                        item["stream_links"].append(s_entry)
+                cur_title = None
+                cur_key = None
+    except Exception as e:
+        logger.debug(f"PrimeVideo M3U error: {e}")
 
     # 4. Tapmad Live Sports
     try:
@@ -355,6 +399,17 @@ def fetch_aggregated_sports_sync() -> dict:
             ev["stream_links"] = alive_links
             ev["server_urls"] = [sl["url"] for sl in alive_links]
 
+            # If match has 0 working streams, it is UPCOMING, not LIVE
+            if not alive_links:
+                ev["status"] = "upcoming"
+                ev["status_display"] = "UPCOMING"
+                if ev.get("match_time") == "LIVE NOW":
+                    ev["match_time"] = "UPCOMING"
+            else:
+                if ev.get("status") != "upcoming" or ev.get("match_time") == "LIVE NOW":
+                    ev["status"] = "live"
+                    ev["status_display"] = "LIVE"
+
     # Convert to list and re-index
     events = list(grouped.values())
     
@@ -384,6 +439,7 @@ def fetch_aggregated_sports_sync() -> dict:
                 "status_display": e["status_display"],
                 "match_time": e["match_time"],
                 "thumbnail": e["thumbnail"],
+                "cover_image": e.get("cover_image") or e.get("thumbnail") or "",
                 "server_urls": e["server_urls"],
                 "stream_links": e["stream_links"]
             }

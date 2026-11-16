@@ -111,7 +111,7 @@ fun SeriesDownloadBottomSheet(
             showTurboUnlockDialog = false
             MediaDownloadManager.unlockTurbo(context)
             MediaDownloadManager.setMaxConcurrentDownloads(context, 3)
-            Toast.makeText(context, "🎉 একসাথে ৩টি ভিডিও ডাউনলোড আনলক হয়েছে!", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "🎉 3 Simultaneous Downloads Unlocked!", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -183,10 +183,10 @@ fun SeriesDownloadBottomSheet(
             isBatchDownloading = false
             onDismiss()
             if (queuedCount > 0) {
-                val speedDesc = if (MediaDownloadManager.getMaxConcurrentDownloads(context) == 3) "একসাথে ৩টি করে" else "১টি করে"
+                val speedDesc = if (MediaDownloadManager.getMaxConcurrentDownloads(context) == 3) "3 at a time" else "1 at a time"
                 Toast.makeText(
                     context,
-                    "${queuedCount}টি পর্ব ডাউনলোড লাইনে যুক্ত হয়েছে ($speedDesc)!",
+                    "$queuedCount episodes queued for download ($speedDesc)!",
                     Toast.LENGTH_LONG
                 ).show()
                 if (!BackgroundDownloadHelper.isBatteryOptimizationIgnored(context) && !BackgroundDownloadHelper.hasPromptedInitialPermission(context)) {
@@ -535,9 +535,9 @@ fun SeriesDownloadBottomSheet(
                         color = if (is3Active) AccentCyan.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.05f),
                         border = BorderStroke(1.dp, if (is3Active) AccentCyan else Color.White.copy(alpha = 0.1f)),
                         modifier = Modifier.clickable {
-                            if (MediaDownloadManager.isTurboUnlocked(context)) {
+                            if (MediaDownloadManager.isTurboUnlocked(context) || com.streamhit.app.util.ReferralManager.isUserPremium()) {
                                 MediaDownloadManager.setMaxConcurrentDownloads(context, 3)
-                                Toast.makeText(context, "⚡ একসাথে ৩টি ভিডিও ডাউনলোড সক্রিয়!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "⚡ 3 Simultaneous Downloads Active!", Toast.LENGTH_SHORT).show()
                             } else {
                                 showTurboUnlockDialog = true
                             }
@@ -641,9 +641,9 @@ fun SeriesDownloadBottomSheet(
         }
 
         // Sponsor gate for Turbo 3-concurrent downloads
-        if (showTurboUnlockDialog) {
+        if (showTurboUnlockDialog && !com.streamhit.app.util.ReferralManager.isUserPremium()) {
             SponsorSupportDialog(
-                videoTitle = "একসাথে ৩টি ভিডিও ডাউনলোড",
+                videoTitle = "3 Simultaneous Downloads",
                 onSupportClick = {
                     val intent = Intent(context, SponsorWebViewActivity::class.java).apply {
                         putExtra("EXTRA_TARGET_URL", SponsorAdManager.getPlacementUrl(SponsorAdManager.PLACEMENT_DOWNLOAD_TURBO))
@@ -664,7 +664,7 @@ fun SeriesDownloadBottomSheet(
                     showBgPermissionDialog = false
                     BackgroundDownloadHelper.setPromptedInitialPermission(context, true)
                     BackgroundDownloadHelper.requestIgnoreBatteryOptimization(context)
-                    Toast.makeText(context, "ব্যাকগ্রাউন্ড পারমিশন উইন্ডো খোলা হয়েছে। 'Allow' দিন।", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "Background permission opened. Please select 'Allow'.", Toast.LENGTH_LONG).show()
                 },
                 onDismiss = {
                     showBgPermissionDialog = false

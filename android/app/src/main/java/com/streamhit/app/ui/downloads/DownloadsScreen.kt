@@ -74,7 +74,7 @@ fun DownloadsScreen(
             showTurboSponsorDialog = false
             MediaDownloadManager.unlockTurbo(context)
             MediaDownloadManager.setMaxConcurrentDownloads(context, 3)
-            Toast.makeText(context, "🎉 একসাথে ৩টি ভিডিও ডাউনলোড আনলক হয়েছে!", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "🎉 3 Simultaneous Downloads Unlocked!", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -410,7 +410,7 @@ fun DownloadsScreen(
                     isGranted = isBgDownloadActive,
                     onClick = {
                         if (isBgDownloadActive) {
-                            Toast.makeText(context, "✅ ব্যাকগ্রাউন্ড ডাউনলোড সক্রিয় আছে! স্ক্রিন বন্ধ বা অ্যাপ মিনিমাইজ থাকলেও ডাউনলোড চলবে।", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, "✅ Background download is active! Downloads will continue with screen off or app minimized.", Toast.LENGTH_LONG).show()
                         } else {
                             showBgDownloadPermissionDialog = true
                         }
@@ -422,20 +422,20 @@ fun DownloadsScreen(
             item {
                 DownloadConcurrencySelectorCard(
                     maxConcurrent = maxConcurrent,
-                    isTurboUnlocked = MediaDownloadManager.isTurboUnlocked(context),
+                    isTurboUnlocked = MediaDownloadManager.isTurboUnlocked(context) || com.streamhit.app.util.ReferralManager.isUserPremium(),
                     activeCount = downloadItems.count { it.status == DownloadStatus.DOWNLOADING },
                     pendingCount = downloadItems.count { it.status == DownloadStatus.PENDING },
                     onSelectLimit = { limit ->
                         if (limit == 3) {
-                            if (MediaDownloadManager.isTurboUnlocked(context)) {
+                            if (MediaDownloadManager.isTurboUnlocked(context) || com.streamhit.app.util.ReferralManager.isUserPremium()) {
                                 MediaDownloadManager.setMaxConcurrentDownloads(context, 3)
-                                Toast.makeText(context, "⚡ একসাথে ৩টি ভিডিও ডাউনলোড সক্রিয় করা হয়েছে!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "⚡ 3 Simultaneous Downloads activated!", Toast.LENGTH_SHORT).show()
                             } else {
                                 showTurboSponsorDialog = true
                             }
                         } else {
                             MediaDownloadManager.setMaxConcurrentDownloads(context, 1)
-                            Toast.makeText(context, "১টি করে ডাউনলোড মোড সক্রিয় করা হয়েছে।", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Single download mode activated.", Toast.LENGTH_SHORT).show()
                         }
                     }
                 )
@@ -709,7 +709,7 @@ fun DownloadsScreen(
                 showBgDownloadPermissionDialog = false
                 BackgroundDownloadHelper.setPromptedInitialPermission(context, true)
                 BackgroundDownloadHelper.requestIgnoreBatteryOptimization(context)
-                Toast.makeText(context, "ব্যাকগ্রাউন্ড পারমিশন উইন্ডো খোলা হয়েছে। 'Allow' বা 'No restrictions' দিন।", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "Background permission opened. Please select 'Allow' or 'No restrictions'.", Toast.LENGTH_LONG).show()
             },
             onDismiss = {
                 showBgDownloadPermissionDialog = false
@@ -718,9 +718,9 @@ fun DownloadsScreen(
         )
     }
 
-    if (showTurboSponsorDialog) {
+    if (showTurboSponsorDialog && !com.streamhit.app.util.ReferralManager.isUserPremium()) {
         SponsorSupportDialog(
-            videoTitle = "একসাথে ৩টি ভিডিও ডাউনলোড",
+            videoTitle = "3 Simultaneous Downloads",
             onSupportClick = {
                 val intent = Intent(context, SponsorWebViewActivity::class.java).apply {
                     putExtra("EXTRA_TARGET_URL", SponsorAdManager.getPlacementUrl(SponsorAdManager.PLACEMENT_DOWNLOAD_TURBO))
@@ -771,7 +771,7 @@ fun DownloadConcurrencySelectorCard(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = "ডাউনলোড কিউ স্পিড",
+                        text = "Download Queue Speed",
                         color = Color.White,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
@@ -780,7 +780,7 @@ fun DownloadConcurrencySelectorCard(
 
                 if (activeCount > 0 || pendingCount > 0) {
                     Text(
-                        text = "${activeCount}টি চলছে${if (pendingCount > 0) " • ${pendingCount}টি লাইনে" else ""}",
+                        text = "$activeCount Active${if (pendingCount > 0) " • $pendingCount Queued" else ""}",
                         color = if (maxConcurrent == 3) AccentCyan else AccentEmerald,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium
@@ -821,7 +821,7 @@ fun DownloadConcurrencySelectorCard(
                             Spacer(modifier = Modifier.width(4.dp))
                         }
                         Text(
-                            text = "১টি করে (Normal)",
+                            text = "1 at a time (Normal)",
                             color = if (is1Selected) AccentEmerald else TextSecondary,
                             fontSize = 12.sp,
                             fontWeight = if (is1Selected) FontWeight.Bold else FontWeight.Medium
@@ -847,7 +847,7 @@ fun DownloadConcurrencySelectorCard(
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = "⚡ একসাথে ৩টি (VIP)",
+                            text = "⚡ 3 at a time (VIP)",
                             color = if (is3Selected) AccentCyan else TextPrimary,
                             fontSize = 12.sp,
                             fontWeight = if (is3Selected) FontWeight.Bold else FontWeight.Medium
@@ -925,14 +925,14 @@ fun BackgroundDownloadStatusBanner(
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        text = if (isGranted) "ব্যাকগ্রাউন্ড ডাউনলোড সক্রিয়" else "ব্যাকগ্রাউন্ড ডাউনলোড চালু করুন",
+                        text = if (isGranted) "Background Download Active" else "Enable Background Download",
                         color = Color.White,
                         fontSize = 13.5.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = if (isGranted) "অ্যাপ মিনিমাইজ বা স্ক্রিন অফ থাকলেও সচল থাকবে" else "অ্যাপ থেকে বের হলেও যেন ডাউনলোড না থামে",
+                        text = if (isGranted) "Downloads continue when app is minimized or screen off" else "Prevent downloads from pausing when closing the app",
                         color = if (isGranted) Color(0xFF00F5D4).copy(alpha = 0.85f) else TextSecondary,
                         fontSize = 11.sp,
                         maxLines = 1,

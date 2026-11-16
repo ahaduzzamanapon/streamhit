@@ -150,7 +150,7 @@ fun AppNoticeDialog(
 
                 // Title
                 Text(
-                    text = title.ifBlank { "গুরুত্বপূর্ণ নোটিশ" },
+                    text = title.ifBlank { "Important Notice" },
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary,
@@ -220,7 +220,7 @@ fun AppNoticeDialog(
                                 horizontalArrangement = Arrangement.Center
                             ) {
                                 Text(
-                                    text = btn1Text.ifBlank { "যুক্ত হন" },
+                                    text = btn1Text.ifBlank { "Open Link" },
                                     color = Color.White,
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold
@@ -286,7 +286,7 @@ fun AppNoticeDialog(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = cancelText.ifBlank { "বন্ধ করুন" },
+                                text = cancelText.ifBlank { "Close" },
                                 color = TextMuted,
                                 fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Medium

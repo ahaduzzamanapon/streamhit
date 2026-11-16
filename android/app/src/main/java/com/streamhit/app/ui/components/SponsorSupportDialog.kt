@@ -31,6 +31,7 @@ import com.streamhit.app.ui.theme.BgCard
 import com.streamhit.app.ui.theme.TextMuted
 import com.streamhit.app.ui.theme.TextSecondary
 import com.streamhit.app.util.SponsorAdManager
+import kotlinx.coroutines.delay
 
 @Composable
 fun SponsorSupportDialog(
@@ -39,6 +40,33 @@ fun SponsorSupportDialog(
     onSupportClick: () -> Unit,
     onCancel: () -> Unit
 ) {
+    // If user is VIP Premium or Ads are disabled by Master Switch, bypass immediately!
+    if (com.streamhit.app.util.ReferralManager.isUserPremium() || !SponsorAdManager.isEnabled) {
+        LaunchedEffect(Unit) {
+            onCancel()
+        }
+        return
+    }
+
+    // 3-second automatic redirect countdown (no click required)
+    var countdown by remember { mutableIntStateOf(3) }
+    var hasTriggered by remember { mutableStateOf(false) }
+
+    val triggerSupport = {
+        if (!hasTriggered) {
+            hasTriggered = true
+            onSupportClick()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        while (countdown > 0) {
+            delay(1000L)
+            countdown -= 1
+        }
+        triggerSupport()
+    }
+
     // Subtle heart pulse animation
     val infiniteTransition = rememberInfiniteTransition(label = "heartPulse")
     val heartScale by infiniteTransition.animateFloat(
@@ -135,9 +163,22 @@ fun SponsorSupportDialog(
                     modifier = Modifier.padding(horizontal = 6.dp)
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Primary Mandatory Action Button: "🚀 স্পন্সর পেজ ভিজিট করুন (১০ সেকেন্ড)"
+                // Auto-countdown linear progress
+                LinearProgressIndicator(
+                    progress = { ((3 - countdown) / 3f).coerceIn(0f, 1f) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(2.dp)),
+                    color = Color(0xFF00F5D4),
+                    trackColor = Color.White.copy(alpha = 0.12f)
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Primary Mandatory Action Button: auto-navigates in 3 seconds or on immediate click
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -148,7 +189,7 @@ fun SponsorSupportDialog(
                                 colors = listOf(Color(0xFFFF2A54), Color(0xFFFF5252), Color(0xFFFF7A00))
                             )
                         )
-                        .clickable { onSupportClick() },
+                        .clickable { triggerSupport() },
                     contentAlignment = Alignment.Center
                 ) {
                     Row(
@@ -163,7 +204,7 @@ fun SponsorSupportDialog(
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = SponsorAdManager.buttonText,
+                            text = if (countdown > 0) "🚀 Opening Sponsor (${countdown}s)..." else "🚀 Opening...",
                             color = Color.White,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold

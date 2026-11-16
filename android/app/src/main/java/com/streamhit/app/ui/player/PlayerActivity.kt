@@ -63,9 +63,23 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.C
+import androidx.media3.common.DrmInitData
+import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.analytics.PlayerId
+import androidx.media3.exoplayer.drm.DefaultDrmSessionManager
+import androidx.media3.exoplayer.drm.DefaultDrmSessionManagerProvider
+import androidx.media3.exoplayer.drm.DrmSession
+import androidx.media3.exoplayer.drm.DrmSessionEventListener
+import androidx.media3.exoplayer.drm.DrmSessionManager
+import androidx.media3.exoplayer.drm.DrmSessionManagerProvider
+import androidx.media3.exoplayer.drm.FrameworkMediaDrm
+import androidx.media3.exoplayer.drm.LocalMediaDrmCallback
+import androidx.media3.extractor.mp4.PsshAtomUtil
+import android.os.Looper
+import java.util.UUID
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.SeekParameters
@@ -216,6 +230,7 @@ class PlayerActivity : ComponentActivity() {
         val dubName = intent.getStringExtra("EXTRA_DUB_NAME") ?: ""
         val isOffline = intent.getBooleanExtra("EXTRA_IS_OFFLINE", false)
         val isLiveEvent = intent.getBooleanExtra("EXTRA_IS_LIVE_EVENT", false)
+        val extraLicenseKey = intent.getStringExtra("EXTRA_LICENSE_KEY") ?: ""
         val extraServersJson = intent.getStringExtra("EXTRA_SERVERS_JSON") ?: ""
         val extraServersList: List<com.streamhit.app.data.model.StreamLinkItem> = try {
             if (extraServersJson.isNotBlank()) {
@@ -253,6 +268,7 @@ class PlayerActivity : ComponentActivity() {
                     initialDubName = dubName,
                     initialIsOffline = isOffline,
                     initialIsLiveEvent = isLiveEvent,
+                    initialLicenseKey = extraLicenseKey,
                     initialLiveEvents = allEventsList,
                     extraServers = extraServersList,
                     onBack = { finish() },
@@ -381,6 +397,85 @@ class PlayerActivity : ComponentActivity() {
 }
 
 @OptIn(UnstableApi::class)
+class ClearKeyDrmSessionManager(
+    private val delegate: DefaultDrmSessionManager,
+    private val kidUuid: UUID
+) : DrmSessionManager {
+
+    private fun buildPsshAtom(systemId: UUID, kid: UUID): ByteArray {
+        return try {
+            PsshAtomUtil.buildPsshAtom(systemId, arrayOf(kid), null) ?: buildFallbackPssh(systemId, kid)
+        } catch (_: Exception) {
+            buildFallbackPssh(systemId, kid)
+        }
+    }
+
+    private fun buildFallbackPssh(systemId: UUID, kid: UUID): ByteArray {
+        val bb = java.nio.ByteBuffer.allocate(52)
+        bb.putInt(52)
+        bb.put("pssh".toByteArray(Charsets.US_ASCII))
+        bb.put(1.toByte()) // version 1
+        bb.put(0.toByte()).put(0.toByte()).put(0.toByte()) // flags
+        bb.putLong(systemId.mostSignificantBits)
+        bb.putLong(systemId.leastSignificantBits)
+        bb.putInt(1) // num key IDs
+        bb.putLong(kid.mostSignificantBits)
+        bb.putLong(kid.leastSignificantBits)
+        bb.putInt(0) // data length
+        return bb.array()
+    }
+
+    private val commonPssh = buildPsshAtom(C.COMMON_PSSH_UUID, kidUuid)
+
+    private val schemeList: List<DrmInitData.SchemeData> = listOf(
+        DrmInitData.SchemeData(C.CLEARKEY_UUID, "cenc", commonPssh),
+        DrmInitData.SchemeData(C.CLEARKEY_UUID, "video/mp4", commonPssh),
+        DrmInitData.SchemeData(C.CLEARKEY_UUID, "audio/mp4", commonPssh),
+        DrmInitData.SchemeData(C.CLEARKEY_UUID, "", commonPssh),
+        DrmInitData.SchemeData(C.COMMON_PSSH_UUID, "cenc", commonPssh),
+        DrmInitData.SchemeData(C.COMMON_PSSH_UUID, "video/mp4", commonPssh),
+        DrmInitData.SchemeData(C.COMMON_PSSH_UUID, "audio/mp4", commonPssh),
+        DrmInitData.SchemeData(C.COMMON_PSSH_UUID, "", commonPssh)
+    )
+
+    override fun setPlayer(playbackLooper: Looper, playerId: PlayerId) {
+        delegate.setPlayer(playbackLooper, playerId)
+    }
+
+    override fun prepare() {
+        delegate.prepare()
+    }
+
+    override fun release() {
+        delegate.release()
+    }
+
+    override fun preacquireSession(
+        eventDispatcher: DrmSessionEventListener.EventDispatcher?,
+        format: Format
+    ): DrmSessionManager.DrmSessionReference {
+        val effectiveFormat = format.buildUpon()
+            .setDrmInitData(DrmInitData(schemeList))
+            .build()
+        return delegate.preacquireSession(eventDispatcher, effectiveFormat)
+    }
+
+    override fun acquireSession(
+        eventDispatcher: DrmSessionEventListener.EventDispatcher?,
+        format: Format
+    ): DrmSession? {
+        val effectiveFormat = format.buildUpon()
+            .setDrmInitData(DrmInitData(schemeList))
+            .build()
+        return delegate.acquireSession(eventDispatcher, effectiveFormat)
+    }
+
+    override fun getCryptoType(format: Format): Int {
+        return C.CRYPTO_TYPE_FRAMEWORK
+    }
+}
+
+@OptIn(UnstableApi::class)
 @Composable
 fun AdaptivePlayerScreen(
     initialStreamUrl: String,
@@ -397,6 +492,7 @@ fun AdaptivePlayerScreen(
     initialDubName: String = "",
     initialIsOffline: Boolean = false,
     initialIsLiveEvent: Boolean = false,
+    initialLicenseKey: String = "",
     initialLiveEvents: List<com.streamhit.app.data.model.LiveSportItem> = emptyList(),
     extraServers: List<com.streamhit.app.data.model.StreamLinkItem> = emptyList(),
     onBack: () -> Unit,
@@ -417,13 +513,13 @@ fun AdaptivePlayerScreen(
     var isFullscreen by remember { mutableStateOf(isTvDevice) }
     var isLocked by remember { mutableStateOf(false) }
 
-    // TV Live Playlist side panel & auto-dismiss interaction timer (6s)
+    // TV Live Playlist side panel & auto-dismiss interaction timer (15s)
     var showTvSidePanel by remember { mutableStateOf(false) }
     var tvSidePanelInteractionTime by remember { mutableLongStateOf(0L) }
 
     LaunchedEffect(showTvSidePanel, tvSidePanelInteractionTime) {
         if (showTvSidePanel) {
-            delay(6000L)
+            delay(15000L)
             showTvSidePanel = false
         }
     }
@@ -579,9 +675,12 @@ fun AdaptivePlayerScreen(
     var currentExtraServers by remember { mutableStateOf(extraServers) }
 
     LaunchedEffect(isLiveEvent) {
-        if (isLiveEvent && liveEvents.isEmpty()) {
+        if (isLiveEvent) {
             try {
-                liveEvents = repository.getLiveSports()
+                val fetched = repository.getLiveSports()
+                if (fetched.isNotEmpty()) {
+                    liveEvents = fetched
+                }
             } catch (_: Exception) {}
         }
     }
@@ -664,10 +763,10 @@ fun AdaptivePlayerScreen(
         } ?: return
 
         currentServerIndex = index
-        currentStreamUrl = s.url
         hasPlaybackError = false
         playbackErrorMessage = null
         isBuffering = true
+        currentStreamUrl = s.url
         val directUrl = resolveDirectPlayableUrl(s.url)
         val mediaItem = buildPlayableMediaItem(directUrl, isLive = true, licenseKey = s.licenseKey)
         exoPlayer?.apply {
@@ -677,7 +776,7 @@ fun AdaptivePlayerScreen(
             prepare()
             play()
         }
-        Toast.makeText(context, "📡 ${s.label} চালু করা হয়েছে", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "📡 Switched to ${s.label}", Toast.LENGTH_SHORT).show()
     }
 
     fun switchLiveEvent(event: com.streamhit.app.data.model.LiveSportItem) {
@@ -685,11 +784,11 @@ fun AdaptivePlayerScreen(
         currentVideoTitle = event.matchTitle
         currentExtraServers = event.streamLinks
         currentServerIndex = 0
-        currentStreamUrl = s.url
         failedStreamUrls.clear()
         hasPlaybackError = false
         playbackErrorMessage = null
         isBuffering = true
+        currentStreamUrl = s.url
         val directUrl = resolveDirectPlayableUrl(s.url)
         val mediaItem = buildPlayableMediaItem(directUrl, isLive = true, licenseKey = s.licenseKey)
         exoPlayer?.apply {
@@ -699,7 +798,7 @@ fun AdaptivePlayerScreen(
             prepare()
             play()
         }
-        Toast.makeText(context, "🏏 ${event.matchTitle} চালু করা হয়েছে", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "🏏 Now Playing: ${event.matchTitle}", Toast.LENGTH_SHORT).show()
     }
 
     val relatedChannels = remember(liveChannels, currentChannel) {
@@ -747,7 +846,7 @@ fun AdaptivePlayerScreen(
         }
         val idx = liveChannels.indexOfFirst { it.name.equals(channel.name, ignoreCase = true) }
         channelOverlayBanner = Pair(if (idx >= 0) idx + 1 else 1, channel)
-        Toast.makeText(context, "📺 চ্যানেল: ${channel.name}", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "📺 Channel: ${channel.name}", Toast.LENGTH_SHORT).show()
     }
 
     fun playNextChannel() {
@@ -823,7 +922,7 @@ fun AdaptivePlayerScreen(
                                 enteredChannelDigits = (enteredChannelDigits + digit.toString()).take(3)
                                 true
                             }
-                            // 2. ENTER / DPAD_CENTER (Confirm entered number OR Toggle Live TV Playlist Side Panel)
+                            // 2. ENTER / DPAD_CENTER (Confirm entered number OR Open Live TV Playlist Side Panel)
                             code == KeyEvent.KEYCODE_ENTER || code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_NUMPAD_ENTER -> {
                                 if (enteredChannelDigits.isNotEmpty()) {
                                     val num = enteredChannelDigits.toIntOrNull()
@@ -832,11 +931,17 @@ fun AdaptivePlayerScreen(
                                     }
                                     enteredChannelDigits = ""
                                     true
-                                } else {
-                                    // Bring up side playlist panel while TV keeps playing smoothly!
-                                    showTvSidePanel = !showTvSidePanel
+                                } else if (!showTvSidePanel) {
+                                    // When closed, pressing OK brings up the split drawer immediately!
+                                    showTvSidePanel = true
+                                    showControls = false
                                     tvSidePanelInteractionTime = System.currentTimeMillis()
                                     true
+                                } else {
+                                    // When ALREADY OPEN: DO NOT CLOSE!
+                                    // Let Compose focus system handle DPAD_CENTER / ENTER to click category or channel!
+                                    tvSidePanelInteractionTime = System.currentTimeMillis()
+                                    false
                                 }
                             }
                             // 3. Channel UP / PAGE UP / MEDIA NEXT
@@ -1296,16 +1401,81 @@ fun AdaptivePlayerScreen(
         val resolvedUrl = resolveDirectPlayableUrl(currentStreamUrl)
         var triedProxyFallback = false
 
-        val dataSourceFactory = if (isLiveTv) {
+        val dataSourceFactory = if (isLiveTv || isLiveEvent) {
             MediaCacheManager.getDirectDataSourceFactory(context)
         } else {
             MediaCacheManager.getDataSourceFactory(context)
         }
+
+        val customDrmSessionManagerProvider = DrmSessionManagerProvider { mediaItem ->
+            val drmConfig = mediaItem.localConfiguration?.drmConfiguration
+            if (drmConfig != null && drmConfig.scheme == C.CLEARKEY_UUID) {
+                val uriStr = drmConfig.licenseUri?.toString() ?: ""
+                if (uriStr.startsWith("data:", ignoreCase = true)) {
+                    val base64Data = uriStr.substringBefore("?").substringAfter("base64,")
+                    val jwkBytes = try {
+                        android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
+                    } catch (_: Exception) {
+                        null
+                    }
+                    if (jwkBytes != null) {
+                        // Extract KID UUID: first check ?kid= query param, or parse from jwk
+                        val hexKid = uriStr.substringAfter("?kid=", "").substringBefore("&").trim()
+                        val kidUuid = if (hexKid.length == 32) {
+                            try {
+                                val uStr = "${hexKid.substring(0,8)}-${hexKid.substring(8,12)}-${hexKid.substring(12,16)}-${hexKid.substring(16,20)}-${hexKid.substring(20,32)}"
+                                UUID.fromString(uStr)
+                            } catch (_: Exception) {
+                                null
+                            }
+                        } else {
+                            try {
+                                val jwkStr = String(jwkBytes, Charsets.UTF_8)
+                                val kidB64 = Regex("\"kid\"\\s*:\\s*\"([^\"]+)\"").find(jwkStr)?.groupValues?.get(1)
+                                if (kidB64 != null) {
+                                    val safeKid = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                        java.util.Base64.getUrlDecoder().decode(kidB64)
+                                    } else {
+                                        var padded = kidB64.replace('-', '+').replace('_', '/')
+                                        while (padded.length % 4 != 0) padded += "="
+                                        android.util.Base64.decode(padded, android.util.Base64.DEFAULT)
+                                    }
+                                    val hex = safeKid.joinToString("") { "%02x".format(it) }
+                                    if (hex.length == 32) {
+                                        val uStr = "${hex.substring(0,8)}-${hex.substring(8,12)}-${hex.substring(12,16)}-${hex.substring(16,20)}-${hex.substring(20,32)}"
+                                        UUID.fromString(uStr)
+                                    } else null
+                                } else null
+                            } catch (_: Exception) {
+                                null
+                            }
+                        }
+
+                        android.util.Log.d("StreamHitPlayer", "Using ClearKey DRM with kidUuid=$kidUuid for stream: ${mediaItem.localConfiguration?.uri}")
+                        val drmCallback = LocalMediaDrmCallback(jwkBytes)
+                        val delegateManager = DefaultDrmSessionManager.Builder()
+                            .setUuidAndExoMediaDrmProvider(C.CLEARKEY_UUID, FrameworkMediaDrm.DEFAULT_PROVIDER)
+                            .setMultiSession(true)
+                            .setPlayClearSamplesWithoutKeys(false)
+                            .build(drmCallback)
+
+                        return@DrmSessionManagerProvider if (kidUuid != null) {
+                            ClearKeyDrmSessionManager(delegateManager, kidUuid)
+                        } else {
+                            delegateManager
+                        }
+                    }
+                }
+            }
+            DefaultDrmSessionManagerProvider().get(mediaItem)
+        }
+
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
             .setDataSourceFactory(dataSourceFactory)
+            .setDrmSessionManagerProvider(customDrmSessionManagerProvider)
 
         val allocator = DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE)
-        val loadControl = if (isLiveTv) {
+        val loadControl = if (isLiveTv || isLiveEvent) {
             DefaultLoadControl.Builder()
                 .setAllocator(allocator)
                 .setBufferDurationsMs(
@@ -1386,19 +1556,28 @@ fun AdaptivePlayerScreen(
             .setLoadControl(loadControl)
             .setSeekParameters(SeekParameters.CLOSEST_SYNC)
             .build().apply {
-                val initialLicenseKey = if (isLiveEvent) {
-                    currentExtraServers.firstOrNull { it.url == resolvedUrl || it.url == initialStreamUrl }?.licenseKey
-                        ?: currentExtraServers.firstOrNull()?.licenseKey ?: ""
+                val liveLicenseKey = if (isLiveEvent) {
+                    currentExtraServers.firstOrNull { it.url == currentStreamUrl || it.url == resolvedUrl }?.licenseKey
+                        ?.takeIf { it.isNotBlank() }
+                        ?: initialLicenseKey.takeIf { it.isNotBlank() }
+                        ?: currentExtraServers.firstOrNull { it.licenseKey.isNotBlank() }?.licenseKey
+                        ?: ""
                 } else if (isLiveTv) {
-                    currentChannel?.activeServers?.firstOrNull { it.url == resolvedUrl || it.url == initialStreamUrl }?.licenseKey ?: ""
+                    currentChannel?.activeServers?.firstOrNull { it.url == currentStreamUrl || it.url == resolvedUrl }?.licenseKey
+                        ?.takeIf { it.isNotBlank() }
+                        ?: ""
                 } else ""
 
                 val mediaItem = if (isLiveTv || isLiveEvent) {
-                    buildPlayableMediaItem(resolvedUrl, isLive = true, licenseKey = initialLicenseKey)
+                    buildPlayableMediaItem(resolvedUrl, isLive = true, licenseKey = liveLicenseKey)
                 } else {
                     MediaItem.fromUri(Uri.parse(resolvedUrl))
                 }
-                setMediaItem(mediaItem, if (isLiveTv || isLiveEvent) 0L else initialStartMs)
+                if (isLiveTv || isLiveEvent) {
+                    setMediaItem(mediaItem)
+                } else {
+                    setMediaItem(mediaItem, initialStartMs)
+                }
                 prepare()
                 playWhenReady = true
             }
@@ -1514,7 +1693,7 @@ fun AdaptivePlayerScreen(
                         isBuffering = true
                         triedProxyFallback = false
                         android.util.Log.w("StreamHitPlayer", "Live TV Auto-failover: Switching to ${nextServer.label} (${nextServer.url})")
-                        Toast.makeText(context, "⚠️ সার্ভার বিচ্ছিন্ন। ${nextServer.label}-এ অটো সুইচ করা হচ্ছে...", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "⚠️ Server disconnected. Auto-switching to ${nextServer.label}...", Toast.LENGTH_SHORT).show()
                         val directUrl = resolveDirectPlayableUrl(nextServer.url)
                         val mediaItem = buildPlayableMediaItem(directUrl, isLive = true, licenseKey = nextServer.licenseKey)
                         player.stop()
@@ -1536,7 +1715,7 @@ fun AdaptivePlayerScreen(
                         isBuffering = true
                         triedProxyFallback = false
                         android.util.Log.w("StreamHitPlayer", "Live Event Auto-failover: Switching to ${nextServer.label} (${nextServer.url})")
-                        Toast.makeText(context, "⚠️ সার্ভার সমস্যা। ${nextServer.label}-এ অটো সুইচ করা হচ্ছে...", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "⚠️ Server issue. Auto-switching to ${nextServer.label}...", Toast.LENGTH_SHORT).show()
                         val directUrl = resolveDirectPlayableUrl(nextServer.url)
                         val mediaItem = buildPlayableMediaItem(directUrl, isLive = true, licenseKey = nextServer.licenseKey)
                         player.stop()
@@ -1555,7 +1734,7 @@ fun AdaptivePlayerScreen(
                     android.util.Log.w("StreamHitPlayer", "Auto-failover: Trying next server ${nextRes.displayResolution} (${nextRes.url})")
                     val curPos = player.currentPosition.coerceAtLeast(0L)
                     targetStartPositionMs = curPos
-                    Toast.makeText(context, "সার্ভার চেক করা হচ্ছে: ${nextRes.displayResolution}...", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Checking server: ${nextRes.displayResolution}...", Toast.LENGTH_SHORT).show()
                     currentStreamUrl = nextRes.url
                     return
                 }
@@ -1601,13 +1780,13 @@ fun AdaptivePlayerScreen(
                         val nextBest = selectNextBestUntried(candidates) ?: candidates.first()
                         val curPos = player.currentPosition.coerceAtLeast(0L)
                         targetStartPositionMs = curPos
-                        Toast.makeText(context, "বিকল্প সার্ভার পাওয়া গেছে: ${nextBest.displayResolution}...", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Alternative server found: ${nextBest.displayResolution}...", Toast.LENGTH_SHORT).show()
                         currentStreamUrl = nextBest.url
                     } else {
                         // All servers across all available resolutions (1080p, 720p, 480p, 360p) have been tested and failed!
                         isBuffering = false
                         hasPlaybackError = true
-                        playbackErrorMessage = "সকল সার্ভার (1080p, 720p, 480p, 360p) যাচাই করা হয়েছে, কিন্তু কোনোটিতেই ভিডিওটি চালু করা যায়নি।"
+                        playbackErrorMessage = "All stream servers failed to connect. Please try another video or check your connection."
                     }
                 }
             }
@@ -2059,7 +2238,7 @@ fun AdaptivePlayerScreen(
                     prefs.edit().putBoolean("unlock_$contentKey", true).apply()
                     showWatchLockDialog = false
                     exoPlayer?.play()
-                    Toast.makeText(context, "ধন্যবাদ! আপনার মুভিটি আবার প্লে হচ্ছে 🍿", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Thank you! Resuming video playback 🍿", Toast.LENGTH_SHORT).show()
                 }
             )
         }
@@ -2255,7 +2434,7 @@ fun AdaptivePlayerScreen(
                     showPlayerBgPermissionDialog = false
                     BackgroundDownloadHelper.setPromptedInitialPermission(context, true)
                     BackgroundDownloadHelper.requestIgnoreBatteryOptimization(context)
-                    Toast.makeText(context, "ব্যাকগ্রাউন্ড পারমিশন উইন্ডো খোলা হয়েছে। 'Allow' দিন।", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "Background permission window opened. Please select 'Allow'.", Toast.LENGTH_LONG).show()
                 },
                 onDismiss = {
                     showPlayerBgPermissionDialog = false
@@ -2308,11 +2487,12 @@ fun buildClearKeyDataUri(hexKeyId: String, hexKey: String): String {
     }
     val kidBytes = hexToBytes(hexKeyId)
     val keyBytes = hexToBytes(hexKey)
-    val kidB64 = android.util.Base64.encodeToString(kidBytes, android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING or android.util.Base64.NO_WRAP)
-    val keyB64 = android.util.Base64.encodeToString(keyBytes, android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING or android.util.Base64.NO_WRAP)
+    val kidB64 = android.util.Base64.encodeToString(kidBytes, android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING or android.util.Base64.NO_WRAP).trim().replace("=", "")
+    val keyB64 = android.util.Base64.encodeToString(keyBytes, android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING or android.util.Base64.NO_WRAP).trim().replace("=", "")
     val jwkJson = "{\"keys\":[{\"kty\":\"oct\",\"k\":\"$keyB64\",\"kid\":\"$kidB64\"}],\"type\":\"temporary\"}"
     val jwkB64 = android.util.Base64.encodeToString(jwkJson.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
-    return "data:application/json;base64,$jwkB64"
+    val cleanKid = hexKeyId.trim().replace("-", "")
+    return "data:application/json;base64,$jwkB64?kid=$cleanKid"
 }
 
 fun buildPlayableMediaItem(
@@ -2321,9 +2501,9 @@ fun buildPlayableMediaItem(
     licenseKey: String = ""
 ): MediaItem {
     val builder = MediaItem.Builder().setUri(Uri.parse(url))
-    if (url.contains(".mpd", ignoreCase = true)) {
+    if (url.contains(".mpd", ignoreCase = true) || url.contains("/dash/", ignoreCase = true)) {
         builder.setMimeType(androidx.media3.common.MimeTypes.APPLICATION_MPD)
-    } else if (url.contains(".m3u8", ignoreCase = true)) {
+    } else if (url.contains(".m3u8", ignoreCase = true) || url.contains("/hls/", ignoreCase = true)) {
         builder.setMimeType(androidx.media3.common.MimeTypes.APPLICATION_M3U8)
     }
 
@@ -2565,7 +2745,7 @@ fun PlayerErrorReloadOverlay(
             Spacer(modifier = Modifier.height(14.dp))
 
             Text(
-                text = "Playback Failed / প্লে করতে সমস্যা হচ্ছে",
+                text = "Playback Failed",
                 color = Color.White,
                 fontSize = if (isFullscreen) 18.sp else 16.sp,
                 fontWeight = FontWeight.Bold,
@@ -2575,7 +2755,7 @@ fun PlayerErrorReloadOverlay(
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
-                text = "ভিডিও সার্ভারের সংযোগ বিচ্ছিন্ন হয়েছে। পুনরায় চেষ্টা করতে নিচের বাটনে চাপুন।",
+                text = "Video stream connection lost. Tap below to retry.",
                 color = Color.White.copy(alpha = 0.7f),
                 fontSize = 12.5.sp,
                 textAlign = TextAlign.Center,
@@ -2616,7 +2796,7 @@ fun PlayerErrorReloadOverlay(
                             modifier = Modifier.size(18.dp)
                         )
                         Text(
-                            text = "Reload / পুনরায় চেষ্টা করুন",
+                            text = "Reload Stream",
                             color = Color.Black,
                             fontSize = 13.5.sp,
                             fontWeight = FontWeight.Black

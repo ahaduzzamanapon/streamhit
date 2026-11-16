@@ -44,7 +44,7 @@ object MediaCacheManager {
                     val req = chain.request()
                     val host = req.url.host.lowercase()
                     val reqBuilder = req.newBuilder()
-                        .header("User-Agent", "okhttp/4.12.0")
+                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
                         .header("Accept", "*/*")
                         .header("Accept-Encoding", "identity")
 
@@ -52,6 +52,8 @@ object MediaCacheManager {
                     if (host.contains("bcdnxw")) {
                         reqBuilder.header("Origin", "https://123movienow.cc")
                         reqBuilder.header("Referer", "https://123movienow.cc/")
+                    } else if (host.contains("tapmad")) {
+                        reqBuilder.header("Referer", "https://www.tapmad.com/")
                     }
                     chain.proceed(reqBuilder.build())
                 }

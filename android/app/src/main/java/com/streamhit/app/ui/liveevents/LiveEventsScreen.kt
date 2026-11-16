@@ -19,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
@@ -105,7 +106,7 @@ fun LiveEventsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "সিলেক্ট সার্ভার (Multi-Server)",
+                        text = "Select Server (Multi-Server)",
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -123,7 +124,7 @@ fun LiveEventsScreen(
 
                 val servers = event.streamLinks
                 if (servers.isEmpty()) {
-                    Text("কোন সক্রিয় সার্ভার পাওয়া যায়নি।", color = Color.Gray, fontSize = 13.sp)
+                    Text("No active servers found.", color = Color.Gray, fontSize = 13.sp)
                 } else {
                     servers.forEachIndexed { idx, s ->
                         Surface(
@@ -235,7 +236,7 @@ fun LiveEventsScreen(
                         }
                     }
                     Text(
-                        text = "ক্রিকেট, ফুটবল ও ওয়ার্ল্ড স্পোর্টস লাইভ স্ট্রিম",
+                        text = "Live Cricket, Football & World Sports Streams",
                         fontSize = 11.5.sp,
                         color = Color(0xFF94A3B8)
                     )
@@ -316,12 +317,12 @@ fun LiveEventsScreen(
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
-                            text = "বর্তমানে কোনো ম্যাচ পাওয়া যায়নি",
+                            text = "No matches currently streaming",
                             color = Color(0xFF94A3B8),
                             fontSize = 14.sp
                         )
                         Text(
-                            text = "শীঘ্রই নতুন লাইভ ইভেন্ট যুক্ত হবে (অটো-আপডেট প্রতি ১০ মিনিট)",
+                            text = "New live matches will be added soon (auto-refreshed every 10 min)",
                             color = Color(0xFF64748B),
                             fontSize = 11.5.sp,
                             modifier = Modifier.padding(top = 4.dp)
@@ -438,6 +439,39 @@ fun LiveEventCard(
                         color = Color(0xFF38BDF8),
                         fontSize = 10.5.sp,
                         fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Cover Banner Image (if available)
+            if (item.coverUrl.isNotBlank()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(130.dp)
+                        .background(Color(0xFF0F172A))
+                ) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(item.coverUrl)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = item.matchTitle,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color.Transparent,
+                                        Color(0x880F172A),
+                                        Color(0xFF0F172A)
+                                    )
+                                )
+                            )
                     )
                 }
             }

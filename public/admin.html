@@ -839,6 +839,10 @@
                 <span class="icon">💖</span> Sponsor & Ads Manager
                 <span class="badge-pill" style="color:#00F5D4;border-color:rgba(0,245,212,0.3);">Multi-Link</span>
             </a>
+            <a class="nav-item" onclick="switchNavTab('referrals')">
+                <span class="icon">🎁</span> Referral & VIP Growth
+                <span class="badge-pill" style="color:#FFD700;border-color:rgba(255,215,0,0.3);">3-Day VIP</span>
+            </a>
 
             <div class="menu-heading">System & Growth</div>
             <a class="nav-item" onclick="switchNavTab('notifications')">
@@ -1228,7 +1232,65 @@
                 </div>
             </section>
 
-            <!-- 2. REELS & SHORTS CREATOR ──────────────────────────────────── -->
+            <!-- 🎁 REFERRAL & VIP GROWTH PANEL ──────────────────────── -->
+            <section class="tab-panel" id="panel-referrals">
+                <div class="card" style="margin-bottom:20px;">
+                    <div class="card-header" style="flex-wrap:wrap;gap:12px;">
+                        <div>
+                            <h2>🎁 Referral Program & VIP Growth</h2>
+                            <div class="subtitle">Real-time referral tracking, 3-day VIP stack monitoring, and hardware device attribution</div>
+                        </div>
+                        <button class="btn-secondary" onclick="loadReferralStats()">
+                            🔄 Refresh Stats
+                        </button>
+                    </div>
+
+                    <!-- Metric Stats Grid -->
+                    <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-top:16px;">
+                        <div class="metric-card">
+                            <div class="metric-title">👥 Total Enrolled Devices</div>
+                            <div class="metric-value" id="refTotalUsers" style="color:var(--accent-cyan);">0</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-title">🤝 Successful Referral Claims</div>
+                            <div class="metric-value" id="refTotalClaims" style="color:#00F5D4;">0</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-title">👑 Active VIP Ad-Free Devices</div>
+                            <div class="metric-value" id="refActiveVip" style="color:#FFD700;">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <h2>📜 Referral Event Logs (Recent Claims)</h2>
+                            <div class="subtitle">Complete audit trail of who referred whom with rewarded VIP status</div>
+                        </div>
+                    </div>
+
+                    <div class="table-container" style="margin-top:12px;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Date & Time</th>
+                                    <th>Referrer Code</th>
+                                    <th>Referrer Device</th>
+                                    <th>Referee Code</th>
+                                    <th>Referee Device</th>
+                                    <th>Reward</th>
+                                    <th>Referrer VIP</th>
+                                    <th>Referee VIP</th>
+                                </tr>
+                            </thead>
+                            <tbody id="referralLogsTableBody">
+                                <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">Loading referral logs...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
                         <!-- 2. UNIFIED CONTENT AUTOMATION & N8N WORKFLOW ENGINE ──────────────────────── -->
             <section class="tab-panel" id="panel-automation">
                 <!-- SUB-NAVIGATION BAR -->
@@ -2555,6 +2617,7 @@
             const titles = {
                 dashboard: ['Dashboard Overview', 'Real-time telemetry, app traffic, and quick actions'],
                 sponsors: ['Sponsor & Ads Manager', 'Feature-level toggles, periodic intervals, and multi-link sponsor control'],
+                referrals: ['Referral Program & VIP Growth', 'Real-time referral tracking, 3-day VIP stack monitoring, and hardware device attribution'],
                 automation: ['Content Automation', 'Unified visual workflow, multi-select queue, and social publishing'],
                 reels: ['Reels & Shorts Creator', 'AI vertical video cutter with anti-copyright filters'],
                 facebook: ['Facebook Auto-Pilot Bot', 'Automated 10-minute posting cycle with 1st comment link'],
@@ -2612,7 +2675,41 @@
                 case 'version': fetchAppVersion(); break;
                 case 'notifications': fetchPushStats(); break;
                 case 'sponsors': loadAdStats(); break;
+                case 'referrals': loadReferralStats(); break;
                 case 'popup': loadAppPopupSettings(); break;
+            }
+        }
+
+        // ── REFERRAL PROGRAM & VIP STATS ─────────────────────────────────
+        async function loadReferralStats() {
+            try {
+                const res = await fetch('/api/admin/referrals/stats');
+                const data = await res.json();
+                if (data.code === 0) {
+                    document.getElementById('refTotalUsers').textContent = data.total_users || 0;
+                    document.getElementById('refTotalClaims').textContent = data.total_claims || 0;
+                    document.getElementById('refActiveVip').textContent = data.active_premium_users || 0;
+                    
+                    const tbody = document.getElementById('referralLogsTableBody');
+                    if (!data.logs || data.logs.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">No referral events recorded yet.</td></tr>';
+                        return;
+                    }
+                    tbody.innerHTML = data.logs.map(log => `
+                        <tr>
+                            <td style="font-size:12px;color:var(--text-muted);">${log.date}</td>
+                            <td><span class="badge-pill" style="color:#00F5D4;font-family:monospace;font-size:12px;">${log.referrer_code}</span></td>
+                            <td style="font-size:11px;color:var(--text-muted);font-family:monospace;">${log.referrer_device_id}</td>
+                            <td><span class="badge-pill" style="color:#FFD700;font-family:monospace;font-size:12px;">${log.referee_code}</span></td>
+                            <td style="font-size:11px;color:var(--text-muted);font-family:monospace;">${log.referee_device_id}</td>
+                            <td style="color:#00F5D4;font-weight:bold;">+${log.reward_days} Days VIP</td>
+                            <td><span class="badge-pill" style="${log.referrer_active ? 'color:#FFD700;border-color:rgba(255,215,0,0.4);' : 'color:var(--text-muted);'}">${log.referrer_active ? '👑 Active' : 'Expired'}</span></td>
+                            <td><span class="badge-pill" style="${log.referee_active ? 'color:#FFD700;border-color:rgba(255,215,0,0.4);' : 'color:var(--text-muted);'}">${log.referee_active ? '👑 Active' : 'Expired'}</span></td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (e) {
+                console.error('Error loading referral stats:', e);
             }
         }
 

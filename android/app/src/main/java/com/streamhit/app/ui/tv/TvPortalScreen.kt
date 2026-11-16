@@ -293,6 +293,34 @@ fun TvHubMainContent(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // VIP Status or Referral Code Badge for TV
+                    val isPrem = com.streamhit.app.util.ReferralManager.isUserPremium()
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (isPrem) Color(0xFFFFD700).copy(alpha = 0.18f)
+                                else Color.White.copy(alpha = 0.08f)
+                            )
+                            .border(
+                                1.dp,
+                                if (isPrem) Color(0xFFFFD700).copy(alpha = 0.45f)
+                                else Color.White.copy(alpha = 0.15f),
+                                RoundedCornerShape(8.dp)
+                            )
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = if (isPrem) "👑 VIP (${com.streamhit.app.util.ReferralManager.premiumDaysLeft}d)"
+                                   else if (com.streamhit.app.util.ReferralManager.myReferralCode.isNotBlank()) "CODE: ${com.streamhit.app.util.ReferralManager.myReferralCode}"
+                                   else "VIP INACTIVE",
+                            color = if (isPrem) Color(0xFFFFD700) else Color(0xFF94A3B8),
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(14.dp))
+
                     if (DeviceUtils.isForcedTvMode(context)) {
                         Button(
                             onClick = {
@@ -331,14 +359,14 @@ fun TvHubMainContent(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "কী দেখতে চান নির্বাচন করুন",
+                    text = "Select What You Want to Watch",
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "রিমোটের ডানে/বামে সিলেক্ট করে OK চাপুন",
+                    text = "Navigate with remote ◀ / ▶ and press OK",
                     fontSize = 14.sp,
                     color = Color(0xFF64748B)
                 )
@@ -354,8 +382,8 @@ fun TvHubMainContent(
                         modifier = Modifier
                             .weight(1f)
                             .focusRequester(moviesFocusRequester),
-                        title = "মুভি ও সিরিজ",
-                        subtitle = "হাজারো এইচডি মুভি, হলিউড, বলিউড ও বাংলা ডাবিং",
+                        title = "Movies & Series",
+                        subtitle = "Thousands of HD Movies, Hollywood, Bollywood & Dubbed Cinema",
                         badgeText = "CINEMA & SERIES",
                         badgeColor = Color(0xFF3B82F6),
                         icon = Icons.Default.Movie,
@@ -366,8 +394,8 @@ fun TvHubMainContent(
                     // ── Tile 2: Live Events (NEW) ──
                     TvHubCard(
                         modifier = Modifier.weight(1f),
-                        title = "লাইভ ইভেন্ট",
-                        subtitle = "লাইভ ক্রিকেট, ফুটবল ও স্পোর্টস ইভেন্ট",
+                        title = "Live Events",
+                        subtitle = "Live Cricket, Football & Global Sports Streaming",
                         badgeText = "LIVE SPORTS",
                         badgeColor = Color(0xFFEF4444),
                         icon = Icons.Default.SportsCricket,
@@ -379,8 +407,8 @@ fun TvHubMainContent(
                     // ── Tile 3: Live TV ──
                     TvHubCard(
                         modifier = Modifier.weight(1f),
-                        title = "লাইভ টিভি",
-                        subtitle = "সকল দেশি ও বিদেশি টিভি চ্যানেল ও সংবাদ",
+                        title = "Live TV",
+                        subtitle = "All Local & International News, Sports & Entertainment",
                         badgeText = "LIVE NOW",
                         badgeColor = Color(0xFF10B981),
                         icon = Icons.Default.Tv,
@@ -397,11 +425,11 @@ fun TvHubMainContent(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TvRemoteKeyHint(keyLabel = "◄ ►", desc = "সিলেক্ট")
+                TvRemoteKeyHint(keyLabel = "◄ ►", desc = "Select")
                 Spacer(modifier = Modifier.width(20.dp))
-                TvRemoteKeyHint(keyLabel = "OK", desc = "ওপেন করুন")
+                TvRemoteKeyHint(keyLabel = "OK", desc = "Open")
                 Spacer(modifier = Modifier.width(20.dp))
-                TvRemoteKeyHint(keyLabel = "BACK", desc = "বাহির হন")
+                TvRemoteKeyHint(keyLabel = "BACK", desc = "Exit")
             }
         }
 
@@ -473,7 +501,7 @@ fun TvLiveEventsOverlay(
                             }
                         }
                         Text(
-                            text = "লাইভ ক্রিকেট, ফুটবল ও স্পোর্টস ইভেন্ট • রিমোটের OK চেপে প্লে করুন",
+                            text = "Live Cricket, Football & Global Sports Streaming • Press OK to Play",
                             fontSize = 12.sp,
                             color = Color(0xFF94A3B8)
                         )
@@ -481,9 +509,9 @@ fun TvLiveEventsOverlay(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    TvRemoteKeyHint(keyLabel = "OK", desc = "প্লে করুন")
+                    TvRemoteKeyHint(keyLabel = "OK", desc = "Play")
                     Spacer(modifier = Modifier.width(14.dp))
-                    TvRemoteKeyHint(keyLabel = "BACK", desc = "বন্ধ করুন")
+                    TvRemoteKeyHint(keyLabel = "BACK", desc = "Close")
                 }
             }
 
@@ -496,7 +524,7 @@ fun TvLiveEventsOverlay(
             } else if (events.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        text = "বর্তমানে কোনো লাইভ ইভেন্ট পাওয়া যায়নি।",
+                        text = "No live sports matches currently streaming.",
                         color = Color.Gray,
                         fontSize = 16.sp
                     )
@@ -783,7 +811,7 @@ fun TvHubCard(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "প্লে করতে OK চাপুন",
+                            text = "Press OK to Play",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF022C22)

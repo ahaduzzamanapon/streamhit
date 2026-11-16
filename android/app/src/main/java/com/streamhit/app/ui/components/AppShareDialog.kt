@@ -310,7 +310,7 @@ fun WatchLockShareDialog(
                 Spacer(modifier = Modifier.height(18.dp))
 
                 Text(
-                    text = "মুভিটি কি ভালো লাগছে? 🍿",
+                    text = "Enjoying the Movie? 🍿",
                     color = Color.White,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Black,
@@ -320,7 +320,7 @@ fun WatchLockShareDialog(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Text(
-                    text = "২০ মিনিট ফ্রি দেখা সম্পন্ন হয়েছে! বাকি অংশ সম্পূর্ণ ফ্রিতে দেখতে বন্ধুদের সাথে অ্যাপটি শেয়ার করুন।",
+                    text = "You've enjoyed 20 free minutes! Share the app with friends to unlock uninterrupted viewing.",
                     color = Color(0xFFB0C4DE),
                     fontSize = 13.5.sp,
                     lineHeight = 20.sp,
@@ -344,17 +344,17 @@ fun WatchLockShareDialog(
                         horizontalArrangement = Arrangement.SpaceAround,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("✨ ফুল HD", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("✨ Full HD", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         Text("•", color = Color(0xFF00C6FF))
-                        Text("⚡ বাফারিং ছাড়া", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("⚡ Buffer Free", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         Text("•", color = Color(0xFF00C6FF))
-                        Text("🎁 ১০০% ফ্রি", color = Color(0xFF00C6FF), fontSize = 12.sp, fontWeight = FontWeight.Black)
+                        Text("🎁 100% Free", color = Color(0xFF00C6FF), fontSize = 12.sp, fontWeight = FontWeight.Black)
                     }
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                val shareText = "🔥 $movieTitle এবং হাজারো HD মুভি ও সিরিজ সম্পূর্ণ ফ্রিতে দেখুন NXLY Stream অ্যাপে!\n\nএখনই ডাউনলোড করুন: $APP_SHARE_URL"
+                val shareText = "🔥 Watch $movieTitle and thousands of HD Movies & Series 100% Free on NXLY Stream!\n\nDownload Now: $APP_SHARE_URL"
 
                 // Direct WhatsApp Button
                 Button(
@@ -371,7 +371,7 @@ fun WatchLockShareDialog(
                                 type = "text/plain"
                                 putExtra(Intent.EXTRA_TEXT, shareText)
                             }
-                            context.startActivity(Intent.createChooser(fallback, "বন্ধুদের সাথে শেয়ার করুন"))
+                            context.startActivity(Intent.createChooser(fallback, "Share with Friends"))
                         }
                         onShareSuccess()
                     },
@@ -382,7 +382,7 @@ fun WatchLockShareDialog(
                         .height(50.dp)
                 ) {
                     Text(
-                        text = "💬 হোয়াটসঅ্যাপে শেয়ার করুন",
+                        text = "💬 Share on WhatsApp",
                         color = Color.White,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Black
@@ -399,7 +399,7 @@ fun WatchLockShareDialog(
                             putExtra(Intent.EXTRA_SUBJECT, "NXLY Stream - Free Movies & TV Shows")
                             putExtra(Intent.EXTRA_TEXT, shareText)
                         }
-                        context.startActivity(Intent.createChooser(shareIntent, "বন্ধুদের সাথে শেয়ার করুন"))
+                        context.startActivity(Intent.createChooser(shareIntent, "Share with Friends"))
                         onShareSuccess()
                     },
                     colors = ButtonDefaults.buttonColors(
@@ -418,7 +418,7 @@ fun WatchLockShareDialog(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "অন্যান্য অ্যাপে শেয়ার করে দেখা চালান 🚀",
+                        text = "Share via Other Apps 🚀",
                         color = Color.Black,
                         fontSize = 13.5.sp,
                         fontWeight = FontWeight.Black
@@ -479,7 +479,7 @@ fun ShareAppBannerCard(
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "বন্ধুদের সাথে অ্যাপটি শেয়ার করুন",
+                        text = "Share App with Friends",
                         color = Color.White,
                         fontSize = 13.5.sp,
                         fontWeight = FontWeight.Bold,
@@ -488,7 +488,7 @@ fun ShareAppBannerCard(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "বন্ধুদের সাথে শেয়ার করে ফ্রি দেখা উপভোগ করুন 🍿",
+                        text = "Invite friends and enjoy free cinema streaming 🍿",
                         color = Color(0xFF8FA3BF),
                         fontSize = 11.sp,
                         maxLines = 1,

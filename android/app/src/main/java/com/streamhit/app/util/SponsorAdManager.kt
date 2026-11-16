@@ -93,7 +93,7 @@ object SponsorAdManager {
     }
 
     fun isPlaybackIntervalUnlocked(): Boolean {
-        if (!isEnabled) return true
+        if (!isEnabled || ReferralManager.isUserPremium()) return true
         if (!isPlacementEnabled(PLACEMENT_PLAYER_INTERVAL)) return true
         if (!isSessionUnlocked) return false
         val elapsed = System.currentTimeMillis() - lastAdUnlockTimeMs
@@ -102,9 +102,9 @@ object SponsorAdManager {
     }
 
     fun isPlacementEnabled(placement: String): Boolean {
-        if (!isEnabled) return false
+        if (!isEnabled || ReferralManager.isUserPremium()) return false
         val cfg = placementsMap[placement]
-        return cfg?.enabled ?: true
+        return cfg?.enabled ?: false
     }
 
     fun getPlacementUrl(placement: String): String {
@@ -140,19 +140,19 @@ object SponsorAdManager {
         private set
 
     @Volatile
-    var dialogTitle: String = "অটোমেটেড অ্যাড সেন্টার"
+    var dialogTitle: String = "VIP Sponsor Center"
         private set
 
     @Volatile
-    var dialogMessage: String = "যেকোনো কিছুতে ক্লিক করলে ১০ সেকেন্ডে শেষ হবে, আর ক্লিক না করলে ৩০ সেকেন্ড অপেক্ষা করতে হবে।"
+    var dialogMessage: String = "Support NXLY Stream! Wait 10 seconds or click any ad to continue."
         private set
 
     @Volatile
-    var buttonText: String = "🚀 অ্যাড দেখুন (১০ সেকেন্ড)"
+    var buttonText: String = "🚀 Continue to Sponsor (10s)"
         private set
 
     @Volatile
-    var cancelText: String = "✕ সরাসরি দেখুন"
+    var cancelText: String = "✕ Watch Directly"
         private set
 
     private var syncJob: Job? = null
@@ -209,7 +209,7 @@ object SponsorAdManager {
             prefs.getString(KEY_DIALOG_TITLE, null)?.let { if (it.isNotBlank()) dialogTitle = it }
             prefs.getString(KEY_DIALOG_MESSAGE, null)?.let { if (it.isNotBlank()) dialogMessage = it }
             prefs.getString(KEY_BUTTON_TEXT, null)?.let { if (it.isNotBlank()) buttonText = it }
-                ?: run { buttonText = "🚀 অ্যাড দেখুন ($durationClickedSeconds সেকেন্ড)" }
+                ?: run { buttonText = "🚀 Continue to Sponsor (${durationClickedSeconds}s)" }
             prefs.getString(KEY_CANCEL_TEXT, null)?.let { if (it.isNotBlank()) cancelText = it }
         } catch (_: Exception) {}
 
@@ -325,7 +325,7 @@ object SponsorAdManager {
                     if (!rBtn.isNullOrBlank()) {
                         buttonText = rBtn
                     } else {
-                        buttonText = "🚀 অ্যাড দেখুন ($durationClickedSeconds সেকেন্ড)"
+                        buttonText = "🚀 Continue to Sponsor (${durationClickedSeconds}s)"
                     }
 
                     val rCancel = body?.get("cancel_text")?.toString()?.trim()

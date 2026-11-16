@@ -75,7 +75,7 @@ fun BackgroundDownloadPermissionDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "ব্যাকগ্রাউন্ড ডাউনলোড পারমিশন",
+                    text = "Background Download Permission",
                     color = Color.White,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
@@ -85,7 +85,7 @@ fun BackgroundDownloadPermissionDialog(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = "অ্যাপ মিনিমাইজ বা স্ক্রিন অফ থাকলেও নিরবচ্ছিন্ন ডাউনলোড",
+                    text = "Uninterrupted downloads when screen is off or app is minimized",
                     color = TextSecondary,
                     fontSize = 12.5.sp,
                     textAlign = TextAlign.Center,
@@ -116,14 +116,14 @@ fun BackgroundDownloadPermissionDialog(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "অনুমতি দিলে যা সুবিধা পাবেন:",
+                                text = "Benefits of granting permission:",
                                 color = Color.White,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "অ্যাপ থেকে বের হয়ে গেলেও ব্যাকগ্রাউন্ডে ফুল স্পিডে ডাউনলোড চলবে এবং নোটিফিকেশনে লাইভ প্রোগ্রেস দেখতে পাবেন।",
+                                text = "Downloads continue at maximum speed in background even if you exit the app, with live progress in notifications.",
                                 color = TextSecondary,
                                 fontSize = 11.5.sp,
                                 lineHeight = 16.sp
@@ -156,14 +156,14 @@ fun BackgroundDownloadPermissionDialog(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "অনুমতি না দিলে:",
+                                text = "If not granted:",
                                 color = Color(0xFFFFB300),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "ফোনের ব্যাটারি সেভারের কারণে অ্যাপ মিনিমাইজ বা স্ক্রিন বন্ধ করলে ডাউনলোড থেমে যেতে পারে।",
+                                text = "Battery optimizations may pause downloads when the screen turns off or the app is minimized.",
                                 color = TextMuted,
                                 fontSize = 11.5.sp,
                                 lineHeight = 16.sp
@@ -190,7 +190,7 @@ fun BackgroundDownloadPermissionDialog(
                             .height(46.dp)
                     ) {
                         Text(
-                            text = "বাতিল",
+                            text = "Cancel",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -206,7 +206,7 @@ fun BackgroundDownloadPermissionDialog(
                             .height(46.dp)
                     ) {
                         Text(
-                            text = "অনুমতি দিন ⚡",
+                            text = "Allow ⚡",
                             color = BgDark,
                             fontSize = 13.5.sp,
                             fontWeight = FontWeight.Bold

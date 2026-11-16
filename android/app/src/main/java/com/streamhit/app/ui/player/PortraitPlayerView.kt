@@ -28,11 +28,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import coil.compose.AsyncImage
 import com.streamhit.app.data.model.LiveSportItem
 import com.streamhit.app.ui.components.ShareAppBannerCard
 import com.streamhit.app.ui.components.AppShareDialog
@@ -728,10 +731,24 @@ fun PortraitMediaDetails(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(12.dp),
+                                .padding(10.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            if (ev.coverUrl.isNotBlank()) {
+                                AsyncImage(
+                                    model = coil.request.ImageRequest.Builder(LocalContext.current)
+                                        .data(ev.coverUrl)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = ev.matchTitle,
+                                    modifier = Modifier
+                                        .size(width = 62.dp, height = 42.dp)
+                                        .clip(RoundedCornerShape(6.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                            }
                             Column(modifier = Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     val isEvLive = ev.matchTime == "LIVE NOW" || ev.title.contains("Live", ignoreCase = true)

@@ -24,7 +24,7 @@ class DownloadForegroundService : Service() {
 
     companion object {
         const val CHANNEL_ID = "streamhit_downloads_channel"
-        const val CHANNEL_NAME = "ডাউনলোড ম্যানেজার"
+        const val CHANNEL_NAME = "Download Manager"
         const val NOTIFICATION_ID = 90210
         const val COMPLETE_NOTIFICATION_ID = 90211
 
@@ -65,7 +65,7 @@ class DownloadForegroundService : Service() {
         } catch (_: Exception) {}
 
         // Launch initial foreground notification
-        val initialNotification = buildNotification("ডাউনলোড শুরু হচ্ছে...", 0, "প্রস্তুত করা হচ্ছে...")
+        val initialNotification = buildNotification("Starting download...", 0, "Preparing...")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIFICATION_ID, initialNotification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         } else {
@@ -166,8 +166,8 @@ class DownloadForegroundService : Service() {
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("ডাউনলোড সম্পন্ন! 🍿")
-            .setContentText("$title অফলাইনে দেখার জন্য প্রস্তুত")
+            .setContentTitle("Download Complete! 🍿")
+            .setContentText("$title is ready for offline playback")
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
@@ -183,7 +183,7 @@ class DownloadForegroundService : Service() {
                 CHANNEL_NAME,
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "NXLY Stream ব্যাকগ্রাউন্ড ফাইল ডাউনলোডের লাইভ প্রোগ্রেস"
+                description = "NXLY Stream background download live progress"
                 setShowBadge(false)
             }
             notificationManager.createNotificationChannel(channel)

@@ -1159,7 +1159,7 @@ fun DetailsScreen(
                     showBgPermissionDialog = false
                     BackgroundDownloadHelper.setPromptedInitialPermission(context, true)
                     BackgroundDownloadHelper.requestIgnoreBatteryOptimization(context)
-                    Toast.makeText(context, "ব্যাকগ্রাউন্ড পারমিশন উইন্ডো খোলা হয়েছে। 'Allow' দিন।", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "Background permission opened. Please select 'Allow'.", Toast.LENGTH_LONG).show()
                 },
                 onDismiss = {
                     showBgPermissionDialog = false

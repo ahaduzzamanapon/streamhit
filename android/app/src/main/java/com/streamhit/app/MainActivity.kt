@@ -61,8 +61,10 @@ import com.streamhit.app.service.AppFirebaseMessagingService
 import com.streamhit.app.ui.components.AppShareDialog
 import com.streamhit.app.ui.components.SponsorSupportDialog
 import com.streamhit.app.ui.components.AppNoticeDialog
+import com.streamhit.app.ui.components.ReferralFirstLaunchDialog
 import com.streamhit.app.util.SponsorAdManager
 import com.streamhit.app.util.AppNoticePopupManager
+import com.streamhit.app.util.ReferralManager
 import com.streamhit.app.ui.splash.SplashScreen
 import com.streamhit.app.util.DeviceUtils
 import com.streamhit.app.ui.tv.TvPortalScreen
@@ -84,6 +86,7 @@ class MainActivity : ComponentActivity() {
         // Register device & start telemetry heartbeat
         AppAnalyticsManager.getDeviceId(this)
         AppAnalyticsManager.startHeartbeat(this, lifecycleScope)
+        ReferralManager.init(this)
         SponsorAdManager.init(this)
         SponsorAdManager.startRealtimeSync(this)
         AppNoticePopupManager.init(this)
@@ -150,6 +153,7 @@ class MainActivity : ComponentActivity() {
         // Synchronize latest dynamic sponsor settings and in-app popup from admin panel
         SponsorAdManager.fetchRemoteConfig(this)
         AppNoticePopupManager.fetchRemoteConfig(this)
+        ReferralManager.syncWithServer(this)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -261,6 +265,7 @@ fun MainAppScreen(
 
     var showNoticePopup by remember { mutableStateOf(false) }
     var showAppLaunchSponsorDialog by remember { mutableStateOf(false) }
+    var showReferralPrompt by remember { mutableStateOf(!ReferralManager.hasClaimed && !ReferralManager.hasPromptedFirstLaunch) }
 
     val adConfigVersion = SponsorAdManager.configVersion
     val popupConfigVersion = AppNoticePopupManager.popupVersion
@@ -476,14 +481,22 @@ fun MainAppScreen(
                 }
             },
             onSelectLiveEvent = { event, streamUrl ->
-                val intent = Intent(context, PlayerActivity::class.java).apply {
-                    putExtra("EXTRA_STREAM_URL", streamUrl)
-                    putExtra("EXTRA_VIDEO_TITLE", event.matchTitle)
-                    putExtra("EXTRA_IS_LIVE_EVENT", true)
-                    putExtra("EXTRA_SERVERS_JSON", com.google.gson.Gson().toJson(event.streamLinks))
-                    putExtra("EXTRA_ALL_EVENTS_JSON", com.google.gson.Gson().toJson(listOf(event)))
+                val chosenUrl = streamUrl.ifBlank { event.streamLinks.firstOrNull()?.url ?: "" }
+                if (chosenUrl.isNotBlank()) {
+                    val licKey = event.streamLinks.firstOrNull { it.url == chosenUrl }?.licenseKey
+                        ?: event.streamLinks.firstOrNull()?.licenseKey ?: ""
+                    val intent = Intent(context, PlayerActivity::class.java).apply {
+                        putExtra("EXTRA_STREAM_URL", chosenUrl)
+                        putExtra("EXTRA_VIDEO_TITLE", event.matchTitle)
+                        putExtra("EXTRA_IS_LIVE_EVENT", true)
+                        putExtra("EXTRA_LICENSE_KEY", licKey)
+                        putExtra("EXTRA_SERVERS_JSON", com.google.gson.Gson().toJson(event.streamLinks))
+                        putExtra("EXTRA_ALL_EVENTS_JSON", com.google.gson.Gson().toJson(listOf(event)))
+                    }
+                    context.startActivity(intent)
+                } else {
+                    Toast.makeText(context, "Match is upcoming. Live stream has not started yet.", Toast.LENGTH_SHORT).show()
                 }
-                context.startActivity(intent)
             }
         )
         return
@@ -666,28 +679,42 @@ fun MainAppScreen(
                                 switchTab(Screen.LiveEvents)
                             },
                             onSelectLiveEvent = { event, allEvents ->
-                                val sUrl = event.streamLinks.firstOrNull()?.url ?: ""
-                                val intent = Intent(context, PlayerActivity::class.java).apply {
-                                    putExtra("EXTRA_STREAM_URL", sUrl)
-                                    putExtra("EXTRA_VIDEO_TITLE", event.matchTitle)
-                                    putExtra("EXTRA_IS_LIVE_EVENT", true)
-                                    putExtra("EXTRA_SERVERS_JSON", com.google.gson.Gson().toJson(event.streamLinks))
-                                    putExtra("EXTRA_ALL_EVENTS_JSON", com.google.gson.Gson().toJson(allEvents))
+                                val s = event.streamLinks.firstOrNull()
+                                if (s != null && s.url.isNotBlank()) {
+                                    val sUrl = s.url
+                                    val licKey = s.licenseKey
+                                    val intent = Intent(context, PlayerActivity::class.java).apply {
+                                        putExtra("EXTRA_STREAM_URL", sUrl)
+                                        putExtra("EXTRA_VIDEO_TITLE", event.matchTitle)
+                                        putExtra("EXTRA_IS_LIVE_EVENT", true)
+                                        putExtra("EXTRA_LICENSE_KEY", licKey)
+                                        putExtra("EXTRA_SERVERS_JSON", com.google.gson.Gson().toJson(event.streamLinks))
+                                        putExtra("EXTRA_ALL_EVENTS_JSON", com.google.gson.Gson().toJson(allEvents))
+                                    }
+                                    context.startActivity(intent)
+                                } else {
+                                    Toast.makeText(context, "Match is upcoming. Live stream has not started yet.", Toast.LENGTH_SHORT).show()
                                 }
-                                context.startActivity(intent)
                             }
                         )
                         Screen.LiveEvents -> LiveEventsScreen(
                             repository = repository,
                             onPlayEvent = { title, streamUrl, servers, allEvents ->
-                                val intent = Intent(context, PlayerActivity::class.java).apply {
-                                    putExtra("EXTRA_STREAM_URL", streamUrl)
-                                    putExtra("EXTRA_VIDEO_TITLE", title)
-                                    putExtra("EXTRA_IS_LIVE_EVENT", true)
-                                    putExtra("EXTRA_SERVERS_JSON", com.google.gson.Gson().toJson(servers))
-                                    putExtra("EXTRA_ALL_EVENTS_JSON", com.google.gson.Gson().toJson(allEvents))
+                                if (streamUrl.isNotBlank() && servers.isNotEmpty()) {
+                                    val licKey = servers.firstOrNull { it.url == streamUrl }?.licenseKey
+                                        ?: servers.firstOrNull()?.licenseKey ?: ""
+                                    val intent = Intent(context, PlayerActivity::class.java).apply {
+                                        putExtra("EXTRA_STREAM_URL", streamUrl)
+                                        putExtra("EXTRA_VIDEO_TITLE", title)
+                                        putExtra("EXTRA_IS_LIVE_EVENT", true)
+                                        putExtra("EXTRA_LICENSE_KEY", licKey)
+                                        putExtra("EXTRA_SERVERS_JSON", com.google.gson.Gson().toJson(servers))
+                                        putExtra("EXTRA_ALL_EVENTS_JSON", com.google.gson.Gson().toJson(allEvents))
+                                    }
+                                    context.startActivity(intent)
+                                } else {
+                                    Toast.makeText(context, "Match is upcoming. Live stream has not started yet.", Toast.LENGTH_SHORT).show()
                                 }
-                                context.startActivity(intent)
                             }
                         )
                         Screen.LiveTv -> LiveTvScreen(
@@ -1048,6 +1075,13 @@ fun MainAppScreen(
 
             if (showAppShareModal) {
                 AppShareDialog(onDismiss = { showAppShareModal = false })
+            }
+
+            // First Launch Referral Program Prompt
+            if (showReferralPrompt && !ReferralManager.hasClaimed && !ReferralManager.hasPromptedFirstLaunch) {
+                ReferralFirstLaunchDialog(
+                    onDismiss = { showReferralPrompt = false }
+                )
             }
 
             // In-App Notice Pop-up (Admin controlled)
