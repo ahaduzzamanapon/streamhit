@@ -1,7 +1,7 @@
 {
   "playlist_name": "All-in-One Live TV & Sports",
-  "total_channels": 367,
-  "last_updated": "03:44 PM 18-11-2026 BST",
+  "total_channels": 366,
+  "last_updated": "12:39 AM 19-11-2026 BST",
   "categories": [
     "Bangladesh",
     "Sports",
@@ -1599,6 +1599,16 @@
       }
     },
     {
+      "id": "GolfChannelLatinAmerica.us@SD",
+      "name": "Golf Channel Latin America (1080p)",
+      "category": "Sports",
+      "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Golf_Channel_Logo_2018.png/960px-Golf_Channel_Logo_2018.png",
+      "stream_url": "http://15.204.246.24:8080/GolfChannelHD/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "HBCUGOSports.us@SD",
       "name": "HBCU-GO Sports (720p)",
       "category": "Sports",
@@ -1824,16 +1834,6 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/z854PC3.png",
       "stream_url": "https://live.mnb.mn/hls/mnb_sport.stream.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "MRTVSports.mm@SD",
-      "name": "MRTV Sports [Not 24/7]",
-      "category": "Sports",
-      "logo": "https://i.imgur.com/cFTR4kC.png",
-      "stream_url": "https://mrtvott.com/cache/MRTV-SPORT/master.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -3664,16 +3664,6 @@
       "category": "Kids",
       "logo": "https://d229kpbsb5jevy.cloudfront.net/yupptvnew/content/common/channel/logos/mjvezt.png",
       "stream_url": "https://yuppparoriglin.akamaized.net/181224/smil:wowkidztelgu.smil/playlist.m3u8?hdnts=st=1735898689~exp=1835898688~acl=*~hmac=f5fe24724fe05481e3841f9eb5ab8efdee0a3dd83645ae9dcf45703f525bab7b",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "ZBCartoon.in@HD",
-      "name": "ZB Cartoon (1080p)",
-      "category": "Kids",
-      "logo": "https://jiotvimages.cdn.jio.com/dare_images/images/zbcatun.png",
-      "stream_url": "https://server.zillarbarta.com/zbcatun/video.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
