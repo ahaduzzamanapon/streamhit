@@ -1,7 +1,7 @@
 {
   "playlist_name": "All-in-One Live TV & Sports",
-  "total_channels": 367,
-  "last_updated": "11:23 PM 17-11-2026 BST",
+  "total_channels": 372,
+  "last_updated": "06:33 AM 18-11-2026 BST",
   "categories": [
     "Bangladesh",
     "Sports",
@@ -249,6 +249,46 @@
       }
     },
     {
+      "id": "5Gold.il@SD",
+      "name": "5Gold",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/zFLRfXh.png",
+      "stream_url": "https://r.il.cdn-redge.media/livehls/oil/freetv/live/sport_5_gold/live.livx/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "5Live.il@SD",
+      "name": "5Live",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/0yr3yvd.png",
+      "stream_url": "https://r.il.cdn-redge.media/livehls/oil/freetv/live/sport_5_live/live.livx/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "5Sport.il@SD",
+      "name": "5Sport",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/dRVsB89.png",
+      "stream_url": "https://r.il.cdn-redge.media/livehls/oil/freetv/live/sport_5/live.livx/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "5Sport4K.il@SD",
+      "name": "5Sport 4K",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/Msfhpqd.png",
+      "stream_url": "https://r.il.cdn-redge.media/livehls/oil/freetv/live/sport_5_4k_avc/live.livx/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "ASpor.tr@SD",
       "name": "A Spor SD (1080p)",
       "category": "Sports",
@@ -314,6 +354,16 @@
       "category": "Sports",
       "logo": "https://i0.wp.com/africa24tv.com/wp-content/uploads/2023/12/LOGO-AFRICASPORT-4-HD-sans-fond.png?fit=512%2C107&ssl=1",
       "stream_url": "https://africa24.vedge.infomaniak.com/livecast/ik:africa24sport/manifest.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "AlIraqiaSport.iq@SD",
+      "name": "Al Iraqia Sport (720p)",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/DrrlxTO.png",
+      "stream_url": "https://imn-live.esite-lab.com/hls/iraqia-sports-1.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -853,7 +903,7 @@
       "name": "ESPN Latin America Colombia (1080p)",
       "category": "Sports",
       "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/ESPN_wordmark.svg/960px-ESPN_wordmark.svg.png",
-      "stream_url": "http://190.61.47.54:8000/play/a004/index.m3u8",
+      "stream_url": "http://181.78.211.244:8005/play/a08q/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -864,16 +914,6 @@
       "category": "Sports",
       "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/ESPN_wordmark.svg/960px-ESPN_wordmark.svg.png",
       "stream_url": "http://168.228.44.241:9997/play/a06p/index.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "ESPNPremium.ar@SD",
-      "name": "ESPN Premium",
-      "category": "Sports",
-      "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/ESPN_Premium_logo.svg/960px-ESPN_Premium_logo.svg.png",
-      "stream_url": "http://45.134.141.161:2200/ARG/ESPN_Premium_Argentina_HD/tracks-v1a1/mono.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -979,16 +1019,6 @@
       }
     },
     {
-      "id": "Eurosport.fr@Asia",
-      "name": "Eurosport (France)",
-      "category": "Sports",
-      "logo": "https://i.imgur.com/s4jDnJh.png",
-      "stream_url": "http://103.253.74.210:7070/stream/122/index.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
       "id": "Eurosport1.fr@France",
       "name": "Eurosport 1",
       "category": "Sports",
@@ -1059,21 +1089,11 @@
       }
     },
     {
-      "id": "Eurosport1.fr@Spain",
-      "name": "Eurosport 1 Spain (576p)",
-      "category": "Sports",
-      "logo": "https://i.imgur.com/olQJgm7.png",
-      "stream_url": "http://45.134.141.161:2200/ARG/Eurosport_1_HD/index.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
       "id": "Eurosport1.fr@UK",
-      "name": "Eurosport 1 UK (1080p)",
+      "name": "Eurosport 1 UK (720p)",
       "category": "Sports",
       "logo": "https://i.imgur.com/olQJgm7.png",
-      "stream_url": "http://85.117.37.43/eurosport1/index.m3u8",
+      "stream_url": "https://r.eu.cdn-redge.media/livehls/oeu/mt/live/eurosport_1_en/live.livx/playlist.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -1144,16 +1164,6 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/f56dHgR.png",
       "stream_url": "https://s7.iptv-24.net/1452/playlist.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "Eurosport2.fr@Spain",
-      "name": "Eurosport 2 Spain (1080p)",
-      "category": "Sports",
-      "logo": "https://i.imgur.com/f56dHgR.png",
-      "stream_url": "http://45.134.141.161:2200/ARG/Eurosport_2_HD/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -1324,16 +1334,6 @@
       "category": "Sports",
       "logo": "https://play-lh.googleusercontent.com/J0YeRB884koVfecR2mp43Y2mbNtRVTSSOiq2U1gkITJ9IxzIM4VA71Rqbh3UlREI4mCnlxGHm4wxoujt5ZH1AQ",
       "stream_url": "https://fontvlive.mediacdn.ru/stream/fontv/playlist.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "FOXCentral.mx@CostaRica",
-      "name": "FOX Central (1080p)",
-      "category": "Sports",
-      "logo": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/25/FOX_wordmark.svg/960px-FOX_wordmark.svg.png?utm_source=es.wikipedia.org&utm_campaign=index&utm_content=thumbnail",
-      "stream_url": "http://181.78.106.127:5000/play/a009/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -1584,16 +1584,6 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/Lgux6Ik.png",
       "stream_url": "https://tvsen6.aynaott.com/golfchannel/index.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "GolfChannelLatinAmerica.us@SD",
-      "name": "Golf Channel Latin America (1080p)",
-      "category": "Sports",
-      "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Golf_Channel_Logo_2018.png/960px-Golf_Channel_Logo_2018.png",
-      "stream_url": "http://15.204.246.24:8080/GolfChannelHD/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -2429,6 +2419,16 @@
       }
     },
     {
+      "id": "RealMadridTV.es@SD",
+      "name": "Real Madrid TV (1080p)",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/5pMo7dL.png",
+      "stream_url": "http://90.163.85.113:8093/stream/26/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "RealMadridTVEnglish.es@SD",
       "name": "Real Madrid TV English",
       "category": "Sports",
@@ -2694,6 +2694,16 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/8bzAfgK.png",
       "stream_url": "https://stream-us-east-1.getpublica.com/playlist.m3u8?network_id=2241",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "SonySportsTen3Hindi.in@SD",
+      "name": "Sony Sports Ten 3 Hindi (1080p)",
+      "category": "Sports",
+      "logo": "https://dtil.tmsimg.com/assets/GNLZZGG0025TCMR.png?lock=720x540",
+      "stream_url": "https://r2.amml.in/sony-ten-3-hd/live.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -3289,6 +3299,16 @@
       }
     },
     {
+      "id": "TourSpotTV.do@HD",
+      "name": "Tour Spot TV (1280p) [Not 24/7]",
+      "category": "Sports",
+      "logo": "https://imgur.com/khj869k.png",
+      "stream_url": "https://fox.hostlagarto.com:8081/toursporttv/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "TraceSportStars.fr@HD",
       "name": "Trace Sport Stars (1080p)",
       "category": "Sports",
@@ -3369,11 +3389,31 @@
       }
     },
     {
+      "id": "VTV6.vn@HD",
+      "name": "VTV6 (720p)",
+      "category": "Sports",
+      "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/VTV6_logo_2026_final.svg/960px-VTV6_logo_2026_final.svg.png",
+      "stream_url": "https://dethich.pw/vtv6/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "VarzeshTV.ir@SD",
       "name": "Varzesh TV",
       "category": "Sports",
       "logo": "https://upload.wikimedia.org/wikipedia/fa/thumb/f/f5/Iribvarzesh2022.png/960px-Iribvarzesh2022.png",
       "stream_url": "https://ncdn.telewebion.ir/varzesh/live/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "VinhLongTV4.vn@SD",
+      "name": "Vinh Long TV 4 (720p)",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/ARhIkvR.png",
+      "stream_url": "https://dethich.pw/thvl4/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -3619,6 +3659,16 @@
       }
     },
     {
+      "id": "SonyYay.in@SD",
+      "name": "Sony Yay! (1080p)",
+      "category": "Kids",
+      "logo": "https://dtil.tmsimg.com/assets/s159100_ld_h15_aa.png?lock=720x540",
+      "stream_url": "https://r2.amml.in/sony-yay/live.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "TheJungleBook.in@SD",
       "name": "The Jungle Book (1080p)",
       "category": "Kids",
@@ -3633,7 +3683,7 @@
       "name": "Unique TV (576p)",
       "category": "Kids",
       "logo": "https://jiotvimages.cdn.jio.com/dare_images/images/Unique_Tv.png",
-      "stream_url": "https://fta.ektv.in/live/688/master.m3u8",
+      "stream_url": "http://163.61.226.31:9981/stream/channelid/1687023184?profile=pass",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
