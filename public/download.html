@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>NXLY Stream App Download APK — Official Android Latest Version (Free)</title>
-    <meta name="description" content="Official NXLY Stream App Download APK Latest Version (v1.0.33). Download Nxly Stream Android APK free with zero ads, 1080p Full HD movies, TV series, Hindi dubbed & live sports. No mod needed.">
+    <meta name="description" content="Official NXLY Stream App Download APK Latest Version (v1.0.36). Download Nxly Stream Android APK free with zero ads, 1080p Full HD movies, TV series, Hindi dubbed & live sports. No mod needed.">
     <meta name="keywords" content="nxly stream app download, nxly stream app apk, nxly stream app download apk, nxly stream app download apk old version, nxly stream app download apk mod, nxly stream app download apk latest version, nxly stream app, nxly stream android, nxly stream download, nxly stream apk, download streamfit apk, nxly app download, free movie app apk, live tv app, android apk download">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
     <link rel="canonical" href="https://nxly.online/download">
@@ -49,7 +49,7 @@
       },
       "downloadUrl": "https://nxly.online/uploads/apks/NXLY-Stream.apk",
       "fileSize": "15MB",
-      "softwareVersion": "1.0.33",
+      "softwareVersion": "1.0.36",
       "image": "https://nxly.online/nxly-logo.png",
       "keywords": "Nxly stream app download, Nxly stream app apk, Nxly stream app download apk, Nxly stream app download apk latest version, Nxly stream app download apk mod, Nxly stream app download apk old version, Nxly stream app, Nxly stream android, Nxly stream download"
     }
@@ -62,6 +62,9 @@
       gtag('js', new Date());
       gtag('config', 'G-EGFDL2X6GY');
     </script>
+    <!-- Google AdSense -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8135122441154292"
+       crossorigin="anonymous"></script>
 
     <!-- Google Fonts: Outfit, Plus Jakarta Sans, Hind Siliguri -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -397,7 +400,161 @@
             font-size: 16px;
         }
 
-        /* Mirror Links */
+        /* Modern Action Buttons Grid */
+        .download-actions-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            width: 100%;
+            margin-top: 24px;
+            padding-top: 18px;
+            border-top: 1px solid var(--card-border);
+        }
+
+        @media (max-width: 580px) {
+            .download-actions-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .action-dl-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            border-radius: 14px;
+            text-decoration: none;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .action-dl-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), transparent 70%);
+            opacity: 0;
+            transition: opacity 0.25s ease;
+        }
+
+        .action-dl-card:hover {
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.22);
+            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+        }
+
+        .action-dl-card:hover::before {
+            opacity: 1;
+        }
+
+        .action-icon-box {
+            width: 38px;
+            height: 38px;
+            min-width: 38px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            transition: transform 0.25s ease;
+        }
+
+        .action-dl-card:hover .action-icon-box {
+            transform: scale(1.08);
+        }
+
+        .action-info {
+            display: flex;
+            flex-direction: column;
+            text-align: left;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .action-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #f1f5f9;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .action-desc {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .action-arrow {
+            font-size: 12px;
+            color: #64748b;
+            transition: transform 0.2s ease, color 0.2s ease;
+        }
+
+        .action-dl-card:hover .action-arrow {
+            transform: translateX(3px);
+            color: #f1f5f9;
+        }
+
+        /* Specific Color Accents */
+        .card-tv {
+            border-color: rgba(16, 185, 129, 0.25);
+        }
+        .card-tv:hover {
+            border-color: #10b981;
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.22);
+        }
+        .card-tv .action-icon-box {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+        }
+
+        .card-mirror {
+            border-color: rgba(96, 239, 255, 0.25);
+        }
+        .card-mirror:hover {
+            border-color: #60efff;
+            box-shadow: 0 6px 20px rgba(96, 239, 255, 0.22);
+        }
+        .card-mirror .action-icon-box {
+            background: rgba(96, 239, 255, 0.15);
+            color: #60efff;
+        }
+
+        .card-beta {
+            border-color: rgba(245, 158, 11, 0.25);
+        }
+        .card-beta:hover {
+            border-color: #f59e0b;
+            box-shadow: 0 6px 20px rgba(245, 158, 11, 0.22);
+        }
+        .card-beta .action-icon-box {
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
+        }
+
+        .card-direct {
+            border-color: rgba(168, 85, 247, 0.25);
+        }
+        .card-direct:hover {
+            border-color: #a855f7;
+            box-shadow: 0 6px 20px rgba(168, 85, 247, 0.22);
+        }
+        .card-direct .action-icon-box {
+            background: rgba(168, 85, 247, 0.15);
+            color: #a855f7;
+        }
+
+        /* Legacy Mirror Fallbacks */
         .mirror-wrap {
             margin-top: 22px;
             padding: 12px 18px;
@@ -715,7 +872,7 @@
         <!-- Live Release Badge -->
         <div class="live-badge">
             <span class="live-indicator"></span>
-            <span>অফিশিয়াল অ্যান্ড্রয়েড অ্যাপ • লেটেস্ট রিলিজ v1.0.33</span>
+            <span>অফিশিয়াল অ্যান্ড্রয়েড অ্যাপ • লেটেস্ট রিলিজ v1.0.36</span>
         </div>
 
         <h1 class="main-headline">
@@ -749,22 +906,60 @@
 
             <!-- Specs Grid -->
             <div class="specs-grid">
-                <div class="spec-item"><i class="fa-solid fa-microchip"></i> <span id="ver-badge">ভার্সন 1.0.33</span></div>
+                <div class="spec-item"><i class="fa-solid fa-microchip"></i> <span id="ver-badge">ভার্সন 1.0.36</span></div>
                 <div class="spec-item"><i class="fa-solid fa-file-zipper"></i> সাইজ: মাত্র ১৫ MB</div>
                 <div class="spec-item"><i class="fa-solid fa-mobile-screen"></i> Android Phone & Google TV</div>
                 <div class="spec-item"><i class="fa-solid fa-shield-halved"></i> ১০০% নিরাপদ ও অফিসিয়াল</div>
             </div>
 
-            <!-- Alternate TV & Beta Edition Links -->
-            <div class="mirror-wrap" style="display:flex; flex-direction:column; gap:8px; align-items:center; width:100%; max-width:380px;">
-                <a href="/download/tv" class="mirror-btn" style="background:rgba(16,185,129,0.18); border-color:#10b981; color:#10b981; width:100%; justify-content:center; font-weight:700;">
-                    <i class="fa-solid fa-tv"></i> Android TV / Google TV Edition APK
+            <!-- Alternate Action Download Buttons Grid -->
+            <div class="download-actions-grid">
+                <!-- 1. Android TV / Google TV -->
+                <a href="/download/tv" class="action-dl-card card-tv" title="Download Android TV / Google TV APK">
+                    <div class="action-icon-box">
+                        <i class="fa-solid fa-tv"></i>
+                    </div>
+                    <div class="action-info">
+                        <span class="action-title">Android / Google TV</span>
+                        <span class="action-desc">স্মার্ট টিভি ও রিমোট ফ্রেন্ডলি</span>
+                    </div>
+                    <i class="fa-solid fa-arrow-down-to-line action-arrow"></i>
                 </a>
-                <a href="/download/beta" class="mirror-btn" style="background:rgba(6,182,212,0.15); border-color:#06b6d4; color:#06b6d4; width:100%; justify-content:center; font-weight:700;">
-                    <i class="fa-solid fa-flask"></i> Beta Edition (Early Access APK)
+
+                <!-- 2. Mirror Server 2 -->
+                <a href="/uploads/apks/NXLY-Stream.apk" class="action-dl-card card-mirror" title="Download from Mirror Server 2">
+                    <div class="action-icon-box">
+                        <i class="fa-solid fa-cloud-arrow-down"></i>
+                    </div>
+                    <div class="action-info">
+                        <span class="action-title">Mirror Server 2</span>
+                        <span class="action-desc">সরাসরি ডাইরেক্ট ডাউনলোড</span>
+                    </div>
+                    <i class="fa-solid fa-arrow-down-to-line action-arrow"></i>
                 </a>
-                <a href="/uploads/apks/NXLY-Stream.apk" class="mirror-btn" style="width:100%; justify-content:center;">
-                    <i class="fa-solid fa-cloud-arrow-down"></i> Mirror Server 2 (Direct APK)
+
+                <!-- 3. Beta Edition -->
+                <a href="/download/beta" class="action-dl-card card-beta" title="Download Beta Edition APK">
+                    <div class="action-icon-box">
+                        <i class="fa-solid fa-flask"></i>
+                    </div>
+                    <div class="action-info">
+                        <span class="action-title">Beta Edition</span>
+                        <span class="action-desc">আর্লি এক্সেস ও নতুন ফিচার</span>
+                    </div>
+                    <i class="fa-solid fa-arrow-down-to-line action-arrow"></i>
+                </a>
+
+                <!-- 4. Fast Direct Mirror -->
+                <a href="/app.apk" class="action-dl-card card-direct" title="Download Standard Phone APK">
+                    <div class="action-icon-box">
+                        <i class="fa-solid fa-bolt"></i>
+                    </div>
+                    <div class="action-info">
+                        <span class="action-title">Fast Server 1</span>
+                        <span class="action-desc">হাই-স্পিড অল্টারনেটিভ লিংক</span>
+                    </div>
+                    <i class="fa-solid fa-arrow-down-to-line action-arrow"></i>
                 </a>
             </div>
         </div>
@@ -864,7 +1059,7 @@
 
             <div class="faq-row">
                 <div class="faq-question"><i class="fa-solid fa-chevron-right"></i> Nxly Stream App Download APK Latest Version কীভাবে করবেন?</div>
-                <div class="faq-answer">উপরে থাকা "ডাউনলোড করুন" বাটনে ক্লিক করে সরাসরি Nxly Stream App APK-এর লেটেস্ট অফিসিয়াল রিলিজ (v1.0.33) ডাউনলোড করতে পারবেন। এতে আল্ট্রা এইচডি কোয়ালিটি, বাংলা ও হিন্দি ডাব এবং দ্রুত স্ট্রিমিং সার্ভার যুক্ত রয়েছে।</div>
+                <div class="faq-answer">উপরে থাকা "ডাউনলোড করুন" বাটনে ক্লিক করে সরাসরি Nxly Stream App APK-এর লেটেস্ট অফিসিয়াল রিলিজ (v1.0.36) ডাউনলোড করতে পারবেন। এতে আল্ট্রা এইচডি কোয়ালিটি, বাংলা ও হিন্দি ডাব এবং দ্রুত স্ট্রিমিং সার্ভার যুক্ত রয়েছে।</div>
             </div>
 
             <div class="faq-row">

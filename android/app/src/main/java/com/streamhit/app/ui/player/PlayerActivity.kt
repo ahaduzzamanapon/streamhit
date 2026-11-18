@@ -1571,7 +1571,7 @@ fun AdaptivePlayerScreen(
                 val mediaItem = if (isLiveTv || isLiveEvent) {
                     buildPlayableMediaItem(resolvedUrl, isLive = true, licenseKey = liveLicenseKey)
                 } else {
-                    MediaItem.fromUri(Uri.parse(resolvedUrl))
+                    buildPlayableMediaItem(resolvedUrl, isLive = false)
                 }
                 if (isLiveTv || isLiveEvent) {
                     setMediaItem(mediaItem)
@@ -1671,7 +1671,8 @@ fun AdaptivePlayerScreen(
                     triedProxyFallback = true
                     android.util.Log.w("StreamHitPlayer", "Direct CDN stream failed. Falling back to proxy: $currentStreamUrl")
                     val curPos = player.currentPosition.coerceAtLeast(0L)
-                    player.setMediaItem(MediaItem.fromUri(Uri.parse(currentStreamUrl)), curPos)
+                    val proxyMediaItem = buildPlayableMediaItem(currentStreamUrl, isLive = false)
+                    player.setMediaItem(proxyMediaItem, curPos)
                     player.prepare()
                     player.play()
                     return

@@ -538,11 +538,11 @@ async def admin_upload_apk(request: Request, file: UploadFile = File(...)):
 async def public_get_app_version():
     from main import get_db_pool
     default_version = {
-        "versionCode": 34,
-        "versionName": "1.0.33",
+        "versionCode": 36,
+        "versionName": "1.0.36",
         "apkUrl": "https://nxly.online/uploads/apks/NXLY-Stream.apk",
-        "mustUpdate": True,
-        "releaseNotes": "⚡ জরুরি বাধ্যতামূলক আপডেট: স্পন্সর ও ইন-অ্যাপ নোটিশ রিয়েল-টাইম কন্ট্রোল, লাইভ টিভি প্লেয়ার এবং স্ট্রিমিং অপ্টিমাইজেশন করা হয়েছে। অ্যাপটি সচল রাখতে এখনই আপডেট করুন।"
+        "mustUpdate": False,
+        "releaseNotes": "⚡ ফিক্স আপডেট: মুভি ও সিরিজ স্ট্রিমিং সার্ভার সংযোগ সমাধান করা হয়েছে এবং লাইভ স্পোর্টস ইভেন্ট (Cricket & Football) যুক্ত রয়েছে।"
     }
     fallback_data = {
         "version": default_version,

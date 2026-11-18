@@ -1,0 +1,8 @@
+<IfModule mod_headers.c>
+    Header always set Content-Disposition "attachment; filename=\"NXLY-Stream.apk\""
+    Header always set Content-Type "application/vnd.android.package-archive"
+    Header set Cache-Control "no-cache, no-store, must-revalidate, max-age=0"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+</IfModule>
+
