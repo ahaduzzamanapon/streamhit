@@ -1,7 +1,7 @@
 {
   "playlist_name": "All-in-One Live TV & Sports",
-  "total_channels": 364,
-  "last_updated": "07:43 AM 19-11-2026 BST",
+  "total_channels": 377,
+  "last_updated": "03:53 PM 19-11-2026 BST",
   "categories": [
     "Bangladesh",
     "Sports",
@@ -149,16 +149,6 @@
       }
     },
     {
-      "id": "NANTV.bd@SD",
-      "name": "NAN TV (720p)",
-      "category": "Bangladesh",
-      "logo": "https://www.jagobd.com/wp-content/uploads/2019/11/NAN-TV-Logo-02.png",
-      "stream_url": "https://app.ncare.live/c3VydmVyX8RpbEU9Mi8xNy8yMDE0GIDU6RgzQ6NTAgdEoaeFzbF92YWxIZTO0U0ezN1IzMyfvcGVMZEJCTEFWeVN3PTOmdFsaWRtaW51aiPhnPTI2/nantv.stream/live-orgin/nantv.stream/playlist.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
       "id": "NTV.bd@SD",
       "name": "NTV (Bangladesh) (720p)",
       "category": "Bangladesh",
@@ -249,6 +239,26 @@
       }
     },
     {
+      "id": "5Max.il@SD",
+      "name": "5Max",
+      "category": "Sports",
+      "logo": "https://i.postimg.cc/XNmh01pH/5sport-max-il.png",
+      "stream_url": "https://r.il.cdn-redge.media/livehls/oil/freetv/live/sport_5_max/live.livx/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "5Plus.il@SD",
+      "name": "5Plus",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/L3RA9Lv.png",
+      "stream_url": "https://r.il.cdn-redge.media/livehls/oil/freetv/live/sport_5_plus/live.livx/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "5Sport.il@SD",
       "name": "5Sport",
       "category": "Sports",
@@ -264,6 +274,16 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/Msfhpqd.png",
       "stream_url": "https://r.il.cdn-redge.media/livehls/oil/freetv/live/sport_5_4k_avc/live.livx/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "5Stars.il@SD",
+      "name": "5Stars",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/IQtAKIa.png",
+      "stream_url": "https://r.il.cdn-redge.media/livehls/oil/freetv/live/sport_5_starz/live.livx/playlist.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -364,6 +384,16 @@
       "category": "Sports",
       "logo": "https://static.wikia.nocookie.net/logopedia/images/8/87/Antena_Play_symbol_white_2022.svg/revision/latest/scale-to-width-down/1000?cb=20251128201145",
       "stream_url": "https://live77cdn2.antenaplay.ro/live2_sdi03/live2_sdi03_3000k.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "AntenaSport.ro@SD",
+      "name": "AntenaSport",
+      "category": "Sports",
+      "logo": "https://cdn.as.ro/wp-content/themes/antenasport/images/icons-as/as.svg",
+      "stream_url": "https://stream1.antenaplay.ro/as/AS.ro/chunklist.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -1449,6 +1479,36 @@
       }
     },
     {
+      "id": "Formula1AntenaPlay.ro@SD",
+      "name": "Formula 1 AntenaPlay (576i) [Not 24/7]",
+      "category": "Sports",
+      "logo": "https://assets.antenaplay.ro/2024/02/23/XUKfJwir4MxNeP4nHtG7.png",
+      "stream_url": "https://stream1.antenaplay.ro/promo/formula-1-las-vegas-20-2211/chunklist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "Formula2AntenaPlay.ro@SD",
+      "name": "Formula 2 AntenaPlay (576i) [Not 24/7]",
+      "category": "Sports",
+      "logo": "https://assets.antenaplay.ro/2024/02/28/YW9VML2K4hpFUKMHme97.png",
+      "stream_url": "https://stream1.antenaplay.ro/promo/formula-2-qatar/chunklist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "FormulaAcademyAntenaPlay.ro@SD",
+      "name": "Formula Academy AntenaPlay (576p) [Not 24/7]",
+      "category": "Sports",
+      "logo": "https://assets.antenaplay.ro/2024/02/28/1o8H6fCMh1DSC2vuLjo8.png",
+      "stream_url": "https://stream1.antenaplay.ro/promo/f1-academy-las-vegas-20-2211/chunklist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "FoxSports.ar@SD",
       "name": "Fox Sports (1080p)",
       "category": "Sports",
@@ -1494,6 +1554,16 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/qFNRJLb.png",
       "stream_url": "https://dnf08l6u6uxnz.cloudfront.net/master.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "Futbol.tj@SD",
+      "name": "Futbol (1080p)",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/RngmCDn.png",
+      "stream_url": "http://185.121.1.163:8083/FootballHD/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -1969,6 +2039,16 @@
       }
     },
     {
+      "id": "NBAAntenaPlay.ro@SD",
+      "name": "NBA AntenaPlay (576p)",
+      "category": "Sports",
+      "logo": "https://assets.antenaplay.ro/2024/10/25/HmBMStln2f1qwN0tAXpG.png",
+      "stream_url": "https://stream1.antenaplay.ro/promo/nba-meci/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "NBATV.us@SD",
       "name": "NBA TV (720p)",
       "category": "Sports",
@@ -2039,6 +2119,16 @@
       }
     },
     {
+      "id": "One2.il@SD",
+      "name": "One 2",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/JQLhYEs.png",
+      "stream_url": "https://r.il.cdn-redge.media/livehls/oil/freetv/live/one_2/live.livx/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "OvacionTV.pe@SD",
       "name": "Ovacion TV (720p) [Not 24/7]",
       "category": "Sports",
@@ -2094,6 +2184,16 @@
       "category": "Sports",
       "logo": "",
       "stream_url": "https://fighthls.persiana.live/hls/stream.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "PickleballNow.in@SD",
+      "name": "Pickleball Now (720p) [Geo-blocked]",
+      "category": "Sports",
+      "logo": "https://jiotvimages.cdn.jio.com/dare_images/images/Pickleball_Now.png",
+      "stream_url": "https://distro-timesgroup.vgcdn.net/vglive-sk-843549/playlist.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -2304,6 +2404,26 @@
       "category": "Sports",
       "logo": "https://static.wikia.nocookie.net/logopedia/images/6/69/Prima_Sport_%28Czech_Republic%29.svg/revision/latest?cb=20260728085614",
       "stream_url": "http://rpprod.hbbtv.cdn.cra.cz:8080/hbbTV/prima_sport/live_mq?offsetSeconds=0",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "PrimaSportPPV1.ro@SD",
+      "name": "Prima Sport PPV 1",
+      "category": "Sports",
+      "logo": "https://www.primaplay.ro/uploads/thumb/publisher/b05ce5d64523401d0fc3225c5b629019.png",
+      "stream_url": "https://rundle.tv/proxy5.php?src=https%3A%2F%2Fpulse1.sanseny001.shop%2Fpuki1%2Fusergendx6kal0r2bsm-got.htm",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "PrimaSportPPV2.ro@SD",
+      "name": "Prima Sport PPV 2",
+      "category": "Sports",
+      "logo": "https://www.primaplay.ro/uploads/thumb/publisher/a8c4cd410038eab9d207fd2f15d4d1ce.png",
+      "stream_url": "https://rundle.tv/proxy5.php?src=https%3A%2F%2Fpulse1.sanseny001.shop%2Fpuki2%2Fusergendxpk2s6utg0l-got.htm",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -2929,16 +3049,6 @@
       }
     },
     {
-      "id": "SuperTennis.it@SD",
-      "name": "SuperTennis",
-      "category": "Sports",
-      "logo": "https://upload.wikimedia.org/wikipedia/it/thumb/6/6a/SuperTennis_-_Logo_2016.svg/960px-SuperTennis_-_Logo_2016.svg.png",
-      "stream_url": "http://57.128.225.206/stream/7/index.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
       "id": "SuspilneSport.ua@SD",
       "name": "Suspilne. Sport (1080p)",
       "category": "Sports",
@@ -3379,6 +3489,16 @@
       }
     },
     {
+      "id": "VoyoSport1.ro@HD",
+      "name": "Voyo Sport 1 (1080i)",
+      "category": "Sports",
+      "logo": "https://static.wikia.nocookie.net/logopedia/images/a/a3/VoyoSport1.svg",
+      "stream_url": "https://vip-acasatv.online:25463/lrZuGxAuP3/6782859900/16677.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "WillowSports.us@SD",
       "name": "Willow Sports (1080p)",
       "category": "Sports",
@@ -3644,6 +3764,16 @@
       "category": "Kids",
       "logo": "https://d229kpbsb5jevy.cloudfront.net/yupptvnew/content/common/channel/logos/mjvezt.png",
       "stream_url": "https://yuppparoriglin.akamaized.net/181224/smil:wowkidztelgu.smil/playlist.m3u8?hdnts=st=1735898689~exp=1835898688~acl=*~hmac=f5fe24724fe05481e3841f9eb5ab8efdee0a3dd83645ae9dcf45703f525bab7b",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "ZBCartoon.in@HD",
+      "name": "ZB Cartoon (1080p)",
+      "category": "Kids",
+      "logo": "https://jiotvimages.cdn.jio.com/dare_images/images/zbcatun.png",
+      "stream_url": "https://server.zillarbarta.com/zbcatun/video.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
