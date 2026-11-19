@@ -1,7 +1,7 @@
 {
   "playlist_name": "All-in-One Live TV & Sports",
-  "total_channels": 366,
-  "last_updated": "12:39 AM 19-11-2026 BST",
+  "total_channels": 364,
+  "last_updated": "07:43 AM 19-11-2026 BST",
   "categories": [
     "Bangladesh",
     "Sports",
@@ -364,16 +364,6 @@
       "category": "Sports",
       "logo": "https://static.wikia.nocookie.net/logopedia/images/8/87/Antena_Play_symbol_white_2022.svg/revision/latest/scale-to-width-down/1000?cb=20251128201145",
       "stream_url": "https://live77cdn2.antenaplay.ro/live2_sdi03/live2_sdi03_3000k.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "AntenaSport.ro@SD",
-      "name": "AntenaSport",
-      "category": "Sports",
-      "logo": "https://cdn.as.ro/wp-content/themes/antenasport/images/icons-as/as.svg",
-      "stream_url": "https://stream1.antenaplay.ro/as/AS.ro/chunklist.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -1459,26 +1449,6 @@
       }
     },
     {
-      "id": "Formula1AntenaPlay.ro@SD",
-      "name": "Formula 1 AntenaPlay (576i) [Not 24/7]",
-      "category": "Sports",
-      "logo": "https://assets.antenaplay.ro/2024/02/23/XUKfJwir4MxNeP4nHtG7.png",
-      "stream_url": "https://stream1.antenaplay.ro/promo/formula-1-las-vegas-20-2211/chunklist.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "Formula2AntenaPlay.ro@SD",
-      "name": "Formula 2 AntenaPlay (576i) [Not 24/7]",
-      "category": "Sports",
-      "logo": "https://assets.antenaplay.ro/2024/02/28/YW9VML2K4hpFUKMHme97.png",
-      "stream_url": "https://stream1.antenaplay.ro/promo/formula-2-qatar/chunklist.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
       "id": "FoxSports.ar@SD",
       "name": "Fox Sports (1080p)",
       "category": "Sports",
@@ -1524,16 +1494,6 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/qFNRJLb.png",
       "stream_url": "https://dnf08l6u6uxnz.cloudfront.net/master.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "Futbol.tj@SD",
-      "name": "Futbol (1080p)",
-      "category": "Sports",
-      "logo": "https://i.imgur.com/RngmCDn.png",
-      "stream_url": "http://185.121.1.163:8083/FootballHD/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -1839,6 +1799,16 @@
       }
     },
     {
+      "id": "MRTVSports.mm@SD",
+      "name": "MRTV Sports [Not 24/7]",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/cFTR4kC.png",
+      "stream_url": "https://mrtvott.com/cache/MRTV-SPORT/master.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "MUTV.uk@SD",
       "name": "MUTV (720p)",
       "category": "Sports",
@@ -1904,6 +1874,16 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/GQPyHYK.png",
       "stream_url": "http://185.23.80.23:8080/MATCH_PREMIER/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "MatchUltra.ru@4K",
+      "name": "Match! Ultra (1080p)",
+      "category": "Sports",
+      "logo": "https://www.kartina.tv/media/news/images/News/SEO/kanal-match-ultra.jpg",
+      "stream_url": "http://31.148.5.241/kanal_3/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -1984,16 +1964,6 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/SLrjImc.png",
       "stream_url": "https://mts1.iptv-playoutcenter.de/mts/mts-web/playlist.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "NBAAntenaPlay.ro@SD",
-      "name": "NBA AntenaPlay (576p)",
-      "category": "Sports",
-      "logo": "https://assets.antenaplay.ro/2024/10/25/HmBMStln2f1qwN0tAXpG.png",
-      "stream_url": "https://stream1.antenaplay.ro/promo/nba-meci/playlist.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -3544,6 +3514,16 @@
       "category": "Sports",
       "logo": "https://upload.wikimedia.org/wikipedia/en/9/9d/Talksport_logo.png",
       "stream_url": "https://af7a8b4e.wurl.com/master/f36d25e7e52f1ba8d7e56eb859c636563214f541/TEctZ2JfdGFsa1NQT1JUX0hMUw/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "vijuPlusSport.ru@SD",
+      "name": "viju+ Sport (576p)",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/fXESG0l.png",
+      "stream_url": "http://31.148.5.241/Viasat_Sport/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
