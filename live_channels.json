@@ -1,7 +1,7 @@
 {
   "playlist_name": "All-in-One Live TV & Sports",
-  "total_channels": 363,
-  "last_updated": "12:52 AM 20-11-2026 BST",
+  "total_channels": 365,
+  "last_updated": "07:39 AM 20-11-2026 BST",
   "categories": [
     "Bangladesh",
     "Sports",
@@ -139,16 +139,6 @@
       }
     },
     {
-      "id": "MyTV.bd@SD",
-      "name": "My TV (Bangladesh) (480p)",
-      "category": "Bangladesh",
-      "logo": "https://i.imgur.com/475qK5T.png",
-      "stream_url": "https://app.ncare.live/c3VydmVyX8RpbEU9Mi8xNy8yMDE0GIDU6RgzQ6NTAgdEoaeFzbF92YWxIZTO0U0ezN1IzMyfvcGVMZEJCTEFWeVN3PTOmdFsaWRtaW51aiPhnPTI2/mytv-up-off.stream/live-orgin/mytv-up-off.stream/playlist.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
       "id": "NANTV.bd@SD",
       "name": "NAN TV (720p)",
       "category": "Bangladesh",
@@ -164,6 +154,26 @@
       "category": "Bangladesh",
       "logo": "https://i.imgur.com/l75bDTx.png",
       "stream_url": "https://tvsen5.aynaott.com/xV4jEKf3D9zc/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "NationalGeographic.in@HD",
+      "name": "National Geographic (India) HD (1080p)",
+      "category": "Bangladesh",
+      "logo": "https://dtil.tmsimg.com/assets/s143574_ld_h15_aa.png?lock=720x540",
+      "stream_url": "http://116.90.120.149:8000/play/a115/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "NationalGeographicWild.in@HD",
+      "name": "National Geographic Wild (India) HD (1080p)",
+      "category": "Bangladesh",
+      "logo": "https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_NAT_GEO_WILD/images/LOGO_HD/image.png",
+      "stream_url": "http://116.90.120.149:8000/play/a11h/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -999,6 +1009,16 @@
       }
     },
     {
+      "id": "Eurosport.in@HD",
+      "name": "Eurosport (India) HD (1080p)",
+      "category": "Sports",
+      "logo": "https://dtil.tmsimg.com/assets/GNLZZGG002E9LQS.png?lock=720x540",
+      "stream_url": "http://116.90.120.149:8000/play/a118/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "Eurosport1.fr@France",
       "name": "Eurosport 1",
       "category": "Sports",
@@ -1240,10 +1260,10 @@
     },
     {
       "id": "FIFAPlus.uk@English",
-      "name": "FIFA+ (720p)",
+      "name": "FIFA+ (1080p)",
       "category": "Sports",
       "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/FIFA%2B_(2025).svg/960px-FIFA%2B_(2025).svg.png",
-      "stream_url": "https://jmp2.uk/plu-660c29b5aec9680008f5b4a4.m3u8",
+      "stream_url": "https://95cedebd.wurl.com/master/f36d25e7e52f1ba8d7e56eb859c636563214f541/Vml6aW9fRklGQVBsdXNFbmdsaXNoX0hMUw/playlist.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -1959,16 +1979,6 @@
       }
     },
     {
-      "id": "MonsterJam.us@SD",
-      "name": "Monster Jam (720p)",
-      "category": "Sports",
-      "logo": "https://provider-static.plex.tv/epg/cms/production/23824964-562b-4498-9eaa-d6262cb7e0c3/Monster_Jam_Logo_on_Transparent_1500x1000_Casey_Murawski.png",
-      "stream_url": "https://jmp2.uk/plu-65bcc9c8d77d450008b34c6b.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
       "id": "MonterricoTV.pe@SD",
       "name": "Monterrico TV",
       "category": "Sports",
@@ -2144,6 +2154,16 @@
       "category": "Sports",
       "logo": "https://jiotvimages.cdn.jio.com/dare_images/images/Pickleball_Now.png",
       "stream_url": "https://distro-timesgroup.vgcdn.net/vglive-sk-843549/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "PickleballTV.us@HD",
+      "name": "Pickleball TV (1080p) [Geo-blocked]",
+      "category": "Sports",
+      "logo": "https://pickleballtv.com/wp-content/themes/bootscore-child-main/img/logo/full-logo.svg",
+      "stream_url": "https://amg27547-amg27547c1-amgplt0022.playout.now3.amagi.tv/playlist.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -2354,26 +2374,6 @@
       "category": "Sports",
       "logo": "https://static.wikia.nocookie.net/logopedia/images/6/69/Prima_Sport_%28Czech_Republic%29.svg/revision/latest?cb=20260728085614",
       "stream_url": "http://rpprod.hbbtv.cdn.cra.cz:8080/hbbTV/prima_sport/live_mq?offsetSeconds=0",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "PrimaSportPPV1.ro@SD",
-      "name": "Prima Sport PPV 1",
-      "category": "Sports",
-      "logo": "https://www.primaplay.ro/uploads/thumb/publisher/b05ce5d64523401d0fc3225c5b629019.png",
-      "stream_url": "https://rundle.tv/proxy5.php?src=https%3A%2F%2Fpulse1.sanseny001.shop%2Fpuki1%2Fusergendx6kal0r2bsm-got.htm",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "PrimaSportPPV2.ro@SD",
-      "name": "Prima Sport PPV 2",
-      "category": "Sports",
-      "logo": "https://www.primaplay.ro/uploads/thumb/publisher/a8c4cd410038eab9d207fd2f15d4d1ce.png",
-      "stream_url": "https://rundle.tv/proxy5.php?src=https%3A%2F%2Fpulse1.sanseny001.shop%2Fpuki2%2Fusergendxpk2s6utg0l-got.htm",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -2879,16 +2879,6 @@
       }
     },
     {
-      "id": "StarSports2Telugu.in@HD",
-      "name": "Star Sports 2 Telugu HD (576p)",
-      "category": "Sports",
-      "logo": "https://i.imgur.com/m7DvvqF.png",
-      "stream_url": "https://real-vk.proxy.nellaiiptv.com/SDMEDIA/index.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
       "id": "Strongman.us@Germany",
       "name": "Strongman (720p)",
       "category": "Sports",
@@ -3202,7 +3192,7 @@
       "id": "TigoSports.bo@SD",
       "name": "Tigo Sports (Bolivia) (720p) [Geo-blocked]",
       "category": "Sports",
-      "logo": "https://i.imgur.com/6wkmgGM.png",
+      "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Tigo_Sports_2025.png/960px-Tigo_Sports_2025.png",
       "stream_url": "https://dipdxjic51jcl.cloudfront.net/out/v1/81f769d780694be488d85811331c8a4f/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
@@ -3302,7 +3292,7 @@
       "id": "VTV6.vn@HD",
       "name": "VTV6 (720p)",
       "category": "Sports",
-      "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/VTV6_logo_2026_final.svg/960px-VTV6_logo_2026_final.svg.png",
+      "logo": "https://upload.wikimedia.org/wikipedia/commons/4/4e/VTV6_new_logo_2026.webp",
       "stream_url": "https://dethich.pw/vtv6/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
@@ -3539,6 +3529,26 @@
       }
     },
     {
+      "id": "DisneyChannel.in@SD",
+      "name": "Disney Channel (India) (576p)",
+      "category": "Kids",
+      "logo": "https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_DISNEY_CHANNEL/images/LOGO_HD/image.png",
+      "stream_url": "http://116.90.120.149:8000/play/a124/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "DisneyChannel.in@HD",
+      "name": "Disney Channel (India) HD (1080p)",
+      "category": "Kids",
+      "logo": "https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_DISNEY_CHANNEL_HD/images/LOGO_HD/image.png",
+      "stream_url": "http://116.90.120.149:8000/play/a11r/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "EpicKids.in@Digital",
       "name": "Epic Kids Digital (1080p)",
       "category": "Kids",
@@ -3564,6 +3574,16 @@
       "category": "Kids",
       "logo": "https://static.wikia.nocookie.net/logopedia/images/2/25/Mr._Bean_Animated_Series_stacked_logo.png",
       "stream_url": "https://amg00627-amg00627c23-samsung-au-4110.playouts.now.amagi.tv/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "NickHDPlus.in@HD",
+      "name": "Nick HD+ (1080p)",
+      "category": "Kids",
+      "logo": "https://dtil.tmsimg.com/assets/s159121_ld_h15_aa.png?lock=720x540",
+      "stream_url": "http://116.90.120.149:8000/play/a11j/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
