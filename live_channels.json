@@ -1,7 +1,7 @@
 {
   "playlist_name": "All-in-One Live TV & Sports",
-  "total_channels": 369,
-  "last_updated": "11:06 PM 21-11-2026 BST",
+  "total_channels": 370,
+  "last_updated": "04:46 AM 22-11-2026 BST",
   "categories": [
     "Bangladesh",
     "Sports",
@@ -229,16 +229,6 @@
       }
     },
     {
-      "id": "StarJalsha.in@SD",
-      "name": "Star Jalsha (1080p) [Geo-blocked]",
-      "category": "Bangladesh",
-      "logo": "https://i.imgur.com/IlufzR5.png",
-      "stream_url": "http://cdn98.com/play/live.php?extension=ts&mac=00:1A:79:99:54:11&play_token=o1cczsG9wV&stream=225805",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
       "id": "ZeeBangla.in@HD",
       "name": "Zee Bangla HD (720p)",
       "category": "Bangladesh",
@@ -259,61 +249,11 @@
       }
     },
     {
-      "id": "5Gold.il@SD",
-      "name": "5Gold",
-      "category": "Sports",
-      "logo": "https://i.imgur.com/zFLRfXh.png",
-      "stream_url": "https://r.il.cdn-redge.media/livehls/oil/freetv/live/sport_5_gold/live.livx/playlist.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
       "id": "5Live.il@SD",
       "name": "5Live",
       "category": "Sports",
       "logo": "https://i.imgur.com/0yr3yvd.png",
       "stream_url": "https://r.il.cdn-redge.media/livehls/oil/freetv/live/sport_5_live/live.livx/playlist.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "5Max.il@SD",
-      "name": "5Max",
-      "category": "Sports",
-      "logo": "https://i.postimg.cc/XNmh01pH/5sport-max-il.png",
-      "stream_url": "https://r.il.cdn-redge.media/livehls/oil/freetv/live/sport_5_max/live.livx/playlist.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "5Plus.il@SD",
-      "name": "5Plus",
-      "category": "Sports",
-      "logo": "https://i.imgur.com/L3RA9Lv.png",
-      "stream_url": "https://r.il.cdn-redge.media/livehls/oil/freetv/live/sport_5_plus/live.livx/playlist.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "5Sport.il@SD",
-      "name": "5Sport",
-      "category": "Sports",
-      "logo": "https://i.imgur.com/dRVsB89.png",
-      "stream_url": "https://r.il.cdn-redge.media/livehls/oil/freetv/live/sport_5/live.livx/playlist.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "5Sport4K.il@SD",
-      "name": "5Sport 4K",
-      "category": "Sports",
-      "logo": "https://i.imgur.com/Msfhpqd.png",
-      "stream_url": "https://r.il.cdn-redge.media/livehls/oil/freetv/live/sport_5_4k_avc/live.livx/playlist.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -429,16 +369,6 @@
       }
     },
     {
-      "id": "AntenaSport.ro@SD",
-      "name": "AntenaSport",
-      "category": "Sports",
-      "logo": "https://cdn.as.ro/wp-content/themes/antenasport/images/icons-as/as.svg",
-      "stream_url": "https://stream1.antenaplay.ro/as/AS.ro/chunklist.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
       "id": "Arena4.hu@SD",
       "name": "Arena4",
       "category": "Sports",
@@ -504,6 +434,16 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/NJsRFud.png",
       "stream_url": "https://ngtrk.dc.beltelecom.by/ngtrk/smil:belarus5.smil/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "Belarus5.by@Internet",
+      "name": "Belarus-5 Internet (1080p) [Not 24/7]",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/NJsRFud.png",
+      "stream_url": "https://edge59.dc.beltelecom.by/ngtrk/smil:belarus5int.smil/playlist.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -734,6 +674,16 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/n0kd17r.png",
       "stream_url": "http://45.171.64.30:6060/play/a00w/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "ColimdoTV.do@SD",
+      "name": "Colimdo TV (720p)",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/ZeUgLCa.png",
+      "stream_url": "https://cnn.livestreaminggroup.info:3132/live/colimdotvlive.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -2059,16 +2009,6 @@
       }
     },
     {
-      "id": "One2.il@SD",
-      "name": "One 2",
-      "category": "Sports",
-      "logo": "https://i.imgur.com/JQLhYEs.png",
-      "stream_url": "https://r.il.cdn-redge.media/livehls/oil/freetv/live/one_2/live.livx/playlist.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
       "id": "OvacionTV.pe@SD",
       "name": "Ovacion TV (720p) [Not 24/7]",
       "category": "Sports",
@@ -2349,11 +2289,51 @@
       }
     },
     {
+      "id": "PrimaSport1.ro@HD",
+      "name": "Prima Sport 1 HD",
+      "category": "Sports",
+      "logo": "https://static.wikia.nocookie.net/tvfanon6528/images/5/52/Prima_Sport_1_%282022-.n.v.%29.png/revision/latest/scale-to-width-down/1000?cb=20240205121905",
+      "stream_url": "https://rundle.tv/proxy5.php?src=https%3A%2F%2Firon1.xn--x2rw19a.space%2Fpuk1%2Fusergenrx0cir27aq-got.htm",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "PrimaSport2.ro@HD",
+      "name": "Prima Sport 2 HD",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/hROcepe.png",
+      "stream_url": "https://rundle.tv/proxy5.php?src=https%3A%2F%2Firon1.xn--x2rw19a.space%2Fpuk2%2Fusergenrnd0clv03fyt-got.htm",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "PrimaSportCzechia.cz@SD",
       "name": "Prima Sport Czechia",
       "category": "Sports",
       "logo": "https://static.wikia.nocookie.net/logopedia/images/6/69/Prima_Sport_%28Czech_Republic%29.svg/revision/latest?cb=20260728085614",
       "stream_url": "http://rpprod.hbbtv.cdn.cra.cz:8080/hbbTV/prima_sport/live_mq?offsetSeconds=0",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "PrimaSportPPV1.ro@SD",
+      "name": "Prima Sport PPV 1",
+      "category": "Sports",
+      "logo": "https://www.primaplay.ro/uploads/thumb/publisher/b05ce5d64523401d0fc3225c5b629019.png",
+      "stream_url": "https://rundle.tv/proxy5.php?src=https%3A%2F%2Fpulse1.sanseny001.shop%2Fpuki1%2Fusergendx6kal0r2bsm-got.htm",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "PrimaSportPPV2.ro@SD",
+      "name": "Prima Sport PPV 2",
+      "category": "Sports",
+      "logo": "https://www.primaplay.ro/uploads/thumb/publisher/a8c4cd410038eab9d207fd2f15d4d1ce.png",
+      "stream_url": "https://rundle.tv/proxy5.php?src=https%3A%2F%2Fpulse1.sanseny001.shop%2Fpuki2%2Fusergendxpk2s6utg0l-got.htm",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -2554,6 +2534,16 @@
       "category": "Sports",
       "logo": "https://static.wikia.nocookie.net/logopedia/images/b/bc/Setanta_Sports_3_2023.svg/revision/latest?cb=20230804060013",
       "stream_url": "http://85.117.61.84/setanta3/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "SetantaSportsPlusGeorgia.ge@SD",
+      "name": "Setanta Sports+ Georgia (1080p)",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/ZtoZQUV.png",
+      "stream_url": "http://85.117.61.84/setanta2/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -3439,6 +3429,16 @@
       }
     },
     {
+      "id": "WinPlusFutbol.co@SD",
+      "name": "Win+ Futbol (1080p)",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/0UN87vB.png",
+      "stream_url": "http://181.78.12.119:16123/play/ch19/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "WorldPokerTour.us@US",
       "name": "World Poker Tour (1080p)",
       "category": "Sports",
@@ -3694,6 +3694,16 @@
       "category": "Kids",
       "logo": "https://d229kpbsb5jevy.cloudfront.net/yupptvnew/content/common/channel/logos/mjvezt.png",
       "stream_url": "https://yuppparoriglin.akamaized.net/181224/smil:wowkidztelgu.smil/playlist.m3u8?hdnts=st=1735898689~exp=1835898688~acl=*~hmac=f5fe24724fe05481e3841f9eb5ab8efdee0a3dd83645ae9dcf45703f525bab7b",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "ZBCartoon.in@HD",
+      "name": "ZB Cartoon (1080p)",
+      "category": "Kids",
+      "logo": "https://jiotvimages.cdn.jio.com/dare_images/images/zbcatun.png",
+      "stream_url": "https://server.zillarbarta.com/zbcatun/video.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
