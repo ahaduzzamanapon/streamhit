@@ -1,7 +1,7 @@
 {
   "playlist_name": "All-in-One Live TV & Sports",
-  "total_channels": 370,
-  "last_updated": "04:46 AM 22-11-2026 BST",
+  "total_channels": 385,
+  "last_updated": "11:08 AM 22-11-2026 BST",
   "categories": [
     "Bangladesh",
     "Sports",
@@ -249,11 +249,61 @@
       }
     },
     {
+      "id": "5Gold.il@SD",
+      "name": "5Gold",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/zFLRfXh.png",
+      "stream_url": "https://r.il.cdn-redge.media/livehls/oil/freetv/live/sport_5_gold/live.livx/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "5Live.il@SD",
       "name": "5Live",
       "category": "Sports",
       "logo": "https://i.imgur.com/0yr3yvd.png",
       "stream_url": "https://r.il.cdn-redge.media/livehls/oil/freetv/live/sport_5_live/live.livx/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "5Max.il@SD",
+      "name": "5Max",
+      "category": "Sports",
+      "logo": "https://i.postimg.cc/XNmh01pH/5sport-max-il.png",
+      "stream_url": "https://r.il.cdn-redge.media/livehls/oil/freetv/live/sport_5_max/live.livx/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "5Plus.il@SD",
+      "name": "5Plus",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/L3RA9Lv.png",
+      "stream_url": "https://r.il.cdn-redge.media/livehls/oil/freetv/live/sport_5_plus/live.livx/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "5Sport.il@SD",
+      "name": "5Sport",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/dRVsB89.png",
+      "stream_url": "https://r.il.cdn-redge.media/livehls/oil/freetv/live/sport_5/live.livx/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "5Sport4K.il@SD",
+      "name": "5Sport 4K",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/Msfhpqd.png",
+      "stream_url": "https://r.il.cdn-redge.media/livehls/oil/freetv/live/sport_5_4k_avc/live.livx/playlist.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -364,6 +414,16 @@
       "category": "Sports",
       "logo": "https://static.wikia.nocookie.net/logopedia/images/8/87/Antena_Play_symbol_white_2022.svg/revision/latest/scale-to-width-down/1000?cb=20251128201145",
       "stream_url": "https://live77cdn2.antenaplay.ro/live2_sdi03/live2_sdi03_3000k.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "AntenaSport.ro@SD",
+      "name": "AntenaSport",
+      "category": "Sports",
+      "logo": "https://cdn.as.ro/wp-content/themes/antenasport/images/icons-as/as.svg",
+      "stream_url": "https://stream1.antenaplay.ro/as/AS.ro/chunklist.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -1139,10 +1199,30 @@
       }
     },
     {
+      "id": "Eurosport3Polska.pl@SD",
+      "name": "Eurosport 3 Polska (1080p)",
+      "category": "Sports",
+      "logo": "https://static.wikia.nocookie.net/logopedia/images/d/da/Eurosport_3_2022.svg/revision/latest?cb=20220418054130",
+      "stream_url": "https://vuvuu-geil-m3u8.yaskar661.workers.dev/?url=https%3A%2F%2Fvavoo.to%2Fvavoo-iptv%2Fplay%2F5121596371c5191ed9b35",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "Eurosport4Polska.pl@SD",
+      "name": "Eurosport 4 Polska (1080p)",
+      "category": "Sports",
+      "logo": "https://static.wikia.nocookie.net/logopedia/images/a/ae/Eurosport_4_2022.svg/revision/latest?cb=20220418053934",
+      "stream_url": "https://vuvuu-geil-m3u8.yaskar661.workers.dev/?url=https%3A%2F%2Fvavoo.to%2Fvavoo-iptv%2Fplay%2F2896573317d9d69e0e2d72",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "Eurosport4KCzechia.cz@UHD",
       "name": "Eurosport 4K Czechia",
       "category": "Sports",
-      "logo": "https://i.imgur.com/0o3zjC7.png",
+      "logo": "https://web02.antik.sk/assets/img/channels/645a85b97a8257d6702639d6e540fe5b.svg",
       "stream_url": "http://88.212.15.50/live/esp_4k_atk/playlist.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
@@ -1152,7 +1232,7 @@
       "id": "Eurosport4K.fr@Romania",
       "name": "Eurosport 4K Romania (2160p) [Geo-blocked]",
       "category": "Sports",
-      "logo": "https://i.imgur.com/0o3zjC7.png",
+      "logo": "https://web02.antik.sk/assets/img/channels/645a85b97a8257d6702639d6e540fe5b.svg",
       "stream_url": "https://vip-acasatv.online:25463/lrZuGxAuP3/6782859900/5449.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
@@ -2009,6 +2089,16 @@
       }
     },
     {
+      "id": "One2.il@SD",
+      "name": "One 2",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/JQLhYEs.png",
+      "stream_url": "https://r.il.cdn-redge.media/livehls/oil/freetv/live/one_2/live.livx/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "OvacionTV.pe@SD",
       "name": "Ovacion TV (720p) [Not 24/7]",
       "category": "Sports",
@@ -2304,6 +2394,36 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/hROcepe.png",
       "stream_url": "https://rundle.tv/proxy5.php?src=https%3A%2F%2Firon1.xn--x2rw19a.space%2Fpuk2%2Fusergenrnd0clv03fyt-got.htm",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "PrimaSport3.ro@HD",
+      "name": "Prima Sport 3 HD",
+      "category": "Sports",
+      "logo": "https://static.wikia.nocookie.net/tvfanon6528/images/9/9a/Prima_Sport_3_%282022-.n.v.%29.png/revision/latest/scale-to-width-down/1000?cb=20240205122802",
+      "stream_url": "https://rundle.tv/proxy5.php?src=https%3A%2F%2Firon1.xn--x2rw19a.space%2Fpuk3%2Fusergenrx4t0l8sybkr-got.htm",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "PrimaSport4.ro@HD",
+      "name": "Prima Sport 4 HD",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/lqaIIhc.png",
+      "stream_url": "https://rundle.tv/proxy5.php?src=https%3A%2F%2Fpulse1.sanseny001.shop%2Fpuk4%2Fusergendx3j2x4tqrnd-got.htm",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "PrimaSport5.ro@HD",
+      "name": "Prima Sport 5 HD",
+      "category": "Sports",
+      "logo": "https://www.media-max.ro/wp-content/uploads/2022/11/Prima-Sport-5-HD-disponibil-in-grila-Vodafone.jpg",
+      "stream_url": "https://rundle.tv/proxy5.php?src=https%3A%2F%2Fpulse1.sanseny001.shop%2Fpuk5%2Fusergen0grnd8l2y6gw-got.htm",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -2624,6 +2744,16 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/9fLRHSg.png",
       "stream_url": "http://37.49.224.5/stream/52/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "SkySportF1.it@SD",
+      "name": "Sky Sport F1 (Italy)",
+      "category": "Sports",
+      "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Sky_Sport_F1_-_Logo_2020.svg/960px-Sky_Sport_F1_-_Logo_2020.svg.png",
+      "stream_url": "https://vuvuu-geil-m3u8.yaskar661.workers.dev/?url=https%3A%2F%2Fvavoo.to%2Fvavoo-iptv%2Fplay%2F22890389722acc4573933d",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -3189,6 +3319,16 @@
       }
     },
     {
+      "id": "Teledeporte.es@SD",
+      "name": "Teledeporte (720p) [Geo-blocked]",
+      "category": "Sports",
+      "logo": "https://i.ibb.co/0jxLdjnY/TDP.png",
+      "stream_url": "https://rtvelivestream.rtve.es/rtvesec/tdp/tdp_main.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "TennisChannel.us@SD",
       "name": "Tennis Channel (1080p)",
       "category": "Sports",
@@ -3514,6 +3654,16 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/V562tpO.png",
       "stream_url": "https://dc1644a9jazgj.cloudfront.net/beIN_Sports_Xtra_Espanol.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "beINSports1Turk.tr@SD",
+      "name": "beIN Sports 1 Turk (1080p)",
+      "category": "Sports",
+      "logo": "https://static.wikia.nocookie.net/logopedia/images/2/27/BeinSports1.svg/revision/latest?cb=20230910184457",
+      "stream_url": "https://vuvuu-geil-m3u8.yaskar661.workers.dev/?url=https%3A%2F%2Fvavoo.to%2Fvavoo-iptv%2Fplay%2F300113394ceebba66c8ad",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
