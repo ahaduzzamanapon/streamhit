@@ -1217,7 +1217,7 @@
                         <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left;">
                             <thead>
                                 <tr style="border-bottom:1px solid rgba(255,255,255,0.1); color:#A0AEC0;">
-                                    <th style="padding:10px;">Time</th>
+                                    <th style="padding:10px;">Time (বাংলাদেশ সময় / BD Time)</th>
                                     <th style="padding:10px;">Placement / Video</th>
                                     <th style="padding:10px;">Device Model</th>
                                     <th style="padding:10px;">Country</th>
@@ -2852,15 +2852,32 @@
                         if (d.recent_clicks.length === 0) {
                             tbody.innerHTML = '<tr><td colspan="5" style="padding:16px; text-align:center; color:#A0AEC0;">No clicks recorded yet.</td></tr>';
                         } else {
-                            tbody.innerHTML = d.recent_clicks.map(c => `
-                                <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-                                    <td style="padding:10px; color:#A0AEC0;">${c.time || '-'}</td>
-                                    <td style="padding:10px; font-weight:600; color:#00F5D4;">${c.video_title || 'Media'}</td>
-                                    <td style="padding:10px; color:#E2E8F0;">${c.device_model || 'Android'}</td>
-                                    <td style="padding:10px; color:#E2E8F0;">${c.country || 'Unknown'}</td>
-                                    <td style="padding:10px; color:#718096; font-family:monospace;">${c.ip || '-'}</td>
-                                </tr>
-                            `).join('');
+                            tbody.innerHTML = d.recent_clicks.map(c => {
+                                let timeDisplay = c.time || '-';
+                                if (c.created_at) {
+                                    try {
+                                        timeDisplay = new Date(c.created_at * 1000).toLocaleString('en-US', {
+                                            day: 'numeric',
+                                            month: 'short',
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                            hour12: true,
+                                            timeZone: 'Asia/Dhaka'
+                                        });
+                                    } catch(e) {
+                                        timeDisplay = c.time || '-';
+                                    }
+                                }
+                                return `
+                                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                                        <td style="padding:10px; color:#A0AEC0; white-space:nowrap; font-weight:500;">${timeDisplay}</td>
+                                        <td style="padding:10px; font-weight:600; color:#00F5D4;">${c.video_title || 'Media'}</td>
+                                        <td style="padding:10px; color:#E2E8F0;">${c.device_model || 'Android'}</td>
+                                        <td style="padding:10px; color:#E2E8F0;">${c.country || 'Unknown'}</td>
+                                        <td style="padding:10px; color:#718096; font-family:monospace;">${c.ip || '-'}</td>
+                                    </tr>
+                                `;
+                            }).join('');
                         }
                     }
                 }
@@ -3746,8 +3763,8 @@
                     ? `<span style="color:#00F0FF; font-weight:700;">▶ Watching</span>` 
                     : (isOnline ? `<span style="color:#10B981; font-weight:700;">● Online</span>` : `<span style="color:var(--text-muted);">Offline</span>`);
                 const watchTitle = u.current_watching ? `🎬 ${u.current_watching}` : `<span style="color:var(--text-muted);">Browsing</span>`;
-                const firstSeen = u.first_seen ? new Date(u.first_seen * 1000).toLocaleDateString() : '–';
-                const lastSeen = u.last_seen ? new Date(u.last_seen * 1000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '–';
+                const firstSeen = u.first_seen ? new Date(u.first_seen * 1000).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric', timeZone:'Asia/Dhaka' }) : '–';
+                const lastSeen = u.last_seen ? new Date(u.last_seen * 1000).toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:true, timeZone:'Asia/Dhaka' }) : '–';
                 const durMin = Math.round((u.daily_active_seconds || 0) / 60);
                 const isWeb = u.user_type === 'web';
                 const typeBadge = isWeb

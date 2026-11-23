@@ -15,6 +15,23 @@ import hmac
 import secrets
 import math
 import aiomysql
+
+BD_TZ = datetime.timezone(datetime.timedelta(hours=6))
+
+def get_bd_now() -> datetime.datetime:
+    return datetime.datetime.now(BD_TZ)
+
+def get_bd_today_str() -> str:
+    return datetime.datetime.now(BD_TZ).strftime("%Y-%m-%d")
+
+def format_bd_time(ts, fmt="%d %b, %I:%M %p") -> str:
+    if not ts:
+        return "-"
+    try:
+        dt = datetime.datetime.fromtimestamp(float(ts), tz=datetime.timezone.utc).astimezone(BD_TZ)
+        return dt.strftime(fmt)
+    except Exception:
+        return "-"
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, HTTPException, Query, Response
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, RedirectResponse, PlainTextResponse, FileResponse
@@ -1459,7 +1476,7 @@ def set_sponsor_setting(key: str, value: str):
 
 def record_sponsor_ad_event(event_type: str, device_id: str, device_model: str, video_title: str, client_ip: str, country: str):
     now = time.time()
-    today_str = datetime.datetime.fromtimestamp(now).strftime("%Y-%m-%d")
+    today_str = get_bd_today_str()
     try:
         with sqlite3.connect(_ACTIVE_DB_PATH, timeout=5) as conn:
             conn.execute("""
@@ -1723,10 +1740,11 @@ def get_referral_admin_stats() -> dict:
             """)
             logs = []
             for r in cur.fetchall():
-                c_time = datetime.datetime.fromtimestamp(r["created_at"]).strftime("%Y-%m-%d %H:%M:%S")
+                c_time = format_bd_time(r["created_at"], "%Y-%m-%d %I:%M:%S %p")
                 logs.append({
                     "id": r["id"],
                     "date": c_time,
+                    "created_at": r["created_at"],
                     "referrer_code": r["referrer_code"],
                     "referrer_device_id": (r["referrer_device_id"][:12] + "...") if r["referrer_device_id"] else "",
                     "referee_code": r["referee_code"],
@@ -1749,7 +1767,7 @@ def get_referral_admin_stats() -> dict:
 
 def get_sponsor_ad_stats():
     now = time.time()
-    today_str = datetime.datetime.fromtimestamp(now).strftime("%Y-%m-%d")
+    today_str = get_bd_today_str()
     total_clicks = 0
     today_clicks = 0
     total_impressions = 0
@@ -1789,14 +1807,15 @@ def get_sponsor_ad_stats():
                 LIMIT 50
             """)
             for r in cur.fetchall():
-                t_str = datetime.datetime.fromtimestamp(r["created_at"]).strftime("%d %b, %I:%M %p")
+                t_str = format_bd_time(r["created_at"], "%d %b, %I:%M %p")
                 recent_clicks.append({
                     "device_id": r["device_id"] or "Unknown",
                     "device_model": r["device_model"] or "Android Device",
                     "video_title": r["video_title"] or "Playing Media",
                     "ip": r["ip"] or "-",
                     "country": r["country"] or "Unknown",
-                    "time": t_str
+                    "time": t_str,
+                    "created_at": r["created_at"]
                 })
     except Exception as e:
         print(f"[AdStats] Error: {e}")
@@ -1928,7 +1947,7 @@ def record_app_device(
     if not device_id:
         return
     now = time.time()
-    today_str = datetime.datetime.fromtimestamp(now).strftime("%Y-%m-%d")
+    today_str = get_bd_today_str()
     is_web = device_id.startswith("web_") or "web" in app_version.lower()
     if is_web:
         _active_web_users[device_id] = now
@@ -2312,7 +2331,7 @@ def get_active_users_stats():
 def get_app_users_list(limit: int = 5000, country_filter: str = ""):
     now = time.time()
     cutoff = now - 300  # 5 min live
-    today_start = now - (now % 86400)
+    today_start = datetime.datetime.now(BD_TZ).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
     users = []
     total_installs = 0
     live_count = 0
