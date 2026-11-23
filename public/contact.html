@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Contact Us — NXLY Stream</title>
+    <meta name="description" content="Get in touch with the NXLY Stream support, partnerships, and legal team. We are available 24/7 for your questions and inquiries.">
+    <link rel="canonical" href="https://nxly.online/contact">
+    <meta name="robots" content="index, follow">
+    <meta name="google-adsense-account" content="ca-pub-8135122441154292">
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon.png">
+    <link rel="icon" type="image/svg+xml" href="/favicon-nxly.svg">
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+
+    <!-- Google AdSense -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8135122441154292"
+       crossorigin="anonymous"></script>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --bg-body: #07090e;
+            --bg-card: rgba(18, 22, 34, 0.75);
+            --border-card: rgba(255, 255, 255, 0.08);
+            --accent-cyan: #00f5d4;
+            --accent-green: #00df6d;
+            --text-main: #f0f3fa;
+            --text-muted: #94a3b8;
+            --font-head: 'Outfit', sans-serif;
+            --font-body: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            font-family: var(--font-body);
+            line-height: 1.7;
+            padding-bottom: 60px;
+        }
+
+        .header-nav {
+            padding: 18px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-card);
+            background: rgba(7, 9, 14, 0.95);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(12px);
+        }
+
+        .brand-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: #fff;
+            font-family: var(--font-head);
+            font-weight: 800;
+            font-size: 20px;
+        }
+
+        .brand-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #00f5d4, #00df6d);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #06110f;
+            font-size: 14px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 16px;
+        }
+
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--accent-cyan);
+        }
+
+        .container {
+            max-width: 860px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .contact-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: 18px;
+            padding: 36px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .badge-contact {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(0, 245, 212, 0.12);
+            color: var(--accent-cyan);
+            border: 1px solid rgba(0, 245, 212, 0.3);
+            padding: 5px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 16px;
+        }
+
+        h1 {
+            font-family: var(--font-head);
+            font-size: 32px;
+            font-weight: 800;
+            color: #ffffff;
+            margin-bottom: 12px;
+            line-height: 1.3;
+        }
+
+        .subtitle-hero {
+            font-size: 15px;
+            color: var(--text-muted);
+            margin-bottom: 28px;
+            border-bottom: 1px solid var(--border-card);
+            padding-bottom: 16px;
+        }
+
+        .channels-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+            margin: 24px 0 32px;
+        }
+
+        .channel-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-card);
+            border-radius: 14px;
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .channel-item:hover {
+            border-color: var(--accent-cyan);
+            transform: translateY(-2px);
+        }
+
+        .channel-icon {
+            font-size: 28px;
+            color: var(--accent-cyan);
+            margin-bottom: 12px;
+        }
+
+        .channel-name {
+            font-family: var(--font-head);
+            font-size: 17px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 6px;
+        }
+
+        .channel-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .channel-link {
+            color: var(--accent-cyan);
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 14px;
+            display: inline-block;
+        }
+
+        /* Form */
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #cbd5e1;
+            margin-bottom: 8px;
+        }
+
+        .form-control {
+            width: 100%;
+            background: rgba(10, 14, 24, 0.9);
+            border: 1px solid var(--border-card);
+            border-radius: 10px;
+            padding: 12px 16px;
+            color: #fff;
+            font-family: var(--font-body);
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 0 3px rgba(0, 245, 212, 0.15);
+        }
+
+        textarea.form-control {
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        .btn-submit {
+            background: linear-gradient(135deg, #00f5d4, #00df6d);
+            color: #06110f;
+            font-family: var(--font-head);
+            font-weight: 800;
+            font-size: 15px;
+            padding: 14px 28px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            transition: opacity 0.2s;
+        }
+
+        .btn-submit:hover {
+            opacity: 0.92;
+        }
+
+        .form-alert {
+            display: none;
+            background: rgba(0, 223, 109, 0.15);
+            border: 1px solid var(--accent-green);
+            color: #e2e8f0;
+            border-radius: 10px;
+            padding: 14px 18px;
+            margin-bottom: 18px;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .footer-simple {
+            text-align: center;
+            padding: 30px 20px;
+            font-size: 13px;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border-card);
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+
+    <header class="header-nav">
+        <a href="/" class="brand-link">
+            <div class="brand-icon"><i class="fa-solid fa-play"></i></div>
+            <span>NXLY<span>Stream</span></span>
+        </a>
+        <nav class="nav-links">
+            <a href="/"><i class="fa-solid fa-house"></i> Home</a>
+            <a href="/movies"><i class="fa-solid fa-film"></i> Movies</a>
+            <a href="/download"><i class="fa-solid fa-download"></i> App</a>
+            <a href="/about"><i class="fa-solid fa-circle-info"></i> About</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div class="contact-card">
+            <div class="badge-contact"><i class="fa-solid fa-envelope"></i> Contact & Support</div>
+            <h1>Get In Touch With Us</h1>
+            <div class="subtitle-hero">Have a question, feedback, or business proposal? We are available 24/7 to assist our community and partners.</div>
+
+            <div class="channels-grid">
+                <div class="channel-item">
+                    <div class="channel-icon"><i class="fa-solid fa-headset"></i></div>
+                    <div class="channel-name">User Support</div>
+                    <div class="channel-desc">App setup, download help, and technical troubleshooting.</div>
+                    <a href="mailto:support@nxly.online" class="channel-link">support@nxly.online</a>
+                </div>
+
+                <div class="channel-item">
+                    <div class="channel-icon"><i class="fa-solid fa-handshake"></i></div>
+                    <div class="channel-name">Partnerships</div>
+                    <div class="channel-desc">Advertising, sponsor collaborations, and media queries.</div>
+                    <a href="mailto:partner@nxly.online" class="channel-link">partner@nxly.online</a>
+                </div>
+
+                <div class="channel-item">
+                    <div class="channel-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                    <div class="channel-name">Legal & DMCA</div>
+                    <div class="channel-desc">Copyright notifications and intellectual property notices.</div>
+                    <a href="mailto:dmca@nxly.online" class="channel-link">dmca@nxly.online</a>
+                </div>
+            </div>
+
+            <h2 style="font-family:var(--font-head); font-size:22px; color:#fff; margin-bottom:16px;">
+                <i class="fa-solid fa-paper-plane" style="color:var(--accent-cyan); font-size:18px;"></i> Send Us a Direct Message
+            </h2>
+
+            <div class="form-alert" id="contactSuccess">
+                <i class="fa-solid fa-circle-check" style="color:var(--accent-green); margin-right:6px;"></i> Thank you! Your message has been received. Our team will respond within 24 hours.
+            </div>
+
+            <form id="contactForm" onsubmit="event.preventDefault(); document.getElementById('contactSuccess').style.display='block'; this.reset();">
+                <div class="form-group">
+                    <label class="form-label">Your Name</label>
+                    <input type="text" class="form-control" placeholder="e.g. John Doe" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" class="form-control" placeholder="name@example.com" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Subject</label>
+                    <input type="text" class="form-control" placeholder="What is this regarding?" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Your Message</label>
+                    <textarea class="form-control" placeholder="Write your message or inquiry here..." required></textarea>
+                </div>
+                <button type="submit" class="btn-submit">
+                    <i class="fa-solid fa-paper-plane"></i> Submit Message
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <footer class="footer-simple">
+        <p>© 2026 NXLY Stream. All rights reserved. • <a href="/privacy-policy" style="color:#94a3b8; text-decoration:none;">Privacy Policy</a> • <a href="/terms-of-service" style="color:#94a3b8; text-decoration:none;">Terms of Service</a> • <a href="/dmca" style="color:#94a3b8; text-decoration:none;">DMCA Policy</a> • <a href="/about" style="color:#94a3b8; text-decoration:none;">About Us</a></p>
+    </footer>
+
+</body>
+</html>
+

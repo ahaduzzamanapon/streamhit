@@ -1376,18 +1376,8 @@ async function initWatchPage() {
     const oldStyle = document.getElementById('plyr-live-custom-css');
     if (oldStyle) oldStyle.remove();
     if (isLiveStream) {
-        const style = document.createElement('style');
-        style.id = 'plyr-live-custom-css';
-        style.innerHTML = `
-            .plyr__progress, 
-            .plyr__controls [data-plyr="rewind"], 
-            .plyr__controls [data-plyr="fast-forward"],
-            .plyr__time--current,
-            .plyr__time--duration {
-                display: none !important;
-            }
-        `;
-        document.head.appendChild(style);
+        window.location.replace("/download");
+        return;
     }
     
     if (!isLiveStream && !watchSlug && !tmdbId) {
@@ -4060,7 +4050,7 @@ function createSportsCard(sport) {
     innerHTML += `<div class="sports-card-title">${sport.title}</div>`;
     card.innerHTML = innerHTML;
     
-    card.onclick = () => playLiveStreamSelector(sport, 'sports');
+    card.onclick = () => showSportsAppDownloadModal(sport);
     return card;
 }
 
@@ -4079,61 +4069,56 @@ function createTvCard(channel) {
         <div class="tv-card-title">${cleanName}</div>
     `;
     
-    card.onclick = () => playLiveStreamSelector(channel, 'tv');
+    card.onclick = () => showSportsAppDownloadModal(channel);
     return card;
 }
 
-function playLiveStreamSelector(item, mediaType) {
-    const streamLinks = item.streamLinks || [];
-    if (streamLinks.length === 0) {
-        showToastNotification("No active stream links found for this channel.");
+function showSportsAppDownloadModal(item) {
+    const modalOverlay = document.getElementById("sportsModalOverlay");
+    if (!modalOverlay) {
+        window.location.href = "/download";
         return;
     }
-    
-    const title = item.title || item.name;
-    
-    if (streamLinks.length === 1) {
-        // Play directly
-        playLiveStream(title, streamLinks[0].url, streamLinks, 0, item.referer, item.origin, item.useBdProxy);
-    } else {
-        // Show selection modal
-        const modalOverlay = document.getElementById("sportsModalOverlay");
-        const modalTitle = document.getElementById("sportsModalTitle");
-        const linksList = document.getElementById("sportsLinksList");
-        const modalClose = document.getElementById("sportsModalClose");
-        
-        if (!modalOverlay || !linksList) return;
-        
-        modalTitle.textContent = title;
-        linksList.innerHTML = "";
-        
-        streamLinks.forEach((link, idx) => {
-            const btn = document.createElement("button");
-            btn.className = "sports-link-btn";
-            btn.innerHTML = `
-                <span>${link.label || 'Stream Link ' + (idx + 1)}</span>
-                <i class="fa-solid fa-play"></i>
-            `;
-            btn.onclick = () => {
-                modalOverlay.classList.remove("show");
-                // Individual link overrides
-                const linkReferer = link.referer || item.referer || "";
-                const linkOrigin = link.origin || item.origin || "";
-                const linkUserAgent = link.userAgent || "";
-                const linkUseBd = link.useBdProxy !== undefined ? link.useBdProxy : item.useBdProxy;
-                
-                playLiveStream(title, link.url, streamLinks, idx, linkReferer, linkOrigin, linkUseBd, linkUserAgent);
-            };
-            linksList.appendChild(btn);
-        });
-        
-        modalOverlay.classList.add("show");
-        
-        modalClose.onclick = () => modalOverlay.classList.remove("show");
+    const title = item ? (item.title || item.name || "Live Sports Match") : "Live Sports Match";
+    const modal = modalOverlay.querySelector(".sports-modal");
+    if (modal) {
+        modal.innerHTML = `
+            <span class="sports-modal-close" id="sportsModalClose">&times;</span>
+            <div style="text-align:center; padding: 6px 0;">
+                <div style="display:inline-flex; align-items:center; gap:8px; background:rgba(255,42,84,0.15); border:1px solid rgba(255,42,84,0.4); color:#ff2a54; padding:5px 14px; border-radius:20px; font-size:12px; font-weight:800; letter-spacing:1px; margin-bottom:14px;">
+                    <span style="width:8px; height:8px; border-radius:50%; background:#ff2a54; box-shadow:0 0 8px #ff2a54;"></span>
+                    LIVE MATCH • APP ONLY
+                </div>
+                <div style="width:68px; height:68px; border-radius:20px; background:rgba(0,245,212,0.12); border:1px solid rgba(0,245,212,0.3); display:inline-flex; align-items:center; justify-content:center; color:#00f5d4; font-size:30px; margin-bottom:16px; box-shadow:0 0 30px rgba(0,245,212,0.25);">
+                    <i class="fa-solid fa-satellite-dish"></i>
+                </div>
+                <h3 style="font-family:'Outfit',sans-serif; font-size:20px; font-weight:800; color:#fff; margin-bottom:8px; line-height:1.35;">${title}</h3>
+                <p style="font-size:14px; color:#cbd5e1; line-height:1.6; margin-bottom:22px;">
+                    ওয়েবে লাইভ খেলা প্লে হবে না। কোনো বাফারিং ছাড়া সরাসরি ফুল স্পিডে ও ফুল এইচডিতে লাইভ ম্যাচ উপভোগ করতে এখনই অফিশিয়াল <strong>NXLY Stream</strong> অ্যাপটি ডাউনলোড করে নিন।
+                </p>
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    <a href="/download" style="display:flex; align-items:center; justify-content:center; gap:10px; background:linear-gradient(135deg, #00f5d4, #00df6d); color:#06110f; font-family:'Outfit',sans-serif; font-size:15px; font-weight:800; padding:13px 18px; border-radius:12px; text-decoration:none; box-shadow:0 8px 24px rgba(0,245,212,0.3); transition:transform 0.2s;">
+                        <i class="fa-brands fa-android" style="font-size:19px;"></i>
+                        <span>অ্যাপ ডাউনলোড করুন (Download APK)</span>
+                    </a>
+                    <a href="/app.apk" style="display:flex; align-items:center; justify-content:center; gap:8px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12); color:#94a3b8; font-size:13px; font-weight:600; padding:10px 16px; border-radius:10px; text-decoration:none; transition:background 0.2s;">
+                        <i class="fa-solid fa-download" style="color:#00f5d4;"></i>
+                        <span>সরাসরি APK ফাইল (Direct Download • 15 MB)</span>
+                    </a>
+                </div>
+            </div>
+        `;
+        const closeBtn = document.getElementById("sportsModalClose");
+        if (closeBtn) closeBtn.onclick = () => modalOverlay.classList.remove("show");
         modalOverlay.onclick = (e) => {
             if (e.target === modalOverlay) modalOverlay.classList.remove("show");
         };
     }
+    modalOverlay.classList.add("show");
+}
+
+function playLiveStreamSelector(item, mediaType) {
+    showSportsAppDownloadModal(item);
 }
 
 function playLiveStream(title, url, streamLinks, index, referer, origin, useBdProxy, userAgent = "") {

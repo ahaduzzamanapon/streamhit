@@ -1402,32 +1402,25 @@ def _init_active_db():
             # One-time migration: mark real users who have watched and purge non-watching crawler bots
             try:
                 conn.execute("""
+                    DELETE FROM app_installations
+                    WHERE (device_id LIKE 'web_%' OR app_version = 'Web')
+                      AND (
+                          country IN ('Hong Kong', 'China')
+                          OR current_watching IN ('Watching Video', 'Playing Video', 'Live Sports', '', 'Browsing Site', 'Browsing Homepage', 'Browsing', 'Searching Movies', 'Live TV', 'Browsing Watch Page', 'Browsing Player', 'Browsing Sports', 'Browsing TV')
+                          OR (watching_detail_path = '' AND is_watching = 1)
+                          OR daily_active_seconds <= 30
+                      )
+                """)
+                conn.execute("""
                     UPDATE app_installations
                     SET has_watched = 1,
                         last_watched_title = CASE 
-                            WHEN (last_watched_title IS NULL OR last_watched_title = '') AND current_watching NOT IN ('', 'Browsing Site', 'Browsing Homepage', 'Browsing', 'Searching Movies', 'Live TV', 'Live Sports') THEN current_watching
+                            WHEN (last_watched_title IS NULL OR last_watched_title = '') AND current_watching NOT IN ('', 'Browsing Site', 'Browsing Homepage', 'Browsing', 'Searching Movies', 'Live TV', 'Live Sports', 'Browsing Watch Page', 'Browsing Player', 'Browsing Sports', 'Browsing TV') THEN current_watching
                             ELSE last_watched_title 
                         END
                     WHERE is_watching = 1
-                       OR (current_watching != '' AND current_watching NOT IN ('Browsing Site', 'Browsing Homepage', 'Browsing', 'Searching Movies', 'Live TV', 'Live Sports'))
+                       OR (current_watching != '' AND current_watching NOT IN ('Browsing Site', 'Browsing Homepage', 'Browsing', 'Searching Movies', 'Live TV', 'Live Sports', 'Browsing Watch Page', 'Browsing Player', 'Browsing Sports', 'Browsing TV'))
                        OR (daily_active_seconds >= 60 AND (device_id NOT LIKE 'web_%' AND app_version != 'Web'))
-                """)
-                conn.execute("""
-                    DELETE FROM app_installations
-                    WHERE (has_watched = 0 OR has_watched IS NULL)
-                      AND (is_watching = 0 OR is_watching IS NULL)
-                      AND (current_watching = '' OR current_watching IN ('Browsing Site', 'Browsing Homepage', 'Browsing', 'Searching Movies', 'Live TV', 'Live Sports'))
-                      AND (device_id LIKE 'web_%' OR app_version = 'Web')
-                      AND (daily_active_seconds < 60)
-                """)
-                conn.execute("""
-                    UPDATE app_installations
-                    SET current_watching = 'Watching Video',
-                        last_watched_title = 'Watching Video'
-                    WHERE current_watching LIKE '%pbcdn%' 
-                       OR current_watching LIKE '%7B%'
-                       OR current_watching LIKE '%{%'
-                       OR current_watching LIKE '%http%'
                 """)
             except Exception as _mig_err:
                 pass
@@ -2142,7 +2135,8 @@ def record_active_user(request: Request):
             "bot", "spider", "crawl", "slurp", "headless", "lighthouse",
             "semrush", "ahrefs", "bytespider", "yandex", "petalbot",
             "curl", "python", "wget", "httpclient", "go-http-client",
-            "postman", "node-fetch", "axios", "censys", "shodan", "netcraft"
+            "postman", "node-fetch", "axios", "censys", "shodan", "netcraft",
+            "tencent", "alibaba", "phantom", "selenium", "puppeteer", "playwright"
         ]):
             return
 
@@ -2183,34 +2177,35 @@ def record_active_user(request: Request):
             if path.startswith("/watch/movie/") or path.startswith("/watch/tv/"):
                 w_path = path.replace("/watch/movie/", "").replace("/watch/tv/", "").strip()
                 if any(bad in w_path.lower() for bad in ("%7b", "{", "http", "pbcdn", "image", ".jpg", ".png", "url")):
-                    c_watching = "Watching Video"
-                    is_watching = 0
+                    c_watching = "Browsing Watch Page"
                 else:
-                    c_watching = w_path.replace("-", " ").title()
-                    is_watching = 1
+                    c_watching = f"Viewing: {w_path.replace('-', ' ').title()}"
+                is_watching = 0
             elif path.startswith("/watch"):
-                c_watching = "Watching Video"
-                is_watching = 1
+                c_watching = "Browsing Watch Page"
+                is_watching = 0
             elif path.startswith("/play"):
-                c_watching = "Playing Video"
-                is_watching = 1
+                c_watching = "Browsing Player"
+                is_watching = 0
             elif path.startswith("/sports"):
-                c_watching = "Live Sports"
-                is_watching = 1
+                c_watching = "Browsing Sports"
+                is_watching = 0
             elif path.startswith("/movie/"):
                 w_path = path.replace("/movie/", "").strip()
                 if any(bad in w_path.lower() for bad in ("%7b", "{", "http", "pbcdn", "image", ".jpg", ".png", "url")):
                     c_watching = "Browsing Site"
-                    is_watching = 0
                 else:
                     c_watching = f"Viewing: {w_path.replace('-', ' ').title()}"
-                    is_watching = 0
+                is_watching = 0
             elif path in ("/", "/index.html"):
                 c_watching = "Browsing Homepage"
+                is_watching = 0
             elif path.startswith("/search"):
                 c_watching = "Searching Movies"
+                is_watching = 0
             elif path.startswith("/tv"):
-                c_watching = "Live TV"
+                c_watching = "Browsing TV"
+                is_watching = 0
             # NOTE: Do NOT set c_watching for /api/ to prevent wiping out watch status!
 
             # Record web device install telemetry throttled every 20s
@@ -3200,6 +3195,34 @@ async def livetv(request: Request):
 async def download_page(request: Request):
     host = request.headers.get("host", "")
     return serve_html("public/download.html", host=host)
+
+@app.api_route("/sponsor", methods=["GET", "HEAD"], response_class=HTMLResponse)
+@app.api_route("/sponsor.html", methods=["GET", "HEAD"], response_class=HTMLResponse)
+@app.api_route("/reward", methods=["GET", "HEAD"], response_class=HTMLResponse)
+@app.api_route("/reward.html", methods=["GET", "HEAD"], response_class=HTMLResponse)
+@app.api_route("/articles", methods=["GET", "HEAD"], response_class=HTMLResponse)
+@app.api_route("/articles.html", methods=["GET", "HEAD"], response_class=HTMLResponse)
+async def sponsor_reward_page(request: Request):
+    host = request.headers.get("host", "")
+    return serve_html("public/sponsor.html", host=host)
+
+@app.api_route("/dmca", methods=["GET", "HEAD"], response_class=HTMLResponse)
+@app.api_route("/dmca.html", methods=["GET", "HEAD"], response_class=HTMLResponse)
+async def dmca_page(request: Request):
+    host = request.headers.get("host", "")
+    return serve_html("public/dmca.html", host=host)
+
+@app.api_route("/about", methods=["GET", "HEAD"], response_class=HTMLResponse)
+@app.api_route("/about.html", methods=["GET", "HEAD"], response_class=HTMLResponse)
+async def about_page(request: Request):
+    host = request.headers.get("host", "")
+    return serve_html("public/about.html", host=host)
+
+@app.api_route("/contact", methods=["GET", "HEAD"], response_class=HTMLResponse)
+@app.api_route("/contact.html", methods=["GET", "HEAD"], response_class=HTMLResponse)
+async def contact_page(request: Request):
+    host = request.headers.get("host", "")
+    return serve_html("public/contact.html", host=host)
 
 @app.api_route("/app.apk", methods=["GET", "HEAD"])
 @app.api_route("/download/apk", methods=["GET", "HEAD"])
