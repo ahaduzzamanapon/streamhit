@@ -1,13 +1,23 @@
 {
   "playlist_name": "All-in-One Live TV & Sports",
-  "total_channels": 353,
-  "last_updated": "04:52 PM 25-11-2026 BST",
+  "total_channels": 352,
+  "last_updated": "03:04 AM 26-11-2026 BST",
   "categories": [
     "Bangladesh",
     "Sports",
     "Kids"
   ],
   "channels": [
+    {
+      "id": "AnandaTV.bd@SD",
+      "name": "Ananda TV (720p)",
+      "category": "Bangladesh",
+      "logo": "https://i.imgur.com/jkbo7Qe.png",
+      "stream_url": "https://app.ncare.live/c3VydmVyX8RpbEU9Mi8xNy8yMDE0GIDU6RgzQ6NTAgdEoaeFzbF92YWxIZTO0U0ezN1IzMyfvcGVMZEJCTEFWeVN3PTOmdFsaWRtaW51aiPhnPTI2/anandatv.stream/live-orgin/anandatv.stream/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
     {
       "id": "AzanTV.ca@SD",
       "name": "Azan TV",
@@ -29,11 +39,21 @@
       }
     },
     {
-      "id": "BoishakhiTV.bd@SD",
-      "name": "Boishakhi TV",
+      "id": "ChannelS.bd@SD",
+      "name": "Channel S (Bangladesh) (720p)",
       "category": "Bangladesh",
-      "logo": "https://i.imgur.com/gxL05Y4.png",
-      "stream_url": "https://boishakhi.sonarbanglatv.com/boishakhi/boishakhitv/index.m3u8",
+      "logo": "https://www.channels.com.bd/storage/project_files/logo/2024-05-14a_n17156821814310.png",
+      "stream_url": "https://app.ncare.live/c3VydmVyX8RpbEU9Mi8xNy8yMDE0GIDU6RgzQ6NTAgdEoaeFzbF92YWxIZTO0U0ezN1IzMyfvcGVMZEJCTEFWeVN3PTOmdFsaWRtaW51aiPhnPTI2/channels.stream/live-orgin/channels.stream/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "ChannelS.uk@SD",
+      "name": "Channel S (United Kingdom) (576p)",
+      "category": "Bangladesh",
+      "logo": "https://i.imgur.com/hJxFLvF.png",
+      "stream_url": "https://app.ncare.live/c3VydmVyX8RpbEU9Mi8xNy8yMDE0GIDU6RgzQ6NTAgdEoaeFzbF92YWxIZTO0U0ezN1IzMyfvcGVMZEJCTEFWeVN3PTOmdFsaWRtaW51aiPhnPTI/chsukoff.stream/playlist.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -44,6 +64,16 @@
       "category": "Bangladesh",
       "logo": "https://i.imgur.com/PzqzgMm.png",
       "stream_url": "https://deshitv.deshitv24.net/live/myStream/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "EkusheyTV.bd@SD",
+      "name": "Ekushey TV (480p)",
+      "category": "Bangladesh",
+      "logo": "https://i.imgur.com/lRpkGHj.png",
+      "stream_url": "https://ekusheyserver.com/etvlivesn.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -99,21 +129,31 @@
       }
     },
     {
-      "id": "NTV.bd@SD",
-      "name": "NTV (Bangladesh) (720p)",
+      "id": "MyTV.bd@SD",
+      "name": "My TV (Bangladesh) (480p)",
       "category": "Bangladesh",
-      "logo": "https://i.imgur.com/l75bDTx.png",
-      "stream_url": "https://tvsen5.aynaott.com/xV4jEKf3D9zc/index.m3u8",
+      "logo": "https://i.imgur.com/475qK5T.png",
+      "stream_url": "https://app.ncare.live/c3VydmVyX8RpbEU9Mi8xNy8yMDE0GIDU6RgzQ6NTAgdEoaeFzbF92YWxIZTO0U0ezN1IzMyfvcGVMZEJCTEFWeVN3PTOmdFsaWRtaW51aiPhnPTI2/mytv-up-off.stream/live-orgin/mytv-up-off.stream/playlist.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
     },
     {
-      "id": "News21BanglaTV.bd@SD",
-      "name": "News 21 Bangla TV (1080p)",
+      "id": "NANTV.bd@SD",
+      "name": "NAN TV (720p)",
       "category": "Bangladesh",
-      "logo": "https://i.imgur.com/ijuJfmd.png",
-      "stream_url": "http://103.190.133.68:1935/news21live/live/playlist.m3u8",
+      "logo": "https://www.jagobd.com/wp-content/uploads/2019/11/NAN-TV-Logo-02.png",
+      "stream_url": "https://app.ncare.live/c3VydmVyX8RpbEU9Mi8xNy8yMDE0GIDU6RgzQ6NTAgdEoaeFzbF92YWxIZTO0U0ezN1IzMyfvcGVMZEJCTEFWeVN3PTOmdFsaWRtaW51aiPhnPTI2/nantv.stream/live-orgin/nantv.stream/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "NTV.bd@SD",
+      "name": "NTV (Bangladesh) (720p)",
+      "category": "Bangladesh",
+      "logo": "https://i.imgur.com/l75bDTx.png",
+      "stream_url": "https://tvsen5.aynaott.com/xV4jEKf3D9zc/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -319,16 +359,6 @@
       }
     },
     {
-      "id": "AlIraqiaSport.iq@SD",
-      "name": "Al Iraqia Sport (720p)",
-      "category": "Sports",
-      "logo": "https://i.imgur.com/DrrlxTO.png",
-      "stream_url": "https://imn-live.esite-lab.com/hls/iraqia-sports-1.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
       "id": "AmericanNinjaWarrior.us@SD",
       "name": "American Ninja Warrior (1080p)",
       "category": "Sports",
@@ -424,6 +454,16 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/NJsRFud.png",
       "stream_url": "https://ngtrk.dc.beltelecom.by/ngtrk/smil:belarus5.smil/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "Belarus5.by@Internet",
+      "name": "Belarus-5 Internet (1080p) [Not 24/7]",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/NJsRFud.png",
+      "stream_url": "https://edge59.dc.beltelecom.by/ngtrk/smil:belarus5int.smil/playlist.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -749,21 +789,11 @@
       }
     },
     {
-      "id": "DigiSport2.ro@SD",
-      "name": "Digi Sport 2 (576i)",
+      "id": "DongNaiTV2.vn@SD",
+      "name": "Dong Nai TV 2 (1080p)",
       "category": "Sports",
-      "logo": "https://i.imgur.com/KWDUi3v.png",
-      "stream_url": "https://rundle.tv/proxy5.php?src=https%3A%2F%2Fkuruk1.xn--okq6e.shop%2Fkuk2%2Fusergendx0ul1ltsDx9lgcdwqrnd-got.htm",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "DigiSport4.ro@SD",
-      "name": "Digi Sport 4 (576i)",
-      "category": "Sports",
-      "logo": "https://i.imgur.com/Knj9I6f.png",
-      "stream_url": "https://rundle.tv/proxy5.php?src=https%3A%2F%2Fpulse1.sanseny001.shop%2Fkuk4%2Fusergendk9g3ks42t3n-got.htm",
+      "logo": "https://i.imgur.com/tNKPSkO.png",
+      "stream_url": "https://freem3u.xyz/api/live/play.m3u8?vid=255",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -834,16 +864,6 @@
       "category": "Sports",
       "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/ESPN_wordmark.svg/960px-ESPN_wordmark.svg.png",
       "stream_url": "http://181.78.211.244:8005/play/a08q/index.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "ESPNLatinAmerica.us@Mexico",
-      "name": "ESPN Latin America Mexico",
-      "category": "Sports",
-      "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/ESPN_wordmark.svg/960px-ESPN_wordmark.svg.png",
-      "stream_url": "https://lilac19.pontiscloud.com/live/gt/ESPN/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -1289,16 +1309,6 @@
       }
     },
     {
-      "id": "FOX.mx@HD",
-      "name": "FOX",
-      "category": "Sports",
-      "logo": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/25/FOX_wordmark.svg/960px-FOX_wordmark.svg.png?utm_source=es.wikipedia.org&utm_campaign=index&utm_content=thumbnail",
-      "stream_url": "https://lilac19.pontiscloud.com/live/gt/FOX/index.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
       "id": "FOXCentral.mx@CostaRica",
       "name": "FOX Central (1080p)",
       "category": "Sports",
@@ -1439,16 +1449,6 @@
       }
     },
     {
-      "id": "FoxSports.ar@SD",
-      "name": "Fox Sports (1080p)",
-      "category": "Sports",
-      "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/FOX_Sports_logo.svg/960px-FOX_Sports_logo.svg.png",
-      "stream_url": "http://138.59.227.20:8000/play/a085/index.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
       "id": "FoxSports1.us@HD",
       "name": "Fox Sports 1 (720p)",
       "category": "Sports",
@@ -1539,16 +1539,6 @@
       }
     },
     {
-      "id": "GolfChannel.us@SD",
-      "name": "Golf Channel (United States) (576p)",
-      "category": "Sports",
-      "logo": "https://i.imgur.com/Lgux6Ik.png",
-      "stream_url": "https://tvsen6.aynaott.com/golfchannel/index.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
       "id": "GolfChannelLatinAmerica.us@SD",
       "name": "Golf Channel Latin America (1080p)",
       "category": "Sports",
@@ -1574,6 +1564,16 @@
       "category": "Sports",
       "logo": "https://www.htspor.com/images/manifest/social-share-logo.png",
       "stream_url": "https://ciner.daioncdn.net/ht-spor/ht-spor.m3u8?app=web",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "HTVSports.vn@SD",
+      "name": "HTV Sports (1080p)",
+      "category": "Sports",
+      "logo": "https://upload.wikimedia.org/wikipedia/vi/3/3f/HTV_THETHAO_2014.png",
+      "stream_url": "https://dethich.pw/htvthethao/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -1779,21 +1779,21 @@
       }
     },
     {
-      "id": "MRTVSports.mm@SD",
-      "name": "MRTV Sports [Not 24/7]",
-      "category": "Sports",
-      "logo": "https://i.imgur.com/cFTR4kC.png",
-      "stream_url": "https://mrtvott.com/cache/MRTV-SPORT/master.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
       "id": "MUTV.uk@SD",
       "name": "MUTV (720p)",
       "category": "Sports",
       "logo": "https://d2n0069hmnqmmx.cloudfront.net/epgdata/1.0/newchanlogos/512/512/skychb1834.png",
       "stream_url": "https://fastly.live.brightcove.com/6374054671112/eu-west-1/6058004203001/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJob3N0IjoiYXplMnp5LmVncmVzcy55ODN1ZWIiLCJhY2NvdW50X2lkIjoiNjA1ODAwNDIwMzAwMSIsImVobiI6ImZhc3RseS5saXZlLmJyaWdodGNvdmUuY29tIiwiaXNzIjoiYmxpdmUtcGxheWJhY2stc291cmNlLWFwaSIsInN1YiI6InBhdGhtYXB0b2tlbiIsImF1ZCI6WyI2MDU4MDA0MjAzMDAxIl0sImp0aSI6IjYzNzQwNTQ2NzExMTIifQ.3FmuTna3DAmY7xlhK5fk6LMrosrtrR5VsU2QOgYO5y4/playlist-hls.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "MadeinBOTV.it@SD",
+      "name": "MadeinBO TV (1080p)",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/47X44DD.png",
+      "stream_url": "https://srvx1.selftv.video/dmchannel/live/playlist.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -1934,16 +1934,6 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/mPGtwAP.png",
       "stream_url": "https://jmp2.uk/plu-5ced7d5df64be98e07ed47b6.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "NFLNetwork.us@SD",
-      "name": "NFL Network (576p)",
-      "category": "Sports",
-      "logo": "https://upload.wikimedia.org/wikipedia/en/thumb/8/8f/NFL_Network_logo.svg/960px-NFL_Network_logo.svg.png",
-      "stream_url": "https://tvsen6.aynaott.com/nfl/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -2399,6 +2389,16 @@
       }
     },
     {
+      "id": "RealMadridTV.es@SD",
+      "name": "Real Madrid TV (1080p)",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/5pMo7dL.png",
+      "stream_url": "http://90.163.85.113:8093/stream/26/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "RealMadridTVEnglish.es@SD",
       "name": "Real Madrid TV English",
       "category": "Sports",
@@ -2524,6 +2524,16 @@
       "category": "Sports",
       "logo": "https://static.wikia.nocookie.net/logopedia/images/b/bc/Setanta_Sports_3_2023.svg/revision/latest?cb=20230804060013",
       "stream_url": "http://85.117.61.84/setanta3/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "SetantaSportsPlusGeorgia.ge@SD",
+      "name": "Setanta Sports+ Georgia (1080p)",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/ZtoZQUV.png",
+      "stream_url": "http://85.117.61.84/setanta2/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -3139,16 +3149,6 @@
       }
     },
     {
-      "id": "TourSpotTV.do@HD",
-      "name": "Tour Spot TV (1280p) [Not 24/7]",
-      "category": "Sports",
-      "logo": "https://imgur.com/khj869k.png",
-      "stream_url": "https://fox.hostlagarto.com:8081/toursporttv/playlist.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
       "id": "TraceSportStars.fr@HD",
       "name": "Trace Sport Stars (1080p)",
       "category": "Sports",
@@ -3374,16 +3374,6 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/V562tpO.png",
       "stream_url": "https://dc1644a9jazgj.cloudfront.net/beIN_Sports_Xtra_Espanol.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "beINSportsUSA.us@SD",
-      "name": "beIN Sports USA (576p)",
-      "category": "Sports",
-      "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/BeIN_Sports_logo_%28vertical_version%29.svg/500px-BeIN_Sports_logo_%28vertical_version%29.svg.png",
-      "stream_url": "https://tvsen6.aynaott.com/beinsports/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
