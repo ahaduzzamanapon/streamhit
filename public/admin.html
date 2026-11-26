@@ -1262,6 +1262,85 @@
                     </div>
                 </div>
 
+                <!-- 👑 ADMIN MANUAL VIP GRANT CARD -->
+                <div class="card" style="margin-bottom:20px; border:1px solid rgba(255,215,0,0.3); background:linear-gradient(135deg, rgba(255,215,0,0.06), rgba(0,245,212,0.04));">
+                    <div class="card-header" style="flex-wrap:wrap;gap:12px;">
+                        <div>
+                            <h2 style="color:#FFD700;">👑 Grant Free VIP Pass (অ্যাপ আপডেট ছাড়াই VIP দিন)</h2>
+                            <div class="subtitle">যেকোনো ইউজারের রেফার কোড লিখে ৩ দিন, ৪ দিন বা ইচ্ছেমতো দিনের জন্য ফ্রি Ad-Free VIP চালু করে দিন</div>
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap:14px; margin-top:14px; align-items:end;">
+                        <div>
+                            <label style="display:block; font-size:12px; color:#A0AEC0; margin-bottom:6px; font-weight:600;">User Referral Code (৬ সংখ্যার কোড)</label>
+                            <input type="text" id="grantVipCodeInput" placeholder="যেমন: X4AHQE" maxlength="12"
+                                style="width:100%; padding:10px 12px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,215,0,0.35); border-radius:8px; color:#FFD700; font-family:monospace; font-size:15px; font-weight:700; text-transform:uppercase; letter-spacing:1.5px;">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:12px; color:#A0AEC0; margin-bottom:6px; font-weight:600;">VIP Duration (কত দিন)</label>
+                            <input type="number" id="grantVipDaysInput" value="3" min="1" max="3650"
+                                style="width:100%; padding:10px 12px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.15); border-radius:8px; color:#fff; font-size:15px; font-weight:700;">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:12px; color:#A0AEC0; margin-bottom:6px; font-weight:600;">Mode</label>
+                            <select id="grantVipModeInput" style="width:100%; padding:10px 12px; background:rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.15); border-radius:8px; color:#E2E8F0; font-size:13px;">
+                                <option value="add">➕ Add Days (আগের মেয়াদের সাথে যোগ হবে)</option>
+                                <option value="set">🔄 Set Exact Days (আজ থেকে ঠিক এত দিন)</option>
+                            </select>
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <button type="button" class="btn-primary" id="btnGrantVip" onclick="submitGrantVip()" style="flex:1; background:linear-gradient(135deg, #FFD700, #F59E0B); color:#000; font-weight:800; padding:11px 16px; border:none; border-radius:8px; cursor:pointer;">
+                                👑 Grant VIP
+                            </button>
+                            <button type="button" class="btn-secondary" onclick="submitRevokeVip()" title="Revoke VIP Access" style="padding:11px 12px; border:1px solid rgba(239,68,68,0.45); color:#F87171; background:rgba(239,68,68,0.1); border-radius:8px; cursor:pointer; font-weight:700;">
+                                ❌ Revoke
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Quick Days Preset Chips -->
+                    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; align-items:center;">
+                        <span style="font-size:11.5px; color:var(--text-muted);">Quick Days:</span>
+                        <button type="button" class="btn-secondary" onclick="document.getElementById('grantVipDaysInput').value=1" style="padding:4px 10px; font-size:11.5px;">1 Day</button>
+                        <button type="button" class="btn-secondary" onclick="document.getElementById('grantVipDaysInput').value=3" style="padding:4px 10px; font-size:11.5px; border-color:rgba(255,215,0,0.4); color:#FFD700;">3 Days</button>
+                        <button type="button" class="btn-secondary" onclick="document.getElementById('grantVipDaysInput').value=4" style="padding:4px 10px; font-size:11.5px; border-color:rgba(0,245,212,0.4); color:#00F5D4;">4 Days</button>
+                        <button type="button" class="btn-secondary" onclick="document.getElementById('grantVipDaysInput').value=7" style="padding:4px 10px; font-size:11.5px;">7 Days</button>
+                        <button type="button" class="btn-secondary" onclick="document.getElementById('grantVipDaysInput').value=15" style="padding:4px 10px; font-size:11.5px;">15 Days</button>
+                        <button type="button" class="btn-secondary" onclick="document.getElementById('grantVipDaysInput').value=30" style="padding:4px 10px; font-size:11.5px;">30 Days</button>
+                        <button type="button" class="btn-secondary" onclick="document.getElementById('grantVipDaysInput').value=365" style="padding:4px 10px; font-size:11.5px;">1 Year</button>
+                    </div>
+
+                    <div id="grantVipStatus" style="display:none; margin-top:12px; padding:10px 14px; border-radius:8px; font-size:13px; font-weight:600;"></div>
+                </div>
+
+                <!-- 👑 ACTIVE VIP DEVICES TABLE -->
+                <div class="card" style="margin-bottom:20px;">
+                    <div class="card-header">
+                        <div>
+                            <h2>👑 Active VIP Ad-Free Devices</h2>
+                            <div class="subtitle">বর্তমানে যাদের অ্যাকাউন্টে ফ্রি VIP চালু আছে (বাংলাদেশ সময় অনুযায়ী মেয়াদ)</div>
+                        </div>
+                    </div>
+                    <div class="table-container" style="margin-top:12px;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Referral Code</th>
+                                    <th>Device Model</th>
+                                    <th>Device ID</th>
+                                    <th>Remaining</th>
+                                    <th>Expires At (BD Time)</th>
+                                    <th>Quick Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="activeVipUsersTableBody">
+                                <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">Loading active VIP devices...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <div class="card">
                     <div class="card-header">
                         <div>
@@ -2683,33 +2762,119 @@
         // ── REFERRAL PROGRAM & VIP STATS ─────────────────────────────────
         async function loadReferralStats() {
             try {
-                const res = await fetch('/api/admin/referrals/stats');
+                const headers = (typeof token !== 'undefined' && token) ? { 'Authorization': `Bearer ${token}` } : {};
+                const res = await fetch('/api/admin/referrals/stats', { headers });
                 const data = await res.json();
                 if (data.code === 0) {
                     document.getElementById('refTotalUsers').textContent = data.total_users || 0;
                     document.getElementById('refTotalClaims').textContent = data.total_claims || 0;
                     document.getElementById('refActiveVip').textContent = data.active_premium_users || 0;
+
+                    const vipBody = document.getElementById('activeVipUsersTableBody');
+                    if (vipBody) {
+                        if (!data.vip_users || data.vip_users.length === 0) {
+                            vipBody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">No active VIP devices right now.</td></tr>';
+                        } else {
+                            vipBody.innerHTML = data.vip_users.map(v => `
+                                <tr>
+                                    <td><span class="badge-pill" style="color:#FFD700;border-color:rgba(255,215,0,0.4);font-family:monospace;font-size:12px;">${v.referral_code}</span></td>
+                                    <td style="font-size:12px;color:#E2E8F0;font-weight:600;">${v.device_model}</td>
+                                    <td style="font-size:11px;color:var(--text-muted);font-family:monospace;">${v.device_id}</td>
+                                    <td><span class="badge-pill" style="color:#00F5D4;border-color:rgba(0,245,212,0.35);font-weight:700;">⏳ ${v.days_left} Days Left</span></td>
+                                    <td style="font-size:12px;color:#A0AEC0;">${v.expires_at}</td>
+                                    <td style="display:flex; gap:6px; align-items:center;">
+                                        <button type="button" class="btn-secondary" onclick="quickActionVip('${v.referral_code}', 'grant', 3)" style="padding:4px 8px; font-size:11px; color:#00F5D4; border-color:rgba(0,245,212,0.35);">+3d</button>
+                                        <button type="button" class="btn-secondary" onclick="quickActionVip('${v.referral_code}', 'revoke', 0)" style="padding:4px 8px; font-size:11px; color:#F87171; border-color:rgba(239,68,68,0.35);">Revoke</button>
+                                    </td>
+                                </tr>
+                            `).join('');
+                        }
+                    }
                     
                     const tbody = document.getElementById('referralLogsTableBody');
                     if (!data.logs || data.logs.length === 0) {
                         tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">No referral events recorded yet.</td></tr>';
                         return;
                     }
-                    tbody.innerHTML = data.logs.map(log => `
+                    tbody.innerHTML = data.logs.map(log => {
+                        const isAdmin = log.referrer_code === 'ADMIN';
+                        return `
                         <tr>
                             <td style="font-size:12px;color:var(--text-muted);">${log.date}</td>
-                            <td><span class="badge-pill" style="color:#00F5D4;font-family:monospace;font-size:12px;">${log.referrer_code}</span></td>
+                            <td><span class="badge-pill" style="${isAdmin ? 'color:#FFD700;border-color:rgba(255,215,0,0.4);' : 'color:#00F5D4;'}font-family:monospace;font-size:12px;">${isAdmin ? '👑 ADMIN' : log.referrer_code}</span></td>
                             <td style="font-size:11px;color:var(--text-muted);font-family:monospace;">${log.referrer_device_id}</td>
                             <td><span class="badge-pill" style="color:#FFD700;font-family:monospace;font-size:12px;">${log.referee_code}</span></td>
                             <td style="font-size:11px;color:var(--text-muted);font-family:monospace;">${log.referee_device_id}</td>
                             <td style="color:#00F5D4;font-weight:bold;">+${log.reward_days} Days VIP</td>
-                            <td><span class="badge-pill" style="${log.referrer_active ? 'color:#FFD700;border-color:rgba(255,215,0,0.4);' : 'color:var(--text-muted);'}">${log.referrer_active ? '👑 Active' : 'Expired'}</span></td>
+                            <td><span class="badge-pill" style="${log.referrer_active ? 'color:#FFD700;border-color:rgba(255,215,0,0.4);' : 'color:var(--text-muted);'}">${isAdmin ? '👑 System' : (log.referrer_active ? '👑 Active' : 'Expired')}</span></td>
                             <td><span class="badge-pill" style="${log.referee_active ? 'color:#FFD700;border-color:rgba(255,215,0,0.4);' : 'color:var(--text-muted);'}">${log.referee_active ? '👑 Active' : 'Expired'}</span></td>
                         </tr>
-                    `).join('');
+                        `;
+                    }).join('');
                 }
             } catch (e) {
                 console.error('Error loading referral stats:', e);
+            }
+        }
+
+        function showGrantVipStatus(msg, isError = false) {
+            const box = document.getElementById('grantVipStatus');
+            if (!box) return;
+            box.style.display = 'block';
+            box.style.background = isError ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.12)';
+            box.style.border = isError ? '1px solid rgba(239,68,68,0.35)' : '1px solid rgba(16,185,129,0.35)';
+            box.style.color = isError ? '#FCA5A5' : '#6EE7B7';
+            box.textContent = msg;
+        }
+
+        async function submitGrantVip() {
+            const codeEl = document.getElementById('grantVipCodeInput');
+            const daysEl = document.getElementById('grantVipDaysInput');
+            const modeEl = document.getElementById('grantVipModeInput');
+            const code = (codeEl ? codeEl.value : '').trim().toUpperCase();
+            const days = parseInt(daysEl ? daysEl.value : '3', 10);
+            const mode = modeEl ? modeEl.value : 'add';
+
+            if (!code) {
+                showGrantVipStatus('দয়া করে ইউজারের Referral Code লিখুন।', true);
+                return;
+            }
+            if (!days || days < 1) {
+                showGrantVipStatus('কমপক্ষে 1 দিন সিলেক্ট করুন।', true);
+                return;
+            }
+            await quickActionVip(code, 'grant', days, mode);
+        }
+
+        async function submitRevokeVip() {
+            const codeEl = document.getElementById('grantVipCodeInput');
+            const code = (codeEl ? codeEl.value : '').trim().toUpperCase();
+            if (!code) {
+                showGrantVipStatus('Revoke করার জন্য Referral Code লিখুন।', true);
+                return;
+            }
+            if (!confirm(`আপনি কি নিশ্চিত ${code}-এর VIP বাতিল করতে চান?`)) return;
+            await quickActionVip(code, 'revoke', 0);
+        }
+
+        async function quickActionVip(referralCode, action = 'grant', days = 3, mode = 'add') {
+            try {
+                const headers = { 'Content-Type': 'application/json' };
+                if (typeof token !== 'undefined' && token) headers['Authorization'] = `Bearer ${token}`;
+                const res = await fetch('/api/admin/referrals/grant-vip', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ referral_code: referralCode, action, days, mode })
+                });
+                const data = await res.json();
+                if (data.code === 0) {
+                    showGrantVipStatus(data.message || 'VIP Updated!', false);
+                    loadReferralStats();
+                } else {
+                    showGrantVipStatus(data.error || data.detail || 'Failed to update VIP', true);
+                }
+            } catch (e) {
+                showGrantVipStatus('Network error: ' + e.message, true);
             }
         }
 

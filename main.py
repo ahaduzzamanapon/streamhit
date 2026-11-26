@@ -1712,6 +1712,85 @@ def claim_referral_code(referee_device_id: str, code_to_claim: str, referee_mode
         print(f"[ReferralClaim] Error: {e}")
         return {"code": 1, "error": str(e)}
 
+def grant_vip_by_referral_code(referral_code: str, days: int, mode: str = "add") -> dict:
+    init_referral_db()
+    code_clean = (referral_code or "").strip().upper()
+    if not code_clean:
+        return {"code": 1, "error": "Please enter a valid Referral Code."}
+    try:
+        days_int = int(days)
+    except Exception:
+        return {"code": 1, "error": "Days must be a valid number."}
+    if days_int < 1 or days_int > 3650:
+        return {"code": 1, "error": "Days must be between 1 and 3650."}
+
+    now = time.time()
+    reward_seconds = days_int * 86400
+    try:
+        with sqlite3.connect(_ACTIVE_DB_PATH, timeout=5) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM referral_users WHERE UPPER(referral_code) = ?", (code_clean,))
+            user = cur.fetchone()
+            if not user:
+                return {"code": 1, "error": f"Referral code '{code_clean}' পাওয়া যায়নি। ইউজার অন্তত একবার অ্যাপ ওপেন করে থাকলে তার কোড এখানে পাওয়া যাবে।"}
+
+            current_prem = float(user["premium_until"] or 0)
+            if mode == "set":
+                new_prem = now + reward_seconds
+            else:
+                base_time = current_prem if current_prem > now else now
+                new_prem = base_time + reward_seconds
+
+            conn.execute(
+                "UPDATE referral_users SET premium_until = ? WHERE device_id = ?",
+                (new_prem, user["device_id"])
+            )
+            conn.execute(
+                "INSERT INTO referral_logs (referrer_code, referrer_device_id, referee_code, referee_device_id, reward_days, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                ("ADMIN", "admin_manual_grant", user["referral_code"], user["device_id"], days_int, now)
+            )
+
+        days_left = max(0, int(math.ceil((new_prem - now) / 86400)))
+        expires_bd = format_bd_time(new_prem, "%d %b %Y, %I:%M %p")
+        dev_model = user["device_model"] or "Android Device"
+        return {
+            "code": 0,
+            "status": "ok",
+            "message": f"✅ {user['referral_code']} ({dev_model})-কে {days_int} দিনের Free VIP দেওয়া হয়েছে! মোট বাকি: {days_left} দিন (মেয়াদ: {expires_bd})",
+            "referral_code": user["referral_code"],
+            "device_model": dev_model,
+            "days_added": days_int,
+            "premium_days_left": days_left,
+            "expires_at": expires_bd
+        }
+    except Exception as e:
+        print(f"[AdminGrantVIP] Error: {e}")
+        return {"code": 1, "error": str(e)}
+
+def revoke_vip_by_referral_code(referral_code: str) -> dict:
+    init_referral_db()
+    code_clean = (referral_code or "").strip().upper()
+    if not code_clean:
+        return {"code": 1, "error": "Please enter a valid Referral Code."}
+    try:
+        with sqlite3.connect(_ACTIVE_DB_PATH, timeout=5) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM referral_users WHERE UPPER(referral_code) = ?", (code_clean,))
+            user = cur.fetchone()
+            if not user:
+                return {"code": 1, "error": f"Referral code '{code_clean}' not found."}
+            conn.execute("UPDATE referral_users SET premium_until = 0 WHERE device_id = ?", (user["device_id"],))
+        return {
+            "code": 0,
+            "status": "ok",
+            "message": f"🚫 {user['referral_code']} ({user['device_model'] or 'Device'})-এর VIP এক্সেস বাতিল করা হয়েছে।"
+        }
+    except Exception as e:
+        print(f"[AdminRevokeVIP] Error: {e}")
+        return {"code": 1, "error": str(e)}
+
 def get_referral_admin_stats() -> dict:
     init_referral_db()
     now = time.time()
@@ -1728,6 +1807,26 @@ def get_referral_admin_stats() -> dict:
             
             cur.execute("SELECT COUNT(*) as cnt FROM referral_users WHERE premium_until > ?", (now,))
             active_premium_users = cur.fetchone()["cnt"]
+
+            cur.execute("""
+                SELECT device_id, referral_code, device_model, premium_until, total_referrals, last_active
+                FROM referral_users
+                WHERE premium_until > ?
+                ORDER BY premium_until DESC
+                LIMIT 100
+            """, (now,))
+            vip_users = []
+            for v in cur.fetchall():
+                prem_until = float(v["premium_until"] or 0)
+                days_left = max(1, int(math.ceil((prem_until - now) / 86400)))
+                vip_users.append({
+                    "referral_code": v["referral_code"],
+                    "device_id": (v["device_id"][:12] + "...") if v["device_id"] else "",
+                    "device_model": v["device_model"] or "Android Device",
+                    "days_left": days_left,
+                    "expires_at": format_bd_time(prem_until, "%d %b, %I:%M %p"),
+                    "total_referrals": int(v["total_referrals"] or 0)
+                })
             
             cur.execute("""
                 SELECT l.id, l.referrer_code, l.referrer_device_id, l.referee_code, l.referee_device_id, l.reward_days, l.created_at,
@@ -1741,16 +1840,17 @@ def get_referral_admin_stats() -> dict:
             logs = []
             for r in cur.fetchall():
                 c_time = format_bd_time(r["created_at"], "%Y-%m-%d %I:%M:%S %p")
+                is_admin_grant = (r["referrer_code"] == "ADMIN")
                 logs.append({
                     "id": r["id"],
                     "date": c_time,
                     "created_at": r["created_at"],
                     "referrer_code": r["referrer_code"],
-                    "referrer_device_id": (r["referrer_device_id"][:12] + "...") if r["referrer_device_id"] else "",
+                    "referrer_device_id": "Admin Console" if is_admin_grant else ((r["referrer_device_id"][:12] + "...") if r["referrer_device_id"] else ""),
                     "referee_code": r["referee_code"],
                     "referee_device_id": (r["referee_device_id"][:12] + "...") if r["referee_device_id"] else "",
                     "reward_days": r["reward_days"],
-                    "referrer_active": (r["referrer_premium_until"] or 0) > now,
+                    "referrer_active": True if is_admin_grant else ((r["referrer_premium_until"] or 0) > now),
                     "referee_active": (r["referee_premium_until"] or 0) > now
                 })
             
@@ -1759,6 +1859,7 @@ def get_referral_admin_stats() -> dict:
                 "total_users": total_users,
                 "total_claims": total_claims,
                 "active_premium_users": active_premium_users,
+                "vip_users": vip_users,
                 "logs": logs
             }
     except Exception as e:

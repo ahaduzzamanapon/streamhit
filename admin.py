@@ -1036,6 +1036,20 @@ async def admin_referral_stats(request: Request):
     from main import get_referral_admin_stats
     return get_referral_admin_stats()
 
+@router.post("/api/admin/referrals/grant-vip")
+async def admin_grant_vip(request: Request):
+    check_admin_auth(request)
+    data = await request.json()
+    referral_code = str(data.get("referral_code") or "").strip()
+    action = str(data.get("action") or "grant").strip().lower()
+    if action == "revoke":
+        from main import revoke_vip_by_referral_code
+        return revoke_vip_by_referral_code(referral_code)
+    days = data.get("days", 3)
+    mode = str(data.get("mode") or "add").strip().lower()
+    from main import grant_vip_by_referral_code
+    return grant_vip_by_referral_code(referral_code, days, mode=mode)
+
 @router.get("/api/admin/popup")
 async def admin_get_popup(request: Request):
     check_admin_auth(request)
