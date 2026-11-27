@@ -1,7 +1,7 @@
 {
   "playlist_name": "All-in-One Live TV & Sports",
-  "total_channels": 365,
-  "last_updated": "12:47 PM 27-11-2026 BST",
+  "total_channels": 362,
+  "last_updated": "11:50 PM 27-11-2026 BST",
   "categories": [
     "Bangladesh",
     "Sports",
@@ -74,6 +74,16 @@
       "category": "Bangladesh",
       "logo": "https://i.imgur.com/lRpkGHj.png",
       "stream_url": "https://ekusheyserver.com/etvlivesn.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "JalshaMovies.in@SD",
+      "name": "Jalsha Movies (1080p)",
+      "category": "Bangladesh",
+      "logo": "https://i.imgur.com/25eWjX2.png",
+      "stream_url": "https://box.bbaria.net:8083/Jalsha_Movie/tracks-v1a1/mono.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -1179,16 +1189,6 @@
       }
     },
     {
-      "id": "Eurosport4Polska.pl@SD",
-      "name": "Eurosport 4 Polska (1080p)",
-      "category": "Sports",
-      "logo": "https://static.wikia.nocookie.net/logopedia/images/a/ae/Eurosport_4_2022.svg/revision/latest?cb=20220418053934",
-      "stream_url": "https://vuvuu-geil-m3u8.yaskar661.workers.dev/?url=https%3A%2F%2Fvavoo.to%2Fvavoo-iptv%2Fplay%2F2896573317d9d69e0e2d72",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
       "id": "Eurosport4KCzechia.cz@UHD",
       "name": "Eurosport 4K Czechia",
       "category": "Sports",
@@ -1744,6 +1744,16 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/vDB8HFq.png",
       "stream_url": "https://distribution.sportitalialive.it/origin/laziostyle_abr/playlist.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "MSports.pk@SD",
+      "name": "M Sports (1080p)",
+      "category": "Sports",
+      "logo": "https://msports.pk/wp-content/uploads/2026/02/m-sports-300.png",
+      "stream_url": "https://cdn.rabta.stream/M-Sports/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -2589,16 +2599,6 @@
       }
     },
     {
-      "id": "SetantaSportsPlusGeorgia.ge@SD",
-      "name": "Setanta Sports+ Georgia (1080p)",
-      "category": "Sports",
-      "logo": "https://i.imgur.com/ZtoZQUV.png",
-      "stream_url": "http://85.117.61.84/setanta2/index.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
       "id": "SkyRacing1.au@SD",
       "name": "Sky Racing 1 (720p)",
       "category": "Sports",
@@ -2674,16 +2674,6 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/9fLRHSg.png",
       "stream_url": "http://37.49.224.5/stream/52/index.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "SkySportF1.it@SD",
-      "name": "Sky Sport F1 (Italy)",
-      "category": "Sports",
-      "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Sky_Sport_F1_-_Logo_2020.svg/960px-Sky_Sport_F1_-_Logo_2020.svg.png",
-      "stream_url": "https://vuvuu-geil-m3u8.yaskar661.workers.dev/?url=https%3A%2F%2Fvavoo.to%2Fvavoo-iptv%2Fplay%2F22890389722acc4573933d",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -3064,16 +3054,6 @@
       "category": "Sports",
       "logo": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f4/TNT_Sports_Premium_%28Argentina%29.png/960px-TNT_Sports_Premium_%28Argentina%29.png?utm_source=es.wikipedia.org&utm_campaign=index&utm_content=thumbnail",
       "stream_url": "http://181.78.79.131:8000/play/a0q9",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "TNTSportsPremium.cl@HD",
-      "name": "TNT Sports Premium HD",
-      "category": "Sports",
-      "logo": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f4/TNT_Sports_Premium_%28Argentina%29.png/960px-TNT_Sports_Premium_%28Argentina%29.png?utm_source=es.wikipedia.org&utm_campaign=index&utm_content=thumbnail",
-      "stream_url": "https://play-fulltv.com.ar/playtvpre/tntsportschile.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -3504,16 +3484,6 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/V562tpO.png",
       "stream_url": "https://dc1644a9jazgj.cloudfront.net/beIN_Sports_Xtra_Espanol.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
-      "id": "beINSports1Turk.tr@SD",
-      "name": "beIN Sports 1 Turk (1080p)",
-      "category": "Sports",
-      "logo": "https://static.wikia.nocookie.net/logopedia/images/2/27/BeinSports1.svg/revision/latest?cb=20230910184457",
-      "stream_url": "https://vuvuu-geil-m3u8.yaskar661.workers.dev/?url=https%3A%2F%2Fvavoo.to%2Fvavoo-iptv%2Fplay%2F300113394ceebba66c8ad",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
