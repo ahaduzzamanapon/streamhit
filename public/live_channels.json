@@ -1,7 +1,7 @@
 {
   "playlist_name": "All-in-One Live TV & Sports",
-  "total_channels": 362,
-  "last_updated": "11:50 PM 27-11-2026 BST",
+  "total_channels": 377,
+  "last_updated": "07:06 AM 28-11-2026 BST",
   "categories": [
     "Bangladesh",
     "Sports",
@@ -479,16 +479,6 @@
       }
     },
     {
-      "id": "BahrainSports2.bh@SD",
-      "name": "Bahrain Sports 2 (720p) [Not 24/7]",
-      "category": "Sports",
-      "logo": "https://i.imgur.com/ZkuZmIo.png",
-      "stream_url": "https://5c7b683162943.streamlock.net/live/ngrp:bahrainsportstwo_all/playlist.m3u8",
-      "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    },
-    {
       "id": "Belarus5.by@SD",
       "name": "Belarus-5 (1080p) [Not 24/7]",
       "category": "Sports",
@@ -789,6 +779,16 @@
       }
     },
     {
+      "id": "DAZNF1.uk@Spain",
+      "name": "DAZN F1 (1080p)",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/yFCr5XX.png",
+      "stream_url": "http://45.134.141.161:2200/ARG/Formula_1_HD/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "DAZNHeldinnenxPlutoTV.de@DACH",
       "name": "DAZN Heldinnen x Pluto TV",
       "category": "Sports",
@@ -894,6 +894,16 @@
       "category": "Sports",
       "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/ESPN_4_logo.svg/960px-ESPN_4_logo.svg.png",
       "stream_url": "http://181.78.197.59:8000/play/a07n/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "ESPN5LatinAmerica.us@South",
+      "name": "ESPN 5 Latin America (1080p)",
+      "category": "Sports",
+      "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/ESPN_5_logo.svg/960px-ESPN_5_logo.svg.png",
+      "stream_url": "http://181.78.12.119:16123/play/ch19/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -1189,6 +1199,26 @@
       }
     },
     {
+      "id": "Eurosport3Polska.pl@SD",
+      "name": "Eurosport 3 Polska (1080p)",
+      "category": "Sports",
+      "logo": "https://static.wikia.nocookie.net/logopedia/images/d/da/Eurosport_3_2022.svg/revision/latest?cb=20220418054130",
+      "stream_url": "https://vuvuu-geil-m3u8.yaskar661.workers.dev/?url=https%3A%2F%2Fvavoo.to%2Fvavoo-iptv%2Fplay%2F5121596371c5191ed9b35",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "Eurosport4Polska.pl@SD",
+      "name": "Eurosport 4 Polska (1080p)",
+      "category": "Sports",
+      "logo": "https://static.wikia.nocookie.net/logopedia/images/a/ae/Eurosport_4_2022.svg/revision/latest?cb=20220418053934",
+      "stream_url": "https://vuvuu-geil-m3u8.yaskar661.workers.dev/?url=https%3A%2F%2Fvavoo.to%2Fvavoo-iptv%2Fplay%2F2896573317d9d69e0e2d72",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "Eurosport4KCzechia.cz@UHD",
       "name": "Eurosport 4K Czechia",
       "category": "Sports",
@@ -1404,6 +1434,16 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/f8BkLql.png",
       "stream_url": "http://45.228.234.9:8000/play/a06o/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "FastSports1.am@SD",
+      "name": "Fast Sports 1 (1080p)",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/VmaYUcq.png",
+      "stream_url": "http://s7.merlive.am/Fastsports/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -2329,6 +2369,26 @@
       }
     },
     {
+      "id": "PolsatSportPremium1.pl@SD",
+      "name": "Polsat Sport Premium 1",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/hy1SKE0.png",
+      "stream_url": "http://46.149.222.219:18002/polsatsportpremium1",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "PolsatSportPremium2.pl@SD",
+      "name": "Polsat Sport Premium 2",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/myyWeXY.png",
+      "stream_url": "http://46.149.222.219:18002/polsatsportpremium2",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "PremierSports.ph@SD",
       "name": "Premier Sports (1080p)",
       "category": "Sports",
@@ -2349,6 +2409,16 @@
       }
     },
     {
+      "id": "PrimaPPV3.ro@SD",
+      "name": "Prima PPV 3 (576p)",
+      "category": "Sports",
+      "logo": "https://www.primaplay.ro/uploads/thumb/publisher/99e3b9471f4939aaa6acc29c2df971dc.png",
+      "stream_url": "https://rundle.tv/proxy5.php?src=https://pulse1.sanseny001.shop/puki2/usergendxpk2s6utg0l.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "PrimaSport1.ro@SD",
       "name": "Prima Sport 1 (576p)",
       "category": "Sports",
@@ -2364,6 +2434,16 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/hROcepe.png",
       "stream_url": "http://91.235.165.117:8001/play/a07y/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "PrimaSport2.ro@HD",
+      "name": "Prima Sport 2 HD",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/hROcepe.png",
+      "stream_url": "https://rundle.tv/proxy5.php?src=https%3A%2F%2Firon1.xn--x2rw19a.space%2Fpuk2%2Fusergenrnd0clv03fyt-got.htm",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -2394,6 +2474,26 @@
       "category": "Sports",
       "logo": "https://static.wikia.nocookie.net/logopedia/images/6/69/Prima_Sport_%28Czech_Republic%29.svg/revision/latest?cb=20260728085614",
       "stream_url": "http://rpprod.hbbtv.cdn.cra.cz:8080/hbbTV/prima_sport/live_mq?offsetSeconds=0",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "PrimaSportPPV1.ro@SD",
+      "name": "Prima Sport PPV 1",
+      "category": "Sports",
+      "logo": "https://www.primaplay.ro/uploads/thumb/publisher/b05ce5d64523401d0fc3225c5b629019.png",
+      "stream_url": "https://rundle.tv/proxy5.php?src=https%3A%2F%2Fpulse1.sanseny001.shop%2Fpuki1%2Fusergendx6kal0r2bsm-got.htm",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "PrimaSportPPV2.ro@SD",
+      "name": "Prima Sport PPV 2",
+      "category": "Sports",
+      "logo": "https://www.primaplay.ro/uploads/thumb/publisher/a8c4cd410038eab9d207fd2f15d4d1ce.png",
+      "stream_url": "https://rundle.tv/proxy5.php?src=https%3A%2F%2Fpulse1.sanseny001.shop%2Fpuki2%2Fusergendxpk2s6utg0l-got.htm",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -2599,6 +2699,16 @@
       }
     },
     {
+      "id": "SetantaSportsPlusGeorgia.ge@SD",
+      "name": "Setanta Sports+ Georgia (1080p)",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/ZtoZQUV.png",
+      "stream_url": "http://85.117.61.84/setanta2/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "SkyRacing1.au@SD",
       "name": "Sky Racing 1 (720p)",
       "category": "Sports",
@@ -2674,6 +2784,16 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/9fLRHSg.png",
       "stream_url": "http://37.49.224.5/stream/52/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "SkySportF1.it@SD",
+      "name": "Sky Sport F1 (Italy)",
+      "category": "Sports",
+      "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Sky_Sport_F1_-_Logo_2020.svg/960px-Sky_Sport_F1_-_Logo_2020.svg.png",
+      "stream_url": "https://vuvuu-geil-m3u8.yaskar661.workers.dev/?url=https%3A%2F%2Fvavoo.to%2Fvavoo-iptv%2Fplay%2F22890389722acc4573933d",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -3089,6 +3209,16 @@
       }
     },
     {
+      "id": "TVPSport.pl@SD",
+      "name": "TVP Sport (720p)",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/JUZDOCO.png",
+      "stream_url": "http://91.226.96.110:5555/tvpsport/index.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "TVRSport.ro@SD",
       "name": "TVR Sport (1440p)",
       "category": "Sports",
@@ -3379,6 +3509,16 @@
       }
     },
     {
+      "id": "WAPATV42.pr@HD",
+      "name": "WAPA-TV 4.2 (720p) [Not 24/7]",
+      "category": "Sports",
+      "logo": "https://i.imgur.com/5WNBFmp.png",
+      "stream_url": "https://wapa.hostless.app/WAPA-TV-4-2.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
       "id": "WillowSports.us@SD",
       "name": "Willow Sports (1080p)",
       "category": "Sports",
@@ -3403,7 +3543,7 @@
       "name": "Win+ Futbol (1080p)",
       "category": "Sports",
       "logo": "https://i.imgur.com/0UN87vB.png",
-      "stream_url": "http://181.78.12.119:16123/play/ch19/index.m3u8",
+      "stream_url": "http://190.61.42.218:9000/play/a01s/index.m3u8",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
@@ -3484,6 +3624,16 @@
       "category": "Sports",
       "logo": "https://i.imgur.com/V562tpO.png",
       "stream_url": "https://dc1644a9jazgj.cloudfront.net/beIN_Sports_Xtra_Espanol.m3u8",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "id": "beINSports1Turk.tr@SD",
+      "name": "beIN Sports 1 Turk (1080p)",
+      "category": "Sports",
+      "logo": "https://static.wikia.nocookie.net/logopedia/images/2/27/BeinSports1.svg/revision/latest?cb=20230910184457",
+      "stream_url": "https://vuvuu-geil-m3u8.yaskar661.workers.dev/?url=https%3A%2F%2Fvavoo.to%2Fvavoo-iptv%2Fplay%2F300113394ceebba66c8ad",
       "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
       }
